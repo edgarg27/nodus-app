@@ -1,0 +1,5192 @@
+:root {
+  --navy: #071c4b;
+  --orange: #ff915c;
+  --bg: #f4f6fb;
+  --text-soft: #6b7897;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--navy);
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(7, 28, 75, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-card h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.login-card p.subtitle {
+  margin: 0 0 12px;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.login-card label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.login-card input {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #dde3ef;
+  font-size: 15px;
+}
+
+/* Envoltorio con ícono para los campos de correo/contraseña — el input
+   de adentro pierde su propio borde porque el borde ya lo pone este
+   contenedor. */
+.login-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #dde3ef;
+  border-radius: 8px;
+  padding: 0 12px;
+  transition: border-color 0.15s ease;
+}
+
+.login-input-wrap:focus-within {
+  border-color: var(--orange);
+}
+
+.login-input-wrap input {
+  border: none !important;
+  padding: 10px 0 !important;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.login-input-wrap input:focus {
+  outline: none;
+}
+
+.login-input-icon {
+  display: flex;
+  align-items: center;
+  color: #9aa4b8;
+  flex-shrink: 0;
+}
+
+/* Selector reforzado (.login-input-wrap .login-eye-btn en vez de solo
+   .login-eye-btn) porque la regla ".login-card button" de más abajo es
+   más específica que una sola clase y si no, le ganaba el estilo — por
+   eso el botón del ojito se veía enorme, naranja y desalineado. */
+.login-input-wrap .login-eye-btn {
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 0;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aa4b8;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.login-input-wrap .login-eye-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.login-input-wrap .login-eye-btn:hover {
+  color: var(--navy);
+  background: rgba(7, 28, 75, 0.06);
+}
+
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -2px;
+}
+
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.login-remember input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.login-forgot-link {
+  font-size: 13px;
+  color: var(--orange);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.login-forgot-link:hover {
+  text-decoration: underline;
+}
+
+.login-card button {
+  margin-top: 8px;
+  background: var(--orange);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-card .error {
+  color: #c0392b;
+  font-size: 13px;
+  min-height: 16px;
+  margin: 0;
+}
+
+.dashboard-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  padding: 24px;
+}
+
+.dashboard-wrap h1 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.dashboard-wrap p {
+  color: var(--text-soft);
+  margin: 0 0 16px;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid #dde3ef;
+  color: var(--navy);
+  border-radius: 8px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ---------- Panel Admin (mismo diseño que la app) ---------- */
+.panel {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.panel-header {
+  background: #0d1b3e;
+  padding: 24px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header-title {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.panel-header-sub {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+
+.panel-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 19px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.panel-tabs {
+  display: flex;
+  gap: 8px;
+  background: #fff;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.panel-tab.active {
+  background: #0d1b3e;
+  color: #fff;
+}
+
+.panel-content {
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.panel-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #eee;
+  cursor: pointer;
+  text-align: left;
+}
+
+.stat-val {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.stat-lbl {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0 0;
+}
+
+.stat-delta {
+  font-size: 11px;
+  color: #0f6e56;
+  margin: 6px 0 0;
+}
+
+.search-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+.cliente-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cliente-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.cliente-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #0d1b3e;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cliente-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cliente-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.cliente-email {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.cliente-centro {
+  font-size: 11px;
+  color: #f07e3a;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+
+.empty-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: #888;
+  font-size: 14px;
+}
+
+/* Modal detalle cliente */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background: #f07e3a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-nombre {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.modal-email {
+  font-size: 13px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.modal-cerrar {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.modal-seccion {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 8px 0 4px;
+}
+
+.modal-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.modal-label {
+  color: #888;
+}
+
+.modal-val {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.resumen-pagos {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.resumen-pago-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid #f0f0f0;
+  border-left: 3px solid;
+}
+
+.resumen-pago-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.resumen-pago-lbl {
+  font-size: 10px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.factura-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.factura-folio {
+  font-size: 11px;
+  color: #0d1b3e;
+  font-weight: 700;
+  margin: 0;
+}
+
+.factura-concepto {
+  font-size: 12px;
+  color: #555;
+  margin: 2px 0 0;
+}
+
+.factura-fecha {
+  font-size: 11px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.factura-monto {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: right;
+  margin: 0;
+}
+
+.factura-badge {
+  padding: 2px 6px;
+  border-radius: 20px;
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.factura-badge-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ---------- Dashboard cliente (igual a dashboard-cliente.tsx de la app) ---------- */
+.cli-container {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.cli-header {
+  background: #0d1b3e;
+  padding: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cli-header-bienvenido {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 0;
+}
+
+.cli-header-nombre {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 2px 0 0;
+}
+
+.cli-header-oficina {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+
+.cli-header-numero {
+  color: #f07e3a;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 2px 0 0;
+}
+
+.cli-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #f07e3a;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cli-content {
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Carrusel de banners promocionales (arriba del dashboard de cliente) */
+.cli-carrusel {
+  position: relative;
+}
+
+.cli-carrusel-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  border-radius: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.cli-carrusel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.cli-carrusel-slide {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+}
+
+.cli-carrusel-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2.65 / 1;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.cli-carrusel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cli-carrusel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(13, 27, 62, 0.2);
+  transition: width 0.2s, background 0.2s;
+}
+
+.cli-carrusel-dot.active {
+  width: 16px;
+  border-radius: 4px;
+  background: #f07e3a;
+}
+
+.cli-estado-card {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cli-estado-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 0;
+}
+
+.cli-estado-monto {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.cli-estado-fecha {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.cli-pagar-btn {
+  background: #f07e3a;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* ---- Botón "Pagar" animado (iconos rotando + check al hacer clic) ---- */
+.pay-btn {
+  position: relative;
+  padding: 12px 22px;
+  font-size: 14px;
+  background: #f07e3a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.pay-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(13, 27, 62, 0.35);
+}
+
+.icon-container {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.icon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  color: #0d1b3e;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.default-icon {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Animaciones al pasar el mouse */
+.pay-btn:hover .icon {
+  animation: none;
+}
+
+.pay-btn:hover .wallet-icon {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.pay-btn:hover .card-icon {
+  animation: iconRotate 2.5s infinite;
+  animation-delay: 0s;
+}
+
+.pay-btn:hover .payment-icon {
+  animation: iconRotate 2.5s infinite;
+  animation-delay: 0.5s;
+}
+
+.pay-btn:hover .dollar-icon {
+  animation: iconRotate 2.5s infinite;
+  animation-delay: 1s;
+}
+
+.pay-btn:hover .check-icon {
+  animation: iconRotate 2.5s infinite;
+  animation-delay: 1.5s;
+}
+
+/* Estado al hacer clic: solo se ve el check */
+.pay-btn:active .icon {
+  animation: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.pay-btn:active .check-icon {
+  animation: checkmarkAppear 0.6s ease forwards;
+  visibility: visible;
+  color: #fff;
+}
+
+.btn-text {
+  font-weight: 700;
+  font-family: system-ui, -apple-system, sans-serif;
+  white-space: nowrap;
+}
+
+@keyframes iconRotate {
+  0% {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px) scale(0.5);
+  }
+  5% {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+  20% {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.5);
+  }
+}
+
+@keyframes checkmarkAppear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-45deg);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2) rotate(0deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.cli-al-corriente {
+  background: #e1f5ee;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+}
+
+.cli-al-corriente-icon {
+  font-size: 36px;
+  margin: 0;
+}
+
+.cli-al-corriente-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f6e56;
+  margin: 8px 0 0;
+}
+
+.cli-al-corriente-sub {
+  font-size: 13px;
+  color: #0f6e56;
+  margin: 2px 0 0;
+}
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.quick-card {
+  background: #fff;
+  border: none;
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: center;
+  position: relative;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.quick-card:hover {
+  transform: scale(0.97);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.quick-card:active {
+  transform: scale(0.9);
+}
+
+.quick-card.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.quick-card.disabled:hover,
+.quick-card.disabled:active {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.quick-icon {
+  font-size: 28px;
+  display: inline-block;
+  transition: transform 0.4s ease;
+}
+
+.quick-card:hover .quick-icon {
+  transform: scale(1.12);
+}
+
+.quick-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.quick-soon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 9px;
+  color: #f07e3a;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.servicio-card {
+  background: #fff;
+  border: none;
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  position: relative;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.servicio-card:hover {
+  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.servicio-card:active {
+  transform: scale(0.94);
+}
+
+.servicio-card.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.servicio-card.disabled:hover,
+.servicio-card.disabled:active {
+  transform: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.servicio-icono {
+  width: 44px;
+  height: 44px;
+  background: #fff3e8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  transition: transform 0.4s ease;
+}
+
+.servicio-card:hover .servicio-icono {
+  transform: scale(1.12);
+}
+
+/* ---------- Tarjeta "Mi extensión" ---------- */
+.ext-card-simple {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #eee;
+}
+
+/* Tarjeta que gira para mostrar el DID atrás — basada en el flip-card
+   de Uiverse.io (joe-watson-sbf), adaptada al ancho completo de la
+   tarjeta en vez del cuadro fijo del original. En escritorio gira con
+   :hover; en celular (que no tiene hover) gira al tocarla gracias a la
+   clase "volteada" que agrega el click. */
+.ext-flip-card {
+  perspective: 1000px;
+  height: 84px;
+  cursor: pointer;
+}
+
+.ext-flip-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.7s;
+  transform-style: preserve-3d;
+}
+
+.ext-flip-card:hover .ext-flip-card-inner,
+.ext-flip-card-inner.volteada {
+  transform: rotateY(180deg);
+}
+
+.ext-flip-card-front,
+.ext-flip-card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  border: 1px solid #eee;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.ext-flip-card-front {
+  background: #fff;
+}
+
+.ext-flip-card-back {
+  background: linear-gradient(120deg, #f07e3a 0%, #ff9a5c 100%);
+  color: #fff;
+  border-color: #f07e3a;
+  transform: rotateY(180deg);
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.servicio-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.servicio-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.servicio-desc {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.servicio-arrow {
+  font-size: 22px;
+  color: #ccc;
+}
+
+/* Modal perfil cliente */
+.cli-modal-datos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cli-modal-logout {
+  background: #f5f5f5;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  text-align: center;
+  color: #888;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+/* ---------- Reportes ---------- */
+.rep-header {
+  background: #0d1b3e;
+  padding: 24px 28px;
+}
+
+.rep-back {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.rep-title {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.rep-sub {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.rep-content {
+  padding: 20px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.rep-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 8px 0 0;
+}
+
+.rep-ocupacion-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rep-ocupacion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rep-ocupacion-centro {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.rep-ocupacion-porcentaje {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0d1b3e;
+}
+
+.rep-progress-bar {
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rep-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.rep-ocupacion-detalle {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}
+
+.rep-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rep-cliente-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.rep-cliente-centro {
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+}
+
+.rep-cliente-count-badge {
+  background: #0d1b3e;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rep-stats-row {
+  display: flex;
+  gap: 8px;
+}
+
+.rep-stat-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  border-left: 3px solid;
+}
+
+.rep-stat-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.rep-stat-lbl {
+  font-size: 10px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.rep-barra-horizontal {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.rep-barra-segmento {
+  height: 100%;
+}
+
+/* ---------- Mapa de Oficinas: cuadrícula de disponibilidad ---------- */
+.oficinas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.oficina-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+
+.oficina-box:hover {
+  border-color: #ccc;
+}
+
+.oficina-box-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: block;
+}
+
+.oficina-box-numero {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.oficina-box-tipo {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ---------- Módulos (panel admin) ---------- */
+.modulos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.modulo-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #eee;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.modulo-card.disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.modulo-icon {
+  font-size: 32px;
+}
+
+.modulo-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+/* ---------- Subpáginas de cliente (estado de cuenta, contrato, soporte, reservaciones) ---------- */
+.sub-content {
+  padding: 20px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Estado de cuenta */
+.resumen-principal {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.resumen-principal-item {
+  flex: 1;
+  text-align: center;
+}
+
+.resumen-principal-monto {
+  color: #f07e3a;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.resumen-principal-monto.verde {
+  color: #0f6e56;
+}
+
+.resumen-principal-lbl {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.resumen-principal-divider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.contadores-row {
+  display: flex;
+  gap: 8px;
+}
+
+.contador-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px;
+  border-left: 3px solid;
+}
+
+.contador-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.contador-lbl {
+  font-size: 10px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.sec-label-red {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a32d2d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 8px 0 0;
+}
+
+.factura-card-full {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-left: 3px solid #f07e3a;
+}
+
+.factura-card-full.vencida {
+  border-left-color: #a32d2d;
+  background: #fffbfb;
+}
+
+.factura-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.factura-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ver-pdf-btn {
+  display: inline-block;
+  background: #e6f1fb;
+  color: #185fa5;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px;
+  border-radius: 8px;
+  margin-top: 6px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pagar-btn-full {
+  background: #0d1b3e;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+}
+
+.pagar-btn-full.vencida {
+  background: #a32d2d;
+}
+
+.historial-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-left: 3px solid #0f6e56;
+}
+
+/* Contrato */
+.contrato-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.contrato-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.contrato-row:last-child {
+  border-bottom: none;
+}
+
+.tiempo-card {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.tiempo-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 0;
+}
+
+.tiempo-val {
+  color: #f07e3a;
+  font-size: 36px;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+.tiempo-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.tiempo-progress-fill {
+  height: 100%;
+  background: #f07e3a;
+  border-radius: 4px;
+}
+
+.tiempo-sub {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.doc-icono {
+  width: 44px;
+  height: 44px;
+  background: #fff3e8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.doc-info {
+  flex: 1;
+}
+
+.doc-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.doc-fecha {
+  font-size: 11px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.doc-fecha-pendiente {
+  font-size: 11px;
+  color: #854f0b;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+
+.doc-download-btn {
+  width: 36px;
+  height: 36px;
+  background: #f07e3a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Soporte */
+.categorias-row {
+  display: flex;
+  gap: 10px;
+}
+
+.categoria-card {
+  flex: 1;
+  background: #fff;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.4s ease;
+}
+
+.categoria-card:hover {
+  transform: scale(0.97);
+}
+
+.categoria-card:active {
+  transform: scale(0.9);
+}
+
+.categoria-card.active {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+}
+
+.categoria-icono {
+  width: 28px;
+  height: 28px;
+  font-size: 28px;
+  display: inline-block;
+  transition: transform 0.4s ease;
+}
+
+.categoria-card:hover .categoria-icono {
+  transform: scale(1.05);
+}
+
+/* Íconos de solo líneas negras (ej. queja.png) se pierden sobre el
+   fondo navy de la tarjeta seleccionada — se vuelven blancos ahí. */
+.categoria-card.active .categoria-icono-mono {
+  filter: brightness(0) invert(1);
+}
+
+.categoria-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.categoria-card.active .categoria-nombre {
+  color: #fff;
+}
+
+.categoria-desc {
+  font-size: 10px;
+  color: #888;
+}
+
+.categoria-card.active .categoria-desc {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.form-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-card input[type="text"],
+.form-card input[type="email"],
+.form-card input[type="tel"],
+.form-card input[type="date"],
+.form-card input[type="time"],
+.form-card textarea,
+.form-card input[type="file"],
+.form-card select {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-card textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.sub-label {
+  font-size: 13px;
+  color: #555;
+  font-weight: 500;
+  margin: 0;
+}
+
+.btn-enviar {
+  background: #f07e3a;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+
+.btn-enviar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-enviar.sending:disabled {
+  opacity: 1;
+}
+
+.btn-enviar:active {
+  transform: scale(0.95);
+}
+
+/* Avioncito que aparece al hacer click (mientras se envía el reporte,
+   className "sending" cuando loading/guardandoReporte es true) y se
+   queda flotando suavemente en el centro del botón — el wrapper solo
+   se encarga de aparecer/desaparecer (fade + scale) y el ícono adentro
+   es el que flota, para que las dos cosas no se pisen. */
+.btn-enviar-icon-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.btn-enviar-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  transform-origin: center center;
+}
+
+.btn-enviar-text {
+  display: block;
+  transition: opacity 0.25s ease;
+}
+
+.btn-enviar.sending .btn-enviar-text,
+.btn-enviar.sent .btn-enviar-text {
+  opacity: 0;
+}
+
+.btn-enviar.sending .btn-enviar-icon-wrapper {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.btn-enviar.sending .btn-enviar-icon {
+  animation: btn-enviar-float 1s ease-in-out infinite;
+}
+
+/* "Enviado" con palomita que aparece un momento después de que el
+   reporte se envió con éxito (className "sent"). */
+.btn-enviar-check-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.6);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.btn-enviar-check {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.btn-enviar.sent .btn-enviar-check-wrapper {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: btn-enviar-pop 0.35s ease;
+}
+
+@keyframes btn-enviar-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  60% {
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes btn-enviar-float {
+  0%,
+  100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+/* Zona de carga de archivos (soporte / mantenimiento) */
+.dropzone {
+  border: 1.5px dashed #ddd;
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dropzone:hover {
+  border-color: #f0b98a;
+  background: #fff8f2;
+}
+
+.dropzone.drag-active {
+  border-color: #f07e3a;
+  background: #fff3e8;
+}
+
+.dropzone-icon {
+  color: #f07e3a;
+  margin-bottom: 2px;
+}
+
+.dropzone-text {
+  font-size: 13px;
+  color: #555;
+  margin: 0;
+}
+
+.dropzone-text span {
+  font-weight: 600;
+  color: #0d1b3e;
+}
+
+.dropzone-sub {
+  font-size: 11px;
+  color: #999;
+  margin: 0;
+}
+
+.dropzone-input {
+  display: none;
+}
+
+.dropzone-aviso {
+  font-size: 12px;
+  color: #a32d2d;
+  margin: 6px 0 0;
+}
+
+.dropzone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dropzone-item {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #eee;
+  background: #fff;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropzone-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dropzone-item-file {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+}
+
+.dropzone-item-file-icon {
+  font-size: 20px;
+}
+
+.dropzone-item-file-name {
+  font-size: 9px;
+  color: #666;
+  word-break: break-all;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.dropzone-item-size {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 5px;
+  border-radius: 6px;
+  margin: 0;
+}
+
+.dropzone-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropzone-remove:hover {
+  background: #a32d2d;
+}
+
+.dropzone-add-tile {
+  aspect-ratio: 1 / 1;
+  border: 1.5px dashed #ddd;
+  border-radius: 10px;
+  background: #fafafa;
+  color: #999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.dropzone-add-tile:hover {
+  border-color: #f07e3a;
+  color: #f07e3a;
+}
+
+/* Galería de fotos en el ticket (vista de staff, cuando hay más de una) */
+.ticket-admin-foto-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ticket-admin-foto-mini {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  cursor: pointer;
+  display: block;
+}
+
+.lightbox-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.lightbox-nav-prev {
+  left: 16px;
+}
+
+.lightbox-nav-next {
+  right: 16px;
+}
+
+.ticket-comentario {
+  background: #f7f9fc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ticket-comentario-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.ticket-comentario-msg {
+  font-size: 13px;
+  color: #333;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ticket-comentar-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  cursor: pointer;
+}
+
+.ticket-comentar-btn:hover {
+  background: #f5f5f5;
+}
+
+.modal-textarea {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 90px;
+  resize: vertical;
+  background: #fafafa;
+  color: #1a1a1a;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+.ticket-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.ticket-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ticket-icono {
+  width: 40px;
+  height: 40px;
+  background: #fff3e8;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.ticket-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-folio {
+  font-size: 11px;
+  color: #0d1b3e;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ticket-asunto {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 1px 0 0;
+}
+
+.ticket-categoria {
+  font-size: 11px;
+  color: #888;
+  margin: 1px 0 0;
+}
+
+.estado-badge {
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #333;
+  flex-shrink: 0;
+}
+
+/* Reservaciones */
+.espacio-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.espacio-card.active {
+  border-color: #0d1b3e;
+  background: #f0f3ff;
+}
+
+.fechas-scroll,
+.horas-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.fecha-btn {
+  background: #fff;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  min-width: 64px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fecha-btn.active {
+  background: #0d1b3e;
+}
+
+.fecha-dia {
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+  margin: 0;
+}
+
+.fecha-btn.active .fecha-dia,
+.fecha-btn.active .fecha-num {
+  color: #fff;
+}
+
+.fecha-num {
+  font-size: 13px;
+  color: #1a1a1a;
+  font-weight: 700;
+  margin: 2px 0 0;
+}
+
+.hora-btn {
+  background: #fff;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 80px;
+  text-align: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hora-btn.active {
+  background: #f07e3a;
+  border-color: #f07e3a;
+}
+
+.hora-btn.active span {
+  color: #fff;
+}
+
+.hora-btn.disabled {
+  background: #f0f0f0;
+  border-color: #e0e0e0;
+  cursor: default;
+}
+
+.hora-btn span {
+  font-size: 13px;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.hora-btn.disabled span {
+  color: #bbb;
+}
+
+.ocupada-label {
+  display: block;
+  font-size: 9px;
+  color: #a32d2d;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+.ocupadas-card {
+  background: #fcebeb;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.ocupadas-title {
+  font-size: 12px;
+  color: #a32d2d;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.ocupadas-item {
+  font-size: 12px;
+  color: #a32d2d;
+  margin: 0;
+}
+
+.resumen-reserva-card {
+  background: #0d1b3e;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resumen-reserva-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.resumen-reserva-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.resumen-reserva-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.resumen-reserva-val {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nota-info {
+  background: rgba(240, 126, 58, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+  color: #f07e3a;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reservar-btn {
+  background: #f07e3a;
+  color: #fff;
+  border: none;
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.reservar-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Mis reservaciones */
+.reservacion-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reservacion-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reservacion-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.reservacion-espacio {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.reservacion-detalle {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.reservacion-centro {
+  font-size: 11px;
+  color: #0d1b3e;
+  font-weight: 500;
+  margin: 2px 0 0;
+}
+
+.cancelar-btn {
+  background: #f5f5f5;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  color: #a32d2d;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---------- Telefonía ---------- */
+.tel-centro-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tel-centro-header {
+  background: #0d1b3e;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.tel-centro-nombre {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.tel-centro-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.tel-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tel-tabla th {
+  text-align: left;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.tel-tabla td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid #f5f5f5;
+  color: #1a1a1a;
+}
+
+.tel-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.tel-ext-badge {
+  font-family: monospace;
+  font-weight: 700;
+  color: #0d1b3e;
+  background: #f0f3ff;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.tel-tipo-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.tel-inactivo {
+  opacity: 0.5;
+}
+
+.tel-borrar-btn {
+  background: transparent;
+  border: none;
+  color: #a32d2d;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tel-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.tel-form-grid input,
+.tel-form-grid select {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+  width: 100%;
+}
+
+/* ---------- Tickets (admin) ---------- */
+.tickets-filtros {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filtro-chip {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+}
+
+.filtro-chip.active {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+.ticket-admin-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-nuevo {
+  background: #FFF8E8;
+  border: 1.5px solid #F5B942;
+  box-shadow: 0 2px 8px rgba(245, 185, 66, 0.18);
+}
+
+.ticket-nuevo-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #8A6D00;
+  background: #FEF2C7;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+  animation: ticketNuevoPulso 1.6s ease-in-out infinite;
+}
+
+@keyframes ticketNuevoPulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.ticket-admin-foto {
+  width: 100%;
+  max-width: 220px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: block;
+}
+
+.ticket-admin-select {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+}
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+  cursor: zoom-out;
+}
+
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+
+/* ---------- Banner "en proceso" (persistente) ---------- */
+.ticket-en-proceso-banner {
+  background: #fff3e8;
+  border: 1px solid #f5c99a;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ticket-en-proceso-icon {
+  font-size: 24px;
+}
+
+.ticket-en-proceso-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #854f0b;
+  margin: 0;
+}
+
+.ticket-en-proceso-sub {
+  font-size: 12px;
+  color: #a3701f;
+  margin: 2px 0 0;
+}
+
+/* ---------- Celebración "ticket resuelto" ---------- */
+.celebracion-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 28px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  z-index: 2;
+  animation: celebracion-pop 0.4s ease;
+}
+
+@keyframes celebracion-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.celebracion-icon {
+  font-size: 52px;
+  margin: 0 0 4px;
+  animation: celebracion-bounce 0.8s ease infinite alternate;
+}
+
+@keyframes celebracion-bounce {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-8px);
+  }
+}
+
+.celebracion-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.celebracion-sub {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 8px;
+}
+
+.confetti-wrap {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 8px;
+  height: 14px;
+  opacity: 0.9;
+  animation: confetti-fall 2.6s linear infinite;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(540deg);
+    opacity: 0.3;
+  }
+}
+
+/* ---------- Panel por centro ---------- */
+.centro-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.centro-selector select {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.centro-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  background: #fff;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.centro-tab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.centro-tab.active {
+  background: #0d1b3e;
+  color: #fff;
+}
+
+.item-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.item-card-info p {
+  margin: 0;
+}
+
+.item-card-titulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.item-card-sub {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px !important;
+}
+
+.item-card-extra {
+  font-size: 11px;
+  color: #0d1b3e;
+  margin-top: 3px !important;
+}
+
+.item-card-monto {
+  font-size: 15px;
+  font-weight: 700;
+  color: #a32d2d;
+}
+
+.estado-select-prospecto {
+  border: none;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gastos-total-card {
+  background: #0d1b3e;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+}
+
+.gastos-total-monto {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.gastos-total-lbl {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+/* ---------- Dropdown de cuenta (avatar) ---------- */
+.menu-overlay-click {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.avatar-dropdown {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 14px;
+  min-width: 200px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.avatar-dropdown-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.avatar-dropdown-rol {
+  font-size: 11px;
+  color: #888;
+  text-transform: capitalize;
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.avatar-dropdown-item {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: #a32d2d;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.avatar-dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+/* ---------- Calendario de reservaciones (tipo cine) ---------- */
+.cal-espacio-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cal-espacio-tab {
+  flex-shrink: 0;
+  background: #fff;
+  border: 1.5px solid #eee;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cal-espacio-tab.active {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+.cal-semana-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.cal-semana-nav button {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #0d1b3e;
+  padding: 4px 10px;
+}
+
+.cal-semana-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.cal-grid-wrap {
+  background: #fff;
+  border-radius: 12px;
+  overflow-x: auto;
+  padding: 10px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(64px, 1fr));
+  gap: 3px;
+  min-width: 560px;
+}
+
+.cal-head-cell {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  padding: 6px 2px;
+}
+
+.cal-head-cell .num {
+  display: block;
+  font-size: 13px;
+  color: #1a1a1a;
+  margin-top: 2px;
+}
+
+.cal-hour-cell {
+  font-size: 10px;
+  color: #888;
+  text-align: right;
+  padding-right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.cal-slot {
+  height: 30px;
+  border-radius: 5px;
+  cursor: pointer;
+  background: #8fe0b3;
+  border: 1px solid #4fb17a;
+}
+
+.cal-slot.ocupado {
+  background: #f29494;
+  border-color: #d64545;
+  cursor: not-allowed;
+}
+
+.cal-slot.pasado {
+  background: #d8d8d8;
+  border-color: #bdbdbd;
+  cursor: not-allowed;
+}
+
+.cal-slot.fuera-horario {
+  background: #ffc766;
+  border-color: #e29200;
+}
+
+.cal-slot.seleccionado {
+  background: #f07e3a;
+  border-color: #c96125;
+}
+
+.cal-leyenda {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: #888;
+  flex-wrap: wrap;
+}
+
+.cal-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-leyenda-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.horas-banco-card {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.horas-banco-num {
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.horas-banco-lbl {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+.horas-banco-bar-wrap {
+  flex: 1;
+  margin-left: 20px;
+}
+
+.horas-banco-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.horas-banco-bar-fill {
+  height: 100%;
+  background: #f07e3a;
+  border-radius: 4px;
+}
+
+.horas-banco-detalle {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  margin: 6px 0 0;
+}
+
+/* ---------- Notificaciones (admin) ---------- */
+.notif-bell {
+  position: relative;
+  background: #0d1b3e;
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.18);
+  transition: background-color 0.3s, transform 0.15s;
+}
+
+.notif-bell:hover {
+  background: #16264f;
+}
+
+.notif-bell:active {
+  transform: scale(0.85);
+}
+
+.notif-bell-svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  pointer-events: none;
+  transform-origin: 50% 8%;
+}
+
+.notif-bell-svg path {
+  fill: #fff;
+}
+
+/* Campanita "suena" al pasar el mouse, una sola vez */
+.notif-bell:hover .notif-bell-svg {
+  animation: notifBellRing 0.9s ease-in-out both;
+}
+
+/* ---------- Íconos "pro" (imagen) reutilizables ----------
+   Vamos reemplazando los emojis de iconos sueltos (campanita, llave de
+   tuercas, etc.) por imágenes — estas clases dan el tamaño según dónde
+   se use, para no repetir width/height cada vez. Úsalas en cualquier
+   <img> que reemplace un emoji de ícono nuevo. */
+.icon-img-20 {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.icon-img-24 {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.icon-img-28 {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+
+.icon-img-32 {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+/* Mientras haya notificaciones sin leer, la campana suena sola cada
+   1.8s (además de sonar una vez extra al pasar el mouse encima). */
+.notif-bell-ring .notif-bell-svg {
+  animation: notifBellRing 1.8s ease-in-out infinite;
+}
+@keyframes notifBellRing {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  4% { transform: rotate(18deg); }
+  8% { transform: rotate(-16deg); }
+  12% { transform: rotate(14deg); }
+  16% { transform: rotate(-12deg); }
+  20% { transform: rotate(10deg); }
+  24% { transform: rotate(-8deg); }
+  28% { transform: rotate(6deg); }
+  32% { transform: rotate(-4deg); }
+  36% { transform: rotate(2deg); }
+  40% { transform: rotate(0deg); }
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #f07e3a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.notif-dropdown {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  width: 300px;
+  max-height: 360px;
+  overflow-y: auto;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.notif-item.no-leida {
+  background: #fff8f2;
+}
+
+.notif-item-msg {
+  font-size: 12px;
+  color: #333;
+  margin: 0;
+}
+
+.notif-item-fecha {
+  font-size: 10px;
+  color: #aaa;
+  margin: 4px 0 0;
+}
+
+.notif-empty {
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+}
+
+/* ---------- Reservaciones admin (aceptar/rechazar) ---------- */
+.reserva-admin-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reserva-admin-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.reserva-admin-cliente {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.reserva-admin-detalle {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.reserva-admin-acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-aceptar {
+  flex: 1;
+  background: #e1f5ee;
+  color: #0f6e56;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-rechazar {
+  flex: 1;
+  background: #fcebeb;
+  color: #a32d2d;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---------- Exportar Excel ---------- */
+.btn-exportar {
+  background: #0f6e56;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- Gráfica de ocupación (donut) ---------- */
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.donut-leyenda {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.donut-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.donut-leyenda-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.donut-leyenda-num {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* ---------- Contratos y Paquetes ---------- */
+.paquete-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-top: 3px solid #f07e3a;
+}
+
+.paquete-nombre {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.paquete-precio {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 4px 0 0;
+}
+
+.paquete-desc {
+  font-size: 12px;
+  color: #888;
+  margin: 4px 0 0;
+}
+
+.paquete-horas {
+  font-size: 11px;
+  color: #0f6e56;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.contrato-card-admin {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contrato-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.contrato-cliente-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.contrato-detalle {
+  font-size: 12px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+/* ---------- Paquetes de Coffee Break (selección en modal de reserva) ---------- */
+.paquete-coffee-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px 2px 2px 0;
+  margin-top: 4px;
+}
+
+.paquete-coffee-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: #fafafa;
+  border: 1.5px solid #eee;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.paquete-coffee-card:hover {
+  border-color: #f0c9ae;
+}
+
+.paquete-coffee-card.seleccionado {
+  background: rgba(240, 126, 58, 0.06);
+  border-color: #f07e3a;
+}
+
+.paquete-coffee-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.paquete-coffee-nombre {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.paquete-coffee-check {
+  color: #f07e3a;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.paquete-coffee-precio {
+  font-size: 13px;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.paquete-coffee-precio-tachado {
+  color: #999;
+  text-decoration: line-through;
+  margin-right: 6px;
+}
+
+.paquete-coffee-promo {
+  display: inline-block;
+  width: fit-content;
+  background: rgba(240, 126, 58, 0.12);
+  color: #a3701f;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  margin: 2px 0 0;
+}
+
+.paquete-coffee-detalle {
+  font-size: 12px;
+  color: #888;
+  margin: 0;
+}
+
+/* ---------- Correos masivos ---------- */
+.destinatario-chip {
+  background: #fff;
+  border: 1.5px solid #eee;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.destinatario-chip.seleccionado {
+  border-color: #0d1b3e;
+  background: #f0f3ff;
+}
+
+.destinatario-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.destinatario-chip.seleccionado .destinatario-check {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+.correo-preview {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #eee;
+}
+
+.correo-preview-asunto {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px;
+}
+
+/* ---------- Baja de cliente ---------- */
+.warning-box {
+  background: #fff3e8;
+  border: 1.5px solid #f5c99a;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.warning-box-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #854f0b;
+  margin: 0;
+}
+
+.warning-box-text {
+  font-size: 13px;
+  color: #854f0b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.warning-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.warning-check-row input {
+  margin-top: 2px;
+}
+
+.baja-detalle-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.btn-dar-baja {
+  background: #a32d2d;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-dar-baja:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- Tours ---------- */
+.tours-hoy-card {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.tours-hoy-titulo {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.tours-hoy-vacio {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  margin: 0;
+}
+
+.tour-hoy-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tour-hoy-nombre {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tour-hoy-hora {
+  color: #f07e3a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tour-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tour-fecha-badge {
+  background: #f0f3ff;
+  color: #0d1b3e;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ---------- Sala de Juntas (carta responsiva) ---------- */
+.responsiva-doc {
+  background: #fff;
+  border-radius: 12px;
+  padding: 26px 32px;
+  max-width: 800px;
+  margin: 0 auto;
+  color: #333;
+}
+
+.responsiva-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 18px;
+  gap: 16px;
+}
+
+.responsiva-logo {
+  font-size: 20px;
+  font-weight: 900;
+  color: #001a3d;
+}
+
+.responsiva-meta {
+  display: flex;
+  gap: 12px;
+}
+
+.responsiva-meta-field {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #000;
+  padding-bottom: 4px;
+}
+
+.responsiva-meta-field label {
+  font-size: 8px;
+  color: #999;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.responsiva-meta-field input {
+  border: none;
+  outline: none;
+  font-weight: 700;
+  font-size: 12px;
+  background: transparent;
+  width: 90px;
+}
+
+.responsiva-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: #001a3d;
+  text-transform: uppercase;
+  margin: 0 0 20px;
+}
+
+.responsiva-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #001a3d;
+  margin: 0 0 10px;
+}
+
+.responsiva-sala-input {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #001a3d;
+  width: 100%;
+  margin-bottom: 14px;
+  break-inside: avoid;
+}
+
+.responsiva-parrafo {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 14px;
+  break-inside: avoid;
+}
+
+.responsiva-inline-input {
+  border: none;
+  border-bottom: 1px solid #000;
+  outline: none;
+  padding: 0 6px;
+  font-weight: 700;
+  color: #001a3d;
+  background: transparent;
+  margin: 0 4px;
+}
+
+.responsiva-equipo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.responsiva-check-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+  break-inside: avoid;
+}
+
+.responsiva-check-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.responsiva-check-row input[type="number"] {
+  width: 32px;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  text-align: center;
+  outline: none;
+}
+
+.responsiva-condiciones-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.responsiva-condiciones-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.responsiva-legal-box {
+  background: #fdf2ed;
+  border-left: 4px solid #ff9a62;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  font-style: italic;
+  color: #001a3d;
+  line-height: 1.5;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.responsiva-notas {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #eee;
+  outline: none;
+  resize: none;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #001a3d;
+  background: transparent;
+  margin-top: 6px;
+}
+
+.responsiva-firmas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+  margin-top: 24px;
+  text-align: center;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.responsiva-firma-box {
+  position: relative;
+  border-bottom: 2px solid #000;
+  height: 90px;
+  background: #fafafa;
+  margin-bottom: 8px;
+}
+
+.responsiva-firma-box canvas {
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.responsiva-firma-limpiar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.responsiva-firma-label {
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #001a3d;
+}
+
+/* ---------- Mapa de oficinas / Cotizaciones ---------- */
+.mapa-imagen-wrap {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.mapa-imagen-wrap img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.mapa-descargas {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.cotizacion-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ---------- Pago SPEI (Openpay) ---------- */
+.spei-card {
+  background: #0d1b3e;
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spei-monto {
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.spei-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+}
+
+.spei-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.spei-val {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.spei-copiar {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+/* ---------- Cobranza ---------- */
+.cobranza-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cobranza-card.suspendido {
+  border-left: 4px solid #a32d2d;
+}
+
+.btn-ejecutar-cobranza {
+  background: #0d1b3e;
+  color: #fff;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---------- Mantenimiento / Inventario ---------- */
+.mtto-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+}
+
+.mtto-fecha-badge {
+  background: #f0f3ff;
+  color: #0d1b3e;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  flex-shrink: 0;
+  height: fit-content;
+  min-width: 56px;
+}
+
+.inv-table-wrap {
+  background: #fff;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+
+.inv-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #888;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.inv-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.estado-pill {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ---------- Panel de Sistemas: tickets recientes ---------- */
+.sistemas-ticket-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-decoration: none;
+}
+
+.sistemas-ticket-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sistemas-ticket-folio {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.sistemas-ticket-sub {
+  font-size: 11px;
+  color: #888;
+  margin: 2px 0 0;
+}
+
+.sistemas-ticket-tiempo {
+  font-size: 11px;
+  color: #aaa;
+  flex-shrink: 0;
+}
+
+/* ---------- Spinner de carga con el logo de Nodus ----------
+   El logo real son 4 "nodos" (cada uno con su propia forma de gota/
+   corazón), no 8 — medí a mano dónde estaba el hueco real entre cada
+   nodo (con un análisis de la imagen) para cortar el clip-path justo
+   por ahí. Así cada pieza se separa completa, respetando su forma,
+   en vez de partirse en triángulos que cortan el dibujo por la mitad.
+   En reposo los 4 se ven juntos como el logo normal.
+
+   La animación va como manecillas de reloj: arriba → derecha → abajo →
+   izquierda, y solo se mueve UN nodo a la vez (no los 4 juntos). Cada
+   nodo tiene su propio "turno" — una cuarta parte del ciclo total — y
+   se queda quieto el resto del tiempo esperando su siguiente vuelta. */
+.nodus-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.nodus-spinner {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+/* Versión chica del spinner, para usar dentro de una página o tarjeta
+   mientras carga algún dato (en vez de la pantalla completa de
+   app/loading.tsx, que solo aplica al cambiar de página). */
+.nodus-spinner-sm {
+  width: 28px;
+  height: 28px;
+}
+
+.nodus-inline-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.nodus-spinner-petal {
+  position: absolute;
+  inset: 0;
+  background: url("/icons/logo-nodus.png") center / 100% 100% no-repeat;
+  animation: nodus-spinner-pulse 1.8s calc(var(--delay) * 1s) infinite ease-in-out;
+}
+
+.nodus-spinner-petal:nth-child(1) {
+  --dx: 0;
+  --dy: -1;
+  --delay: 0;
+  clip-path: polygon(50% 50%, -3.03% -3.03%, 103.03% -3.03%);
+}
+.nodus-spinner-petal:nth-child(2) {
+  --dx: 1;
+  --dy: 0;
+  --delay: 0.45;
+  clip-path: polygon(50% 50%, 103.03% -3.03%, 103.03% 103.03%);
+}
+.nodus-spinner-petal:nth-child(3) {
+  --dx: 0;
+  --dy: 1;
+  --delay: 0.9;
+  clip-path: polygon(50% 50%, 103.03% 103.03%, -3.03% 103.03%);
+}
+.nodus-spinner-petal:nth-child(4) {
+  --dx: -1;
+  --dy: 0;
+  --delay: 1.35;
+  clip-path: polygon(50% 50%, -3.03% 103.03%, -3.03% -3.03%);
+}
+
+/* El "salto" de cada nodo ocupa solo el primer 25% de su propio ciclo
+   (0.45s de los 1.8s totales) — como los --delay están espaciados
+   exactamente 0.45s entre sí, apenas un nodo termina su turno empieza
+   el siguiente, sin que se traslapen ni se muevan al mismo tiempo. */
+@keyframes nodus-spinner-pulse {
+  0%,
+  25%,
+  100% {
+    transform: translate(0, 0);
+  }
+  12.5% {
+    transform: translate(calc(var(--dx) * 20%), calc(var(--dy) * 20%));
+  }
+}
+
+
+
+
+/* ---------- Day Pass (ticket futurista, colores Nodus) ---------- */
+.daypass-modal-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daypass-modal-card input[type="text"],
+.daypass-modal-card input[type="email"],
+.daypass-modal-card input[type="tel"],
+.daypass-modal-card input[type="date"],
+.daypass-modal-card input:not([type]),
+.daypass-modal-card select {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Aviso cuando ya se detectó que este invitado usó un Day Pass antes —
+   bloquea el botón de "Generar" en vez de solo advertir. */
+.daypass-bloqueo-aviso {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #a32d2d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.daypass-ticket-wrap {
+  --daypass-notch-bg: #f4f6fb;
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 4px;
+}
+.daypass-modal-card .daypass-ticket-wrap {
+  --daypass-notch-bg: #fff;
+}
+
+/* Host del efecto 3D + variables de color — todo el ticket está medido en
+   "em" relativo a este font-size, así que cambiarlo reescala el boleto
+   completo de forma proporcional. */
+.daypass-ticket-3d {
+  --t-bg: #0d1b3e;
+  --t-bg-light: #16264d;
+  --t-accent: #f07e3a;
+  --t-accent-glow: rgba(240, 126, 58, 0.5);
+  --t-text-main: #f8fafc;
+  --t-text-muted: #93a3c2;
+  font-size: 10px;
+  perspective: 1000px;
+  display: inline-block;
+}
+
+.daypass-ticket {
+  position: relative;
+  width: 22em;
+  overflow: hidden;
+  border-radius: 1em;
+  color: var(--t-text-main);
+  font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.6s ease;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: transparent;
+}
+
+.daypass-ticket-3d:hover .daypass-ticket {
+  transform: rotateX(5deg) rotateY(-10deg) scale(1.02);
+  box-shadow: 20px 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1),
+    -5px -5px 20px var(--t-accent-glow);
+}
+
+.daypass-ticket::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 1em;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.1) 45%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.1) 55%,
+    transparent 60%,
+    transparent 100%
+  );
+  z-index: 10;
+  background-size: 250% 250%;
+  background-position: 100% 100%;
+  transition: background-position 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  mix-blend-mode: overlay;
+}
+.daypass-ticket-3d:hover .daypass-ticket::after {
+  background-position: 0% 0%;
+}
+
+.daypass-main {
+  padding: 2em;
+  position: relative;
+  overflow: hidden;
+  background: var(--t-bg);
+}
+.daypass-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(240, 126, 58, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(240, 126, 58, 0.15) 1px, transparent 1px);
+  background-size: 2em 2em;
+  opacity: 0.6;
+  z-index: 0;
+  pointer-events: none;
+  transform: perspective(500px) rotateX(20deg) scale(1.5);
+  animation: daypass-grid-scroll 20s linear infinite;
+}
+@keyframes daypass-grid-scroll {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 4em;
+  }
+}
+
+.daypass-content {
+  position: relative;
+  z-index: 1;
+}
+
+.daypass-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2em;
+}
+.daypass-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+.daypass-brand-icon {
+  width: 2.2em;
+  height: 2.2em;
+  object-fit: contain;
+  flex: none;
+}
+.daypass-brand {
+  font-weight: 900;
+  font-size: 1em;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.daypass-brand-sub {
+  font-size: 0.65em;
+  letter-spacing: 0.2em;
+  color: var(--t-text-muted);
+  text-transform: uppercase;
+  margin-top: 0.2em;
+}
+.daypass-type-badge {
+  font-size: 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--t-accent);
+  border: 1px solid var(--t-accent);
+  padding: 0.4em 0.8em;
+  border-radius: 99em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.daypass-title {
+  font-size: 2.5em;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0 0 0.2em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #fff 0%, #ffcfa8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.daypass-subtitle {
+  color: var(--t-text-muted);
+  font-size: 0.9em;
+  margin: 0 0 2.5em;
+}
+
+.daypass-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5em;
+}
+.daypass-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  min-width: 0;
+}
+.daypass-label {
+  font-size: 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t-text-muted);
+}
+.daypass-value {
+  font-size: 1.1em;
+  font-weight: 700;
+  color: var(--t-text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Línea de corte compacta, con muescas pequeñas que sí calzan con el color
+   real de detrás del ticket (blanco en el modal, gris clarito en la
+   página pública) — en vez de un "agujero" grande. */
+.daypass-perforation {
+  position: relative;
+  z-index: 2;
+  height: 0;
+  border-top: 2px dashed rgba(255, 255, 255, 0.25);
+}
+.daypass-perforation::before,
+.daypass-perforation::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 50%;
+  background: var(--daypass-notch-bg, #f4f6fb);
+  transform: translateY(-50%);
+}
+.daypass-perforation::before {
+  left: -0.7em;
+}
+.daypass-perforation::after {
+  right: -0.7em;
+}
+
+.daypass-stub {
+  padding: 2em;
+  background: var(--t-bg-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.daypass-ticket-3d:active .daypass-stub {
+  transform: translateY(5px) rotateZ(2deg);
+  opacity: 0.8;
+}
+
+.daypass-barcode-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.daypass-barcode {
+  width: 10em;
+  height: 3em;
+  background: repeating-linear-gradient(
+    90deg,
+    #fff 0,
+    #fff 2px,
+    transparent 2px,
+    transparent 4px,
+    #fff 4px,
+    #fff 5px,
+    transparent 5px,
+    transparent 8px,
+    #fff 8px,
+    #fff 12px,
+    transparent 12px,
+    transparent 15px,
+    #fff 15px,
+    #fff 16px,
+    transparent 16px,
+    transparent 18px
+  );
+  opacity: 0.8;
+}
+.daypass-barcode-id {
+  font-family: monospace;
+  font-size: 0.7em;
+  color: var(--t-text-muted);
+  letter-spacing: 0.15em;
+  margin: 0;
+}
+
+.daypass-qr {
+  width: 4.2em;
+  height: 4.2em;
+  border-radius: 0.4em;
+  background: #fff;
+  padding: 0.3em;
+  display: block;
+  flex: none;
+}
+
+.daypass-admit {
+  text-align: right;
+}
+.daypass-admit-label {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t-text-muted);
+  margin: 0;
+}
+.daypass-admit-num {
+  font-size: 3em;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--t-accent);
+  text-shadow: 0 0 15px var(--t-accent-glow);
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 0.5cm;
+  }
+  /* Sin esto, aunque el resto de la página esté oculto (visibility:hidden
+     no le quita el espacio que ocupa), Chrome sigue midiendo varias
+     páginas de alto de contenido de fondo y termina repitiendo/cortando
+     el ticket en 2 o 3 hojas. Esto obliga a que todo el documento se
+     "recorte" a una sola página al imprimir. */
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .daypass-ticket-imprimible,
+  .daypass-ticket-imprimible * {
+    visibility: visible;
+    /* Sin esto, Chrome/Edge no imprimen fondos ni colores de texto por
+       default (para ahorrar tinta) — el ticket sale casi en blanco,
+       con el texto blanco invisible sobre el fondo azul que tampoco
+       se imprime. Esto obliga a que sí se impriman tal cual se ven. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  .daypass-ticket-imprimible {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .daypass-main::after {
+    animation: none;
+  }
+}
+
+/* ---------- Check-in de Day Pass (staff, requiere iniciar sesión) ---------- */
+.checkin-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 26px 20px 22px;
+  max-width: 360px;
+  margin: 12px auto 0;
+  box-shadow: 0 4px 20px rgba(13, 27, 62, 0.08);
+  border-top: 4px solid #0d1b3e;
+  text-align: center;
+}
+.checkin-card.checkin-usado {
+  border-top-color: #0d9b52;
+}
+.checkin-card.checkin-vencido {
+  border-top-color: #a32d2d;
+}
+.checkin-card.checkin-futuro {
+  border-top-color: #d9a441;
+}
+
+.checkin-nombre {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0d1b3e;
+  margin: 0 0 14px 0;
+}
+
+.checkin-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 2px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+.checkin-detail-row:last-of-type {
+  border-bottom: none;
+}
+.checkin-detail-row span {
+  color: #888;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+.checkin-detail-row strong {
+  color: #1a1a1a;
+  font-size: 14px;
+  text-align: right;
+}
+
+.checkin-msg {
+  margin: 16px 0 0 0;
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+.checkin-msg-ok {
+  background: #e2feee;
+  color: #0d9b52;
+  font-weight: 700;
+}
+.checkin-msg-warn {
+  background: #fef2f2;
+  color: #a32d2d;
+  font-weight: 700;
+}
+
+.checkin-btn-aceptar {
+  margin-top: 18px;
+  width: 100%;
+  background: #0d9b52;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.checkin-btn-aceptar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Agendar invitado (público, sin cuenta) ---------- */
+.invitado-intro {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-soft, #6b7897);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.invitado-intro-icon {
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.invitado-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.invitado-menu-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9aa4b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 10px 0 -2px;
+}
+
+.invitado-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #eef0f6;
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(7, 28, 75, 0.04);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  font-family: inherit;
+}
+
+.invitado-menu-item:hover {
+  transform: translateY(-1px);
+  border-color: #e2e6f2;
+  box-shadow: 0 8px 18px rgba(7, 28, 75, 0.09);
+}
+
+.invitado-menu-item:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(7, 28, 75, 0.06);
+}
+
+.invitado-menu-icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  background: rgba(13, 27, 62, 0.07);
+}
+
+.invitado-menu-item.daypass .invitado-menu-icon {
+  background: rgba(240, 126, 58, 0.14);
+}
+
+.invitado-menu-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.invitado-menu-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.invitado-menu-desc {
+  font-size: 12px;
+  color: #8b93a7;
+  margin: 2px 0 0;
+}
+
+.invitado-menu-chevron {
+  flex: none;
+  color: #c3c9d8;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.invitado-back-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* ---------- Alerta urgente (barra de error reutilizable en todos los paneles) ---------- */
+.alerta-urgente {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.alerta-urgente-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.alerta-urgente-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.alerta-urgente-titulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.alerta-urgente-item {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #b91c1c;
+}
+
+.alerta-urgente-link {
+  text-decoration: none;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.alerta-urgente-link:hover {
+  border-color: #f87171;
+  box-shadow: 0 4px 12px rgba(153, 27, 27, 0.12);
+}
+
+/* ---------- Confirmación de solicitud enviada (agendar-invitado) ---------- */
+.exito-card {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 16px;
+  max-width: 340px;
+  margin: 12px auto 0;
+  padding: 30px 22px 26px;
+  box-shadow: 0 20px 25px -5px rgba(7, 28, 75, 0.12), 0 10px 10px -5px rgba(7, 28, 75, 0.05);
+  background: #fff;
+}
+
+.exito-icono {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  margin: 0 auto;
+  background: #e2feee;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  align-items: center;
+  justify-content: center;
+  animation: exito-pulso 0.6s ease-in-out alternate infinite;
+}
+
+.exito-icono svg {
+  width: 28px;
+  height: 28px;
+  color: #0d9b52;
+}
+
+.exito-titulo {
+  position: relative;
+  z-index: 2;
+  margin: 14px 0 0;
+  color: #0d1b3e;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.exito-mensaje {
+  position: relative;
+  z-index: 2;
+  margin: 8px 0 0;
+  color: #6b7897;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.exito-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 13px 20px;
+  background: #f07e3a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes exito-pulso {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.confetti-pieza {
+  position: absolute;
+  top: -12px;
+  width: 7px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0.9;
+  animation-name: confetti-caer;
+  animation-timing-function: ease-in;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-caer {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(280px) rotate(560deg);
+    opacity: 0;
+  }
+}
+
+/* ---------- Checkbox animado (componente app/components/Checkbox.tsx) ----------
+   Usado por CotizarForm.tsx (Coffee Break, Cargo recurrente). El <input>
+   real queda oculto y accesible; el <label> dibuja el cuadro + la palomita
+   con dasharray/dashoffset animados sobre pathLength=800/172. */
+.checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.checkbox-wrapper input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.terms-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  overflow: visible;
+}
+
+.checkbox-box {
+  stroke: #ccc;
+  fill: #fff;
+  stroke-dasharray: 800;
+  stroke-dashoffset: 0;
+  transition: stroke 0.2s ease;
+}
+
+.checkbox-tick {
+  stroke: #0f6e56;
+  stroke-dasharray: 172;
+  stroke-dashoffset: 172;
+  transition: stroke-dashoffset 0.25s ease 0.05s;
+}
+
+.checkbox-wrapper input[type="checkbox"]:checked + .terms-label .checkbox-box {
+  stroke: #0f6e56;
+}
+
+.checkbox-wrapper input[type="checkbox"]:checked + .terms-label .checkbox-tick {
+  stroke-dashoffset: 0;
+}
+
+.checkbox-wrapper input[type="checkbox"]:disabled + .terms-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.checkbox-wrapper input[type="checkbox"]:focus-visible + .terms-label .checkbox-box {
+  stroke: #185fa5;
+}
+
+.label-text {
+  font-size: 13px;
+  color: inherit;
+}
+
+/* ---------- Tarjetas de paquete de Coffee Break (CotizarForm.tsx) ----------
+   Mismos paquetes/tabla que ya usa el cliente en /reservaciones (ahí se
+   eligen desde un <select>) — aquí se ofrecen como tarjetas clicables,
+   consistentes con el resto de selecciones de CotizarForm (ej. Oficina). */
+.paquete-coffee-lista {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.paquete-coffee-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.paquete-coffee-card.seleccionado {
+  border-color: #0d1b3e;
+  border-width: 2px;
+  background: #F0F4FA;
+}
+
+.paquete-coffee-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.paquete-coffee-nombre {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.paquete-coffee-check {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d1b3e;
+  min-width: 14px;
+  text-align: center;
+}
+
+.paquete-coffee-precio {
+  margin: 0;
+  font-size: 12px;
+  color: #555;
+}
+
+.paquete-coffee-precio-tachado {
+  text-decoration: line-through;
+  color: #aaa;
+  margin-right: 6px;
+}
+
+.paquete-coffee-promo {
+  margin: 0;
+  font-size: 11px;
+  color: #a3701f;
+  font-weight: 600;
+}
+
+.paquete-coffee-detalle {
+  margin: 0;
+  font-size: 11px;
+  color: #888;
+}
+
+/* ---------- Pantalla de éxito "¡Listo!" al cotizar Sala de Juntas
+   (CotizarForm.tsx → crearCotizacionSalaJuntas) — sin estas clases el
+   <svg> de la palomita no tenía tamaño definido y se estiraba a todo lo
+   ancho del panel de Centro. */
+.invitado-exito-card {
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  border-radius: 16px;
+  max-width: 340px;
+  margin: 12px auto 0;
+  padding: 30px 22px 26px;
+  box-shadow: 0 20px 25px -5px rgba(7, 28, 75, 0.12), 0 10px 10px -5px rgba(7, 28, 75, 0.05);
+  background: #fff;
+}
+
+.invitado-exito-icono {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  margin: 0 auto;
+  background: #e2feee;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  align-items: center;
+  justify-content: center;
+  animation: invitado-exito-pulso 0.6s ease-in-out alternate infinite;
+}
+
+.invitado-exito-icono svg {
+  width: 28px;
+  height: 28px;
+  color: #0d9b52;
+}
+
+.invitado-exito-titulo {
+  position: relative;
+  z-index: 2;
+  margin: 14px 0 0;
+  color: #0d1b3e;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.invitado-exito-mensaje {
+  position: relative;
+  z-index: 2;
+  margin: 8px 0 0;
+  color: #6b7897;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.invitado-exito-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 13px 20px;
+  background: #f07e3a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes invitado-exito-pulso {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+.invitado-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.invitado-confetti-pieza {
+  position: absolute;
+  top: -12px;
+  width: 7px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0.9;
+  animation-name: invitado-confetti-caer;
+  animation-timing-function: ease-in;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes invitado-confetti-caer {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(280px) rotate(560deg);
+    opacity: 0;
+  }
+}

@@ -1,0 +1,21 @@
+-- =====================================================================
+-- Prospectos: medio de contacto + visibilidad global entre centros
+--
+-- Qué agrega:
+--   1) Columna `medio` en `prospectos` — cómo llegó el prospecto
+--      (Teléfono, Redes sociales, Referido, Página web, Otro), capturado
+--      desde el formulario "Registrar prospecto" en /centro.
+--
+-- No hace falta nada más de este lado: la columna `centro` ya existía
+-- (ahora se usa como "centro de interés", elegido a mano en el formulario
+-- en vez de heredar el centro que el admin tiene seleccionado), y la
+-- pestaña Prospectos ya no filtra por centro al leer — cualquier admin
+-- ve todos los prospectos de todos los centros. Si `prospectos` ya tiene
+-- una policy de RLS tipo "staff_all" (cualquier rol distinto de
+-- "cliente" puede leer/escribir), no se necesita ningún cambio de
+-- permisos para esto.
+--
+-- Corre esto UNA VEZ en el SQL Editor de Supabase.
+-- =====================================================================
+
+alter table public.prospectos add column if not exists medio text;
