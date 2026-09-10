@@ -58,6 +58,9 @@ function AltaClienteInner() {
   const rfcDesdeUrl = searchParams.get("rfc") || "";
   const diaPagoDesdeUrl = searchParams.get("diaPago") || "";
   const prospectoIdDesdeUrl = searchParams.get("prospectoId") || "";
+  // Handoff desde "Continuar en Alta de cliente →" en /contratos — preselecciona
+  // el contrato ya aprobado en vez de obligar a buscarlo de nuevo en la lista.
+  const contratoIdDesdeUrl = searchParams.get("contratoId") || "";
   const [loading, setLoading] = useState(true);
   const [miRol, setMiRol] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
@@ -144,6 +147,15 @@ function AltaClienteInner() {
   useEffect(() => {
     if (centro) cargarContratosPendientes(centro);
   }, [centro]);
+
+  // Una vez que llega la lista, si venimos de "Continuar en Alta de
+  // cliente →" (contratoId por URL) se preselecciona ese contrato.
+  useEffect(() => {
+    if (!contratoIdDesdeUrl || contratoSeleccionadoId) return;
+    const c = contratosPendientes.find((ct) => ct.id === contratoIdDesdeUrl);
+    if (c) seleccionarContrato(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contratosPendientes, contratoIdDesdeUrl]);
 
   async function cargarContratosPendientes(c: string) {
     const { data: conts } = await supabase
