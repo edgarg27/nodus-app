@@ -316,6 +316,52 @@ export default function ContratosPage() {
     if (centro) fetchTodo(centro);
   }
 
+  // ---- Renovación de contrato ----
+  // Cuando un contrato vigente llega (o está por llegar) a su
+  // fecha_vencimiento: captura la nueva fecha y, si aplica, el % de
+  // incremento sobre la renta actual (mismo concepto que "esRenovacion"
+  // en CotizarForm.tsx) — actualiza el contrato existente, no crea uno
+  // nuevo desde cero.
+  const [renovandoId, setRenovandoId] = useState<string | null>(null);
+  const [formRenovacion, setFormRenovacion] = useState({ fecha_vencimiento: "", porcentaje_incremento: "" });
+  const [guardandoRenovacion, setGuardandoRenovacion] = useState(false);
+  const [errorRenovacion, setErrorRenovacion] = useState("");
+
+  function abrirRenovacion(c: Contrato) {
+    setRenovandoId(c.id);
+    setFormRenovacion({ fecha_vencimiento: "", porcentaje_incremento: "" });
+    setErrorRenovacion("");
+  }
+
+  function cerrarRenovacion() {
+    setRenovandoId(null);
+    setErrorRenovacion("");
+  }
+
+  async function guardarRenovacion(c: Contrato) {
+    setErrorRenovacion("");
+    if (!formRenovacion.fecha_vencimiento) {
+      setErrorRenovacion("Captura la nueva fecha de vencimiento");
+      return;
+    }
+    setGuardandoRenovacion(true);
+    const incremento = Number(formRenovacion.porcentaje_incremento) || 0;
+    const nuevaRenta = incremento > 0 ? Math.round(c.renta_mensual * (1 + incremento / 100) * 100) / 100 : c.renta_mensual;
+
+    const { error } = await supabase
+      .from("contratos")
+      .update({ fecha_vencimiento: formRenovacion.fecha_vencimiento, renta_mensual: nuevaRenta })
+      .eq("id", c.id);
+
+    setGuardandoRenovacion(false);
+    if (error) {
+      setErrorRenovacion("No se pudo renovar el contrato. Intenta de nuevo.");
+      return;
+    }
+    setRenovandoId(null);
+    if (centro) fetchTodo(centro);
+  }
+
   // ---- Formulario Contrato ----
   // Siempre se crea para un PROSPECTO (nunca para un cliente ya existente):
   // la cuenta se da de alta después, en /alta-cliente, ligando este mismo
@@ -944,7 +990,59 @@ export default function ContratosPage() {
                       >
                         ✎ Editar
                       </button>
+                      {c.estatus === "vigente" && (
+                        <button
+                          className="tel-borrar-btn"
+                          style={{ color: "#0d1b3e", fontWeight: 600 }}
+                          onClick={() => (renovandoId === c.id ? cerrarRenovacion() : abrirRenovacion(c))}
+                        >
+                          {renovandoId === c.id ? "Cancelar renovación" : "🔄 Renovar"}
+                        </button>
+                      )}
                     </div>
+
+                    {renovandoId === c.id && (
+                      <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, marginTop: 8 }}>
+                        <p className="sub-label">Renta actual: ${c.renta_mensual.toLocaleString("es-MX")}/mes</p>
+                        <div className="tel-form-grid">
+                          <div>
+                            <p className="sub-label">Nueva fecha de vencimiento</p>
+                            <input
+                              type="date"
+                              value={formRenovacion.fecha_vencimiento}
+                              onChange={(e) => setFormRenovacion({ ...formRenovacion, fecha_vencimiento: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <p className="sub-label">% de incremento (opcional)</p>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formRenovacion.porcentaje_incremento}
+                              onChange={(e) => setFormRenovacion({ ...formRenovacion, porcentaje_incremento: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        {Number(formRenovacion.porcentaje_incremento) > 0 && (
+                          <p style={{ fontSize: 12, color: "#555", margin: "6px 0 0" }}>
+                            Nueva renta: $
+                            {(
+                              Math.round(c.renta_mensual * (1 + Number(formRenovacion.porcentaje_incremento) / 100) * 100) / 100
+                            ).toLocaleString("es-MX")}
+                            /mes
+                          </p>
+                        )}
+                        {errorRenovacion && <p style={{ color: "#A32D2D", fontSize: 12, marginTop: 6 }}>{errorRenovacion}</p>}
+                        <button
+                          className="btn-aceptar"
+                          style={{ marginTop: 8 }}
+                          onClick={() => guardarRenovacion(c)}
+                          disabled={guardandoRenovacion}
+                        >
+                          {guardandoRenovacion ? "Renovando…" : "✓ Confirmar renovación"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })

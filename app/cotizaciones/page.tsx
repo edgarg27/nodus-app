@@ -107,18 +107,13 @@ export default function CotizacionesPage() {
   }
 
   async function aceptarCotizacion(id: string) {
-    const rfc = prompt("RFC del cliente (se usa para redactar el contrato):");
-    if (rfc == null) return; // canceló
-    if (!rfc.trim()) {
-      alert("Falta el RFC del cliente");
-      return;
-    }
+    if (!confirm("¿Aceptar esta cotización y generar el contrato como pre-aprobado?")) return;
     setAceptandoId(id);
     try {
       const res = await fetch("/api/cotizacion-aceptar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, rfc: rfc.trim() }),
+        body: JSON.stringify({ id }),
       });
       const data = await res.json();
       if (!res.ok) {
