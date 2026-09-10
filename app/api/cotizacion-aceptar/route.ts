@@ -90,25 +90,40 @@ export async function POST(req: NextRequest) {
     }
     const archivoUrl = admin.storage.from("contratos").getPublicUrl(fileName).data.publicUrl;
 
-    const { data: contratoCreado, error: insertError } = await admin
+    // Coworking/Oficina Privada/Working Desk ya crean su contrato
+    // "pre_aprobado" de inmediato al cotizar (CotizarForm.tsx →
+    // crearCotizacion(), líneas ~1225-1254) — solo Sala de Juntas llega
+    // aquí sin uno todavía. Para no duplicar el contrato en esos casos,
+    // si ya existe uno ligado a esta venta se actualiza (se le pega el
+    // .docx recién generado) en vez de crear uno nuevo.
+    const { data: contratoExistente } = await admin
       .from("contratos")
-      .insert({
-        centro: venta.centro,
-        estatus: "pre_aprobado",
-        archivo_url: archivoUrl,
-        cotizacion_id: venta.id,
-        user_id: venta.cliente_id ?? null,
-        cliente_nombre_historico: venta.nombre_contesta_telefono ?? null,
-        cliente_email_historico: venta.correo_contesta ?? null,
-        fecha_inicio: venta.fecha_inicio ?? null,
-        fecha_vencimiento: venta.fecha_fin ?? null,
-        renta_mensual: precioMensual,
-        deposito_garantia: depositoGarantia,
-        paquete_id: venta.paquete_id ?? null,
-        oficina_id: venta.oficina_id ?? null,
-      })
-      .select()
-      .single();
+      .select("id")
+      .eq("cotizacion_id", venta.id)
+      .maybeSingle();
+
+    const datosContrato = {
+      centro: venta.centro,
+      archivo_url: archivoUrl,
+      cotizacion_id: venta.id,
+      user_id: venta.cliente_id ?? null,
+      cliente_nombre_historico: venta.nombre_contesta_telefono ?? null,
+      cliente_email_historico: venta.correo_contesta ?? null,
+      fecha_inicio: venta.fecha_inicio ?? null,
+      fecha_vencimiento: venta.fecha_fin ?? null,
+      renta_mensual: precioMensual,
+      deposito_garantia: depositoGarantia,
+      paquete_id: venta.paquete_id ?? null,
+      oficina_id: venta.oficina_id ?? null,
+    };
+
+    const { data: contratoCreado, error: insertError } = contratoExistente
+      ? await admin.from("contratos").update(datosContrato).eq("id", contratoExistente.id).select().single()
+      : await admin
+          .from("contratos")
+          .insert({ ...datosContrato, estatus: "pre_aprobado" })
+          .select()
+          .single();
     if (insertError) {
       return NextResponse.json({ error: "El contrato se generó pero no se pudo registrar: " + insertError.message }, { status: 500 });
     }
