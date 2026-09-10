@@ -7,12 +7,15 @@ type Tour = {
   id: string;
   nombre: string;
   telefono: string | null;
+  correo: string | null;
   fecha: string;
   hora: string | null;
   notas: string | null;
+  tipo_espacio_interes: string | null;
 };
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const TIPOS_ESPACIO_INTERES = ["Coworking", "Oficina Privada", "Working Desk", "Sala de Juntas"];
 
 function hoyISO() {
   return new Date().toISOString().split("T")[0];
@@ -29,8 +32,10 @@ export default function ToursPage() {
   const [form, setForm] = useState({
     nombre: "",
     telefono: "",
+    correo: "",
     fecha: hoyISO(),
     hora: "",
+    tipoEspacioInteres: "",
     notas: "",
   });
   const [guardando, setGuardando] = useState(false);
@@ -87,8 +92,10 @@ export default function ToursPage() {
         centro,
         nombre: form.nombre,
         telefono: form.telefono || null,
+        correo: form.correo || null,
         fecha: form.fecha,
         hora: form.hora || null,
+        tipo_espacio_interes: form.tipoEspacioInteres || null,
         notas: form.notas || null,
         registrado_por: user?.id,
       })
@@ -110,7 +117,17 @@ export default function ToursPage() {
       });
     }
 
-    setForm({ nombre: "", telefono: "", fecha: hoyISO(), hora: "", notas: "" });
+    // Correo de confirmación — no bloquea el guardado del tour si falla
+    // (ej. proveedor de correo sin configurar todavía).
+    if (form.correo && nuevo) {
+      fetch("/api/tours-confirmar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tourId: nuevo.id }),
+      }).catch(() => {});
+    }
+
+    setForm({ nombre: "", telefono: "", correo: "", fecha: hoyISO(), hora: "", tipoEspacioInteres: "", notas: "" });
     setMostrarForm(false);
     setGuardando(false);
     setEnviado(true);
@@ -194,6 +211,23 @@ export default function ToursPage() {
                     onChange={(e) => setForm({ ...form, telefono: e.target.value })}
                   />
                   <input
+                    type="email"
+                    placeholder="Correo (para confirmación y recordatorio)"
+                    value={form.correo}
+                    onChange={(e) => setForm({ ...form, correo: e.target.value })}
+                  />
+                  <select
+                    value={form.tipoEspacioInteres}
+                    onChange={(e) => setForm({ ...form, tipoEspacioInteres: e.target.value })}
+                  >
+                    <option value="">¿Qué espacio le interesó?</option>
+                    {TIPOS_ESPACIO_INTERES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <input
                     type="date"
                     value={form.fecha}
                     onChange={(e) => setForm({ ...form, fecha: e.target.value })}
@@ -267,6 +301,9 @@ export default function ToursPage() {
                   <div style={{ flex: 1, marginLeft: 12 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>{t.nombre}</p>
                     {t.telefono && <p style={{ fontSize: 12, color: "#888", margin: 0 }}>{t.telefono}</p>}
+                    {t.tipo_espacio_interes && (
+                      <p style={{ fontSize: 12, color: "#0d1b3e", margin: 0 }}>📌 {t.tipo_espacio_interes}</p>
+                    )}
                   </div>
                   <button className="tel-borrar-btn" onClick={() => borrarTour(t.id)}>
                     🗑

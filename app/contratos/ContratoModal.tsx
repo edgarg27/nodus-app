@@ -57,6 +57,7 @@ export default function ContratoModal({
   const [error, setError] = useState("");
   const [estatus, setEstatus] = useState(contrato.estatus || "");
   const [confirmacionFirma, setConfirmacionFirma] = useState(false);
+  const [enviandoFirma, setEnviandoFirma] = useState(false);
 
   // ---------- Adicionales (catálogo con buscador + persistencia inmediata) ----------
   const [catalogo, setCatalogo] = useState<CatalogoItem[]>([]);
@@ -255,8 +256,28 @@ export default function ContratoModal({
     onClose();
   }
 
+  async function enviarAFirma() {
+    setEnviandoFirma(true);
+    setError("");
+    try {
+      const res = await fetch("/api/contratos/enviar-a-firma", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contratoId: contrato.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "No se pudo mandar el contrato a firma");
+        return;
+      }
+      onGuardado();
+    } finally {
+      setEnviandoFirma(false);
+    }
+  }
+
   async function aprobar() {
-    if (!contrato.archivo_url || !confirmacionFirma) return;
+    if (!contrato.archivo_url || !(confirmacionFirma || contrato.firmado)) return;
     setProcesandoAprobacion(true);
     await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", contrato.id);
 
@@ -397,18 +418,36 @@ export default function ContratoModal({
 
         {estatus === "pre_aprobado" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, width: "100%", color: "#333" }}>
-              <input
-                type="checkbox"
-                checked={confirmacionFirma}
-                onChange={(e) => setConfirmacionFirma(e.target.checked)}
-              />
-              Confirmo que el documento cargado es la versión firmada
-            </label>
+            {contrato.archivo_url && !contrato.firmado && (
+              <div style={{ width: "100%" }}>
+                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={enviarAFirma} disabled={enviandoFirma}>
+                  {enviandoFirma ? "Mandando…" : contrato.enviado_a_firma_at ? "📧 Reenviar a firma" : "📧 Enviar a firma"}
+                </button>
+                {contrato.enviado_a_firma_at && (
+                  <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
+                    Mandado a firma el {new Date(contrato.enviado_a_firma_at).toLocaleDateString("es-MX")} — todavía no lo firma el cliente.
+                  </p>
+                )}
+              </div>
+            )}
+            {contrato.firmado ? (
+              <p style={{ fontSize: 12, color: "#0F6E56", width: "100%", margin: 0 }}>
+                ✓ Firmado por el cliente{contrato.firmado_at ? ` el ${new Date(contrato.firmado_at).toLocaleDateString("es-MX")}` : ""}.
+              </p>
+            ) : (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, width: "100%", color: "#333" }}>
+                <input
+                  type="checkbox"
+                  checked={confirmacionFirma}
+                  onChange={(e) => setConfirmacionFirma(e.target.checked)}
+                />
+                Confirmo que el documento cargado es la versión firmada
+              </label>
+            )}
             <button
               className="btn-aceptar"
               onClick={aprobar}
-              disabled={procesandoAprobacion || !contrato.archivo_url || !confirmacionFirma}
+              disabled={procesandoAprobacion || !contrato.archivo_url || !(confirmacionFirma || contrato.firmado)}
             >
               ✓ Aprobar contrato
             </button>

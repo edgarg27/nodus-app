@@ -54,6 +54,8 @@ export type Contrato = {
   dia_pago: number | null;
   cotizacion_id: string | null;
   firmado: boolean;
+  firmado_at: string | null;
+  enviado_a_firma_at: string | null;
   plan_nombre?: string | null;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
