@@ -21,9 +21,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id } = await req.json();
+  const { id, rfc } = await req.json();
   if (!id) {
     return NextResponse.json({ error: "Falta el id de la cotización" }, { status: 400 });
+  }
+  if (!rfc || !String(rfc).trim()) {
+    return NextResponse.json({ error: "Falta el RFC del cliente" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -76,6 +79,17 @@ export async function POST(req: NextRequest) {
       nombrePaquete = paquete?.nombre ?? null;
     }
 
+    // Identificador del espacio asignado ("Coworking 3", "Oficina 10") —
+    // se saca de la oficina que ya se ligó al cotizar, no se vuelve a
+    // preguntar (ver oficinas.numero).
+    let numeroEspacio = "";
+    if (venta.oficina_id) {
+      const { data: oficina } = await admin.from("oficinas").select("numero").eq("id", venta.oficina_id).maybeSingle();
+      numeroEspacio = oficina?.numero ?? "";
+    }
+
+    const rfcLimpio = String(rfc).trim().toUpperCase();
+
     const docxBuffer = await generarContratoDocx({
       centro: venta.centro,
       tipoEspacio,
@@ -84,6 +98,8 @@ export async function POST(req: NextRequest) {
       folio: cotizacion.id,
       nombreCliente: venta.nombre_contesta_telefono || "",
       razonSocial: venta.razon_social || "",
+      rfc: rfcLimpio,
+      numeroEspacio,
       correoCliente: venta.correo_contesta || "",
       fechaInicio: fmtFecha(venta.fecha_inicio),
       fechaFin: fmtFecha(venta.fecha_fin),
@@ -127,6 +143,7 @@ export async function POST(req: NextRequest) {
       deposito_garantia: depositoGarantia,
       paquete_id: venta.paquete_id ?? null,
       oficina_id: venta.oficina_id ?? null,
+      rfc: rfcLimpio,
     };
 
     const { data: contratoCreado, error: insertError } = contratoExistente

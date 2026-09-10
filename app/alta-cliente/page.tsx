@@ -35,9 +35,11 @@ type ContratoPendiente = {
   estatus: string | null;
   cotizacion_id: string | null;
   oficina_id: string | null;
+  rfc: string | null;
   nombreContesta: string | null;
   telefono: string | null;
   correo: string | null;
+  razonSocial: string | null;
   tipoEspacio: string | null;
 };
 
@@ -161,7 +163,7 @@ function AltaClienteInner() {
     const { data: conts } = await supabase
       .from("contratos")
       .select(
-        "id, fecha_inicio, fecha_vencimiento, renta_mensual, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id"
+        "id, fecha_inicio, fecha_vencimiento, renta_mensual, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc"
       )
       .is("user_id", null)
       .eq("centro", c)
@@ -172,12 +174,18 @@ function AltaClienteInner() {
     );
     const cotPorId: Record<
       string,
-      { nombre_contesta_telefono: string | null; telefono_contesta: string | null; correo_contesta: string | null; tipo_espacio: string | null }
+      {
+        nombre_contesta_telefono: string | null;
+        telefono_contesta: string | null;
+        correo_contesta: string | null;
+        tipo_espacio: string | null;
+        razon_social: string | null;
+      }
     > = {};
     if (cotizacionIds.length > 0) {
       const { data: cots } = await supabase
         .from("cotizaciones_comerciales")
-        .select("id, nombre_contesta_telefono, telefono_contesta, correo_contesta, tipo_espacio")
+        .select("id, nombre_contesta_telefono, telefono_contesta, correo_contesta, tipo_espacio, razon_social")
         .in("id", cotizacionIds);
       (cots || []).forEach((c2) => {
         cotPorId[c2.id] = c2;
@@ -192,6 +200,7 @@ function AltaClienteInner() {
           nombreContesta: cot?.nombre_contesta_telefono || null,
           telefono: cot?.telefono_contesta || null,
           correo: cot?.correo_contesta || null,
+          razonSocial: cot?.razon_social || null,
           tipoEspacio: cot?.tipo_espacio || null,
         };
       })
@@ -214,12 +223,14 @@ function AltaClienteInner() {
     setContratoSeleccionadoId(c.id);
     setBusquedaContrato(c.nombreContesta || c.tipoEspacio || "Contrato");
     setMostrarListaContratos(false);
-    if (c.nombreContesta || c.telefono || c.correo) {
+    if (c.nombreContesta || c.telefono || c.correo || c.rfc || c.razonSocial) {
       setFormCliente((prev) => ({
         ...prev,
         nombre: prev.nombre || c.nombreContesta || "",
         telefono: prev.telefono || c.telefono || "",
         email: prev.email || c.correo || "",
+        rfc: prev.rfc || c.rfc || "",
+        empresa: prev.empresa || c.razonSocial || "",
       }));
     }
   }

@@ -63,6 +63,8 @@ export type DatosContratoDocx = {
   folio: string;
   nombreCliente: string;
   razonSocial: string;
+  rfc: string;
+  numeroEspacio: string;
   correoCliente: string;
   fechaInicio: string | null; // ya formateada para mostrar
   fechaFin: string | null;
@@ -107,6 +109,8 @@ export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buf
   doc = reemplazarTodasDocx(doc, "{{FOLIO}}", datos.folio);
   doc = reemplazarTodasDocx(doc, "{{NOMBRE_CLIENTE}}", datos.nombreCliente || "—");
   doc = reemplazarTodasDocx(doc, "{{RAZON_SOCIAL}}", datos.razonSocial || "—");
+  doc = reemplazarTodasDocx(doc, "{{RFC}}", datos.rfc || "—");
+  doc = reemplazarTodasDocx(doc, "{{NUMERO_ESPACIO}}", datos.numeroEspacio || "—");
   doc = reemplazarTodasDocx(doc, "{{CORREO_CLIENTE}}", datos.correoCliente || "—");
   doc = reemplazarTodasDocx(doc, "{{FECHA_INICIO}}", datos.fechaInicio || "—");
   doc = reemplazarTodasDocx(doc, "{{FECHA_FIN}}", datos.fechaFin || "—");
