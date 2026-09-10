@@ -56,6 +56,7 @@ export default function ContratoModal({
   const [procesandoAprobacion, setProcesandoAprobacion] = useState(false);
   const [error, setError] = useState("");
   const [estatus, setEstatus] = useState(contrato.estatus || "");
+  const [confirmacionFirma, setConfirmacionFirma] = useState(false);
 
   // ---------- Adicionales (catálogo con buscador + persistencia inmediata) ----------
   const [catalogo, setCatalogo] = useState<CatalogoItem[]>([]);
@@ -255,9 +256,9 @@ export default function ContratoModal({
   }
 
   async function aprobar() {
-    if (!contrato.archivo_url) return;
+    if (!contrato.archivo_url || !confirmacionFirma) return;
     setProcesandoAprobacion(true);
-    await supabase.from("contratos").update({ estatus: "vigente" }).eq("id", contrato.id);
+    await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", contrato.id);
 
     // El pago de la renta se genera hasta ahora — al aprobar el contrato,
     // no al crearlo (nace en pre_aprobado y no debe cobrarse antes).
@@ -396,7 +397,19 @@ export default function ContratoModal({
 
         {estatus === "pre_aprobado" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <button className="btn-aceptar" onClick={aprobar} disabled={procesandoAprobacion || !contrato.archivo_url}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, width: "100%", color: "#333" }}>
+              <input
+                type="checkbox"
+                checked={confirmacionFirma}
+                onChange={(e) => setConfirmacionFirma(e.target.checked)}
+              />
+              Confirmo que el documento cargado es la versión firmada
+            </label>
+            <button
+              className="btn-aceptar"
+              onClick={aprobar}
+              disabled={procesandoAprobacion || !contrato.archivo_url || !confirmacionFirma}
+            >
               ✓ Aprobar contrato
             </button>
             <button className="btn-rechazar" onClick={rechazar} disabled={procesandoAprobacion}>

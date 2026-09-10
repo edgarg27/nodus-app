@@ -53,10 +53,12 @@ export type Contrato = {
   fecha_baja: string | null;
   dia_pago: number | null;
   cotizacion_id: string | null;
+  firmado: boolean;
   plan_nombre?: string | null;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
   cliente_email?: string;
+  cliente_telefono?: string | null;
 };
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -106,7 +108,7 @@ export default function ContratosPage() {
     setLoading(true);
     const { data: clis } = await supabase
       .from("profiles")
-      .select("id, nombre, email, empresa")
+      .select("id, nombre, email, empresa, telefono")
       .eq("rol", "cliente")
       .eq("centro", c)
       .order("nombre");
@@ -133,10 +135,12 @@ export default function ContratosPage() {
     const nombrePorId: Record<string, string> = {};
     const empresaPorId: Record<string, string | null> = {};
     const emailPorId: Record<string, string> = {};
+    const telefonoPorId: Record<string, string | null> = {};
     (clis || []).forEach((cl) => {
       nombrePorId[cl.id] = cl.nombre;
       empresaPorId[cl.id] = cl.empresa;
       emailPorId[cl.id] = cl.email;
+      telefonoPorId[cl.id] = cl.telefono;
     });
 
     const { data: conts } = await supabase
@@ -190,6 +194,7 @@ export default function ContratosPage() {
         cliente_nombre: ct.user_id ? nombrePorId[ct.user_id] : ct.cliente_nombre_historico,
         cliente_empresa: ct.user_id ? empresaPorId[ct.user_id] : ct.cliente_empresa_historico,
         cliente_email: ct.user_id ? emailPorId[ct.user_id] : ct.cliente_email_historico,
+        cliente_telefono: ct.user_id ? telefonoPorId[ct.user_id] : null,
         plan_nombre: ct.cotizacion_id ? labelPorCotizacion[ct.cotizacion_id] || null : null,
       }))
     );
@@ -199,17 +204,38 @@ export default function ContratosPage() {
   // ---- Aprobación de contratos pre_aprobado ----
   const [contratoEditando, setContratoEditando] = useState<Contrato | null>(null);
   const [procesandoAprobacion, setProcesandoAprobacion] = useState<string | null>(null);
-  const contratosPendientes = contratos.filter((c) => c.estatus === "pre_aprobado");
   const [vistaContratos, setVistaContratos] = useState<"pendientes" | "todos">("pendientes");
+
+  // Casilla "Confirmo que el documento cargado es la versión firmada" por
+  // tarjeta de contrato pendiente — el botón "✓ Aprobar" no se habilita
+  // solo con el archivo cargado, también hace falta esta confirmación.
+  const [confirmacionFirma, setConfirmacionFirma] = useState<Record<string, boolean>>({});
+
+  // Búsqueda por nombre, empresa, teléfono, correo o folio (id del
+  // contrato) — aplica tanto a "Pendientes de aprobación" como a "Todos".
+  const [busquedaContratos, setBusquedaContratos] = useState("");
+  function coincideBusquedaContrato(c: Contrato) {
+    const q = busquedaContratos.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (c.cliente_nombre || "").toLowerCase().includes(q) ||
+      (c.cliente_empresa || "").toLowerCase().includes(q) ||
+      (c.cliente_telefono || "").toLowerCase().includes(q) ||
+      (c.cliente_email || "").toLowerCase().includes(q) ||
+      c.id.toLowerCase().includes(q)
+    );
+  }
+  const contratosPendientes = contratos.filter((c) => c.estatus === "pre_aprobado" && coincideBusquedaContrato(c));
+  const contratosFiltrados = contratos.filter(coincideBusquedaContrato);
 
   // Duplica exactamente la misma lógica de pagos que ContratoModal.tsx →
   // aprobar() — es indispensable no dejar esta vía sin la lógica, porque es
   // el camino más directo que usa el staff desde la lista de pendientes
   // (regla de negocio #3 de DOCUMENTACION_COTIZAR.md).
   async function aprobarContrato(c: Contrato) {
-    if (!c.archivo_url) return;
+    if (!c.archivo_url || !confirmacionFirma[c.id]) return;
     setProcesandoAprobacion(c.id);
-    await supabase.from("contratos").update({ estatus: "vigente" }).eq("id", c.id);
+    await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", c.id);
 
     const renta = Number(c.renta_mensual) || 0;
     if (c.user_id && renta > 0) {
@@ -505,9 +531,16 @@ export default function ContratosPage() {
                 className={"centro-tab" + (vistaContratos === "todos" ? " active" : "")}
                 onClick={() => setVistaContratos("todos")}
               >
-                📄 Todos los contratos ({contratos.length})
+                📄 Todos los contratos ({contratosFiltrados.length})
               </button>
             </div>
+
+            <input
+              placeholder="Buscar por nombre, empresa, teléfono, correo o folio..."
+              value={busquedaContratos}
+              onChange={(e) => setBusquedaContratos(e.target.value)}
+              style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%" }}
+            />
 
             {vistaContratos === "pendientes" && (
               <div className="rep-ocupacion-card">
@@ -532,11 +565,19 @@ export default function ContratosPage() {
                         </span>
                       </span>
                     </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginTop: 8, color: "#333" }}>
+                      <input
+                        type="checkbox"
+                        checked={!!confirmacionFirma[c.id]}
+                        onChange={(e) => setConfirmacionFirma((prev) => ({ ...prev, [c.id]: e.target.checked }))}
+                      />
+                      Confirmo que el documento cargado es la versión firmada
+                    </label>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                       <button
                         className="btn-aceptar"
                         onClick={() => aprobarContrato(c)}
-                        disabled={procesandoAprobacion === c.id || !c.archivo_url}
+                        disabled={procesandoAprobacion === c.id || !c.archivo_url || !confirmacionFirma[c.id]}
                       >
                         ✓ Aprobar
                       </button>
@@ -550,6 +591,11 @@ export default function ContratosPage() {
                       {!c.archivo_url && (
                         <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
                           ⚠️ Sube el contrato firmado antes de aprobar
+                        </p>
+                      )}
+                      {c.archivo_url && !confirmacionFirma[c.id] && (
+                        <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
+                          ⚠️ Marca la casilla de confirmación antes de aprobar
                         </p>
                       )}
                       <button
@@ -837,10 +883,12 @@ export default function ContratosPage() {
               </form>
             )}
 
-            {contratos.length === 0 ? (
-              <div className="empty-card">Sin contratos registrados en {centro}</div>
+            {contratosFiltrados.length === 0 ? (
+              <div className="empty-card">
+                {busquedaContratos ? "Sin contratos que coincidan con la búsqueda" : `Sin contratos registrados en ${centro}`}
+              </div>
             ) : (
-              contratos.map((c) => {
+              contratosFiltrados.map((c) => {
                 const esInactivoDebe = c.estatus === "inactivo_debe";
                 const badge = ESTATUS_LABEL[c.estatus || ""] || { label: c.estatus || "—", bg: "#F0F0F0", color: "#555" };
                 const etiqueta = esInactivoDebe
@@ -882,6 +930,11 @@ export default function ContratosPage() {
                       </a>
                     ) : (
                       <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin contrato PDF adjunto</p>
+                    )}
+                    {!c.user_id && c.estatus !== "rechazado" && (
+                      <a className="ver-pdf-btn" href={`/alta-cliente?contratoId=${c.id}`}>
+                        Continuar en Alta de cliente →
+                      </a>
                     )}
                     <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                       <button
