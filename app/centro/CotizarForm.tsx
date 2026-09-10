@@ -1010,7 +1010,7 @@ export default function CotizarForm({
     const duracionLabel = `${duracionSalaSeleccion} hora${duracionSalaSeleccion === 1 ? "" : "s"}`;
     const horarioLabel = `${formatHora(seleccionSala.horaInicio)} - ${formatHora(seleccionSala.horaFin)}`;
 
-    const { error: cotError } = await supabase.from("cotizaciones_comerciales").insert({
+    const { data: cotizacion, error: cotError } = await supabase.from("cotizaciones_comerciales").insert({
       centro,
       cliente_id: clienteIdEfectivo,
       prospecto_id: prospectoIdPreseleccionado || null,
@@ -1050,10 +1050,10 @@ export default function CotizarForm({
       coffee_break_paquete_id: quiereCoffee && paqueteCoffee ? paqueteCoffee.id : null,
       coffee_break_personas: quiereCoffee && paqueteCoffee ? personasCoffeeNum : null,
       coffee_break_total: quiereCoffee && paqueteCoffee ? totalCoffeeBreak : null,
-    });
+    }).select().single();
 
     setGuardando(false);
-    if (cotError) {
+    if (cotError || !cotizacion) {
       setError("No se pudo guardar la cotización. Intenta de nuevo.");
       return;
     }
@@ -1095,6 +1095,7 @@ export default function CotizarForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           centro,
+          cotizacionComercialId: cotizacion.id,
           tamano: salaSeleccionada.tamano,
           descripcion: `${SALA_JUNTAS_TIPO} ${salaSeleccionada.tamano} · ${duracionLabel} · ${horarioLabel} · ${seleccionSala.fecha}`,
           precioUnitario: precioPactadoNum,
@@ -1342,6 +1343,7 @@ export default function CotizarForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             centro,
+            cotizacionComercialId: cotizacion.id,
             tipoEspacio,
             descripcion: nombreEspacio,
             cantidad: cantidadPeriodo ? Number(cantidadPeriodo) : 1,
