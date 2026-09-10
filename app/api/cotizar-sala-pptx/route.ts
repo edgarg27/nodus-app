@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     nombreCotizacion,
     notas,
     nombreDestinatario,
+    cotizacionComercialId,
   } = await req.json();
 
   if (!centro || !descripcion || precioUnitario == null || subtotal == null || ivaMonto == null || total == null) {
@@ -102,6 +103,8 @@ export async function POST(req: NextRequest) {
         archivo_url: archivoUrl,
         archivo_pdf_url: archivoPdfUrl,
         registrado_por: session.user.id,
+        cotizacion_comercial_id: cotizacionComercialId || null,
+        estatus: "pendiente",
       })
       .select()
       .single();
