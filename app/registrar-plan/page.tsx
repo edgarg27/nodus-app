@@ -23,6 +23,7 @@ function RegistrarPlanInner() {
   const cantidadDesdeUrl = searchParams.get("cantidad") || undefined;
   // Handoff desde la pestaña Prospectos de Centro (botón "🧾 Cotizar" en
   // cada tarjeta) — sin cliente todavía, solo precarga el contexto del lead.
+  const prospectoIdDesdeUrl = searchParams.get("prospectoId") || undefined;
   const prospectoNombreDesdeUrl = searchParams.get("prospectoNombre") || undefined;
   const prospectoTelefonoDesdeUrl = searchParams.get("prospectoTelefono") || undefined;
   const prospectoEmailDesdeUrl = searchParams.get("prospectoEmail") || undefined;
@@ -103,6 +104,7 @@ function RegistrarPlanInner() {
             fechaInicioPreseleccionada={fechaInicioDesdeUrl}
             modalidadPreseleccionada={modalidadDesdeUrl}
             cantidadPreseleccionada={cantidadDesdeUrl}
+            prospectoIdPreseleccionado={prospectoIdDesdeUrl}
             prospectoNombrePreseleccionado={prospectoNombreDesdeUrl}
             prospectoTelefonoPreseleccionado={prospectoTelefonoDesdeUrl}
             prospectoEmailPreseleccionado={prospectoEmailDesdeUrl}
