@@ -3,18 +3,27 @@ import path from "path";
 import fs from "fs/promises";
 import { fmtMoneda, reemplazarTodasDocx } from "./docxHelpers";
 
-// Mismo mecanismo que lib/cotizacionEspacioPptx.ts: un mapa de plantillas
-// por tipo de espacio × tipo de persona, y JSZip para editar el XML del
-// documento. Solo centro Bosques por ahora, igual que las plantillas de
-// cotización en PowerPoint (ver PLAN_TRABAJO_EQUIPO.md, sección 8).
+// Plantillas reales de contrato (NBC) — solo centro Bosques. Coworking
+// tiene 3 variantes por tipo de persona: paquete "30 Horas" (término fijo
+// de 1 mes), y CON/SIN depósito en garantía según si la venta capturó un
+// depósito (ver resolverVarianteCoworking). Oficina Privada tiene una sola
+// variante (siempre con depósito) y Working Desk reutiliza esa misma
+// plantilla — no tiene plantilla propia, igual que en el cotizador de
+// PowerPoint (ver lib/cotizacionEspacioPptx.ts). Sala de Juntas no genera
+// contrato: esas cotizaciones son solo reservas.
 export type TipoEspacioContrato = "Coworking" | "Oficina Privada" | "Working Desk" | "Sala de Juntas";
 export type TipoPersona = "fisica" | "moral";
+type VarianteCoworking = "30hrs" | "conDeposito" | "sinDeposito";
 
-const PLANTILLAS: Record<TipoEspacioContrato, Record<TipoPersona, string>> = {
-  Coworking: { fisica: "BosquesCoworkingFisica.docx", moral: "BosquesCoworkingMoral.docx" },
-  "Oficina Privada": { fisica: "BosquesOficinaPrivadaFisica.docx", moral: "BosquesOficinaPrivadaMoral.docx" },
-  "Working Desk": { fisica: "BosquesWorkingDeskFisica.docx", moral: "BosquesWorkingDeskMoral.docx" },
-  "Sala de Juntas": { fisica: "BosquesSalaDeJuntasFisica.docx", moral: "BosquesSalaDeJuntasMoral.docx" },
+const PLANTILLAS_COWORKING: Record<VarianteCoworking, Record<TipoPersona, string>> = {
+  "30hrs": { fisica: "BosquesCoworking30hrsFisica.docx", moral: "BosquesCoworking30hrsMoral.docx" },
+  conDeposito: { fisica: "BosquesCoworkingFisicaConDeposito.docx", moral: "BosquesCoworkingMoralConDeposito.docx" },
+  sinDeposito: { fisica: "BosquesCoworkingFisicaSinDeposito.docx", moral: "BosquesCoworkingMoralSinDeposito.docx" },
+};
+// Working Desk reutiliza la plantilla de Oficina Privada a propósito.
+const PLANTILLA_OFICINA: Record<TipoPersona, string> = {
+  fisica: "BosquesOficinaPrivadaFisica.docx",
+  moral: "BosquesOficinaPrivadaMoral.docx",
 };
 
 // `tipo_espacio` en `cotizaciones_comerciales` es texto libre (ej.
@@ -30,35 +39,63 @@ export function normalizarTipoEspacioContrato(tipoEspacioLibre: string): TipoEsp
   return null;
 }
 
-export function centroTienePlantillaContrato(tipoEspacio: TipoEspacioContrato, tipoPersona: TipoPersona, centro: string) {
-  return centro === "Bosques" && !!PLANTILLAS[tipoEspacio]?.[tipoPersona];
+// Paquete "30 Horas" (ver tabla `paquetes`) trae un contrato con término
+// fijo de 1 mes — se detecta por nombre, no por id (puede variar entre
+// entornos de prueba y producción).
+function esPaquete30Horas(nombrePaquete: string | null | undefined) {
+  return (nombrePaquete || "").trim().toLowerCase().includes("30 hora");
+}
+
+function resolverVarianteCoworking(nombrePaquete: string | null | undefined, depositoGarantia: number): VarianteCoworking {
+  if (esPaquete30Horas(nombrePaquete)) return "30hrs";
+  return depositoGarantia > 0 ? "conDeposito" : "sinDeposito";
+}
+
+export function centroTienePlantillaContrato(tipoEspacio: TipoEspacioContrato, centro: string) {
+  return centro === "Bosques" && tipoEspacio !== "Sala de Juntas";
 }
 
 export type DatosContratoDocx = {
   centro: string;
   tipoEspacio: TipoEspacioContrato;
   tipoPersona: TipoPersona;
+  nombrePaquete?: string | null;
   folio: string;
   nombreCliente: string;
+  razonSocial: string;
   correoCliente: string;
   fechaInicio: string | null; // ya formateada para mostrar
   fechaFin: string | null;
+  duracionMeses: number | null;
   precioMensual: number;
   depositoGarantia: number;
 };
 
-async function cargarPlantilla(tipoEspacio: TipoEspacioContrato, tipoPersona: TipoPersona, centro: string) {
-  const archivo = PLANTILLAS[tipoEspacio]?.[tipoPersona];
-  if (!archivo || !centroTienePlantillaContrato(tipoEspacio, tipoPersona, centro)) {
-    throw new Error(`Sin plantilla de contrato para "${tipoEspacio}" (persona ${tipoPersona}) en "${centro}" todavía.`);
+function resolverArchivoPlantilla(datos: DatosContratoDocx): string {
+  if (datos.tipoEspacio === "Coworking") {
+    const variante = resolverVarianteCoworking(datos.nombrePaquete, datos.depositoGarantia);
+    return PLANTILLAS_COWORKING[variante][datos.tipoPersona];
   }
+  // Oficina Privada y Working Desk comparten plantilla.
+  return PLANTILLA_OFICINA[datos.tipoPersona];
+}
+
+async function cargarPlantilla(datos: DatosContratoDocx) {
+  if (!centroTienePlantillaContrato(datos.tipoEspacio, datos.centro)) {
+    throw new Error(
+      datos.tipoEspacio === "Sala de Juntas"
+        ? "Las cotizaciones de Sala de Juntas son reservas — no generan contrato."
+        : `Sin plantilla de contrato para "${datos.tipoEspacio}" en "${datos.centro}" todavía.`
+    );
+  }
+  const archivo = resolverArchivoPlantilla(datos);
   const ruta = path.join(process.cwd(), "public", "plantillas-contrato", archivo);
   const buffer = await fs.readFile(ruta);
   return JSZip.loadAsync(buffer);
 }
 
 export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buffer> {
-  const zip = await cargarPlantilla(datos.tipoEspacio, datos.tipoPersona, datos.centro);
+  const zip = await cargarPlantilla(datos);
   const docPath = "word/document.xml";
   let doc = await zip.file(docPath)?.async("string");
   if (!doc) {
@@ -69,9 +106,11 @@ export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buf
   doc = reemplazarTodasDocx(doc, "{{TIPO_ESPACIO}}", datos.tipoEspacio);
   doc = reemplazarTodasDocx(doc, "{{FOLIO}}", datos.folio);
   doc = reemplazarTodasDocx(doc, "{{NOMBRE_CLIENTE}}", datos.nombreCliente || "—");
+  doc = reemplazarTodasDocx(doc, "{{RAZON_SOCIAL}}", datos.razonSocial || "—");
   doc = reemplazarTodasDocx(doc, "{{CORREO_CLIENTE}}", datos.correoCliente || "—");
   doc = reemplazarTodasDocx(doc, "{{FECHA_INICIO}}", datos.fechaInicio || "—");
   doc = reemplazarTodasDocx(doc, "{{FECHA_FIN}}", datos.fechaFin || "—");
+  doc = reemplazarTodasDocx(doc, "{{DURACION_MESES}}", datos.duracionMeses != null ? String(datos.duracionMeses) : "—");
   doc = reemplazarTodasDocx(doc, "{{PRECIO_MENSUAL}}", fmtMoneda(datos.precioMensual));
   doc = reemplazarTodasDocx(doc, "{{DEPOSITO_GARANTIA}}", fmtMoneda(datos.depositoGarantia));
   doc = reemplazarTodasDocx(

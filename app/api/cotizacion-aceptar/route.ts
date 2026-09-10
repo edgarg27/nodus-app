@@ -67,15 +67,27 @@ export async function POST(req: NextRequest) {
     const precioMensual = Number(venta.precio_pactado ?? venta.cargo_recurrente ?? venta.precio_neto ?? 0);
     const depositoGarantia = Number(venta.deposito_garantia ?? 0);
 
+    // Se necesita el nombre del paquete para detectar el paquete "30
+    // Horas" (contrato de término fijo distinto al resto de Coworking) —
+    // ver lib/contratoDocx.ts → resolverVarianteCoworking.
+    let nombrePaquete: string | null = null;
+    if (venta.paquete_id) {
+      const { data: paquete } = await admin.from("paquetes").select("nombre").eq("id", venta.paquete_id).maybeSingle();
+      nombrePaquete = paquete?.nombre ?? null;
+    }
+
     const docxBuffer = await generarContratoDocx({
       centro: venta.centro,
       tipoEspacio,
       tipoPersona,
+      nombrePaquete,
       folio: cotizacion.id,
       nombreCliente: venta.nombre_contesta_telefono || "",
+      razonSocial: venta.razon_social || "",
       correoCliente: venta.correo_contesta || "",
       fechaInicio: fmtFecha(venta.fecha_inicio),
       fechaFin: fmtFecha(venta.fecha_fin),
+      duracionMeses: venta.duracion_meses ?? null,
       precioMensual,
       depositoGarantia,
     });

@@ -651,6 +651,7 @@ export default function CotizarForm({
   const observacionesProspecto = prospectoInteresPreseleccionado ? `Interés: ${prospectoInteresPreseleccionado}` : "";
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
   const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
+  const [razonSocial, setRazonSocial] = useState("");
   const [nombreContesta, setNombreContesta] = useState("");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
   const [correoContesta, setCorreoContesta] = useState(prospectoEmailPreseleccionado || "");
@@ -1003,6 +1004,10 @@ export default function CotizarForm({
       setError("Selecciona si es persona física o moral");
       return;
     }
+    if (tipoPersona === "moral" && !razonSocial.trim()) {
+      setError("Falta la razón social de la empresa");
+      return;
+    }
     setError("");
     setGuardando(true);
 
@@ -1015,6 +1020,7 @@ export default function CotizarForm({
       cliente_id: clienteIdEfectivo,
       prospecto_id: prospectoIdPreseleccionado || null,
       tipo_persona: tipoPersona || null,
+      razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
       oficina_id: null,
       paquete_id: null,
       tipo_espacio: `${SALA_JUNTAS_TIPO} ${salaSeleccionada.tamano} · ${duracionLabel} · ${horarioLabel}`,
@@ -1175,6 +1181,10 @@ export default function CotizarForm({
       setError("Selecciona si es persona física o moral");
       return;
     }
+    if (tipoPersona === "moral" && !razonSocial.trim()) {
+      setError("Falta la razón social de la empresa");
+      return;
+    }
     // Coffee Break es exclusivo de Sala de Juntas — no aplica en este flujo
     // de Coworking/Oficina Privada, así que no se valida aquí.
     setError("");
@@ -1189,6 +1199,7 @@ export default function CotizarForm({
         cliente_id: clienteIdEfectivo,
         prospecto_id: prospectoIdPreseleccionado || null,
         tipo_persona: tipoPersona || null,
+        razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
         oficina_id: oficina?.id || null,
         paquete_id: paquete?.id || null,
         tipo_espacio: tipoEspacio,
@@ -1901,6 +1912,16 @@ export default function CotizarForm({
                 <option value="moral">Persona moral</option>
               </select>
             </div>
+            {tipoPersona === "moral" && (
+              <div>
+                <p className="sub-label">Razón social de la empresa</p>
+                <input
+                  placeholder="Ej. NBC COMPANY, S.A.P.I. DE C.V."
+                  value={razonSocial}
+                  onChange={(e) => setRazonSocial(e.target.value)}
+                />
+              </div>
+            )}
             <div>
               <p className="sub-label">Medio de contacto</p>
               <select
@@ -1933,7 +1954,7 @@ export default function CotizarForm({
               <input type="number" min={0} value={numeroPersonas} onChange={(e) => setNumeroPersonas(e.target.value)} />
             </div>
             <input
-              placeholder="Nombre de quién solicita la cotización"
+              placeholder={tipoPersona === "moral" ? "Nombre del representante legal" : "Nombre de quién solicita la cotización"}
               value={nombreContesta}
               onChange={(e) => setNombreContesta(e.target.value)}
             />
