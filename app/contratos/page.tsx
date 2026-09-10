@@ -147,7 +147,7 @@ export default function ContratosPage() {
       .from("contratos")
       .select("*")
       .eq("centro", c)
-      .order("fecha_vencimiento", { ascending: false });
+      .order("created_at", { ascending: false });
 
     // Contratos creados desde Cotizar no tienen "plan" — su origen (paquete
     // y/o oficina) se resuelve vía cotizacion_id → cotizaciones_comerciales.

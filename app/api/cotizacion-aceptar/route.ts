@@ -21,9 +21,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id } = await req.json();
+  const { id, rfc } = await req.json();
   if (!id) {
     return NextResponse.json({ error: "Falta el id de la cotización" }, { status: 400 });
+  }
+  if (!rfc || !String(rfc).trim()) {
+    return NextResponse.json({ error: "Falta el RFC del cliente" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -67,15 +70,48 @@ export async function POST(req: NextRequest) {
     const precioMensual = Number(venta.precio_pactado ?? venta.cargo_recurrente ?? venta.precio_neto ?? 0);
     const depositoGarantia = Number(venta.deposito_garantia ?? 0);
 
+    // Se necesita el nombre del paquete para detectar el paquete "30
+    // Horas" (contrato de término fijo distinto al resto de Coworking) —
+    // ver lib/contratoDocx.ts → resolverVarianteCoworking — y las horas de
+    // sala de juntas que incluye, para reflejarlas en el contrato.
+    let nombrePaquete: string | null = null;
+    let horasSalaJuntas: number | null = null;
+    if (venta.paquete_id) {
+      const { data: paquete } = await admin
+        .from("paquetes")
+        .select("nombre, incluye_horas_sala_juntas")
+        .eq("id", venta.paquete_id)
+        .maybeSingle();
+      nombrePaquete = paquete?.nombre ?? null;
+      horasSalaJuntas = paquete?.incluye_horas_sala_juntas ?? null;
+    }
+
+    // Identificador del espacio asignado ("Coworking 3", "Oficina 10") —
+    // se saca de la oficina que ya se ligó al cotizar, no se vuelve a
+    // preguntar (ver oficinas.numero).
+    let numeroEspacio = "";
+    if (venta.oficina_id) {
+      const { data: oficina } = await admin.from("oficinas").select("numero").eq("id", venta.oficina_id).maybeSingle();
+      numeroEspacio = oficina?.numero ?? "";
+    }
+
+    const rfcLimpio = String(rfc).trim().toUpperCase();
+
     const docxBuffer = await generarContratoDocx({
       centro: venta.centro,
       tipoEspacio,
       tipoPersona,
+      nombrePaquete,
       folio: cotizacion.id,
       nombreCliente: venta.nombre_contesta_telefono || "",
+      razonSocial: venta.razon_social || "",
+      rfc: rfcLimpio,
+      numeroEspacio,
       correoCliente: venta.correo_contesta || "",
       fechaInicio: fmtFecha(venta.fecha_inicio),
       fechaFin: fmtFecha(venta.fecha_fin),
+      duracionMeses: venta.duracion_meses ?? null,
+      horasSalaJuntas,
       precioMensual,
       depositoGarantia,
     });
@@ -113,8 +149,10 @@ export async function POST(req: NextRequest) {
       fecha_vencimiento: venta.fecha_fin ?? null,
       renta_mensual: precioMensual,
       deposito_garantia: depositoGarantia,
+      horas_sala_juntas: horasSalaJuntas ?? 0,
       paquete_id: venta.paquete_id ?? null,
       oficina_id: venta.oficina_id ?? null,
+      rfc: rfcLimpio,
     };
 
     const { data: contratoCreado, error: insertError } = contratoExistente

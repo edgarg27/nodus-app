@@ -8,15 +8,15 @@ export { escaparXml, fmtMoneda } from "./pptxHelpers";
 import { escaparXml } from "./pptxHelpers";
 
 // Reemplaza TODAS las ocurrencias de un marcador (ej. "{{NOMBRE_CLIENTE}}")
-// por su valor real. Cada marcador debe estar como texto completo de un
-// solo run (<w:t ...>{{MARCADOR}}</w:t>) en la plantilla — el tag de
-// apertura puede traer atributos (Word suele agregar xml:space="preserve"),
-// así que se hace match con regex en vez de una tag fija como en pptxHelpers.
-function escaparRegex(texto: string) {
-  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
+// por su valor real, dentro de cualquier <w:t>...</w:t> de la plantilla —
+// el marcador puede ser todo el contenido de la etiqueta o compartirla con
+// texto literal (ej. "{{FECHA_INICIO}} al {{FECHA_FIN}}" en un solo run,
+// como quedan las plantillas reales de contrato tras insertar marcadores
+// sobre texto que Word ya traía en una sola etiqueta).
 export function reemplazarTodasDocx(xml: string, marcador: string, valorNuevo: string) {
-  const patron = new RegExp(`(<w:t[^>]*>)${escaparRegex(marcador)}(</w:t>)`, "g");
-  return xml.replace(patron, `$1${escaparXml(valorNuevo)}$2`);
+  return xml.replace(/<w:t([^>]*)>([\s\S]*?)<\/w:t>/g, (completo, atributos, contenido) => {
+    if (!contenido.includes(marcador)) return completo;
+    const nuevoContenido = contenido.split(marcador).join(escaparXml(valorNuevo));
+    return `<w:t${atributos}>${nuevoContenido}</w:t>`;
+  });
 }
