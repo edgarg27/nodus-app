@@ -72,11 +72,18 @@ export async function POST(req: NextRequest) {
 
     // Se necesita el nombre del paquete para detectar el paquete "30
     // Horas" (contrato de término fijo distinto al resto de Coworking) —
-    // ver lib/contratoDocx.ts → resolverVarianteCoworking.
+    // ver lib/contratoDocx.ts → resolverVarianteCoworking — y las horas de
+    // sala de juntas que incluye, para reflejarlas en el contrato.
     let nombrePaquete: string | null = null;
+    let horasSalaJuntas: number | null = null;
     if (venta.paquete_id) {
-      const { data: paquete } = await admin.from("paquetes").select("nombre").eq("id", venta.paquete_id).maybeSingle();
+      const { data: paquete } = await admin
+        .from("paquetes")
+        .select("nombre, incluye_horas_sala_juntas")
+        .eq("id", venta.paquete_id)
+        .maybeSingle();
       nombrePaquete = paquete?.nombre ?? null;
+      horasSalaJuntas = paquete?.incluye_horas_sala_juntas ?? null;
     }
 
     // Identificador del espacio asignado ("Coworking 3", "Oficina 10") —
@@ -104,6 +111,7 @@ export async function POST(req: NextRequest) {
       fechaInicio: fmtFecha(venta.fecha_inicio),
       fechaFin: fmtFecha(venta.fecha_fin),
       duracionMeses: venta.duracion_meses ?? null,
+      horasSalaJuntas,
       precioMensual,
       depositoGarantia,
     });
@@ -141,6 +149,7 @@ export async function POST(req: NextRequest) {
       fecha_vencimiento: venta.fecha_fin ?? null,
       renta_mensual: precioMensual,
       deposito_garantia: depositoGarantia,
+      horas_sala_juntas: horasSalaJuntas ?? 0,
       paquete_id: venta.paquete_id ?? null,
       oficina_id: venta.oficina_id ?? null,
       rfc: rfcLimpio,

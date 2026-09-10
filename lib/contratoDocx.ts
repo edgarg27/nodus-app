@@ -69,6 +69,7 @@ export type DatosContratoDocx = {
   fechaInicio: string | null; // ya formateada para mostrar
   fechaFin: string | null;
   duracionMeses: number | null;
+  horasSalaJuntas: number | null;
   precioMensual: number;
   depositoGarantia: number;
 };
@@ -115,6 +116,7 @@ export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buf
   doc = reemplazarTodasDocx(doc, "{{FECHA_INICIO}}", datos.fechaInicio || "—");
   doc = reemplazarTodasDocx(doc, "{{FECHA_FIN}}", datos.fechaFin || "—");
   doc = reemplazarTodasDocx(doc, "{{DURACION_MESES}}", datos.duracionMeses != null ? String(datos.duracionMeses) : "—");
+  doc = reemplazarTodasDocx(doc, "{{HORAS_SALA_JUNTAS}}", datos.horasSalaJuntas != null ? String(datos.horasSalaJuntas) : "0");
   doc = reemplazarTodasDocx(doc, "{{PRECIO_MENSUAL}}", fmtMoneda(datos.precioMensual));
   doc = reemplazarTodasDocx(doc, "{{DEPOSITO_GARANTIA}}", fmtMoneda(datos.depositoGarantia));
   doc = reemplazarTodasDocx(
