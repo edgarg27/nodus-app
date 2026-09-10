@@ -175,6 +175,7 @@ export default function CotizarForm({
   fechaInicioPreseleccionada,
   modalidadPreseleccionada,
   cantidadPreseleccionada,
+  prospectoIdPreseleccionado,
   prospectoNombrePreseleccionado,
   prospectoTelefonoPreseleccionado,
   prospectoEmailPreseleccionado,
@@ -191,7 +192,10 @@ export default function CotizarForm({
   cantidadPreseleccionada?: string;
   // Handoff desde la pestaña Prospectos de Centro (ver botón "🧾 Cotizar"
   // en cada tarjeta) — no hay cliente todavía, así que esto solo precarga
-  // observaciones/tipo de prospecto para no perder el contexto del lead.
+  // observaciones/tipo de prospecto para no perder el contexto del lead. El
+  // id sí se persiste (prospecto_id en cotizaciones_comerciales) para que
+  // /prospectos pueda detectar el seguimiento automático.
+  prospectoIdPreseleccionado?: string;
   prospectoNombrePreseleccionado?: string;
   prospectoTelefonoPreseleccionado?: string;
   prospectoEmailPreseleccionado?: string;
@@ -646,6 +650,7 @@ export default function CotizarForm({
   // campo propio.
   const observacionesProspecto = prospectoInteresPreseleccionado ? `Interés: ${prospectoInteresPreseleccionado}` : "";
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
+  const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
   const [nombreContesta, setNombreContesta] = useState("");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
   const [correoContesta, setCorreoContesta] = useState(prospectoEmailPreseleccionado || "");
@@ -732,7 +737,6 @@ export default function CotizarForm({
   const [depositoGarantia, setDepositoGarantia] = useState("");
   const [cargoRecurrente, setCargoRecurrente] = useState(true);
   const [comentarios, setComentarios] = useState("");
-  const [diaPago, setDiaPago] = useState("");
 
   // Tarifa unitaria vigente (por hora/día/semana/mes según corresponda):
   // la del paquete si hay uno elegido, si no la de la oficina.
@@ -922,6 +926,7 @@ export default function CotizarForm({
     setObservaciones("");
     setDetalleMedioContacto("");
     setMedioContacto("");
+    setTipoPersona("");
     setNumeroPersonas("");
     setQuiereCoffee(false);
     setPaqueteCoffeeId("");
@@ -994,6 +999,10 @@ export default function CotizarForm({
       setError(`Ese paquete de Coffee Break requiere un mínimo de ${paqueteCoffee?.minimo_personas} persona(s)`);
       return;
     }
+    if (!tipoPersona) {
+      setError("Selecciona si es persona física o moral");
+      return;
+    }
     setError("");
     setGuardando(true);
 
@@ -1001,9 +1010,11 @@ export default function CotizarForm({
     const duracionLabel = `${duracionSalaSeleccion} hora${duracionSalaSeleccion === 1 ? "" : "s"}`;
     const horarioLabel = `${formatHora(seleccionSala.horaInicio)} - ${formatHora(seleccionSala.horaFin)}`;
 
-    const { error: cotError } = await supabase.from("cotizaciones_comerciales").insert({
+    const { data: cotizacion, error: cotError } = await supabase.from("cotizaciones_comerciales").insert({
       centro,
       cliente_id: clienteIdEfectivo,
+      prospecto_id: prospectoIdPreseleccionado || null,
+      tipo_persona: tipoPersona || null,
       oficina_id: null,
       paquete_id: null,
       tipo_espacio: `${SALA_JUNTAS_TIPO} ${salaSeleccionada.tamano} · ${duracionLabel} · ${horarioLabel}`,
@@ -1039,10 +1050,10 @@ export default function CotizarForm({
       coffee_break_paquete_id: quiereCoffee && paqueteCoffee ? paqueteCoffee.id : null,
       coffee_break_personas: quiereCoffee && paqueteCoffee ? personasCoffeeNum : null,
       coffee_break_total: quiereCoffee && paqueteCoffee ? totalCoffeeBreak : null,
-    });
+    }).select().single();
 
     setGuardando(false);
-    if (cotError) {
+    if (cotError || !cotizacion) {
       setError("No se pudo guardar la cotización. Intenta de nuevo.");
       return;
     }
@@ -1084,6 +1095,7 @@ export default function CotizarForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           centro,
+          cotizacionComercialId: cotizacion.id,
           tamano: salaSeleccionada.tamano,
           descripcion: `${SALA_JUNTAS_TIPO} ${salaSeleccionada.tamano} · ${duracionLabel} · ${horarioLabel} · ${seleccionSala.fecha}`,
           precioUnitario: precioPactadoNum,
@@ -1159,6 +1171,10 @@ export default function CotizarForm({
       setError("Captura el tipo de cambio para cotizar en USD");
       return;
     }
+    if (!tipoPersona) {
+      setError("Selecciona si es persona física o moral");
+      return;
+    }
     // Coffee Break es exclusivo de Sala de Juntas — no aplica en este flujo
     // de Coworking/Oficina Privada, así que no se valida aquí.
     setError("");
@@ -1171,6 +1187,8 @@ export default function CotizarForm({
       .insert({
         centro,
         cliente_id: clienteIdEfectivo,
+        prospecto_id: prospectoIdPreseleccionado || null,
+        tipo_persona: tipoPersona || null,
         oficina_id: oficina?.id || null,
         paquete_id: paquete?.id || null,
         tipo_espacio: tipoEspacio,
@@ -1247,7 +1265,9 @@ export default function CotizarForm({
         deposito_garantia: depositoNum,
         horas_sala_juntas: paquete?.incluye_horas_sala_juntas || 0,
         horas_bolsa: paquete?.horas_bolsa || 0,
-        dia_pago: diaPago ? Number(diaPago) : null,
+        // El día de pago ya no se pregunta aquí — se vuelve a pedir,
+        // opcional, hasta /alta-cliente (ver app/alta-cliente/page.tsx).
+        dia_pago: null,
         estatus: "pre_aprobado",
         archivo_url: null,
         cotizacion_id: cotizacion.id,
@@ -1323,6 +1343,7 @@ export default function CotizarForm({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             centro,
+            cotizacionComercialId: cotizacion.id,
             tipoEspacio,
             descripcion: nombreEspacio,
             cantidad: cantidadPeriodo ? Number(cantidadPeriodo) : 1,
@@ -1868,6 +1889,19 @@ export default function CotizarForm({
               </select>
             </div>
             <div>
+              <p className="sub-label">Persona física o moral</p>
+              <select
+                value={tipoPersona}
+                onChange={(e) => setTipoPersona(e.target.value as "fisica" | "moral" | "")}
+              >
+                <option value="" hidden>
+                  Selecciona
+                </option>
+                <option value="fisica">Persona física</option>
+                <option value="moral">Persona moral</option>
+              </select>
+            </div>
+            <div>
               <p className="sub-label">Medio de contacto</p>
               <select
                 value={medioContacto}
@@ -2094,21 +2128,15 @@ export default function CotizarForm({
             )}
 
             {!esHora && !esDia && !esSalaJuntas && (
-              <>
-                <div>
-                  <p className="sub-label">% de incremento</p>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={porcentajeIncremento}
-                    onChange={(e) => setPorcentajeIncremento(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <p className="sub-label">Día del mes que paga</p>
-                  <input type="number" min={1} max={31} value={diaPago} onChange={(e) => setDiaPago(e.target.value)} />
-                </div>
-              </>
+              <div>
+                <p className="sub-label">% de incremento</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={porcentajeIncremento}
+                  onChange={(e) => setPorcentajeIncremento(e.target.value)}
+                />
+              </div>
             )}
           </div>
 

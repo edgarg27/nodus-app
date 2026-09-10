@@ -69,10 +69,17 @@ export default function ProspectosPage() {
 
   const [prospectoPerdiendo, setProspectoPerdiendo] = useState<Prospecto | null>(null);
   const [comentarioPerdido, setComentarioPerdido] = useState("");
+  const [avisoExito, setAvisoExito] = useState(false);
 
   useEffect(() => {
     init();
   }, []);
+
+  useEffect(() => {
+    if (!avisoExito) return;
+    const t = setTimeout(() => setAvisoExito(false), 3500);
+    return () => clearTimeout(t);
+  }, [avisoExito]);
 
   async function init() {
     setLoading(true);
@@ -99,7 +106,29 @@ export default function ProspectosPage() {
     // cualquier Nodus, y cualquier admin debe poder ver y dar seguimiento a
     // todos los prospectos, no solo los de un centro.
     const { data } = await supabase.from("prospectos").select("*").order("created_at", { ascending: false });
-    setProspectos(data || []);
+    const lista = data || [];
+    setProspectos(lista);
+    await marcarSeguimientoAutomatico(lista);
+  }
+
+  // Un prospecto que ya tiene al menos una cotización ligada (ver
+  // prospecto_id en cotizaciones_comerciales, precargado desde el botón
+  // "🧾 Cotizar") pasa solo a "en_seguimiento" — nunca si ya está
+  // convertido o perdido, eso son decisiones manuales del staff.
+  async function marcarSeguimientoAutomatico(lista: Prospecto[]) {
+    const candidatos = lista.filter((p) => p.estado === "nuevo" || p.estado === "contactado");
+    if (candidatos.length === 0) return;
+    const { data: cotizaciones } = await supabase
+      .from("cotizaciones_comerciales")
+      .select("prospecto_id")
+      .in("prospecto_id", candidatos.map((p) => p.id));
+    const idsConCotizacion = new Set((cotizaciones || []).map((c) => c.prospecto_id).filter(Boolean));
+    const idsAActualizar = candidatos.filter((p) => idsConCotizacion.has(p.id)).map((p) => p.id);
+    if (idsAActualizar.length === 0) return;
+    await supabase.from("prospectos").update({ estado: "en_seguimiento" }).in("id", idsAActualizar);
+    setProspectos((prev) =>
+      prev.map((p) => (idsAActualizar.includes(p.id) ? { ...p, estado: "en_seguimiento" } : p))
+    );
   }
 
   async function agregarProspecto(e: React.FormEvent) {
@@ -131,6 +160,7 @@ export default function ProspectosPage() {
       rfc: "",
       centroInteres: centro || "",
     });
+    setAvisoExito(true);
     cargarProspectos();
   }
 
@@ -190,6 +220,21 @@ export default function ProspectosPage() {
         ) : (
           <>
             <p className="panel-section-label">Registrar prospecto</p>
+            {avisoExito && (
+              <div
+                style={{
+                  background: "#E1F5EE",
+                  color: "#0F6E56",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                ✅ Prospecto registrado con éxito
+              </div>
+            )}
             <form className="form-card" onSubmit={agregarProspecto}>
               <div className="tel-form-grid">
                 <input
@@ -302,8 +347,6 @@ export default function ProspectosPage() {
                 return mesesOrdenados.map((mesKey) => {
                   const [anio, mesNum] = mesKey.split("-");
                   const lista = [...porMes[mesKey]].sort((a, b) => {
-                    const interesCmp = (a.interes || "").localeCompare(b.interes || "");
-                    if (interesCmp !== 0) return interesCmp;
                     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
                   });
                   return (
@@ -352,7 +395,9 @@ export default function ProspectosPage() {
                               <a
                                 className="tel-borrar-btn"
                                 style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                href={`/registrar-plan?centro=${encodeURIComponent(p.centro || centro || "")}&prospectoNombre=${encodeURIComponent(
+                                href={`/registrar-plan?centro=${encodeURIComponent(p.centro || centro || "")}&prospectoId=${encodeURIComponent(
+                                  p.id
+                                )}&prospectoNombre=${encodeURIComponent(
                                   p.nombre
                                 )}&prospectoTelefono=${encodeURIComponent(p.telefono || "")}&prospectoEmail=${encodeURIComponent(
                                   p.email || ""
