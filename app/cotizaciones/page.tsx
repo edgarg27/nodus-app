@@ -11,6 +11,8 @@ type Cotizacion = {
   notas: string | null;
   archivo_url: string | null;
   created_at: string;
+  estatus: string | null;
+  cotizacion_comercial_id: string | null;
 };
 
 export default function CotizacionesPage() {
@@ -26,6 +28,8 @@ export default function CotizacionesPage() {
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
+
+  const [aceptandoId, setAceptandoId] = useState<string | null>(null);
 
   useEffect(() => {
     init();
@@ -100,6 +104,27 @@ export default function CotizacionesPage() {
     if (!confirm("¿Borrar esta cotización?")) return;
     await supabase.from("cotizaciones").delete().eq("id", id);
     if (centro) fetchCotizaciones(centro, "");
+  }
+
+  async function aceptarCotizacion(id: string) {
+    if (!confirm("¿Aceptar esta cotización y generar el contrato?")) return;
+    setAceptandoId(id);
+    try {
+      const res = await fetch("/api/cotizacion-aceptar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "No se pudo aceptar la cotización");
+        return;
+      }
+      alert("Contrato generado como pre-aprobado.");
+      if (centro) fetchCotizaciones(centro, "");
+    } finally {
+      setAceptandoId(null);
+    }
   }
 
   return (
@@ -213,6 +238,14 @@ export default function CotizacionesPage() {
                         📥 Descargar
                       </a>
                     )}
+                    <button
+                      className="ver-pdf-btn"
+                      disabled={c.estatus === "aceptada" || !c.cotizacion_comercial_id || aceptandoId === c.id}
+                      title={!c.cotizacion_comercial_id ? "Esta cotización todavía no está ligada a una venta" : undefined}
+                      onClick={() => aceptarCotizacion(c.id)}
+                    >
+                      {c.estatus === "aceptada" ? "✓ Aceptada" : aceptandoId === c.id ? "Generando…" : "✓ Aceptar"}
+                    </button>
                     <button className="tel-borrar-btn" onClick={() => borrarCotizacion(c.id)}>
                       🗑
                     </button>
