@@ -652,7 +652,7 @@ export default function CotizarForm({
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
   const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
   const [razonSocial, setRazonSocial] = useState("");
-  const [nombreContesta, setNombreContesta] = useState("");
+  const [nombreContesta, setNombreContesta] = useState(prospectoNombrePreseleccionado || "");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
   const [correoContesta, setCorreoContesta] = useState(prospectoEmailPreseleccionado || "");
   const [observaciones, setObservaciones] = useState(observacionesProspecto);
