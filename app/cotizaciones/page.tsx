@@ -30,6 +30,7 @@ export default function CotizacionesPage() {
   const [error, setError] = useState("");
 
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
+  const [aceptadoOkId, setAceptadoOkId] = useState<string | null>(null);
 
   useEffect(() => {
     init();
@@ -120,7 +121,8 @@ export default function CotizacionesPage() {
         alert(data.error || "No se pudo aceptar la cotización");
         return;
       }
-      alert("Contrato generado como pre-aprobado.");
+      setAceptadoOkId(id);
+      setTimeout(() => setAceptadoOkId(null), 1800);
       if (centro) fetchCotizaciones(centro, "");
     } finally {
       setAceptandoId(null);
@@ -239,12 +241,45 @@ export default function CotizacionesPage() {
                       </a>
                     )}
                     <button
-                      className="ver-pdf-btn"
+                      className={
+                        "btn-enviar" +
+                        (aceptandoId === c.id ? " sending" : "") +
+                        (aceptadoOkId === c.id ? " sent" : "")
+                      }
+                      style={{ padding: "8px 12px", fontSize: 12 }}
                       disabled={c.estatus === "aceptada" || !c.cotizacion_comercial_id || aceptandoId === c.id}
                       title={!c.cotizacion_comercial_id ? "Esta cotización todavía no está ligada a una venta" : undefined}
                       onClick={() => aceptarCotizacion(c.id)}
                     >
-                      {c.estatus === "aceptada" ? "✓ Aceptada" : aceptandoId === c.id ? "Generando…" : "✓ Aceptar"}
+                      <span className="btn-enviar-icon-wrapper">
+                        <svg
+                          className="btn-enviar-icon"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path fill="none" d="M0 0h24v24H0z"></path>
+                          <path
+                            fill="currentColor"
+                            d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"
+                          ></path>
+                        </svg>
+                      </span>
+                      <span className="btn-enviar-check-wrapper">
+                        <svg
+                          className="btn-enviar-check"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        <span>¡Listo!</span>
+                      </span>
+                      <span className="btn-enviar-text">{c.estatus === "aceptada" ? "✓ Aceptada" : "✓ Aceptar"}</span>
                     </button>
                     <button className="tel-borrar-btn" onClick={() => borrarCotizacion(c.id)}>
                       🗑

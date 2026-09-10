@@ -62,10 +62,20 @@ export default function ToursPage() {
     setTours(data || []);
   }
 
-  const tourseHoy = useMemo(() => tours.filter((t) => t.fecha === hoyISO()), [tours]);
+  // Búsqueda por nombre o teléfono — mismo patrón que /contratos.
+  const [busquedaTours, setBusquedaTours] = useState("");
+  const toursFiltrados = useMemo(() => {
+    const q = busquedaTours.trim().toLowerCase();
+    if (!q) return tours;
+    return tours.filter(
+      (t) => t.nombre.toLowerCase().includes(q) || (t.telefono || "").toLowerCase().includes(q)
+    );
+  }, [tours, busquedaTours]);
+
+  const tourseHoy = useMemo(() => toursFiltrados.filter((t) => t.fecha === hoyISO()), [toursFiltrados]);
   const tourseProximos = useMemo(
-    () => tours.filter((t) => t.fecha > hoyISO()).sort((a, b) => a.fecha.localeCompare(b.fecha)),
-    [tours]
+    () => toursFiltrados.filter((t) => t.fecha > hoyISO()).sort((a, b) => a.fecha.localeCompare(b.fecha)),
+    [toursFiltrados]
   );
 
   async function agregarTour(e: React.FormEvent) {
@@ -249,11 +259,20 @@ export default function ToursPage() {
               </form>
             )}
 
+            <input
+              placeholder="Buscar por nombre o teléfono..."
+              value={busquedaTours}
+              onChange={(e) => setBusquedaTours(e.target.value)}
+              style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%", marginTop: 8 }}
+            />
+
             <p className="panel-section-label" style={{ marginTop: 8 }}>
               Próximos tours ({tourseProximos.length})
             </p>
             {tourseProximos.length === 0 ? (
-              <div className="empty-card">Sin tours próximos agendados</div>
+              <div className="empty-card">
+                {busquedaTours ? "Sin tours que coincidan con la búsqueda" : "Sin tours próximos agendados"}
+              </div>
             ) : (
               tourseProximos.map((t) => (
                 <div className="tour-card" key={t.id}>

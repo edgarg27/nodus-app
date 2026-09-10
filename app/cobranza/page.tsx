@@ -14,6 +14,7 @@ type ClienteCobranza = {
   email: string;
   empresa: string | null;
   centro: string | null;
+  created_at: string;
   suspendido: boolean;
   suspendido_desde: string | null;
   dia_pago: number | null;
@@ -47,6 +48,7 @@ export default function CobranzaPage() {
 
   const [clientes, setClientes] = useState<ClienteCobranza[]>([]);
   const [filtroPago, setFiltroPago] = useState<"todos" | "corriente" | "pendiente" | "vencida">("todos");
+  const [busquedaClientes, setBusquedaClientes] = useState("");
   const [ejecutando, setEjecutando] = useState(false);
   const [resultado, setResultado] = useState<any>(null);
   const [error, setError] = useState("");
@@ -85,10 +87,10 @@ export default function CobranzaPage() {
   async function fetchClientes(c: string | null, rolActual: string) {
     let query = supabase
       .from("profiles")
-      .select("id, nombre, email, empresa, centro, suspendido, suspendido_desde")
+      .select("id, nombre, email, empresa, centro, created_at, suspendido, suspendido_desde")
       .eq("rol", "cliente")
       .eq("activo", true)
-      .order("nombre");
+      .order("created_at", { ascending: false });
     if (!ROLES_GLOBALES.includes(rolActual) && c) query = query.eq("centro", c);
     const { data: perfiles } = await query;
 
@@ -163,11 +165,16 @@ export default function CobranzaPage() {
       : { bg: "#F0F0F0", texto: "Sin facturas" };
 
   const clientesFiltrados = clientes.filter((c) => {
-    if (filtroPago === "todos") return true;
-    if (filtroPago === "corriente") return c.ultimaFacturaEstado === "pagada";
-    if (filtroPago === "pendiente") return c.ultimaFacturaEstado === "pendiente";
-    if (filtroPago === "vencida") return c.ultimaFacturaEstado === "vencida";
-    return true;
+    if (filtroPago === "corriente" && c.ultimaFacturaEstado !== "pagada") return false;
+    if (filtroPago === "pendiente" && c.ultimaFacturaEstado !== "pendiente") return false;
+    if (filtroPago === "vencida" && c.ultimaFacturaEstado !== "vencida") return false;
+    const q = busquedaClientes.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      c.nombre.toLowerCase().includes(q) ||
+      (c.empresa || "").toLowerCase().includes(q) ||
+      c.email.toLowerCase().includes(q)
+    );
   });
 
   const conteoPago = {
@@ -331,6 +338,13 @@ export default function CobranzaPage() {
                   </button>
                 </div>
 
+                <input
+                  placeholder="Buscar por nombre, empresa o correo..."
+                  value={busquedaClientes}
+                  onChange={(e) => setBusquedaClientes(e.target.value)}
+                  style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%", marginTop: 8 }}
+                />
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                   <p className="panel-section-label" style={{ margin: 0 }}>
                     Clientes ({clientesFiltrados.length})
@@ -375,7 +389,9 @@ export default function CobranzaPage() {
                 </div>
 
                 {clientesFiltrados.length === 0 ? (
-                  <div className="empty-card">Sin clientes en esta categoría</div>
+                  <div className="empty-card">
+                    {busquedaClientes ? "Sin clientes que coincidan con la búsqueda" : "Sin clientes en esta categoría"}
+                  </div>
                 ) : !esGlobal ? (
                   clientesFiltrados.map((c) => {
                     const badge = badgeInfo(c.ultimaFacturaEstado);

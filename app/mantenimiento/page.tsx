@@ -122,6 +122,20 @@ export default function MantenimientoPage() {
     checkProximosMantenimientos(data || [], c);
   }
 
+  // Búsqueda por título, categoría, equipo/proveedor o descripción — mismo
+  // patrón que /contratos.
+  const [busquedaMantenimiento, setBusquedaMantenimiento] = useState("");
+  const registrosFiltrados = registros.filter((r) => {
+    const q = busquedaMantenimiento.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      r.titulo.toLowerCase().includes(q) ||
+      (r.categoria || "").toLowerCase().includes(q) ||
+      (r.realizado_por || "").toLowerCase().includes(q) ||
+      (r.descripcion || "").toLowerCase().includes(q)
+    );
+  });
+
   // Si algún registro tiene "próximo mantenimiento" dentro de los próximos 7
   // días (o ya vencido) y todavía no se avisó, manda una notificación una
   // sola vez y marca el registro para no repetirla en cada visita.
@@ -257,7 +271,7 @@ export default function MantenimientoPage() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
-                Historial ({registros.length})
+                Historial ({registrosFiltrados.length})
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
@@ -383,10 +397,19 @@ export default function MantenimientoPage() {
               </form>
             )}
 
-            {registros.length === 0 ? (
-              <div className="empty-card">Sin mantenimientos registrados</div>
+            <input
+              placeholder="Buscar por título, categoría, equipo o descripción..."
+              value={busquedaMantenimiento}
+              onChange={(e) => setBusquedaMantenimiento(e.target.value)}
+              style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%" }}
+            />
+
+            {registrosFiltrados.length === 0 ? (
+              <div className="empty-card">
+                {busquedaMantenimiento ? "Sin mantenimientos que coincidan con la búsqueda" : "Sin mantenimientos registrados"}
+              </div>
             ) : (
-              registros.map((r) => (
+              registrosFiltrados.map((r) => (
                 <div className="mtto-card" key={r.id}>
                   <div className="mtto-fecha-badge">
                     {new Date(r.fecha + "T00:00:00").toLocaleDateString("es-MX", {
