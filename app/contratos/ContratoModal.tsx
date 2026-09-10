@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Contrato } from "./page";
 
@@ -39,6 +40,7 @@ export default function ContratoModal({
   onGuardado: () => void;
 }) {
   const supabase = createClient();
+  const router = useRouter();
 
   const [form, setForm] = useState({
     fecha_inicio: contrato.fecha_inicio,
@@ -333,6 +335,13 @@ export default function ContratoModal({
     setProcesandoAprobacion(false);
     setEstatus("vigente");
     onGuardado();
+
+    // Cliente nuevo (sin cuenta todavía) → seguir directo a Alta de
+    // cliente. Si ya tenía cuenta (ej. una renovación), se queda igual
+    // que hoy, sin redirigir a nada.
+    if (!contrato.user_id) {
+      router.push(`/alta-cliente?contratoId=${contrato.id}`);
+    }
   }
 
   async function rechazar() {

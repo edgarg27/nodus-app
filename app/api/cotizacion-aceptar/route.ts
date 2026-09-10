@@ -21,12 +21,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id, rfc } = await req.json();
+  const { id } = await req.json();
   if (!id) {
     return NextResponse.json({ error: "Falta el id de la cotización" }, { status: 400 });
-  }
-  if (!rfc || !String(rfc).trim()) {
-    return NextResponse.json({ error: "Falta el RFC del cliente" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -58,6 +55,9 @@ export async function POST(req: NextRequest) {
   const tipoEspacio = normalizarTipoEspacioContrato(venta.tipo_espacio || "");
   if (!tipoEspacio) {
     return NextResponse.json({ error: `Tipo de espacio "${venta.tipo_espacio}" no reconocido para generar el contrato.` }, { status: 400 });
+  }
+  if (!venta.rfc || !String(venta.rfc).trim()) {
+    return NextResponse.json({ error: "Falta el RFC del cliente — captúralo al cotizar en CotizarForm." }, { status: 400 });
   }
   // tipo_persona lo agrega la migración de Persona A — mientras no exista
   // la columna (o no se haya capturado), se asume persona física.
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       numeroEspacio = oficina?.numero ?? "";
     }
 
-    const rfcLimpio = String(rfc).trim().toUpperCase();
+    const rfcLimpio = String(venta.rfc).trim().toUpperCase();
 
     const docxBuffer = await generarContratoDocx({
       centro: venta.centro,

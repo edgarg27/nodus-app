@@ -652,6 +652,7 @@ export default function CotizarForm({
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
   const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
   const [razonSocial, setRazonSocial] = useState("");
+  const [rfc, setRfc] = useState("");
   const [nombreContesta, setNombreContesta] = useState("");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
   const [correoContesta, setCorreoContesta] = useState(prospectoEmailPreseleccionado || "");
@@ -681,6 +682,9 @@ export default function CotizarForm({
     return [observaciones.trim(), detalle].filter(Boolean).join(" · ") || null;
   }
   const [numeroPersonas, setNumeroPersonas] = useState("");
+  // Solo aplica a la renovación de un contrato que ya existía — el % de
+  // incremento no debe pedirse en una cotización nueva.
+  const [esRenovacion, setEsRenovacion] = useState(false);
   const [porcentajeIncremento, setPorcentajeIncremento] = useState("");
 
   // ---------- Fechas ----------
@@ -1021,6 +1025,8 @@ export default function CotizarForm({
       prospecto_id: prospectoIdPreseleccionado || null,
       tipo_persona: tipoPersona || null,
       razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
+      rfc: null,
+      renovacion: false,
       oficina_id: null,
       paquete_id: null,
       tipo_espacio: `${SALA_JUNTAS_TIPO} ${salaSeleccionada.tamano} · ${duracionLabel} · ${horarioLabel}`,
@@ -1185,6 +1191,10 @@ export default function CotizarForm({
       setError("Falta la razón social de la empresa");
       return;
     }
+    if (!rfc.trim()) {
+      setError("Falta el RFC del cliente");
+      return;
+    }
     // Coffee Break es exclusivo de Sala de Juntas — no aplica en este flujo
     // de Coworking/Oficina Privada, así que no se valida aquí.
     setError("");
@@ -1200,6 +1210,8 @@ export default function CotizarForm({
         prospecto_id: prospectoIdPreseleccionado || null,
         tipo_persona: tipoPersona || null,
         razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
+        rfc: rfc.trim() ? rfc.trim().toUpperCase() : null,
+        renovacion: esRenovacion,
         oficina_id: oficina?.id || null,
         paquete_id: paquete?.id || null,
         tipo_espacio: tipoEspacio,
@@ -1922,6 +1934,12 @@ export default function CotizarForm({
                 />
               </div>
             )}
+            {!esSalaJuntas && (
+              <div>
+                <p className="sub-label">RFC</p>
+                <input placeholder="RFC del cliente" value={rfc} onChange={(e) => setRfc(e.target.value.toUpperCase())} />
+              </div>
+            )}
             <div>
               <p className="sub-label">Medio de contacto</p>
               <select
@@ -2150,13 +2168,30 @@ export default function CotizarForm({
 
             {!esHora && !esDia && !esSalaJuntas && (
               <div>
-                <p className="sub-label">% de incremento</p>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={porcentajeIncremento}
-                  onChange={(e) => setPorcentajeIncremento(e.target.value)}
-                />
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={esRenovacion}
+                    onChange={(e) => {
+                      setEsRenovacion(e.target.checked);
+                      if (!e.target.checked) setPorcentajeIncremento("");
+                    }}
+                  />
+                  ¿Es renovación de un contrato existente?
+                </label>
+                {esRenovacion && (
+                  <>
+                    <p className="sub-label" style={{ marginTop: 8 }}>
+                      % de incremento
+                    </p>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={porcentajeIncremento}
+                      onChange={(e) => setPorcentajeIncremento(e.target.value)}
+                    />
+                  </>
+                )}
               </div>
             )}
           </div>

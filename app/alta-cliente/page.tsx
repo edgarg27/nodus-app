@@ -344,6 +344,10 @@ function AltaClienteInner() {
       setErrorCliente("Nombre y correo son obligatorios");
       return;
     }
+    if (!formCliente.diaPago.trim()) {
+      setErrorCliente("El día del mes que paga es obligatorio");
+      return;
+    }
     // El proceso siempre es: prospecto → cotiza → se sube y aprueba el
     // contrato → HASTA ENTONCES se crea la cuenta. Por eso ya no se puede
     // dar de alta un cliente sin ligarlo a un contrato que ya exista.
@@ -385,9 +389,12 @@ function AltaClienteInner() {
       // generaron), se generan justo ahora.
       if (contratoSeleccionadoId && nuevoClienteId) {
         const contrato = contratosPendientes.find((c) => c.id === contratoSeleccionadoId);
+        // Mismo día de pago que se acaba de mandar a /api/crear-cliente
+        // (queda en profiles.dia_pago) — se refleja aquí también en el
+        // contrato para que no queden desincronizados.
         const { error: updateError } = await supabase
           .from("contratos")
-          .update({ user_id: nuevoClienteId })
+          .update({ user_id: nuevoClienteId, dia_pago: Number(formCliente.diaPago) })
           .eq("id", contratoSeleccionadoId);
 
         if (updateError) {
@@ -621,7 +628,7 @@ function AltaClienteInner() {
                 />
               </div>
               <div>
-                <p className="sub-label">Día del mes que paga (opcional)</p>
+                <p className="sub-label">Día del mes que paga</p>
                 <input
                   type="number"
                   min={1}
