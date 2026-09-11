@@ -1454,7 +1454,7 @@ export default function CotizarForm({
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <p className="invitado-exito-titulo">¡Listo!</p>
+          <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
           <p className="invitado-exito-mensaje">{salaResultado.mensaje.replace(/^✅\s*/, "")}</p>
           <button className="invitado-exito-btn" onClick={crearOtraCotizacionSala}>
             + Cotizar otra Sala de Juntas
@@ -1497,7 +1497,7 @@ export default function CotizarForm({
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <p className="invitado-exito-titulo">¡Listo!</p>
+          <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
           <p className="invitado-exito-mensaje">{espacioResultado.mensaje}</p>
           <button className="invitado-exito-btn" onClick={continuarDespuesDeEspacio}>
             Ir al dashboard

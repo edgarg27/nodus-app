@@ -381,6 +381,7 @@ export default function ContratosPage() {
   const [mostrarFormContrato, setMostrarFormContrato] = useState(false);
   const [guardandoContrato, setGuardandoContrato] = useState(false);
   const [contratoEnviado, setContratoEnviado] = useState(false);
+  const [contratoExitoVisible, setContratoExitoVisible] = useState(false);
   const [errorContrato, setErrorContrato] = useState("");
 
   // Prospecto al que se le va a crear el contrato.
@@ -530,6 +531,7 @@ export default function ContratosPage() {
     setMostrarFormContrato(false);
     setContratoEnviado(true);
     setTimeout(() => setContratoEnviado(false), 1800);
+    setContratoExitoVisible(true);
     if (centro) fetchTodo(centro);
   }
 
@@ -1055,6 +1057,23 @@ export default function ContratosPage() {
           </>
         )}
       </div>
+
+      {contratoExitoVisible && (
+        <div className="modal-overlay" onClick={() => setContratoExitoVisible(false)}>
+          <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+            <div className="invitado-exito-icono">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
+            <p className="invitado-exito-mensaje">El contrato se guardó como pre-aprobado.</p>
+            <button className="invitado-exito-btn" onClick={() => setContratoExitoVisible(false)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {contratoEditando && (
         <ContratoModal
