@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FileDropzone from "@/app/soporte/FileDropzone";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -45,7 +46,7 @@ export default function DepositoGarantiaPage() {
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [procesando, setProcesando] = useState<string | null>(null);
   const [subiendoParaId, setSubiendoParaId] = useState<string | null>(null);
-  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
+  const [archivosComprobante, setArchivosComprobante] = useState<File[]>([]);
   const [errorComprobante, setErrorComprobante] = useState("");
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
@@ -147,12 +148,13 @@ export default function DepositoGarantiaPage() {
 
   function abrirSubidaComprobante(id: string) {
     setErrorComprobante("");
-    setArchivoComprobante(null);
+    setArchivosComprobante([]);
     setSubiendoParaId(id);
   }
 
   async function confirmarConComprobante(id: string) {
     setErrorComprobante("");
+    const archivoComprobante = archivosComprobante[0];
     if (!archivoComprobante) {
       setErrorComprobante("Adjunta el comprobante antes de confirmar");
       return;
@@ -179,7 +181,7 @@ export default function DepositoGarantiaPage() {
 
     setProcesando(null);
     setSubiendoParaId(null);
-    setArchivoComprobante(null);
+    setArchivosComprobante([]);
     if (centro) fetchDepositos(centro);
   }
 
@@ -281,15 +283,13 @@ export default function DepositoGarantiaPage() {
                       )
                     ) : subiendoParaId === d.id ? (
                       <div style={{ marginTop: 8 }}>
-                        <p className="sub-label">Adjunta el comprobante del depósito (imagen o PDF)</p>
-                        <input
-                          type="file"
+                        <p className="sub-label">Adjunta el comprobante del depósito</p>
+                        <FileDropzone
+                          files={archivosComprobante}
+                          onChange={setArchivosComprobante}
+                          maxFiles={1}
                           accept="image/*,application/pdf"
-                          onChange={(e) => setArchivoComprobante(e.target.files?.[0] || null)}
                         />
-                        {archivoComprobante && (
-                          <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>Seleccionado: {archivoComprobante.name}</p>
-                        )}
                         {errorComprobante && <p style={{ color: "#A32D2D", fontSize: 13, margin: "4px 0 0" }}>{errorComprobante}</p>}
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                           <button className="btn-aceptar" onClick={() => confirmarConComprobante(d.id)} disabled={procesando === d.id}>
@@ -299,7 +299,7 @@ export default function DepositoGarantiaPage() {
                             className="btn-rechazar"
                             onClick={() => {
                               setSubiendoParaId(null);
-                              setArchivoComprobante(null);
+                              setArchivosComprobante([]);
                             }}
                             disabled={procesando === d.id}
                           >
