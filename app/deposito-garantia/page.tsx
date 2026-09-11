@@ -24,6 +24,7 @@ type Deposito = {
   centro: string;
   estado: string;
   created_at: string;
+  comprobante_url?: string | null;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
   // Depósitos "todavía sin pago real": el contrato ya tiene monto de
@@ -43,6 +44,9 @@ export default function DepositoGarantiaPage() {
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [procesando, setProcesando] = useState<string | null>(null);
+  const [subiendoParaId, setSubiendoParaId] = useState<string | null>(null);
+  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
+  const [errorComprobante, setErrorComprobante] = useState("");
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
@@ -78,7 +82,7 @@ export default function DepositoGarantiaPage() {
     const [{ data: pgs }, { data: contratosConDeposito }] = await Promise.all([
       supabase
         .from("pagos")
-        .select("id, user_id, monto, contrato_id, centro, estado, created_at")
+        .select("id, user_id, monto, contrato_id, centro, estado, created_at, comprobante_url")
         .eq("centro", c)
         .eq("concepto", CONCEPTO_DEPOSITO)
         .order("created_at", { ascending: false }),
@@ -141,15 +145,41 @@ export default function DepositoGarantiaPage() {
     setLoading(false);
   }
 
-  async function marcarPagado(id: string) {
-    if (!confirm("¿Marcar este depósito en garantía como realizado?")) return;
+  function abrirSubidaComprobante(id: string) {
+    setErrorComprobante("");
+    setArchivoComprobante(null);
+    setSubiendoParaId(id);
+  }
+
+  async function confirmarConComprobante(id: string) {
+    setErrorComprobante("");
+    if (!archivoComprobante) {
+      setErrorComprobante("Adjunta el comprobante antes de confirmar");
+      return;
+    }
     setProcesando(id);
+
+    const ext = archivoComprobante.name.split(".").pop() || "jpg";
+    const fileName = `deposito-garantia/${id}-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("comprobantes")
+      .upload(fileName, archivoComprobante, { contentType: archivoComprobante.type, upsert: true });
+    if (uploadError) {
+      setErrorComprobante("No se pudo subir el comprobante: " + uploadError.message);
+      setProcesando(null);
+      return;
+    }
+    const comprobanteUrl = supabase.storage.from("comprobantes").getPublicUrl(fileName).data.publicUrl;
+
     await fetch("/api/pagos/marcar-pagado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pagoId: id }),
+      body: JSON.stringify({ pagoId: id, comprobanteUrl }),
     });
+
     setProcesando(null);
+    setSubiendoParaId(null);
+    setArchivoComprobante(null);
     if (centro) fetchDepositos(centro);
   }
 
@@ -238,14 +268,51 @@ export default function DepositoGarantiaPage() {
                         Este contrato todavía no se aprueba en Contratos — el depósito se podrá marcar como realizado en
                         cuanto se apruebe (ahí se calcula con IVA).
                       </p>
-                    ) : (
-                      d.estado !== "pagado" && (
+                    ) : d.estado === "pagado" ? (
+                      d.comprobante_url && (
+                        <a
+                          className="ver-pdf-btn"
+                          href={d.comprobante_url}
+                          target="_blank"
+                          style={{ marginTop: 8, display: "inline-block" }}
+                        >
+                          👁️ Ver comprobante
+                        </a>
+                      )
+                    ) : subiendoParaId === d.id ? (
+                      <div style={{ marginTop: 8 }}>
+                        <p className="sub-label">Adjunta el comprobante del depósito (imagen o PDF)</p>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => setArchivoComprobante(e.target.files?.[0] || null)}
+                        />
+                        {archivoComprobante && (
+                          <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>Seleccionado: {archivoComprobante.name}</p>
+                        )}
+                        {errorComprobante && <p style={{ color: "#A32D2D", fontSize: 13, margin: "4px 0 0" }}>{errorComprobante}</p>}
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                          <button className="btn-aceptar" onClick={() => marcarPagado(d.id)} disabled={procesando === d.id}>
-                            ✓ Marcar como realizado
+                          <button className="btn-aceptar" onClick={() => confirmarConComprobante(d.id)} disabled={procesando === d.id}>
+                            {procesando === d.id ? "Subiendo…" : "✓ Confirmar realizado"}
+                          </button>
+                          <button
+                            className="btn-rechazar"
+                            onClick={() => {
+                              setSubiendoParaId(null);
+                              setArchivoComprobante(null);
+                            }}
+                            disabled={procesando === d.id}
+                          >
+                            Cancelar
                           </button>
                         </div>
-                      )
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button className="btn-aceptar" onClick={() => abrirSubidaComprobante(d.id)}>
+                          ✓ Marcar como realizado
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
