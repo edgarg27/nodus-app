@@ -78,6 +78,22 @@ export default function ContratoPage() {
     setLoading(false);
   }
 
+  // Meses de calendario reales entre dos fechas (no días/30 — los meses no
+  // miden todos 30 días, eso desfasaba el conteo hasta por un mes de más).
+  // Redondea hacia arriba: si sobra cualquier fracción de mes, cuenta como
+  // un mes más en curso.
+  function mesesEntre(desde: Date, hasta: Date) {
+    if (hasta <= desde) return 0;
+    let meses = (hasta.getFullYear() - desde.getFullYear()) * 12 + (hasta.getMonth() - desde.getMonth());
+    let alineado = new Date(desde.getFullYear(), desde.getMonth() + meses, desde.getDate());
+    while (alineado > hasta) {
+      meses--;
+      alineado = new Date(desde.getFullYear(), desde.getMonth() + meses, desde.getDate());
+    }
+    if (alineado < hasta) meses++;
+    return Math.max(meses, 0);
+  }
+
   function calcularInfo() {
     if (!contrato) return { mesesRestantes: 0, porcentaje: 0 };
     const hoy = new Date();
@@ -86,7 +102,7 @@ export default function ContratoPage() {
     const totalDias = (fin.getTime() - inicio.getTime()) / 86400000;
     const diasTranscurridos = (hoy.getTime() - inicio.getTime()) / 86400000;
     const porcentaje = Math.min(Math.max((diasTranscurridos / totalDias) * 100, 0), 100);
-    const mesesRestantes = Math.max(Math.ceil((fin.getTime() - hoy.getTime()) / (86400000 * 30)), 0);
+    const mesesRestantes = mesesEntre(hoy, fin);
     return { mesesRestantes, porcentaje };
   }
 

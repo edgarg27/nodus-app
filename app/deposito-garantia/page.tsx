@@ -26,6 +26,12 @@ type Deposito = {
   created_at: string;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
+  // Depósitos "todavía sin pago real": el contrato ya tiene monto de
+  // depósito capturado pero sigue pre_aprobado — el pago de verdad (fila
+  // en `pagos`) no nace hasta que se aprueba en ContratoModal.tsx →
+  // aprobar(). Se muestran aparte, sin el botón de marcar realizado,
+  // para que el staff no piense que "no hay nada pendiente".
+  esPagoReal: boolean;
 };
 
 export default function DepositoGarantiaPage() {
@@ -69,14 +75,29 @@ export default function DepositoGarantiaPage() {
 
   async function fetchDepositos(c: string) {
     setLoading(true);
-    const { data: pgs } = await supabase
-      .from("pagos")
-      .select("id, user_id, monto, contrato_id, centro, estado, created_at")
-      .eq("centro", c)
-      .eq("concepto", CONCEPTO_DEPOSITO)
-      .order("created_at", { ascending: false });
+    const [{ data: pgs }, { data: contratosConDeposito }] = await Promise.all([
+      supabase
+        .from("pagos")
+        .select("id, user_id, monto, contrato_id, centro, estado, created_at")
+        .eq("centro", c)
+        .eq("concepto", CONCEPTO_DEPOSITO)
+        .order("created_at", { ascending: false }),
+      // Contratos que ya tienen monto de depósito capturado pero siguen
+      // pre_aprobado — todavía no existe su fila real en `pagos` (nace
+      // hasta que se aprueban), pero el staff necesita verlos igual.
+      supabase
+        .from("contratos")
+        .select("id, user_id, deposito_garantia, centro, created_at, cliente_nombre_historico, cliente_empresa_historico")
+        .eq("centro", c)
+        .eq("estatus", "pre_aprobado")
+        .gt("deposito_garantia", 0),
+    ]);
 
-    const userIds = Array.from(new Set((pgs || []).map((p) => p.user_id).filter((id): id is string => !!id)));
+    const userIds = Array.from(
+      new Set([...(pgs || []).map((p) => p.user_id), ...(contratosConDeposito || []).map((c) => c.user_id)].filter(
+        (id): id is string => !!id
+      ))
+    );
     const nombrePorId: Record<string, string> = {};
     const empresaPorId: Record<string, string | null> = {};
     if (userIds.length > 0) {
@@ -87,12 +108,35 @@ export default function DepositoGarantiaPage() {
       });
     }
 
+    const contratoIdsConPago = new Set((pgs || []).map((p) => p.contrato_id).filter(Boolean));
+
+    const reales: Deposito[] = (pgs || []).map((p) => ({
+      ...p,
+      cliente_nombre: p.user_id ? nombrePorId[p.user_id] : undefined,
+      cliente_empresa: p.user_id ? empresaPorId[p.user_id] : undefined,
+      esPagoReal: true,
+    }));
+
+    const pendientesSinAprobar: Deposito[] = (contratosConDeposito || [])
+      // Si por algún motivo ya existe su pago real, no se duplica aquí.
+      .filter((ct) => !contratoIdsConPago.has(ct.id))
+      .map((ct) => ({
+        id: ct.id,
+        user_id: ct.user_id,
+        monto: Number(ct.deposito_garantia) || 0,
+        contrato_id: ct.id,
+        centro: ct.centro,
+        estado: "pendiente",
+        created_at: ct.created_at,
+        cliente_nombre: (ct.user_id ? nombrePorId[ct.user_id] : ct.cliente_nombre_historico) || undefined,
+        cliente_empresa: (ct.user_id ? empresaPorId[ct.user_id] : ct.cliente_empresa_historico) || undefined,
+        esPagoReal: false,
+      }));
+
     setDepositos(
-      (pgs || []).map((p) => ({
-        ...p,
-        cliente_nombre: p.user_id ? nombrePorId[p.user_id] : undefined,
-        cliente_empresa: p.user_id ? empresaPorId[p.user_id] : undefined,
-      }))
+      [...reales, ...pendientesSinAprobar].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
     );
     setLoading(false);
   }
@@ -179,22 +223,29 @@ export default function DepositoGarantiaPage() {
                           {d.cliente_nombre || "Cliente"} {d.cliente_empresa ? `· ${d.cliente_empresa}` : ""}
                         </p>
                         <p className="contrato-detalle">
-                          ${Number(d.monto).toLocaleString("es-MX")} (incl. IVA) ·{" "}
+                          ${Number(d.monto).toLocaleString("es-MX")} {d.esPagoReal ? "(incl. IVA)" : "(sin IVA todavía)"} ·{" "}
                           {new Date(d.created_at).toLocaleDateString("es-MX")}
                         </p>
                       </div>
                       <span className="factura-badge" style={{ background: badge.bg }}>
                         <span className="factura-badge-text" style={{ color: badge.color }}>
-                          {badge.label}
+                          {d.esPagoReal ? badge.label : "⏳ Contrato sin aprobar"}
                         </span>
                       </span>
                     </div>
-                    {d.estado !== "pagado" && (
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button className="btn-aceptar" onClick={() => marcarPagado(d.id)} disabled={procesando === d.id}>
-                          ✓ Marcar como realizado
-                        </button>
-                      </div>
+                    {!d.esPagoReal ? (
+                      <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
+                        Este contrato todavía no se aprueba en Contratos — el depósito se podrá marcar como realizado en
+                        cuanto se apruebe (ahí se calcula con IVA).
+                      </p>
+                    ) : (
+                      d.estado !== "pagado" && (
+                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                          <button className="btn-aceptar" onClick={() => marcarPagado(d.id)} disabled={procesando === d.id}>
+                            ✓ Marcar como realizado
+                          </button>
+                        </div>
+                      )
                     )}
                   </div>
                 );
