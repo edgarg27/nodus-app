@@ -8,7 +8,7 @@ import { Resend } from "resend";
 // truena el flujo que la llama — regresa { ok: false } y el que la llama
 // decide si eso es crítico o no (mismo criterio que ya usa
 // app/api/cron/facturacion-diaria/route.ts para otras notificaciones).
-const FROM_EMAIL = process.env.EMAIL_FROM || "Nodus Coworking <notificaciones@nodusbc.mx>";
+const FROM_EMAIL = process.env.EMAIL_FROM || "Nodus Flex Center <notificaciones@nodusbc.mx>";
 
 export async function enviarCorreo({
   to,
