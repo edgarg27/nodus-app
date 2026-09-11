@@ -120,7 +120,7 @@ export default function ContratosPage() {
       .from("prospectos")
       .select("id, nombre, telefono, email, empresa, rfc, dia_pago")
       .eq("centro", c)
-      .order("nombre");
+      .order("created_at", { ascending: false });
     setProspectosBusqueda(prospectos || []);
 
     const { data: ofs } = await supabase.from("oficinas").select("id, numero, tipo, estado").eq("centro", c);

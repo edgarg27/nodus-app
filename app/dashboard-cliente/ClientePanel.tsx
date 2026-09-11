@@ -692,16 +692,6 @@ export default function ClientePanel({
                   <span className="servicio-arrow">›</span>
                 </a>
               )}
-              {(horasBolsaTotales > 0 || sinHorasDefinidas) && (
-                <a className="servicio-card" href={`/reservaciones?categoria=bolsa${qs}`}>
-                  <div className="servicio-icono">🎟️</div>
-                  <div className="servicio-info">
-                    <p className="servicio-nombre">Horas Bolsa</p>
-                    <p className="servicio-desc">Coworking / Sala de Capacitación</p>
-                  </div>
-                  <span className="servicio-arrow">›</span>
-                </a>
-              )}
             </>
           );
         })()}
