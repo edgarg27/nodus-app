@@ -95,7 +95,7 @@ function AltaClienteInner() {
       .from("prospectos")
       .select("id, nombre, telefono, email, empresa, rfc, dia_pago")
       .eq("centro", c)
-      .order("nombre");
+      .order("created_at", { ascending: false });
     setProspectosBusqueda(data || []);
   }
 

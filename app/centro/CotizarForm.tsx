@@ -242,7 +242,11 @@ export default function CotizarForm({
         .not("oficina_id", "is", null),
       supabase.from("precios_cotizacion_sala_juntas").select("*").eq("centro", centro).order("tamano"),
       supabase.from("coffee_break_paquetes").select("*").eq("activo", true).order("numero", { ascending: true }),
-      supabase.from("prospectos").select("id, nombre, telefono, email, interes, medio").eq("centro", centro).order("nombre"),
+      supabase
+        .from("prospectos")
+        .select("id, nombre, telefono, email, interes, medio")
+        .eq("centro", centro)
+        .order("created_at", { ascending: false }),
     ]);
     setClientes(clisRes.data || []);
     setOficinas(ofisRes.data || []);
