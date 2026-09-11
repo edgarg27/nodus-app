@@ -12,7 +12,11 @@ type Contrato = {
   archivo_url: string | null;
   renta_mensual: number | null;
   horas_sala_juntas: number | null;
+  dia_pago: number | null;
+  deposito_garantia: number | null;
 };
+
+const CONCEPTO_PAGO_DEPOSITO = "Depósito en garantía (incl. IVA)";
 
 function formatFecha(fecha: string) {
   return new Date(fecha).toLocaleDateString("es-MX", {
@@ -29,6 +33,7 @@ export default function ContratoPage() {
   const [contrato, setContrato] = useState<Contrato | null>(null);
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState("");
+  const [depositoPagado, setDepositoPagado] = useState(false);
 
   useEffect(() => {
     fetchContrato();
@@ -59,6 +64,17 @@ export default function ContratoPage() {
     const { data } = await query.limit(1).maybeSingle();
 
     setContrato(data);
+
+    if (data && data.deposito_garantia) {
+      const { data: pago } = await supabase
+        .from("pagos")
+        .select("estado")
+        .eq("contrato_id", data.id)
+        .eq("concepto", CONCEPTO_PAGO_DEPOSITO)
+        .maybeSingle();
+      setDepositoPagado(pago?.estado === "pagado");
+    }
+
     setLoading(false);
   }
 
@@ -136,6 +152,12 @@ export default function ContratoPage() {
                   <span className="modal-val">{contrato.horas_sala_juntas}h / mes</span>
                 </div>
               )}
+              {contrato.dia_pago != null && (
+                <div className="contrato-row">
+                  <span className="modal-label">Día de pago</span>
+                  <span className="modal-val">Día {contrato.dia_pago} de cada mes</span>
+                </div>
+              )}
               <div className="contrato-row">
                 <span className="modal-label">Estatus</span>
                 <span
@@ -154,6 +176,22 @@ export default function ContratoPage() {
                   </span>
                 </span>
               </div>
+              {contrato.deposito_garantia != null && contrato.deposito_garantia > 0 && (
+                <div className="contrato-row">
+                  <span className="modal-label">Depósito en garantía</span>
+                  <span
+                    className="factura-badge"
+                    style={{ background: depositoPagado ? "#E1F5EE" : "#FAEEDA" }}
+                  >
+                    <span
+                      className="factura-badge-text"
+                      style={{ color: depositoPagado ? "#0F6E56" : "#854F0B" }}
+                    >
+                      {depositoPagado ? "✓ Entregado" : "⏳ Pendiente"}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="tiempo-card">

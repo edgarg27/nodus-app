@@ -198,7 +198,6 @@ export default function ClientePanel({
   const [horasSalaTotales, setHorasSalaTotales] = useState(0);
   const [horasSalaRestantes, setHorasSalaRestantes] = useState(0);
   const [horasBolsaTotales, setHorasBolsaTotales] = useState(0);
-  const [horasBolsaRestantes, setHorasBolsaRestantes] = useState(0);
 
   // Banners de "Logros" que las empresas comparten y Diseño trabaja —
   // se suman a los banners promocionales fijos de arriba, así el
@@ -322,16 +321,13 @@ export default function ClientePanel({
         .lte("fecha", finMes);
 
       let salaUsadas = 0;
-      let bolsaUsadas = 0;
       (usadas || []).forEach((r) => {
         if (!r.espacio || !r.hora_inicio || !r.hora_fin) return;
-        const horas = parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
-        if (esSalaDeJuntas(r.espacio)) salaUsadas += horas;
-        else bolsaUsadas += horas;
+        if (!esSalaDeJuntas(r.espacio)) return;
+        salaUsadas += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
       });
 
       setHorasSalaRestantes(salaTotales - salaUsadas);
-      setHorasBolsaRestantes(bolsaTotales - bolsaUsadas);
     })();
   }, [contratoId, contratos]);
 
@@ -564,6 +560,28 @@ export default function ClientePanel({
           </div>
         )}
 
+        {horasSalaTotales > 0 && (
+          <div className="horas-banco-card">
+            <div>
+              <p className="horas-banco-num">{Math.max(horasSalaRestantes, 0)}</p>
+              <p className="horas-banco-lbl">horas de sala de juntas</p>
+            </div>
+            <div className="horas-banco-bar-wrap">
+              <div className="horas-banco-bar">
+                <div
+                  className="horas-banco-bar-fill"
+                  style={{
+                    width: `${Math.min((Math.max(horasSalaRestantes, 0) / horasSalaTotales) * 100, 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="horas-banco-detalle">
+                {Math.max(horasSalaRestantes, 0)} de {horasSalaTotales} disponibles
+              </p>
+            </div>
+          </div>
+        )}
+
         {extension && (
           extension.did ? (
             <div className="ext-flip-card" onClick={() => setExtensionVolteada((v) => !v)}>
@@ -613,50 +631,6 @@ export default function ClientePanel({
                 </option>
               ))}
             </select>
-          </div>
-        )}
-
-        {horasSalaTotales > 0 && (
-          <div className="horas-banco-card">
-            <div>
-              <p className="horas-banco-num">{Math.max(horasSalaRestantes, 0)}</p>
-              <p className="horas-banco-lbl">horas de sala de juntas</p>
-            </div>
-            <div className="horas-banco-bar-wrap">
-              <div className="horas-banco-bar">
-                <div
-                  className="horas-banco-bar-fill"
-                  style={{
-                    width: `${Math.min((Math.max(horasSalaRestantes, 0) / horasSalaTotales) * 100, 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="horas-banco-detalle">
-                {Math.max(horasSalaRestantes, 0)} de {horasSalaTotales} disponibles
-              </p>
-            </div>
-          </div>
-        )}
-
-        {horasBolsaTotales > 0 && (
-          <div className="horas-banco-card">
-            <div>
-              <p className="horas-banco-num">{Math.max(horasBolsaRestantes, 0)}</p>
-              <p className="horas-banco-lbl">horas bolsa</p>
-            </div>
-            <div className="horas-banco-bar-wrap">
-              <div className="horas-banco-bar">
-                <div
-                  className="horas-banco-bar-fill"
-                  style={{
-                    width: `${Math.min((Math.max(horasBolsaRestantes, 0) / horasBolsaTotales) * 100, 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="horas-banco-detalle">
-                {Math.max(horasBolsaRestantes, 0)} de {horasBolsaTotales} disponibles
-              </p>
-            </div>
           </div>
         )}
 
