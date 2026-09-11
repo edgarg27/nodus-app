@@ -682,6 +682,12 @@ export default function AdminPanel({
                 <span className="modulo-name">Pagos</span>
               </a>
             )}
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+              <a className="modulo-card" href="/deposito-garantia">
+                <span className="modulo-icon">🔒</span>
+                <span className="modulo-name">Depósito en garantía</span>
+              </a>
+            )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/facturas-admin">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

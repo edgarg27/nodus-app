@@ -782,6 +782,11 @@ export default function CotizarForm({
   const precioPactadoNum = Number(precioPactado) || 0;
   const precioListaNum = Number(precioLista) || 0;
   const depositoNum = Number(depositoGarantia) || 0;
+  // El depósito se cobra con IVA al aprobar el contrato (ver
+  // ContratoModal.tsx → aprobar()) — se muestra aquí igual para que el
+  // "Total primer pago" que ve el staff/cliente ya refleje el monto real
+  // que se va a cobrar, no solo el depósito base.
+  const depositoConIvaNum = round2(depositoNum * 1.16);
   const ivaMonto = round2(precioPactadoNum * 0.16);
   const precioNeto = round2(precioPactadoNum + ivaMonto);
 
@@ -817,7 +822,7 @@ export default function CotizarForm({
     () => adicionalesDraft.reduce((s, a) => s + a.costo_unitario * a.cantidad, 0),
     [adicionalesDraft]
   );
-  const totalPrimerPago = round2(precioNeto + depositoNum + totalAdicionales);
+  const totalPrimerPago = round2(precioNeto + depositoConIvaNum + totalAdicionales);
 
   const catalogoFiltrado = useMemo(() => {
     if (!busquedaAdicional.trim()) return catalogoAdicionales;
@@ -1449,7 +1454,7 @@ export default function CotizarForm({
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <p className="invitado-exito-titulo">¡Listo!</p>
+          <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
           <p className="invitado-exito-mensaje">{salaResultado.mensaje.replace(/^✅\s*/, "")}</p>
           <button className="invitado-exito-btn" onClick={crearOtraCotizacionSala}>
             + Cotizar otra Sala de Juntas
@@ -1492,7 +1497,7 @@ export default function CotizarForm({
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <p className="invitado-exito-titulo">¡Listo!</p>
+          <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
           <p className="invitado-exito-mensaje">{espacioResultado.mensaje}</p>
           <button className="invitado-exito-btn" onClick={continuarDespuesDeEspacio}>
             Ir al dashboard
@@ -2259,13 +2264,18 @@ export default function CotizarForm({
               <input type="number" step="0.01" value={precioPactado} onChange={(e) => setPrecioPactado(e.target.value)} />
             </div>
             <div>
-              <p className="sub-label">Depósito en garantía</p>
+              <p className="sub-label">Depósito en garantía (sin IVA)</p>
               <input
                 type="number"
                 step="0.01"
                 value={depositoGarantia}
                 onChange={(e) => setDepositoGarantia(e.target.value)}
               />
+              {depositoNum > 0 && (
+                <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
+                  Con IVA: ${depositoConIvaNum.toLocaleString("es-MX")}
+                </p>
+              )}
             </div>
           </div>
           <textarea
@@ -2517,8 +2527,8 @@ export default function CotizarForm({
             </div>
           )}
           <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">Depósito en garantía (sin IVA)</span>
-            <span className="resumen-reserva-val">${depositoNum.toLocaleString("es-MX")}</span>
+            <span className="resumen-reserva-label">Depósito en garantía (incl. IVA)</span>
+            <span className="resumen-reserva-val">${depositoConIvaNum.toLocaleString("es-MX")}</span>
           </div>
           {esSalaJuntas && quiereCoffee && paqueteCoffee && (
             <div className="resumen-reserva-row">
