@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { pagoId } = await req.json();
+  const { pagoId, comprobanteUrl } = await req.json();
   if (!pagoId) {
     return NextResponse.json({ error: "Falta pagoId" }, { status: 400 });
   }
@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: pago } = await admin.from("pagos").select("id, user_id").eq("id", pagoId).maybeSingle();
 
-  const { error } = await admin.from("pagos").update({ estado: "pagado" }).eq("id", pagoId);
+  const datosActualizar: { estado: string; comprobante_url?: string } = { estado: "pagado" };
+  if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
+
+  const { error } = await admin.from("pagos").update(datosActualizar).eq("id", pagoId);
   if (error) {
     return NextResponse.json({ error: "No se pudo marcar el pago como pagado" }, { status: 500 });
   }
