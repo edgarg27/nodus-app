@@ -46,6 +46,7 @@ export type Contrato = {
   deposito_garantia: number | null;
   estatus: string | null;
   archivo_url: string | null;
+  archivo_machote_url: string | null;
   cliente_nombre_historico: string | null;
   cliente_email_historico: string | null;
   cliente_empresa_historico: string | null;

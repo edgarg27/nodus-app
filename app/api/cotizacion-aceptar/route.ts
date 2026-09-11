@@ -141,6 +141,11 @@ export async function POST(req: NextRequest) {
     const datosContrato = {
       centro: venta.centro,
       archivo_url: archivoUrl,
+      // El machote se preserva aparte de archivo_url — si el staff sube
+      // una versión corregida después (ver ContratoModal.tsx), ya no se
+      // sobreescribe este campo, solo archivo_url cuando marquen una
+      // versión como final.
+      archivo_machote_url: archivoUrl,
       cotizacion_id: venta.id,
       user_id: venta.cliente_id ?? null,
       cliente_nombre_historico: venta.nombre_contesta_telefono ?? null,
