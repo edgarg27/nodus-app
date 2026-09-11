@@ -782,7 +782,7 @@ function AltaClienteInner() {
                 </svg>
                 <span>¡Listo!</span>
               </span>
-              <span className="btn-enviar-text">🎉 Registrar cliente</span>
+              <span className="btn-enviar-text">Registrar cliente</span>
             </button>
           </form>
         )}
