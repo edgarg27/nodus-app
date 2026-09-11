@@ -63,10 +63,16 @@ export async function POST(req: NextRequest) {
   });
 
   if (inviteError || !invitado?.user) {
-    return NextResponse.json(
-      { error: inviteError?.message || "No se pudo crear la cuenta del cliente (¿ya existe ese correo?)" },
-      { status: 400 }
-    );
+    // AuthRetryableFetchError trae mensajes inútiles como "{}" cuando
+    // Supabase no pudo mandar el correo de invitación — casi siempre por
+    // el límite de correos de auth del proyecto (muy bajo por defecto),
+    // no por un dato mal capturado. Se detecta por status/nombre en vez
+    // de confiar en inviteError.message.
+    const esFalloDeCorreo = inviteError?.status === 500 || inviteError?.name === "AuthRetryableFetchError";
+    const mensaje = esFalloDeCorreo
+      ? "No se pudo mandar el correo de invitación — probablemente se alcanzó el límite de correos de Supabase (son muy pocos por hora en el plan por defecto). Espera unos minutos e intenta de nuevo, o configura un proveedor SMTP propio en Supabase (Project Settings → Auth → SMTP)."
+      : inviteError?.message || "No se pudo crear la cuenta del cliente (¿ya existe ese correo?)";
+    return NextResponse.json({ error: mensaje }, { status: 400 });
   }
 
   const nuevoId = invitado.user.id;
