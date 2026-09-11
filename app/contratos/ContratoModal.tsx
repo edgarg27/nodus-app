@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Contrato } from "./page";
+import FileDropzone from "@/app/soporte/FileDropzone";
+
+type VersionContrato = {
+  id: string;
+  archivo_url: string;
+  nombre_archivo: string | null;
+  created_at: string;
+};
 
 type CatalogoItem = {
   id: string;
@@ -47,17 +55,19 @@ export default function ContratoModal({
     fecha_vencimiento: contrato.fecha_vencimiento,
     renta_mensual: String(contrato.renta_mensual ?? ""),
     horas_sala_juntas: String(contrato.horas_sala_juntas ?? 0),
-    horas_bolsa: String(contrato.horas_bolsa ?? 0),
     dia_pago: contrato.dia_pago ? String(contrato.dia_pago) : "",
     deposito_garantia: contrato.deposito_garantia != null ? String(contrato.deposito_garantia) : "",
   });
-  const [archivoNuevo, setArchivoNuevo] = useState<File | null>(null);
+  const [archivosNuevos, setArchivosNuevos] = useState<File[]>([]);
+  const [versiones, setVersiones] = useState<VersionContrato[]>([]);
+  const [marcandoFinal, setMarcandoFinal] = useState<string | null>(null);
 
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [procesandoAprobacion, setProcesandoAprobacion] = useState(false);
   const [error, setError] = useState("");
   const [estatus, setEstatus] = useState(contrato.estatus || "");
+  const [archivoFinalUrl, setArchivoFinalUrl] = useState(contrato.archivo_url);
   const [confirmacionFirma, setConfirmacionFirma] = useState(false);
   const [enviandoFirma, setEnviandoFirma] = useState(false);
 
@@ -83,10 +93,16 @@ export default function ContratoModal({
 
   async function cargarTodo() {
     setCargandoAdicionales(true);
-    const [{ data: cat }, { data: adi }] = await Promise.all([
+    const [{ data: cat }, { data: adi }, { data: vers }] = await Promise.all([
       supabase.from("adicionales_catalogo").select("*").eq("centro", contrato.centro).eq("activo", true).order("nombre"),
       supabase.from("contrato_adicionales").select("*").eq("contrato_id", contrato.id).order("created_at"),
+      supabase
+        .from("contrato_versiones")
+        .select("id, archivo_url, nombre_archivo, created_at")
+        .eq("contrato_id", contrato.id)
+        .order("created_at", { ascending: false }),
     ]);
+    setVersiones(vers || []);
     setCatalogo(cat || []);
     setAdicionales(
       (adi || []).map((a) => ({
@@ -218,7 +234,10 @@ export default function ContratoModal({
     setError("");
     setGuardando(true);
 
-    let archivoUrl = contrato.archivo_url;
+    // Subir un contrato modificado agrega una versión nueva — ya NO
+    // sobreescribe el machote ni el archivo_url operativo directo; el
+    // staff decide cuál marcar como final con marcarComoFinal() más abajo.
+    const archivoNuevo = archivosNuevos[0];
     if (archivoNuevo) {
       const fileName = `${contrato.user_id || contrato.id}-${Date.now()}.${archivoNuevo.name.split(".").pop() || "pdf"}`;
       const { error: uploadError } = await supabase.storage
@@ -229,7 +248,22 @@ export default function ContratoModal({
         setGuardando(false);
         return;
       }
-      archivoUrl = supabase.storage.from("contratos").getPublicUrl(fileName).data.publicUrl;
+      const archivoUrl = supabase.storage.from("contratos").getPublicUrl(fileName).data.publicUrl;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { error: versionError } = await supabase.from("contrato_versiones").insert({
+        contrato_id: contrato.id,
+        archivo_url: archivoUrl,
+        nombre_archivo: archivoNuevo.name,
+        subido_por: user?.id,
+      });
+      if (versionError) {
+        setError("No se pudo registrar la versión subida: " + versionError.message);
+        setGuardando(false);
+        return;
+      }
+      setArchivosNuevos([]);
     }
 
     const { error: updateError } = await supabase
@@ -239,10 +273,8 @@ export default function ContratoModal({
         fecha_vencimiento: form.fecha_vencimiento,
         renta_mensual: Number(form.renta_mensual) || 0,
         horas_sala_juntas: Number(form.horas_sala_juntas) || 0,
-        horas_bolsa: Number(form.horas_bolsa) || 0,
         dia_pago: form.dia_pago ? Number(form.dia_pago) : null,
         deposito_garantia: form.deposito_garantia ? Number(form.deposito_garantia) : null,
-        archivo_url: archivoUrl,
       })
       .eq("id", contrato.id);
 
@@ -256,6 +288,19 @@ export default function ContratoModal({
     setTimeout(() => setEnviado(false), 1800);
     onGuardado();
     onClose();
+  }
+
+  async function marcarComoFinal(url: string) {
+    setMarcandoFinal(url);
+    setError("");
+    const { error: updateError } = await supabase.from("contratos").update({ archivo_url: url }).eq("id", contrato.id);
+    setMarcandoFinal(null);
+    if (updateError) {
+      setError("No se pudo marcar esa versión como final: " + updateError.message);
+      return;
+    }
+    setArchivoFinalUrl(url);
+    onGuardado();
   }
 
   async function enviarAFirma() {
@@ -279,7 +324,7 @@ export default function ContratoModal({
   }
 
   async function aprobar() {
-    if (!contrato.archivo_url || !(confirmacionFirma || contrato.firmado)) return;
+    if (!archivoFinalUrl || !(confirmacionFirma || contrato.firmado)) return;
     setProcesandoAprobacion(true);
     await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", contrato.id);
 
@@ -427,7 +472,7 @@ export default function ContratoModal({
 
         {estatus === "pre_aprobado" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            {contrato.archivo_url && !contrato.firmado && (
+            {archivoFinalUrl && !contrato.firmado && (
               <div style={{ width: "100%" }}>
                 <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={enviarAFirma} disabled={enviandoFirma}>
                   {enviandoFirma ? "Mandando…" : contrato.enviado_a_firma_at ? "📧 Reenviar a firma" : "📧 Enviar a firma"}
@@ -456,14 +501,14 @@ export default function ContratoModal({
             <button
               className="btn-aceptar"
               onClick={aprobar}
-              disabled={procesandoAprobacion || !contrato.archivo_url || !(confirmacionFirma || contrato.firmado)}
+              disabled={procesandoAprobacion || !archivoFinalUrl || !(confirmacionFirma || contrato.firmado)}
             >
               ✓ Aprobar contrato
             </button>
             <button className="btn-rechazar" onClick={rechazar} disabled={procesandoAprobacion}>
               ✗ Rechazar contrato
             </button>
-            {!contrato.archivo_url && (
+            {!archivoFinalUrl && (
               <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
                 ⚠️ Sube el contrato firmado antes de aprobar — si acabas de seleccionar el PDF, dale "Guardar cambios" primero.
               </p>
@@ -517,14 +562,6 @@ export default function ContratoModal({
             />
           </div>
           <div>
-            <p className="sub-label">Horas bolsa</p>
-            <input
-              type="number"
-              value={form.horas_bolsa}
-              onChange={(e) => setForm({ ...form, horas_bolsa: e.target.value })}
-            />
-          </div>
-          <div>
             <p className="sub-label">Depósito de garantía</p>
             <input
               type="number"
@@ -535,16 +572,84 @@ export default function ContratoModal({
           </div>
         </div>
 
-        <p className="modal-seccion">📎 Contrato PDF</p>
-        {contrato.archivo_url && !archivoNuevo && (
-          <a className="ver-pdf-btn" href={contrato.archivo_url} target="_blank" download>
-            📥 Ver y descargar contrato actual
-          </a>
+        <p className="modal-seccion">📎 Contrato PDF (Machote pre-generado)</p>
+        {contrato.archivo_machote_url || contrato.archivo_url ? (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <a
+              className="ver-pdf-btn"
+              href={contrato.archivo_machote_url || contrato.archivo_url || undefined}
+              target="_blank"
+              download
+            >
+              📥 Ver y descargar machote
+            </a>
+            {archivoFinalUrl === (contrato.archivo_machote_url || contrato.archivo_url) ? (
+              <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Es la versión final</span>
+            ) : (
+              <button
+                className="tel-borrar-btn"
+                style={{ color: "#0d1b3e", fontWeight: 600 }}
+                onClick={() => marcarComoFinal((contrato.archivo_machote_url || contrato.archivo_url)!)}
+                disabled={marcandoFinal === (contrato.archivo_machote_url || contrato.archivo_url)}
+              >
+                ✓ Usar como final
+              </button>
+            )}
+          </div>
+        ) : (
+          <p className="empty-card" style={{ margin: 0 }}>
+            Todavía no hay machote generado para este contrato.
+          </p>
         )}
-        <p className="sub-label" style={{ marginTop: 8 }}>
-          {contrato.archivo_url ? "Reemplazar PDF (opcional)" : "Subir PDF (opcional)"}
+
+        {versiones.length > 0 && (
+          <>
+            <p className="sub-label" style={{ marginTop: 10 }}>
+              Versiones subidas
+            </p>
+            {versiones.map((v) => (
+              <div
+                key={v.id}
+                className="cotizacion-card"
+                style={{ padding: "8px 10px", marginBottom: 6 }}
+              >
+                <div>
+                  <p className="item-card-titulo" style={{ fontSize: 13 }}>
+                    {v.nombre_archivo || "Contrato subido"}
+                  </p>
+                  <p className="item-card-sub">{new Date(v.created_at).toLocaleString("es-MX")}</p>
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <a className="ver-pdf-btn" href={v.archivo_url} target="_blank" download>
+                    📥 Ver
+                  </a>
+                  {archivoFinalUrl === v.archivo_url ? (
+                    <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Final</span>
+                  ) : (
+                    <button
+                      className="tel-borrar-btn"
+                      style={{ color: "#0d1b3e", fontWeight: 600 }}
+                      onClick={() => marcarComoFinal(v.archivo_url)}
+                      disabled={marcandoFinal === v.archivo_url}
+                    >
+                      ✓ Usar como final
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        <p className="sub-label" style={{ marginTop: 10 }}>
+          Subir contrato modificado
         </p>
-        <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivoNuevo(e.target.files?.[0] || null)} />
+        <FileDropzone files={archivosNuevos} onChange={setArchivosNuevos} maxFiles={1} accept="application/pdf,image/*" />
+        {archivosNuevos.length > 0 && (
+          <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
+            Dale "Guardar cambios" para subirlo — no se reemplaza el machote, queda como una versión más para elegir.
+          </p>
+        )}
 
         {/* ---------------- Adicionales ---------------- */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
