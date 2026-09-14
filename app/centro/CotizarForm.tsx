@@ -822,7 +822,20 @@ export default function CotizarForm({
     () => adicionalesDraft.reduce((s, a) => s + a.costo_unitario * a.cantidad, 0),
     [adicionalesDraft]
   );
-  const totalPrimerPago = round2(precioNeto + depositoConIvaNum + totalAdicionales);
+  // El Estacionamiento es el único adicional que lleva IVA — se aplica
+  // aquí (en el desglose ya cotizado), no en la lista editable de arriba
+  // ni en el catálogo, que siguen mostrando el precio base.
+  const totalAdicionalesConIva = useMemo(
+    () =>
+      round2(
+        adicionalesDraft.reduce((s, a) => {
+          const subtotal = a.costo_unitario * a.cantidad;
+          return s + (a.concepto.trim().toLowerCase() === "estacionamiento" ? subtotal * 1.16 : subtotal);
+        }, 0)
+      ),
+    [adicionalesDraft]
+  );
+  const totalPrimerPago = round2(precioNeto + depositoConIvaNum + totalAdicionalesConIva);
 
   const catalogoFiltrado = useMemo(() => {
     if (!busquedaAdicional.trim()) return catalogoAdicionales;
@@ -2264,7 +2277,7 @@ export default function CotizarForm({
               <input type="number" step="0.01" value={precioPactado} onChange={(e) => setPrecioPactado(e.target.value)} />
             </div>
             <div>
-              <p className="sub-label">Depósito en garantía (sin IVA)</p>
+              <p className="sub-label">Depósito en garantía</p>
               <input
                 type="number"
                 step="0.01"
@@ -2520,10 +2533,12 @@ export default function CotizarForm({
               </span>
             </div>
           )}
-          {totalAdicionales > 0 && (
+          {totalAdicionalesConIva > 0 && (
             <div className="resumen-reserva-row">
-              <span className="resumen-reserva-label">Adicionales</span>
-              <span className="resumen-reserva-val">${totalAdicionales.toLocaleString("es-MX")}</span>
+              <span className="resumen-reserva-label">
+                Adicionales{totalAdicionalesConIva !== totalAdicionales ? " (Estacionamiento incl. IVA)" : ""}
+              </span>
+              <span className="resumen-reserva-val">${totalAdicionalesConIva.toLocaleString("es-MX")}</span>
             </div>
           )}
           <div className="resumen-reserva-row">
