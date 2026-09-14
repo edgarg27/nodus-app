@@ -70,16 +70,11 @@ export default function ProspectosPage() {
   const [prospectoPerdiendo, setProspectoPerdiendo] = useState<Prospecto | null>(null);
   const [comentarioPerdido, setComentarioPerdido] = useState("");
   const [avisoExito, setAvisoExito] = useState(false);
+  const [nombreRegistrado, setNombreRegistrado] = useState("");
 
   useEffect(() => {
     init();
   }, []);
-
-  useEffect(() => {
-    if (!avisoExito) return;
-    const t = setTimeout(() => setAvisoExito(false), 3500);
-    return () => clearTimeout(t);
-  }, [avisoExito]);
 
   async function init() {
     setLoading(true);
@@ -149,6 +144,7 @@ export default function ProspectosPage() {
       rfc: formProspecto.rfc || null,
       registrado_por: user?.id,
     });
+    setNombreRegistrado(formProspecto.nombre);
     setFormProspecto({
       nombre: "",
       telefono: "",
@@ -220,21 +216,6 @@ export default function ProspectosPage() {
         ) : (
           <>
             <p className="panel-section-label">Registrar prospecto</p>
-            {avisoExito && (
-              <div
-                style={{
-                  background: "#E1F5EE",
-                  color: "#0F6E56",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
-                ✅ Prospecto registrado con éxito
-              </div>
-            )}
             <form className="form-card" onSubmit={agregarProspecto}>
               <div className="tel-form-grid">
                 <input
@@ -433,6 +414,25 @@ export default function ProspectosPage() {
           </>
         )}
       </div>
+
+      {avisoExito && (
+        <div className="modal-overlay" onClick={() => setAvisoExito(false)}>
+          <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+            <div className="invitado-exito-icono">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
+            <p className="invitado-exito-mensaje">
+              {nombreRegistrado ? `${nombreRegistrado} se registró como prospecto.` : "El prospecto se registró correctamente."}
+            </p>
+            <button className="invitado-exito-btn" onClick={() => setAvisoExito(false)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {prospectoPerdiendo && (
         <div
