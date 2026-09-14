@@ -99,7 +99,10 @@ export async function middleware(req: NextRequest) {
 
   const homeFor = (r?: string) => (r === "cliente" ? "/dashboard-cliente" : "/dashboard");
 
-  if (session && path === "/login") {
+  // Mismo cuidado que abajo: sin rol reconocido no se saca de /login hacia
+  // admin por default — se deja ver /login (una cuenta rota no tiene a
+  // dónde más ir de todos modos).
+  if (session && path === "/login" && role) {
     return NextResponse.redirect(new URL(homeFor(role), req.url));
   }
 
@@ -108,6 +111,15 @@ export async function middleware(req: NextRequest) {
   }
 
   if (session) {
+    // Cuenta autenticada pero sin fila en `profiles` todavía (ej. un alta
+    // que falló a medias) — `role` queda undefined. Antes, undefined !==
+    // "cliente" mandaba a esa cuenta directo al panel de ADMINISTRADOR por
+    // default (ver isDashboardCliente más abajo) — justo el bug reportado.
+    // Sin un rol reconocido no se puede decidir a qué panel pertenece, así
+    // que se manda a login en vez de caer en admin por default.
+    if (!role && path !== "/login") {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
     // panel admin, reportes y telefonía son solo para staff (no clientes)
     if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isExperienciaCliente || isIngresosCentro || isDayPassCheckin) && role === "cliente") {
       return NextResponse.redirect(new URL("/dashboard-cliente", req.url));

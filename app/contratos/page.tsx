@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
@@ -69,6 +70,13 @@ const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Pi
 
 export default function ContratosPage() {
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Handoff desde /cotizaciones (botón "✓ Aceptar") — abre directo el
+  // contrato recién creado, en vez de que el staff tenga que buscarlo.
+  const contratoIdDesdeUrl = searchParams.get("contratoId");
+  const centroDesdeUrl = searchParams.get("centro");
+  const abrioContratoDesdeUrl = useRef(false);
   const [loading, setLoading] = useState(true);
   const [miRol, setMiRol] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
@@ -89,6 +97,15 @@ export default function ContratosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro]);
 
+  useEffect(() => {
+    if (!contratoIdDesdeUrl || abrioContratoDesdeUrl.current || contratos.length === 0) return;
+    const match = contratos.find((c) => c.id === contratoIdDesdeUrl);
+    if (!match) return;
+    abrioContratoDesdeUrl.current = true;
+    setContratoEditando(match);
+    setBusquedaContratos(match.cliente_nombre || match.cliente_nombre_historico || "");
+  }, [contratos, contratoIdDesdeUrl]);
+
   async function init() {
     setLoading(true);
     const {
@@ -101,7 +118,7 @@ export default function ContratosPage() {
 
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
-      setCentro(profile?.centro || CENTROS_SUGERIDOS[0]);
+      setCentro(centroDesdeUrl || profile?.centro || CENTROS_SUGERIDOS[0]);
     } else {
       setCentro(profile?.centro || null);
     }
@@ -309,6 +326,16 @@ export default function ContratosPage() {
 
     setProcesandoAprobacion(null);
     if (centro) fetchTodo(centro);
+
+    // Cliente nuevo (sin cuenta todavía) → seguir directo a Alta de
+    // cliente con este contrato ya ligado, igual que en ContratoModal.tsx
+    // → aprobar(). Si ya tenía cuenta, no hay a dónde más llevarlo — se
+    // confirma con una pantalla de éxito en vez de dejarlo sin avisar nada.
+    if (!c.user_id) {
+      router.push(`/alta-cliente?contratoId=${c.id}`);
+    } else {
+      setAprobacionExitoNombre(c.cliente_nombre || "el cliente");
+    }
   }
 
   async function rechazarContrato(c: Contrato) {
@@ -382,6 +409,7 @@ export default function ContratosPage() {
   const [guardandoContrato, setGuardandoContrato] = useState(false);
   const [contratoEnviado, setContratoEnviado] = useState(false);
   const [contratoExitoVisible, setContratoExitoVisible] = useState(false);
+  const [aprobacionExitoNombre, setAprobacionExitoNombre] = useState<string | null>(null);
   const [errorContrato, setErrorContrato] = useState("");
 
   // Prospecto al que se le va a crear el contrato.
@@ -1075,12 +1103,32 @@ export default function ContratosPage() {
         </div>
       )}
 
+      {aprobacionExitoNombre && (
+        <div className="modal-overlay" onClick={() => setAprobacionExitoNombre(null)}>
+          <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+            <div className="invitado-exito-icono">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
+            <p className="invitado-exito-mensaje">El contrato de {aprobacionExitoNombre} ya está vigente.</p>
+            <button className="invitado-exito-btn" onClick={() => setAprobacionExitoNombre(null)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {contratoEditando && (
         <ContratoModal
           contrato={contratoEditando}
           onClose={() => setContratoEditando(null)}
           onGuardado={() => {
             setContratoEditando(null);
+            if (centro) fetchTodo(centro);
+          }}
+          onRefrescar={() => {
             if (centro) fetchTodo(centro);
           }}
         />

@@ -92,6 +92,9 @@ export default function AdminPanel({
   const [generandoVoucher, setGenerandoVoucher] = useState(false);
   const [voucherEnviado, setVoucherEnviado] = useState(false);
   const [errorVoucher, setErrorVoucher] = useState("");
+  const [reenviandoInvitacion, setReenviandoInvitacion] = useState(false);
+  const [invitacionReenviada, setInvitacionReenviada] = useState(false);
+  const [errorInvitacion, setErrorInvitacion] = useState("");
   const [duracionVoucher, setDuracionVoucher] = useState(43200); // 30 días default
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -413,6 +416,29 @@ export default function AdminPanel({
       setTimeout(() => setVoucherEnviado(false), 1800);
     }
     setGenerandoVoucher(false);
+  }
+
+  async function reenviarInvitacion() {
+    if (!clienteSeleccionado) return;
+    setReenviandoInvitacion(true);
+    setErrorInvitacion("");
+    try {
+      const res = await fetch("/api/reenviar-invitacion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: clienteSeleccionado.email, nombre: clienteSeleccionado.nombre }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorInvitacion(data.error || "No se pudo reenviar la invitación");
+      } else {
+        setInvitacionReenviada(true);
+        setTimeout(() => setInvitacionReenviada(false), 1800);
+      }
+    } catch {
+      setErrorInvitacion("No se pudo conectar. Intenta de nuevo.");
+    }
+    setReenviandoInvitacion(false);
   }
 
   async function handleLogout() {
@@ -1349,6 +1375,54 @@ export default function AdminPanel({
                       </div>
                     ))}
                   </>
+                )}
+
+                <p className="panel-section-label" style={{ marginTop: 12 }}>
+                  Invitación por correo
+                </p>
+                <p style={{ fontSize: 11, color: "#aaa", margin: "0 0 4px" }}>
+                  Si el link del correo original venció o el cliente nunca lo recibió, reenvíaselo
+                  aquí (mientras no haya puesto su contraseña).
+                </p>
+                <button
+                  className={
+                    "btn-enviar" + (reenviandoInvitacion ? " sending" : "") + (invitacionReenviada ? " sent" : "")
+                  }
+                  onClick={reenviarInvitacion}
+                  disabled={reenviandoInvitacion}
+                >
+                  <span className="btn-enviar-icon-wrapper">
+                    <svg
+                      className="btn-enviar-icon"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path fill="none" d="M0 0h24v24H0z"></path>
+                      <path
+                        fill="currentColor"
+                        d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"
+                      ></path>
+                    </svg>
+                  </span>
+                  <span className="btn-enviar-check-wrapper">
+                    <svg
+                      className="btn-enviar-check"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>¡Listo!</span>
+                  </span>
+                  <span className="btn-enviar-text">📧 Reenviar invitación</span>
+                </button>
+                {errorInvitacion && (
+                  <p style={{ color: "#A32D2D", fontSize: 12, margin: 0 }}>{errorInvitacion}</p>
                 )}
               </>
             )}

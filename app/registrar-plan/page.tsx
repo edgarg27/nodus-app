@@ -28,6 +28,7 @@ function RegistrarPlanInner() {
   const prospectoTelefonoDesdeUrl = searchParams.get("prospectoTelefono") || undefined;
   const prospectoEmailDesdeUrl = searchParams.get("prospectoEmail") || undefined;
   const prospectoInteresDesdeUrl = searchParams.get("prospectoInteres") || undefined;
+  const prospectoRfcDesdeUrl = searchParams.get("prospectoRfc") || undefined;
 
   const [loading, setLoading] = useState(true);
   const [centro, setCentro] = useState<string | null>(null);
@@ -109,6 +110,7 @@ function RegistrarPlanInner() {
             prospectoTelefonoPreseleccionado={prospectoTelefonoDesdeUrl}
             prospectoEmailPreseleccionado={prospectoEmailDesdeUrl}
             prospectoInteresPreseleccionado={prospectoInteresDesdeUrl}
+            prospectoRfcPreseleccionado={prospectoRfcDesdeUrl}
           />
         )}
       </div>

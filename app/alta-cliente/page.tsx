@@ -40,6 +40,7 @@ type ContratoPendiente = {
   telefono: string | null;
   correo: string | null;
   razonSocial: string | null;
+  empresaHistorica: string | null;
   tipoEspacio: string | null;
 };
 
@@ -67,7 +68,6 @@ function AltaClienteInner() {
   const [miRol, setMiRol] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
-  const [miNombre, setMiNombre] = useState("");
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
@@ -163,7 +163,7 @@ function AltaClienteInner() {
     const { data: conts } = await supabase
       .from("contratos")
       .select(
-        "id, fecha_inicio, fecha_vencimiento, renta_mensual, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc"
+        "id, fecha_inicio, fecha_vencimiento, renta_mensual, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc, cliente_empresa_historico"
       )
       .is("user_id", null)
       .eq("centro", c)
@@ -201,6 +201,7 @@ function AltaClienteInner() {
           telefono: cot?.telefono_contesta || null,
           correo: cot?.correo_contesta || null,
           razonSocial: cot?.razon_social || null,
+          empresaHistorica: ct.cliente_empresa_historico || null,
           tipoEspacio: cot?.tipo_espacio || null,
         };
       })
@@ -223,14 +224,14 @@ function AltaClienteInner() {
     setContratoSeleccionadoId(c.id);
     setBusquedaContrato(c.nombreContesta || c.tipoEspacio || "Contrato");
     setMostrarListaContratos(false);
-    if (c.nombreContesta || c.telefono || c.correo || c.rfc || c.razonSocial) {
+    if (c.nombreContesta || c.telefono || c.correo || c.rfc || c.razonSocial || c.empresaHistorica) {
       setFormCliente((prev) => ({
         ...prev,
         nombre: prev.nombre || c.nombreContesta || "",
         telefono: prev.telefono || c.telefono || "",
         email: prev.email || c.correo || "",
         rfc: prev.rfc || c.rfc || "",
-        empresa: prev.empresa || c.razonSocial || "",
+        empresa: prev.empresa || c.empresaHistorica || c.razonSocial || "",
       }));
     }
   }
@@ -305,10 +306,9 @@ function AltaClienteInner() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: profile } = await supabase.from("profiles").select("rol, centro, nombre").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const rol = profile?.rol || "";
     setMiRol(rol);
-    setMiNombre(profile?.nombre || "");
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(profile?.centro || CENTROS_SUGERIDOS[0]);
@@ -491,9 +491,6 @@ function AltaClienteInner() {
           </div>
         ) : (
           <form className="form-card" onSubmit={registrarCliente}>
-            <p className="sub-label">Registrado por</p>
-            <input value={miNombre} disabled style={{ background: "#f2f2f2", color: "#555" }} />
-
             <p className="panel-section-label" style={{ marginTop: 14 }}>
               Prospecto (opcional)
             </p>
