@@ -42,10 +42,15 @@ export default function ContratoModal({
   contrato,
   onClose,
   onGuardado,
+  onRefrescar,
 }: {
   contrato: Contrato;
   onClose: () => void;
   onGuardado: () => void;
+  // Refresca la lista de contratos de atrás SIN cerrar este modal — se usa
+  // al aprobar el contrato de un cliente que ya tenía cuenta, para poder
+  // mostrar la pantalla de éxito aquí mismo antes de cerrar (ver aprobar()).
+  onRefrescar: () => void;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -70,6 +75,7 @@ export default function ContratoModal({
   const [archivoFinalUrl, setArchivoFinalUrl] = useState(contrato.archivo_url);
   const [confirmacionFirma, setConfirmacionFirma] = useState(false);
   const [enviandoFirma, setEnviandoFirma] = useState(false);
+  const [exitoAprobacionVisible, setExitoAprobacionVisible] = useState(false);
 
   // ---------- Adicionales (catálogo con buscador + persistencia inmediata) ----------
   const [catalogo, setCatalogo] = useState<CatalogoItem[]>([]);
@@ -400,13 +406,17 @@ export default function ContratoModal({
 
     setProcesandoAprobacion(false);
     setEstatus("vigente");
-    onGuardado();
 
     // Cliente nuevo (sin cuenta todavía) → seguir directo a Alta de
-    // cliente. Si ya tenía cuenta (ej. una renovación), se queda igual
-    // que hoy, sin redirigir a nada.
+    // cliente con este contrato ya ligado. Si ya tenía cuenta (ej. una
+    // renovación), no hay a dónde más llevarlo — se queda aquí mismo y
+    // se le confirma con una pantalla de éxito antes de cerrar.
     if (!contrato.user_id) {
+      onGuardado();
       router.push(`/alta-cliente?contratoId=${contrato.id}`);
+    } else {
+      onRefrescar();
+      setExitoAprobacionVisible(true);
     }
   }
 
@@ -420,6 +430,27 @@ export default function ContratoModal({
   }
 
   const badge = ESTATUS_LABEL[estatus] || { label: estatus || "—", bg: "#F0F0F0", color: "#555" };
+
+  if (exitoAprobacionVisible) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+          <div className="invitado-exito-icono">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
+          <p className="invitado-exito-mensaje">
+            El contrato de {contrato.cliente_nombre || "el cliente"} ya está vigente.
+          </p>
+          <button className="invitado-exito-btn" onClick={onClose}>
+            Entendido
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>

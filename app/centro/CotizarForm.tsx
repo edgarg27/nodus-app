@@ -70,7 +70,14 @@ function formatHora(h: number) {
   return `${h - 12}:00 PM`;
 }
 
-type Cliente = { id: string; nombre: string; email: string; empresa: string | null };
+type Cliente = {
+  id: string;
+  nombre: string;
+  email: string;
+  empresa: string | null;
+  telefono: string | null;
+  rfc: string | null;
+};
 // Lead registrado en la pestaña Prospectos de Centro — no tiene cuenta
 // (profiles.id), así que solo sirve para precargar nombre/contacto al
 // cotizar, nunca para ligar cliente_id.
@@ -81,6 +88,7 @@ type ProspectoBusqueda = {
   email: string | null;
   interes: string | null;
   medio: string | null;
+  rfc: string | null;
 };
 type Oficina = {
   id: string;
@@ -180,6 +188,7 @@ export default function CotizarForm({
   prospectoTelefonoPreseleccionado,
   prospectoEmailPreseleccionado,
   prospectoInteresPreseleccionado,
+  prospectoRfcPreseleccionado,
 }: {
   centro: string;
   clientePreseleccionadoId?: string;
@@ -200,6 +209,7 @@ export default function CotizarForm({
   prospectoTelefonoPreseleccionado?: string;
   prospectoEmailPreseleccionado?: string;
   prospectoInteresPreseleccionado?: string;
+  prospectoRfcPreseleccionado?: string;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -226,7 +236,7 @@ export default function CotizarForm({
   async function cargarDatos() {
     setLoading(true);
     const [clisRes, ofisRes, paqsRes, catRes, contratosRes, salaRes, coffeeRes, prospsRes] = await Promise.all([
-      supabase.from("profiles").select("id, nombre, email, empresa").eq("rol", "cliente").eq("centro", centro),
+      supabase.from("profiles").select("id, nombre, email, empresa, telefono, rfc").eq("rol", "cliente").eq("centro", centro),
       supabase
         .from("oficinas")
         .select("id, numero, tipo, estado, precio, deposito_garantia, cliente_id, paquete_default_id")
@@ -244,7 +254,7 @@ export default function CotizarForm({
       supabase.from("coffee_break_paquetes").select("*").eq("activo", true).order("numero", { ascending: true }),
       supabase
         .from("prospectos")
-        .select("id, nombre, telefono, email, interes, medio")
+        .select("id, nombre, telefono, email, interes, medio, rfc")
         .eq("centro", centro)
         .order("created_at", { ascending: false }),
     ]);
@@ -292,12 +302,52 @@ export default function CotizarForm({
     return `${c.nombre}${c.empresa ? ` (${c.empresa})` : ""}`;
   }
 
+  // ---------- Cliente existente (opcional) ----------
+  // Buscador de clientes que YA tienen cuenta (profiles.rol = "cliente") —
+  // a diferencia del buscador de Prospecto de abajo, elegir uno aquí SÍ
+  // liga cliente_id de verdad. Sin esto, cotizar para un cliente existente
+  // sin llegar por la URL con clienteId (ver /dashboard → "Cotizar" de un
+  // cliente puntual) no tenía forma de ligarse — el contrato quedaba con
+  // user_id null y, al aprobarlo, se trataba como si fuera cliente nuevo.
+  const [busquedaClienteExistente, setBusquedaClienteExistente] = useState("");
+  const [mostrarListaClientesExistentes, setMostrarListaClientesExistentes] = useState(false);
+  const clientesExistentesFiltrados = useMemo(() => {
+    if (!busquedaClienteExistente.trim()) return clientes;
+    const q = busquedaClienteExistente.toLowerCase();
+    return clientes.filter(
+      (c) =>
+        c.nombre.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.telefono?.toLowerCase().includes(q)
+    );
+  }, [busquedaClienteExistente, clientes]);
+
+  function seleccionarClienteExistente(c: Cliente) {
+    setClienteId(c.id);
+    setBusquedaClienteExistente(c.nombre);
+    setMostrarListaClientesExistentes(false);
+    // Un cliente real reemplaza cualquier prospecto que se hubiera elegido
+    // antes — no tiene sentido ligar los dos a la vez.
+    setProspectoSeleccionadoId("");
+    setBusqueda("");
+    setNombreContesta(c.nombre);
+    setTelefonoContesta(c.telefono || "");
+    setCorreoContesta(c.email || "");
+    setRfc(c.rfc || "");
+  }
+
+  function limpiarClienteExistente() {
+    setClienteId("");
+    setBusquedaClienteExistente("");
+    setMostrarListaClientesExistentes(false);
+  }
+
   // ---------- Prospecto (opcional) ----------
   // Buscador de leads ya registrados en la pestaña Prospectos — NO liga un
   // cliente_id real (los prospectos no tienen cuenta), solo precarga
   // nombre/observaciones igual que el handoff por URL desde esa pestaña.
-  const [busqueda, setBusqueda] = useState("");
-  const [prospectoSeleccionadoId, setProspectoSeleccionadoId] = useState("");
+  const [busqueda, setBusqueda] = useState(prospectoNombrePreseleccionado || "");
+  const [prospectoSeleccionadoId, setProspectoSeleccionadoId] = useState(prospectoIdPreseleccionado || "");
   const [mostrarListaClientes, setMostrarListaClientes] = useState(false);
   const [prospectosBusqueda, setProspectosBusqueda] = useState<ProspectoBusqueda[]>([]);
   const prospectosFiltrados = useMemo(() => {
@@ -321,6 +371,7 @@ export default function CotizarForm({
     setNombreContesta(p.nombre);
     setTelefonoContesta(p.telefono || "");
     setCorreoContesta(p.email || "");
+    setRfc(p.rfc || "");
     if (p.medio && MEDIOS_CONTACTO.includes(p.medio)) setMedioContacto(p.medio);
     if (p.interes) setObservaciones((prev) => (prev.trim() ? prev : `Interés: ${p.interes}`));
   }
@@ -398,7 +449,7 @@ export default function CotizarForm({
         const bOcupada = !!ocupacionPorOficina[b.id];
         if (!aOcupada && bOcupada) return -1; // disponibles primero
         if (aOcupada && !bOcupada) return 1;
-        return a.numero.localeCompare(b.numero);
+        return a.numero.localeCompare(b.numero, "es", { numeric: true });
       });
   }, [oficinas, tipoEspacio, ocupacionPorOficina]);
 
@@ -624,8 +675,16 @@ export default function CotizarForm({
       setAvisoPaqueteVinculado("");
       actualizarDepositoSegunSeleccion(id, paqueteVinculado.id);
     } else {
+      // El comentario de arriba decía "se libera el selector", pero nunca
+      // se limpiaba paqueteId — se quedaba pegado al paquete de la oficina
+      // elegida anteriormente. Por eso, con un cliente que ya trae un
+      // paquete registrado (típico al renovar), todas las oficinas de ese
+      // tipo parecían mostrar "el mismo paquete": en realidad era el mismo
+      // valor viejo sin limpiar, no el paquete real de cada oficina.
+      setPaqueteId("");
+      setModalidadPaquete("");
       setPaqueteBloqueado(false);
-      actualizarDepositoSegunSeleccion(id, paqueteId);
+      actualizarDepositoSegunSeleccion(id, "");
       setAvisoPaqueteVinculado(
         paqueteVinculado
           ? `Esta oficina está vinculada al paquete "${paqueteVinculado.nombre}", pero este cliente ya lo tiene registrado — elige otro paquete o continúa sin uno.`
@@ -656,8 +715,8 @@ export default function CotizarForm({
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
   const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
   const [razonSocial, setRazonSocial] = useState("");
-  const [rfc, setRfc] = useState("");
-  const [nombreContesta, setNombreContesta] = useState("");
+  const [rfc, setRfc] = useState(prospectoRfcPreseleccionado || "");
+  const [nombreContesta, setNombreContesta] = useState(prospectoNombrePreseleccionado || "");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
   const [correoContesta, setCorreoContesta] = useState(prospectoEmailPreseleccionado || "");
   const [observaciones, setObservaciones] = useState(observacionesProspecto);
@@ -690,6 +749,77 @@ export default function CotizarForm({
   // incremento no debe pedirse en una cotización nueva.
   const [esRenovacion, setEsRenovacion] = useState(false);
   const [porcentajeIncremento, setPorcentajeIncremento] = useState("");
+
+  // ---------- Renovación: contrato a renovar (solo con cliente existente) ----------
+  // Al elegir cuál de los contratos vigentes del cliente se está renovando,
+  // se precarga la oficina que ya tenía (se puede cambiar a otra disponible
+  // si el cliente quiere una nueva) y las horas de sala de juntas quedan
+  // editables a mano — un cambio de oficina/paquete puede subirlas o
+  // bajarlas y aquí se decide caso por caso, no automático.
+  type ContratoVigenteCliente = {
+    id: string;
+    oficina_id: string | null;
+    horas_sala_juntas: number | null;
+    renta_mensual: number | null;
+    fecha_vencimiento: string;
+  };
+  const [contratosClienteVigentes, setContratosClienteVigentes] = useState<ContratoVigenteCliente[]>([]);
+  const [contratoARenovarId, setContratoARenovarId] = useState("");
+  const [horasSalaJuntasManual, setHorasSalaJuntasManual] = useState("");
+  // Qué hacer con el contrato elegido arriba, una vez que ya se sabe cuál
+  // es: "renovar" lo actualiza en el mismo lugar (misma oficina, datos que
+  // se pueden ajustar); "agregar" hace lo mismo Y suma una oficina nueva al
+  // mismo contrato (como adicional); "cambiar" crea un contrato NUEVO con
+  // la oficina distinta y da de baja el anterior.
+  const [modoRenovacion, setModoRenovacion] = useState<"" | "renovar" | "cambiar" | "agregar">("");
+  // Oficina que se suma en modo "agregar" — selección independiente de la
+  // oficina principal (que sigue siendo la del contrato que se renueva).
+  const [oficinaNuevaId, setOficinaNuevaId] = useState("");
+  const oficinaNueva = oficinas.find((o) => o.id === oficinaNuevaId) || null;
+
+  useEffect(() => {
+    if (!clienteId) {
+      setContratosClienteVigentes([]);
+      setContratoARenovarId("");
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from("contratos")
+        .select("id, oficina_id, horas_sala_juntas, renta_mensual, fecha_vencimiento")
+        .eq("user_id", clienteId)
+        .eq("estatus", "vigente")
+        .order("fecha_vencimiento", { ascending: false });
+      setContratosClienteVigentes(data || []);
+    })();
+  }, [clienteId]);
+
+  // Mismo patrón de hidratación en dos pasos que ya usa el handoff desde
+  // /mapa-oficinas (ver hidratadoDesdeUrl más abajo): si hay que fijar
+  // tipoEspacio primero, el efecto se corta y espera al siguiente render,
+  // porque oficinasDelTipo (derivado por useMemo del tipoEspacio todavía
+  // viejo) no habría recalculado a tiempo para encontrar la oficina.
+  const contratoARenovarAplicadoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!contratoARenovarId) return;
+    if (contratoARenovarAplicadoRef.current === contratoARenovarId) return;
+    const contratoElegido = contratosClienteVigentes.find((c) => c.id === contratoARenovarId);
+    if (!contratoElegido) return;
+    setHorasSalaJuntasManual(String(contratoElegido.horas_sala_juntas ?? 0));
+    if (!contratoElegido.oficina_id) {
+      contratoARenovarAplicadoRef.current = contratoARenovarId;
+      return;
+    }
+    const oficinaDelContrato = oficinas.find((o) => o.id === contratoElegido.oficina_id);
+    if (!oficinaDelContrato) return; // oficinas todavía no cargó
+    if (tipoEspacio !== oficinaDelContrato.tipo) {
+      setTipoEspacio(oficinaDelContrato.tipo);
+      return;
+    }
+    seleccionarOficina(oficinaDelContrato.id);
+    contratoARenovarAplicadoRef.current = contratoARenovarId;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contratoARenovarId, contratosClienteVigentes, oficinas, tipoEspacio]);
 
   // ---------- Fechas ----------
   // Para oficinas la modalidad siempre es "Mes"; para paquetes depende de
@@ -921,24 +1051,13 @@ export default function CotizarForm({
   // Igual, pero para Oficina Privada/Coworking/Working Desk: ese flujo sí
   // navega a /dashboard al terminar (para ver la oficina ya ocupada), pero
   // antes se quedaba sin avisar nada — ahora se muestra la misma pantalla
-  // de "¡Listo!" un momento antes de navegar.
+  // de "¡Listo!" hasta que el staff le da clic a "Ir al dashboard".
   const [espacioResultado, setEspacioResultado] = useState<{ mensaje: string } | null>(null);
-  const espacioResultadoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function continuarDespuesDeEspacio() {
-    if (espacioResultadoTimeoutRef.current) {
-      clearTimeout(espacioResultadoTimeoutRef.current);
-      espacioResultadoTimeoutRef.current = null;
-    }
     onRegistrado();
     router.push(`/dashboard?exito=plan`);
   }
-
-  useEffect(() => {
-    return () => {
-      if (espacioResultadoTimeoutRef.current) clearTimeout(espacioResultadoTimeoutRef.current);
-    };
-  }, []);
 
   function crearOtraCotizacionSala() {
     setSalaResultado(null);
@@ -1177,6 +1296,103 @@ export default function CotizarForm({
     // "Cotizar otra Sala de Juntas") en crearOtraCotizacionSala().
   }
 
+  // Renovación "en línea": actualiza el contrato elegido en su lugar (misma
+  // oficina, mismo registro) — no crea cotización ni contrato nuevos. El %
+  // de incremento se aplica sobre la renta que YA tenía ese contrato
+  // (mismo cálculo que ya usa /contratos → guardarRenovacion), no sobre lo
+  // que calcule el formulario, para no depender de que el paquete/oficina
+  // hidratados reproduzcan exacto el precio original.
+  async function ejecutarRenovacionEnLinea() {
+    if (!fechaFin) {
+      setError("Completa la fecha de vencimiento");
+      return;
+    }
+    setError("");
+    setGuardando(true);
+    const contratoOriginal = contratosClienteVigentes.find((c) => c.id === contratoARenovarId);
+    const incremento = Number(porcentajeIncremento) || 0;
+    const nuevaRenta =
+      incremento > 0 && contratoOriginal?.renta_mensual != null
+        ? round2(Number(contratoOriginal.renta_mensual) * (1 + incremento / 100))
+        : contratoOriginal?.renta_mensual ?? null;
+
+    const { error: updateError } = await supabase
+      .from("contratos")
+      .update({
+        fecha_vencimiento: fechaFin,
+        ...(nuevaRenta != null ? { renta_mensual: nuevaRenta } : {}),
+        horas_sala_juntas: Number(horasSalaJuntasManual) || 0,
+      })
+      .eq("id", contratoARenovarId);
+
+    setGuardando(false);
+    if (updateError) {
+      setError("No se pudo renovar el contrato. Intenta de nuevo.");
+      return;
+    }
+    setEnviado(true);
+    setTimeout(() => setEnviado(false), 1800);
+    setEspacioResultado({ mensaje: "El contrato se renovó correctamente." });
+  }
+
+  // Renovación + agregar oficina: mismo cálculo de renta que arriba, pero
+  // además suma la oficina elegida como un adicional del MISMO contrato
+  // (no crea uno nuevo) y la marca como ocupada por este cliente.
+  async function ejecutarAgregarEspacio() {
+    if (!fechaFin) {
+      setError("Completa la fecha de vencimiento");
+      return;
+    }
+    if (!oficinaNuevaId || !oficinaNueva) {
+      setError("Elige la oficina que se va a agregar");
+      return;
+    }
+    setError("");
+    setGuardando(true);
+    const contratoOriginal = contratosClienteVigentes.find((c) => c.id === contratoARenovarId);
+    const incremento = Number(porcentajeIncremento) || 0;
+    const nuevaRenta =
+      incremento > 0 && contratoOriginal?.renta_mensual != null
+        ? round2(Number(contratoOriginal.renta_mensual) * (1 + incremento / 100))
+        : contratoOriginal?.renta_mensual ?? null;
+
+    const { error: updateError } = await supabase
+      .from("contratos")
+      .update({
+        fecha_vencimiento: fechaFin,
+        ...(nuevaRenta != null ? { renta_mensual: nuevaRenta } : {}),
+        horas_sala_juntas: Number(horasSalaJuntasManual) || 0,
+      })
+      .eq("id", contratoARenovarId);
+    if (updateError) {
+      setGuardando(false);
+      setError("No se pudo actualizar el contrato. Intenta de nuevo.");
+      return;
+    }
+
+    const costoOficinaNueva = Number(oficinaNueva.precio) || 0;
+    await supabase.from("contrato_adicionales").insert({
+      contrato_id: contratoARenovarId,
+      adicional_id: null,
+      concepto: `Oficina agregada: ${oficinaNueva.tipo} ${oficinaNueva.numero}`,
+      descripcion: null,
+      costo_unitario: costoOficinaNueva,
+      cantidad: 1,
+      monto: costoOficinaNueva,
+    });
+
+    if (cliente?.id) {
+      await supabase.from("oficinas").update({ cliente_id: cliente.id, estado: "ocupada" }).eq("id", oficinaNuevaId);
+    }
+
+    setGuardando(false);
+    setEnviado(true);
+    setTimeout(() => setEnviado(false), 1800);
+    setEspacioResultado({
+      mensaje: `Se agregó ${oficinaNueva.tipo} ${oficinaNueva.numero} al contrato ($${costoOficinaNueva.toLocaleString("es-MX")}/mes).`,
+    });
+  }
+
   async function crearCotizacion() {
     if (!tipoEspacio || !espacioListo) {
       setError("Selecciona un tipo de espacio y una oficina o paquete");
@@ -1184,6 +1400,20 @@ export default function CotizarForm({
     }
     if (esSalaJuntas) {
       return crearCotizacionSalaJuntas();
+    }
+    // Renovar o agregar oficina no crean una cotización/contrato desde
+    // cero — actualizan el contrato elegido arriba en su lugar, así que
+    // se atajan aquí antes de pedir datos que ya conoce ese contrato
+    // (RFC, persona física/moral, etc.).
+    if (esRenovacion && contratoARenovarId) {
+      if (!modoRenovacion) {
+        setError("Elige qué hacer: Renovación, Cambiar tipo de espacio o Agregar tipo de espacio.");
+        return;
+      }
+      if (modoRenovacion === "renovar") return ejecutarRenovacionEnLinea();
+      if (modoRenovacion === "agregar") return ejecutarAgregarEspacio();
+      // "cambiar" sigue el flujo normal de abajo (crea cotización + contrato
+      // nuevo), solo que entra "vigente" directo y da de baja al anterior.
     }
     if (paquete && !modalidadPaquete) {
       setError("Elige la modalidad (hora, día, semana o mes) del paquete");
@@ -1223,6 +1453,7 @@ export default function CotizarForm({
     setGuardando(true);
 
     const clienteIdEfectivo = cliente?.id || null;
+    const esCambioDeEspacio = esRenovacion && modoRenovacion === "cambiar" && !!contratoARenovarId;
 
     const { data: cotizacion, error: cotError } = await supabase
       .from("cotizaciones_comerciales")
@@ -1308,12 +1539,15 @@ export default function CotizarForm({
         // /contratos y el pago que se genera al aprobarlo también sale en $0.
         renta_mensual: precioNeto,
         deposito_garantia: depositoNum,
-        horas_sala_juntas: paquete?.incluye_horas_sala_juntas || 0,
+        horas_sala_juntas: esRenovacion ? Number(horasSalaJuntasManual) || 0 : paquete?.incluye_horas_sala_juntas || 0,
         horas_bolsa: paquete?.horas_bolsa || 0,
         // El día de pago ya no se pregunta aquí — se vuelve a pedir,
         // opcional, hasta /alta-cliente (ver app/alta-cliente/page.tsx).
         dia_pago: null,
-        estatus: "pre_aprobado",
+        // "Cambiar tipo de espacio" entra vigente de inmediato (el cliente
+        // ya estaba vetado, no es alguien nuevo) — el resto de los casos
+        // sigue el ciclo normal pre_aprobado → subir firmado → aprobar.
+        estatus: esCambioDeEspacio ? "vigente" : "pre_aprobado",
         archivo_url: null,
         cotizacion_id: cotizacion.id,
       })
@@ -1351,6 +1585,73 @@ export default function CotizarForm({
 
     if (oficina && clienteIdEfectivo) {
       await supabase.from("oficinas").update({ cliente_id: clienteIdEfectivo, estado: "ocupada" }).eq("id", oficina.id);
+    }
+
+    if (esCambioDeEspacio) {
+      // Da de baja el contrato que se está reemplazando — el nuevo ya
+      // entró "vigente" arriba.
+      await supabase.from("contratos").update({ estatus: "rechazado" }).eq("id", contratoARenovarId);
+
+      // Como este contrato entra vigente directo (sin pasar por el
+      // aprobar() manual de ContratoModal.tsx), sus cobros tampoco se
+      // generarían solos — se crean aquí mismo para no dejarlo sin
+      // facturar. Mismo patrón exacto que ContratoModal.tsx → aprobar().
+      if (clienteIdEfectivo) {
+        if (precioNeto > 0) {
+          try {
+            await fetch("/api/pagos/crear", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                clienteId: clienteIdEfectivo,
+                monto: precioNeto,
+                concepto: "Contrato",
+                contratoId: contratoIdCreado,
+                centro,
+              }),
+            });
+          } catch {
+            // no crítico
+          }
+        }
+        if (depositoNum > 0) {
+          const depositoConIva = round2(depositoNum * 1.16);
+          try {
+            await fetch("/api/pagos/crear", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                clienteId: clienteIdEfectivo,
+                monto: depositoConIva,
+                concepto: "Depósito en garantía (incl. IVA)",
+                contratoId: contratoIdCreado,
+                centro,
+              }),
+            });
+          } catch {
+            // no crítico
+          }
+        }
+        for (const a of adicionalesDraft) {
+          if (a.costo_unitario * a.cantidad > 0) {
+            try {
+              await fetch("/api/pagos/crear", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  clienteId: clienteIdEfectivo,
+                  monto: a.costo_unitario * a.cantidad,
+                  concepto: `Adicional: ${a.concepto}`,
+                  contratoId: contratoIdCreado,
+                  centro,
+                }),
+              });
+            } catch {
+              // no crítico
+            }
+          }
+        }
+      }
     }
 
     // El pago ya no se genera aquí — nace hasta que el contrato se aprueba
@@ -1393,7 +1694,7 @@ export default function CotizarForm({
             descripcion: nombreEspacio,
             cantidad: cantidadPeriodo ? Number(cantidadPeriodo) : 1,
             personas: numeroPersonas ? Number(numeroPersonas) : 1,
-            horasSalaJuntas: paquete?.incluye_horas_sala_juntas ?? 0,
+            horasSalaJuntas: esRenovacion ? Number(horasSalaJuntasManual) || 0 : paquete?.incluye_horas_sala_juntas ?? 0,
             precioUnitario: tarifaUnitaria ?? precioPactadoNum,
             totalFila: precioPactadoNum,
             subtotal: subtotalConAdicionales,
@@ -1429,7 +1730,9 @@ export default function CotizarForm({
     setEspacioResultado({
       mensaje: `Cotización registrada para ${nombreParaExito} · ${nombreEspacio}.`,
     });
-    espacioResultadoTimeoutRef.current = setTimeout(continuarDespuesDeEspacio, 2200);
+    // Antes navegaba sola a los 2.2s — ahora se queda visible hasta que el
+    // staff le dé clic al botón, para no perderse la pantalla si tardó en
+    // leerla.
   }
 
   if (loading) return <div className="nodus-inline-loading">
@@ -1526,7 +1829,91 @@ export default function CotizarForm({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Cliente / Prospecto */}
+      {/* Cliente existente — solo si no llegamos ya con uno fijo por URL */}
+      {!clientePrecargado && (
+        <div>
+          <p className="panel-section-label">Cliente existente (opcional)</p>
+          <div style={{ position: "relative" }}>
+            <input
+              placeholder="Buscar cliente por nombre, teléfono o correo... (déjalo vacío si es un prospecto nuevo)"
+              value={busquedaClienteExistente}
+              onChange={(e) => {
+                setBusquedaClienteExistente(e.target.value);
+                if (clienteId) setClienteId("");
+                setMostrarListaClientesExistentes(true);
+              }}
+              onFocus={() => setMostrarListaClientesExistentes(true)}
+              onBlur={() => setTimeout(() => setMostrarListaClientesExistentes(false), 150)}
+              style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%" }}
+            />
+            {clienteId && (
+              <button
+                type="button"
+                className="tel-borrar-btn"
+                style={{ position: "absolute", right: 8, top: 8, color: "#888" }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={limpiarClienteExistente}
+                aria-label="Quitar cliente seleccionado"
+              >
+                ✕
+              </button>
+            )}
+            {mostrarListaClientesExistentes && (
+              <div
+                style={{
+                  position: "absolute",
+                  zIndex: 10,
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  marginTop: 4,
+                  background: "#fff",
+                  border: "1px solid #eee",
+                  borderRadius: 10,
+                  maxHeight: 220,
+                  overflowY: "auto",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                }}
+              >
+                {clientesExistentesFiltrados.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#aaa", margin: 0, padding: "10px 12px" }}>Sin resultados.</p>
+                ) : (
+                  clientesExistentesFiltrados.map((c) => (
+                    <button
+                      type="button"
+                      key={c.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => seleccionarClienteExistente(c)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        color: "#1a1a1a",
+                        background: c.id === clienteId ? "#F0F4FA" : "none",
+                        border: "none",
+                        borderBottom: "1px solid #f2f2f2",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>{c.nombre}</span>
+                      {c.empresa ? ` · ${c.empresa}` : ""}
+                      {c.email ? ` · ${c.email}` : ""}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Cliente / Prospecto — se oculta en cuanto hay un cliente existente
+          real seleccionado (arriba, en "Cliente existente"): buscar un
+          prospecto ya no aplica, ese buscador es solo para leads sin
+          cuenta. */}
+      {(!clienteId || clientePrecargado) && (
       <div>
         <p className="panel-section-label">{clientePrecargado && cliente ? "Cliente (opcional)" : "Prospecto (opcional)"}</p>
         {clientePrecargado && cliente ? (
@@ -1638,6 +2025,145 @@ export default function CotizarForm({
           </div>
         )}
       </div>
+      )}
+
+      {/* Renovación de contrato existente — solo tiene sentido con un
+          cliente real ya seleccionado (no un prospecto). */}
+      {!!clienteId && (
+        <div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={esRenovacion}
+              onChange={(e) => {
+                setEsRenovacion(e.target.checked);
+                if (!e.target.checked) {
+                  setPorcentajeIncremento("");
+                  setContratoARenovarId("");
+                }
+              }}
+            />
+            ¿Es renovación de un contrato existente?
+          </label>
+          {esRenovacion && (
+            <div className="tel-form-grid" style={{ marginTop: 8 }}>
+              <div>
+                <p className="sub-label">Contrato a renovar</p>
+                <select
+                  value={contratoARenovarId}
+                  onChange={(e) => {
+                    // Al elegir (o cambiar) el contrato a renovar se vacía
+                    // el resto del formulario — cualquier dato suelto que
+                    // haya quedado de antes no debe mezclarse con esta
+                    // renovación.
+                    contratoARenovarAplicadoRef.current = null;
+                    // "Renovación" queda como opción por defecto en cuanto
+                    // se elige un contrato — el staff puede cambiar de
+                    // pestaña si en realidad quiere cambiar/agregar oficina.
+                    setModoRenovacion(e.target.value ? "renovar" : "");
+                    setOficinaNuevaId("");
+                    setAdicionalesDraft([]);
+                    setComentarios("");
+                    setComentariosPrecio("");
+                    setNumeroPersonas("");
+                    setDescuentoPorcentaje("0");
+                    setTipoProspecto("");
+                    setMedioContacto("");
+                    setDetalleMedioContacto("");
+                    setObservaciones("");
+                    setContratoARenovarId(e.target.value);
+                  }}
+                >
+                  <option value="">Selecciona un contrato</option>
+                  {contratosClienteVigentes.map((c) => {
+                    const ofi = oficinas.find((o) => o.id === c.oficina_id);
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {ofi ? `${ofi.tipo} ${ofi.numero}` : "Contrato"} · vence{" "}
+                        {new Date(c.fecha_vencimiento).toLocaleDateString("es-MX")}
+                      </option>
+                    );
+                  })}
+                </select>
+                {contratoARenovarId && (
+                  <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>Ya se preseleccionó su oficina actual abajo.</p>
+                )}
+              </div>
+              <div>
+                <p className="sub-label">% de incremento</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={porcentajeIncremento}
+                  onChange={(e) => setPorcentajeIncremento(e.target.value)}
+                />
+              </div>
+              <div>
+                <p className="sub-label">Horas de sala de juntas</p>
+                <input
+                  type="number"
+                  min={0}
+                  value={horasSalaJuntasManual}
+                  onChange={(e) => setHorasSalaJuntasManual(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {esRenovacion && contratoARenovarId && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  className={"centro-tab" + (modoRenovacion === "renovar" ? " active" : "")}
+                  onClick={() => setModoRenovacion("renovar")}
+                >
+                  Renovación
+                </button>
+                <button
+                  type="button"
+                  className={"centro-tab" + (modoRenovacion === "cambiar" ? " active" : "")}
+                  onClick={() => setModoRenovacion("cambiar")}
+                >
+                  Cambiar tipo de espacio
+                </button>
+                <button
+                  type="button"
+                  className={"centro-tab" + (modoRenovacion === "agregar" ? " active" : "")}
+                  onClick={() => setModoRenovacion("agregar")}
+                >
+                  Agregar tipo de espacio
+                </button>
+              </div>
+
+              {modoRenovacion === "renovar" && (
+                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
+                  Se queda con la misma oficina y los mismos datos del contrato anterior — solo se ajusta lo que
+                  cambies arriba (fecha, % de incremento, horas de sala de juntas).
+                </p>
+              )}
+              {modoRenovacion === "cambiar" && (
+                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
+                  Elige abajo la oficina nueva — se crea un contrato nuevo con esa oficina y el anterior se marca
+                  como terminado.
+                </p>
+              )}
+              {modoRenovacion === "agregar" && (
+                <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
+                  Se queda con todos los mismos datos y además suma la oficina que elijas abajo, con su propio
+                  costo desglosado.
+                  {oficinaNueva && (
+                    <span style={{ display: "block", color: "#0d1b3e", fontWeight: 600, marginTop: 4 }}>
+                      + ${Number(oficinaNueva.precio || 0).toLocaleString("es-MX")}/mes por {oficinaNueva.tipo}{" "}
+                      {oficinaNueva.numero}
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tipo de espacio */}
       <div>
@@ -1645,6 +2171,7 @@ export default function CotizarForm({
         <select
           value={tipoEspacio}
           onChange={(e) => seleccionarTipoEspacio(e.target.value)}
+          disabled={esRenovacion && contratoARenovarId !== "" && modoRenovacion === "renovar"}
           style={estiloSelect}
         >
           <option value="">Selecciona un tipo</option>
@@ -1798,24 +2325,47 @@ export default function CotizarForm({
         </div>
       )}
 
+      {/* En Renovación/Agregar la oficina principal no cambia — se muestra
+          nada más como referencia, sin la cuadrícula completa de oficinas
+          (esa cuadrícula es para elegir, y aquí ya está elegida). */}
+      {esRenovacion && contratoARenovarId && (modoRenovacion === "renovar" || modoRenovacion === "agregar") && oficina && (
+        <div>
+          <p className="panel-section-label">Oficina</p>
+          <div className="empty-card" style={{ textAlign: "left" }}>
+            <p style={{ margin: 0, fontWeight: 700, color: "#1a1a1a" }}>
+              {oficina.tipo} {oficina.numero}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Oficina — tarjetas clicables con ocupación en vivo (cruce contra
           contratos vigentes, no solo oficinas.estado). Prioridad de bloqueo:
-          ocupada (por contrato vigente) > mantenimiento > disponible. */}
-      {tipoEspacio && oficinasDelTipo.length > 0 && (
+          ocupada (por contrato vigente) > mantenimiento > disponible.
+          En modo "agregar" esta misma cuadrícula elige la oficina EXTRA a
+          sumar (oficinaNuevaId), no la principal — por eso se excluye la
+          oficina que ya tiene el contrato, no tendría sentido sumarla a
+          sí misma. En "renovar" no se muestra (ver arriba, ya se ve como
+          referencia sin poder cambiarla). */}
+      {tipoEspacio &&
+        oficinasDelTipo.length > 0 &&
+        !(esRenovacion && contratoARenovarId && modoRenovacion === "renovar") && (
         <div>
           <p className="panel-section-label">Oficina</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
-            {oficinasDelTipo.map((o) => {
+            {oficinasDelTipo
+              .filter((o) => !(modoRenovacion === "agregar" && o.id === oficina?.id))
+              .map((o) => {
               const ocupacion = ocupacionPorOficina[o.id];
               const bloqueada = !!ocupacion || o.estado === "mantenimiento";
-              const seleccionada = oficinaId === o.id;
+              const seleccionada = modoRenovacion === "agregar" ? oficinaNuevaId === o.id : oficinaId === o.id;
               return (
                 <button
                   key={o.id}
                   type="button"
                   className="contrato-card-admin"
                   disabled={bloqueada}
-                  onClick={() => seleccionarOficina(o.id)}
+                  onClick={() => (modoRenovacion === "agregar" ? setOficinaNuevaId(o.id) : seleccionarOficina(o.id))}
                   style={{
                     textAlign: "left",
                     cursor: bloqueada ? "not-allowed" : "pointer",
@@ -2188,34 +2738,6 @@ export default function CotizarForm({
               </>
             )}
 
-            {!esHora && !esDia && !esSalaJuntas && (
-              <div>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={esRenovacion}
-                    onChange={(e) => {
-                      setEsRenovacion(e.target.checked);
-                      if (!e.target.checked) setPorcentajeIncremento("");
-                    }}
-                  />
-                  ¿Es renovación de un contrato existente?
-                </label>
-                {esRenovacion && (
-                  <>
-                    <p className="sub-label" style={{ marginTop: 8 }}>
-                      % de incremento
-                    </p>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={porcentajeIncremento}
-                      onChange={(e) => setPorcentajeIncremento(e.target.value)}
-                    />
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {esHora && horaFinCalculada != null && (

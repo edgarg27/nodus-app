@@ -88,7 +88,16 @@ function LoginInner() {
         .select("rol")
         .eq("id", user.id)
         .single();
-      if (profile?.rol === "cliente") destino = "/dashboard-cliente";
+      if (!profile?.rol) {
+        // Cuenta autenticada pero sin fila en profiles (ej. un alta que
+        // falló a medias) — no hay a dónde mandarla. Antes esto caía por
+        // default en /dashboard (panel de administrador); ahora se cierra
+        // la sesión y se avisa en vez de dejarla entrar sin rol.
+        await supabase.auth.signOut();
+        setError("Tu cuenta no tiene un perfil configurado todavía. Contacta a soporte.");
+        return;
+      }
+      if (profile.rol === "cliente") destino = "/dashboard-cliente";
     }
 
     // Si llegó aquí desde una pantalla protegida (ej. escaneó el QR de un

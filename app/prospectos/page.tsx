@@ -25,6 +25,7 @@ type Prospecto = {
   rfc?: string | null;
   dia_pago?: number | null;
   comentario_perdido?: string | null;
+  registrado_por?: string | null;
 };
 
 const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: string }> = {
@@ -47,8 +48,10 @@ export default function ProspectosPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [miRol, setMiRol] = useState("");
+  const [miNombre, setMiNombre] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
+  const [nombrePorRegistradoPor, setNombrePorRegistradoPor] = useState<Record<string, string>>({});
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
@@ -70,16 +73,11 @@ export default function ProspectosPage() {
   const [prospectoPerdiendo, setProspectoPerdiendo] = useState<Prospecto | null>(null);
   const [comentarioPerdido, setComentarioPerdido] = useState("");
   const [avisoExito, setAvisoExito] = useState(false);
+  const [nombreRegistrado, setNombreRegistrado] = useState("");
 
   useEffect(() => {
     init();
   }, []);
-
-  useEffect(() => {
-    if (!avisoExito) return;
-    const t = setTimeout(() => setAvisoExito(false), 3500);
-    return () => clearTimeout(t);
-  }, [avisoExito]);
 
   async function init() {
     setLoading(true);
@@ -90,6 +88,7 @@ export default function ProspectosPage() {
     const { data: profile } = await supabase.from("profiles").select("rol, centro, nombre").eq("id", user.id).single();
     const rol = profile?.rol || "";
     setMiRol(rol);
+    setMiNombre(profile?.nombre || "");
     let miCentro = profile?.centro || null;
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
@@ -109,6 +108,12 @@ export default function ProspectosPage() {
     const lista = data || [];
     setProspectos(lista);
     await marcarSeguimientoAutomatico(lista);
+
+    const idsRegistro = Array.from(new Set(lista.map((p) => p.registrado_por).filter((id): id is string => !!id)));
+    if (idsRegistro.length > 0) {
+      const { data: perfiles } = await supabase.from("profiles").select("id, nombre").in("id", idsRegistro);
+      setNombrePorRegistradoPor(Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre])));
+    }
   }
 
   // Un prospecto que ya tiene al menos una cotización ligada (ver
@@ -149,6 +154,7 @@ export default function ProspectosPage() {
       rfc: formProspecto.rfc || null,
       registrado_por: user?.id,
     });
+    setNombreRegistrado(formProspecto.nombre);
     setFormProspecto({
       nombre: "",
       telefono: "",
@@ -220,22 +226,9 @@ export default function ProspectosPage() {
         ) : (
           <>
             <p className="panel-section-label">Registrar prospecto</p>
-            {avisoExito && (
-              <div
-                style={{
-                  background: "#E1F5EE",
-                  color: "#0F6E56",
-                  borderRadius: 10,
-                  padding: "10px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 8,
-                }}
-              >
-                ✅ Prospecto registrado con éxito
-              </div>
-            )}
             <form className="form-card" onSubmit={agregarProspecto}>
+              <p className="sub-label">Registrado por</p>
+              <input value={miNombre} disabled style={{ background: "#f2f2f2", color: "#555" }} />
               <div className="tel-form-grid">
                 <input
                   placeholder="Nombre"
@@ -375,6 +368,9 @@ export default function ProspectosPage() {
                               )}
                               <p className="item-card-extra" style={{ color: "#aaa" }}>
                                 {new Date(p.created_at).toLocaleDateString("es-MX")}
+                                {p.registrado_por && nombrePorRegistradoPor[p.registrado_por]
+                                  ? ` · Registró: ${nombrePorRegistradoPor[p.registrado_por]}`
+                                  : ""}
                               </p>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
@@ -401,7 +397,9 @@ export default function ProspectosPage() {
                                   p.nombre
                                 )}&prospectoTelefono=${encodeURIComponent(p.telefono || "")}&prospectoEmail=${encodeURIComponent(
                                   p.email || ""
-                                )}&prospectoInteres=${encodeURIComponent(p.interes || "")}`}
+                                )}&prospectoInteres=${encodeURIComponent(p.interes || "")}&prospectoRfc=${encodeURIComponent(
+                                  p.rfc || ""
+                                )}`}
                               >
                                 🧾 Cotizar
                               </a>
@@ -433,6 +431,25 @@ export default function ProspectosPage() {
           </>
         )}
       </div>
+
+      {avisoExito && (
+        <div className="modal-overlay" onClick={() => setAvisoExito(false)}>
+          <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+            <div className="invitado-exito-icono">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <p className="invitado-exito-titulo">¡Se agregó con éxito!</p>
+            <p className="invitado-exito-mensaje">
+              {nombreRegistrado ? `${nombreRegistrado} se registró como prospecto.` : "El prospecto se registró correctamente."}
+            </p>
+            <button className="invitado-exito-btn" onClick={() => setAvisoExito(false)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
 
       {prospectoPerdiendo && (
         <div

@@ -18,6 +18,15 @@ export default async function DashboardPage() {
     .eq("id", session.user.id)
     .single();
 
+  // Antes esta página mostraba el Panel Admin sin importar el rol — un
+  // cliente (o cualquier cuenta sin perfil todavía, ej. si el alta falló a
+  // medias) que entrara directo a /dashboard por URL veía el panel de
+  // administrador completo. El login (app/login/page.tsx) ya manda a los
+  // clientes a /dashboard-cliente, pero esta pantalla necesita el mismo
+  // candado — no puede confiar en que siempre lleguen por esa puerta.
+  if (!profile?.rol) redirect("/login");
+  if (profile.rol === "cliente") redirect("/dashboard-cliente");
+
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;
 

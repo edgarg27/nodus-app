@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -17,6 +18,7 @@ type Cotizacion = {
 
 export default function CotizacionesPage() {
   const supabase = createClient();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [centro, setCentro] = useState<string | null>(null);
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
@@ -31,6 +33,8 @@ export default function CotizacionesPage() {
 
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
   const [aceptadoOkId, setAceptadoOkId] = useState<string | null>(null);
+  const [confirmandoAceptarId, setConfirmandoAceptarId] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
     init();
@@ -107,8 +111,17 @@ export default function CotizacionesPage() {
     if (centro) fetchCotizaciones(centro, "");
   }
 
+  // Búsqueda por nombre (ahí vive el nombre del cliente/prospecto, ver
+  // guardarCotizacion y las plantillas .pptx) o notas — mismo patrón que
+  // /contratos.
+  const cotizacionesFiltradas = cotizaciones.filter((c) => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return true;
+    return c.nombre.toLowerCase().includes(q) || (c.notas || "").toLowerCase().includes(q);
+  });
+
   async function aceptarCotizacion(id: string) {
-    if (!confirm("¿Aceptar esta cotización y generar el contrato como pre-aprobado?")) return;
+    setConfirmandoAceptarId(null);
     setAceptandoId(id);
     try {
       const res = await fetch("/api/cotizacion-aceptar", {
@@ -122,7 +135,17 @@ export default function CotizacionesPage() {
         return;
       }
       setAceptadoOkId(id);
-      setTimeout(() => setAceptadoOkId(null), 1800);
+      // Se deja ver un momento la palomita de "¡Listo!" antes de saltar a
+      // Contratos, donde el contrato recién creado ya abre solo (ver
+      // contratoIdDesdeUrl en app/contratos/page.tsx) — el staff no tiene
+      // que volver a buscar al cliente.
+      const contratoId = data.contrato?.id as string | undefined;
+      setTimeout(() => {
+        setAceptadoOkId(null);
+        if (contratoId) {
+          router.push(`/contratos?contratoId=${contratoId}&centro=${encodeURIComponent(centro || "")}`);
+        }
+      }, 900);
       if (centro) fetchCotizaciones(centro, "");
     } finally {
       setAceptandoId(null);
@@ -156,7 +179,7 @@ export default function CotizacionesPage() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
-                Cotizaciones ({cotizaciones.length})
+                Cotizaciones ({cotizacionesFiltradas.length})
               </p>
               <button
                 className="tel-borrar-btn"
@@ -166,6 +189,13 @@ export default function CotizacionesPage() {
                 {mostrarForm ? "Cancelar" : "+ Subir cotización"}
               </button>
             </div>
+
+            <input
+              placeholder="Buscar por nombre del cliente o notas..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%" }}
+            />
 
             {mostrarForm && (
               <form className="form-card" onSubmit={guardarCotizacion}>
@@ -222,10 +252,12 @@ export default function CotizacionesPage() {
               </form>
             )}
 
-            {cotizaciones.length === 0 ? (
-              <div className="empty-card">Sin cotizaciones registradas</div>
+            {cotizacionesFiltradas.length === 0 ? (
+              <div className="empty-card">
+                {busqueda ? "Sin cotizaciones que coincidan con la búsqueda" : "Sin cotizaciones registradas"}
+              </div>
             ) : (
-              cotizaciones.map((c) => (
+              cotizacionesFiltradas.map((c) => (
                 <div className="cotizacion-card" key={c.id}>
                   <div>
                     <p className="item-card-titulo">{c.nombre}</p>
@@ -249,7 +281,7 @@ export default function CotizacionesPage() {
                       style={{ padding: "8px 12px", fontSize: 12 }}
                       disabled={c.estatus === "aceptada" || !c.cotizacion_comercial_id || aceptandoId === c.id}
                       title={!c.cotizacion_comercial_id ? "Esta cotización todavía no está ligada a una venta" : undefined}
-                      onClick={() => aceptarCotizacion(c.id)}
+                      onClick={() => setConfirmandoAceptarId(c.id)}
                     >
                       <span className="btn-enviar-icon-wrapper">
                         <svg
@@ -291,6 +323,25 @@ export default function CotizacionesPage() {
           </>
         )}
       </div>
+
+      {confirmandoAceptarId && (
+        <div className="modal-overlay" onClick={() => setConfirmandoAceptarId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Aceptar cotización</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Aceptar esta cotización y generar el contrato como pre-aprobado?
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoAceptarId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => aceptarCotizacion(confirmandoAceptarId)}>
+                ✓ Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
