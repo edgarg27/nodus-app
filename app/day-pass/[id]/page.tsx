@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 
 type DayPassPublico = {
   folio: number;
-  tipo: "coworking" | "oficina_privada";
+  tipo: "coworking" | "oficina_privada" | "working_desk";
   centro: string;
   nombre: string;
   fecha: string;
@@ -93,13 +93,17 @@ export default function DayPassPublicoPage() {
                       </div>
                     </div>
                     <span className="daypass-type-badge">
-                      {pase.tipo === "coworking" ? "Coworking" : "Oficina privada"}
+                      {pase.tipo === "coworking" ? "Coworking" : pase.tipo === "working_desk" ? "Working desk" : "Oficina privada"}
                     </span>
                   </div>
                   <p className="daypass-title">Day Pass</p>
                   <p className="daypass-subtitle">
                     Disfruta de trabajar un día en{" "}
-                    {pase.tipo === "coworking" ? "nuestro coworking" : "tu oficina privada"}
+                    {pase.tipo === "coworking"
+                      ? "nuestro coworking"
+                      : pase.tipo === "working_desk"
+                        ? "tu working desk"
+                        : "tu oficina privada"}
                   </p>
                   <div className="daypass-details">
                     <div className="daypass-detail-item">

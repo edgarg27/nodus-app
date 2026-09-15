@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
+import { TIPOS_ESPACIO_FIDELIDAD, LABEL_TIPO_ESPACIO_FIDELIDAD, calcularRegalo, type TipoEspacioFidelidad } from "@/lib/fidelidad";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
 type VoucherCentro = { id: string; codigo: string; folio: string; user_id: string; created_at: string; expira_en: string | null };
@@ -49,7 +50,14 @@ type Prospecto = {
 };
 type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; paquete_label?: string | null };
 type Notificacion = { id: string; tipo: string; categoria: string | null; mensaje: string; leida: boolean; created_at: string; reservacion_id: string | null };
-type TipoSolicitudInvitado = "sala_juntas" | "coworking" | "oficina_privada" | "day_pass_coworking" | "day_pass_oficina_privada";
+type TipoSolicitudInvitado =
+  | "sala_juntas"
+  | "coworking"
+  | "oficina_privada"
+  | "working_desk"
+  | "day_pass_coworking"
+  | "day_pass_oficina_privada"
+  | "day_pass_working_desk";
 type SolicitudInvitado = {
   id: string;
   created_at: string;
@@ -62,6 +70,8 @@ type SolicitudInvitado = {
   fecha_deseada: string | null;
   hora_inicio_deseada: string | null;
   hora_fin_deseada: string | null;
+  duracion_tipo: string;
+  fecha_fin_deseada: string | null;
   notas: string | null;
   estado: string;
   reservacion_id: string | null;
@@ -70,20 +80,47 @@ type SolicitudInvitado = {
 type DayPass = {
   id: string;
   folio: number;
-  tipo: "coworking" | "oficina_privada";
+  tipo: "coworking" | "oficina_privada" | "working_desk";
   centro: string;
   nombre: string;
   fecha: string;
   emitido_por_nombre: string | null;
   created_at: string;
 };
+type TarjetaFidelidad = {
+  id: string;
+  folio: number;
+  created_at: string;
+  centro: string;
+  nombre: string;
+  telefono: string | null;
+  email: string | null;
+  estado: "activa" | "completada" | "canjeada";
+};
+type SelloFidelidadRow = {
+  id: string;
+  tarjeta_id: string;
+  numero: number;
+  created_at: string;
+  tipo_espacio: TipoEspacioFidelidad;
+  detalle: string | null;
+  capturado_por: string | null;
+};
 
 const LABEL_TIPO_SOLICITUD: Record<TipoSolicitudInvitado, string> = {
   sala_juntas: "🤝 Sala de juntas",
   coworking: "💻 Coworking",
   oficina_privada: "🏢 Oficina privada",
+  working_desk: "🪑 Working desk",
   day_pass_coworking: "🎫 Day Pass · Coworking",
   day_pass_oficina_privada: "🎫 Day Pass · Oficina privada",
+  day_pass_working_desk: "🎫 Day Pass · Working desk",
+};
+
+const LABEL_TIPO_DAYPASS: Record<"coworking" | "oficina_privada" | "working_desk", string> = {
+  coworking: "Coworking",
+  oficina_privada: "Oficina privada",
+  working_desk: "Working desk",
 };
 
 // ---------- Calendario de reservaciones (vista admin) ----------
@@ -93,6 +130,7 @@ const CAL_ESPACIOS_DEFAULT = [
   { id: "Sala de Juntas A", icono: "🤝" },
   { id: "Sala de Juntas B", icono: "🤝" },
   { id: "Coworking", icono: "💻" },
+  { id: "Working Desk", icono: "🪑" },
   { id: "Sala de Capacitación", icono: "📚" },
 ];
 const CAL_ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = {
@@ -138,6 +176,7 @@ const TABS_TODAS = [
   { id: "resumen", label: "📊 Resumen" },
   { id: "reservaciones", label: "📅 Reservaciones" },
   { id: "invitados", label: "🙋 Invitados" },
+  { id: "fidelidad", label: "💳 Fidelidad" },
   { id: "vouchers", label: "🎟️ Vouchers" },
   { id: "telefonia", label: "☎️ Telefonía" },
   { id: "internet", label: "🌐 Internet" },
@@ -176,7 +215,9 @@ export default function CentroPanel({
   const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones";
   const TABS =
     rol === "sistemas"
-      ? TABS_TODAS.filter((t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados")
+      ? TABS_TODAS.filter(
+          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad"
+        )
       : rol === "operaciones"
       ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
       : TABS_TODAS;
@@ -231,7 +272,7 @@ export default function CentroPanel({
   const [solicitudEnAgendamiento, setSolicitudEnAgendamiento] = useState<SolicitudInvitado | null>(null);
   const [mostrarGeneradorDayPass, setMostrarGeneradorDayPass] = useState(false);
   const [dayPassForm, setDayPassForm] = useState<{
-    tipo: "coworking" | "oficina_privada";
+    tipo: "coworking" | "oficina_privada" | "working_desk";
     nombre: string;
     telefono: string;
     email: string;
@@ -257,6 +298,20 @@ export default function CentroPanel({
   const [rechazandoInvitado, setRechazandoInvitado] = useState<SolicitudInvitado | null>(null);
   const [motivoRechazoInvitado, setMotivoRechazoInvitado] = useState("");
   const [linkDayPassCopiado, setLinkDayPassCopiado] = useState(false);
+  const [tarjetasFidelidad, setTarjetasFidelidad] = useState<TarjetaFidelidad[]>([]);
+  const [folioBuscado, setFolioBuscado] = useState("");
+  const [buscandoTarjeta, setBuscandoTarjeta] = useState(false);
+  const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
+  const [tarjetaEncontrada, setTarjetaEncontrada] = useState<TarjetaFidelidad | null>(null);
+  const [sellosTarjetaEncontrada, setSellosTarjetaEncontrada] = useState<SelloFidelidadRow[]>([]);
+  const [mostrarFormSello, setMostrarFormSello] = useState(false);
+  const [selloForm, setSelloForm] = useState<{ tipo_espacio: TipoEspacioFidelidad; detalle: string }>({
+    tipo_espacio: "coworking",
+    detalle: "",
+  });
+  const [guardandoSello, setGuardandoSello] = useState(false);
+  const [errorSello, setErrorSello] = useState("");
+  const [regaloModal, setRegaloModal] = useState<{ tipo_espacio: TipoEspacioFidelidad; detalle: string | null } | null>(null);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [menuNotifAbierto, setMenuNotifAbierto] = useState(false);
   const [vouchers, setVouchers] = useState<VoucherCentro[]>([]);
@@ -376,6 +431,7 @@ export default function CentroPanel({
       { data: vchs },
       { data: sols },
       { data: dps },
+      { data: tarjs },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -423,6 +479,12 @@ export default function CentroPanel({
         .order("created_at", { ascending: false }),
       supabase
         .from("day_passes")
+        .select("*")
+        .eq("centro", c)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("tarjetas_fidelidad")
         .select("*")
         .eq("centro", c)
         .order("created_at", { ascending: false })
@@ -513,6 +575,7 @@ export default function CentroPanel({
     setVouchers(vchs || []);
     setSolicitudesInvitados(sols || []);
     setDayPasses(dps || []);
+    setTarjetasFidelidad(tarjs || []);
     setLoading(false);
   }
 
@@ -864,9 +927,12 @@ export default function CentroPanel({
   // Sugiere qué espacio del catálogo del centro conviene preseleccionar en
   // el calendario admin al agendar una solicitud de invitado (sala de
   // juntas vs. coworking/bolsa).
-  function espacioSugeridoParaTipo(tipo: "sala_juntas" | "coworking", espacios: { id: string; icono: string }[]) {
+  function espacioSugeridoParaTipo(tipo: "sala_juntas" | "coworking" | "working_desk", espacios: { id: string; icono: string }[]) {
     if (tipo === "coworking") {
       return espacios.find((e) => e.id.startsWith("Coworking"))?.id || espacios[0]?.id || "";
+    }
+    if (tipo === "working_desk") {
+      return espacios.find((e) => e.id.startsWith("Working Desk"))?.id || espacios[0]?.id || "";
     }
     return (
       espacios.find((e) => !e.id.startsWith("Coworking") && !e.id.startsWith("Sala de Capacitación"))?.id ||
@@ -875,13 +941,19 @@ export default function CentroPanel({
     );
   }
 
-  // Botón "📅 Agendar" de una solicitud de invitado (sala de juntas o
-  // coworking) — abre el calendario admin ya existente, preseleccionando
-  // espacio y semana; el admin solo elige el horario final y confirma.
+  // Botón "📅 Agendar" de una solicitud de invitado (sala de juntas,
+  // coworking o working desk) — abre el calendario admin ya existente,
+  // preseleccionando espacio y semana; el admin solo elige el horario
+  // final y confirma.
   function agendarSolicitud(s: SolicitudInvitado) {
     setTab("reservaciones");
     setMostrarCalReservaciones(true);
-    setCalEspacio(espacioSugeridoParaTipo(s.tipo === "coworking" ? "coworking" : "sala_juntas", calEspaciosDisponibles));
+    setCalEspacio(
+      espacioSugeridoParaTipo(
+        s.tipo === "coworking" || s.tipo === "working_desk" ? s.tipo : "sala_juntas",
+        calEspaciosDisponibles
+      )
+    );
     if (s.fecha_deseada) {
       const [y, m, d] = s.fecha_deseada.split("-").map(Number);
       if (y && m && d) setCalInicioSemana(calLunesDeLaSemana(new Date(y, m - 1, d)));
@@ -979,7 +1051,12 @@ export default function CentroPanel({
     setDayPassCorreoEstado(null);
     setDayPassPrevioUsado(null);
     setDayPassForm({
-      tipo: solicitud?.tipo === "day_pass_oficina_privada" ? "oficina_privada" : "coworking",
+      tipo:
+        solicitud?.tipo === "day_pass_oficina_privada"
+          ? "oficina_privada"
+          : solicitud?.tipo === "day_pass_working_desk"
+            ? "working_desk"
+            : "coworking",
       nombre: solicitud?.nombre || "",
       telefono: solicitud?.telefono || "",
       email: solicitud?.email || "",
@@ -1085,6 +1162,102 @@ export default function CentroPanel({
     } catch {
       alert(link);
     }
+  }
+
+  // Búsqueda de una tarjeta de fidelidad por folio — sin filtrar por centro,
+  // porque el cliente puede presentarse en cualquier Nodus con su tarjeta.
+  async function buscarTarjetaPorFolio(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorBusquedaTarjeta("");
+    setTarjetaEncontrada(null);
+    setSellosTarjetaEncontrada([]);
+    const folioNum = Number(folioBuscado.replace(/\D/g, ""));
+    if (!folioNum) {
+      setErrorBusquedaTarjeta("Escribe el folio de la tarjeta");
+      return;
+    }
+    setBuscandoTarjeta(true);
+    const { data: tarjeta } = await supabase.from("tarjetas_fidelidad").select("*").eq("folio", folioNum).maybeSingle();
+    if (!tarjeta) {
+      setBuscandoTarjeta(false);
+      setErrorBusquedaTarjeta("No se encontró ninguna tarjeta con ese folio");
+      return;
+    }
+    const { data: sellos } = await supabase
+      .from("tarjetas_fidelidad_sellos")
+      .select("*")
+      .eq("tarjeta_id", tarjeta.id)
+      .order("numero", { ascending: true });
+    setBuscandoTarjeta(false);
+    setTarjetaEncontrada(tarjeta);
+    setSellosTarjetaEncontrada(sellos || []);
+  }
+
+  // Registra el siguiente sello de una tarjeta (el staff dice qué se rentó).
+  // Al llegar al sello 8, la tarjeta pasa a "completada" y se le muestra al
+  // staff el regalo calculado (lo que más se rentó de esos 8 usos).
+  async function registrarSello() {
+    if (!tarjetaEncontrada) return;
+    setErrorSello("");
+    setGuardandoSello(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const siguienteNumero = sellosTarjetaEncontrada.length + 1;
+    const { error: insertError } = await supabase.from("tarjetas_fidelidad_sellos").insert({
+      tarjeta_id: tarjetaEncontrada.id,
+      numero: siguienteNumero,
+      tipo_espacio: selloForm.tipo_espacio,
+      detalle: selloForm.detalle.trim() || null,
+      capturado_por: user?.id,
+    });
+    if (insertError) {
+      setGuardandoSello(false);
+      setErrorSello("No se pudo registrar el sello. Intenta de nuevo.");
+      return;
+    }
+    const nuevosSellos = [
+      ...sellosTarjetaEncontrada,
+      {
+        id: "",
+        tarjeta_id: tarjetaEncontrada.id,
+        numero: siguienteNumero,
+        created_at: new Date().toISOString(),
+        tipo_espacio: selloForm.tipo_espacio,
+        detalle: selloForm.detalle.trim() || null,
+        capturado_por: user?.id || null,
+      },
+    ];
+    setSellosTarjetaEncontrada(nuevosSellos);
+    setMostrarFormSello(false);
+    setSelloForm({ tipo_espacio: "coworking", detalle: "" });
+
+    if (siguienteNumero === 8) {
+      await supabase.from("tarjetas_fidelidad").update({ estado: "completada" }).eq("id", tarjetaEncontrada.id);
+      const actualizada = { ...tarjetaEncontrada, estado: "completada" as const };
+      setTarjetaEncontrada(actualizada);
+      setTarjetasFidelidad((prev) => prev.map((t) => (t.id === actualizada.id ? actualizada : t)));
+      const regalo = calcularRegalo(nuevosSellos);
+      if (regalo) setRegaloModal({ tipo_espacio: regalo.tipo_espacio, detalle: regalo.detalle });
+    } else {
+      setTarjetasFidelidad((prev) => prev.map((t) => (t.id === tarjetaEncontrada.id ? tarjetaEncontrada : t)));
+    }
+    setGuardandoSello(false);
+  }
+
+  // El staff marca que ya entregó el regalo de la casilla 9 — cierra el
+  // ciclo de esa tarjeta (un nuevo ciclo implica pedir una tarjeta nueva).
+  async function marcarRegaloEntregado(tarjeta: TarjetaFidelidad) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase
+      .from("tarjetas_fidelidad")
+      .update({ estado: "canjeada", regalo_canjeado_en: new Date().toISOString(), regalo_canjeado_por: user?.id })
+      .eq("id", tarjeta.id);
+    const actualizada = { ...tarjeta, estado: "canjeada" as const };
+    setTarjetasFidelidad((prev) => prev.map((t) => (t.id === tarjeta.id ? actualizada : t)));
+    if (tarjetaEncontrada?.id === tarjeta.id) setTarjetaEncontrada(actualizada);
   }
 
   async function confirmarRechazoInvitado() {
@@ -2214,17 +2387,22 @@ export default function CentroPanel({
                                   {s.empresa && <p className="reserva-admin-detalle">Empresa: {s.empresa}</p>}
                                   {s.fecha_deseada && (
                                     <p className="reserva-admin-detalle">
-                                      Fecha deseada: {s.fecha_deseada}
-                                      {s.hora_inicio_deseada && s.hora_fin_deseada
-                                        ? ` · ${s.hora_inicio_deseada} - ${s.hora_fin_deseada}`
-                                        : ""}
+                                      {s.duracion_tipo === "semana" && s.fecha_fin_deseada
+                                        ? `Semana deseada: ${s.fecha_deseada} al ${s.fecha_fin_deseada}`
+                                        : s.duracion_tipo === "dia"
+                                          ? `Fecha deseada: ${s.fecha_deseada} · Todo el día`
+                                          : `Fecha deseada: ${s.fecha_deseada}${
+                                              s.hora_inicio_deseada && s.hora_fin_deseada
+                                                ? ` · ${s.hora_inicio_deseada} - ${s.hora_fin_deseada}`
+                                                : ""
+                                            }`}
                                     </p>
                                   )}
                                   {s.notas && <p className="reserva-admin-detalle">📝 {s.notas}</p>}
                                 </div>
                               </div>
                               <div className="reserva-admin-acciones">
-                                {(s.tipo === "sala_juntas" || s.tipo === "coworking") && (
+                                {(s.tipo === "sala_juntas" || s.tipo === "coworking" || s.tipo === "working_desk") && (
                                   <button className="btn-aceptar" onClick={() => agendarSolicitud(s)}>
                                     📅 Agendar
                                   </button>
@@ -2234,7 +2412,9 @@ export default function CentroPanel({
                                     📇 Convertir a prospecto
                                   </button>
                                 )}
-                                {(s.tipo === "day_pass_coworking" || s.tipo === "day_pass_oficina_privada") && (
+                                {(s.tipo === "day_pass_coworking" ||
+                                  s.tipo === "day_pass_oficina_privada" ||
+                                  s.tipo === "day_pass_working_desk") && (
                                   <button className="btn-aceptar" onClick={() => abrirGeneradorDayPass(s)}>
                                     🎫 Generar Day Pass
                                   </button>
@@ -2290,7 +2470,7 @@ export default function CentroPanel({
                                   #{String(dp.folio).padStart(3, "0")} · {dp.nombre}
                                 </p>
                                 <p className="item-card-sub">
-                                  {dp.tipo === "coworking" ? "Coworking" : "Oficina privada"} · {dp.fecha} · emitió{" "}
+                                  {LABEL_TIPO_DAYPASS[dp.tipo]} · {dp.fecha} · emitió{" "}
                                   {dp.emitido_por_nombre || "—"}
                                 </p>
                               </div>
@@ -2301,6 +2481,151 @@ export default function CentroPanel({
                     </>
                   );
                 })()}
+              </>
+            )}
+
+            {/* ---------------- FIDELIDAD ---------------- */}
+            {tab === "fidelidad" && (
+              <>
+                <form className="form-card" onSubmit={buscarTarjetaPorFolio}>
+                  <p className="sub-label">Buscar tarjeta por folio</p>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      placeholder="Ej. 123 o NODUS-FID-000123"
+                      value={folioBuscado}
+                      onChange={(e) => setFolioBuscado(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <button className="btn-enviar" type="submit" disabled={buscandoTarjeta}>
+                      {buscandoTarjeta ? "Buscando..." : "Buscar"}
+                    </button>
+                  </div>
+                  {errorBusquedaTarjeta && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorBusquedaTarjeta}</p>}
+                </form>
+
+                {tarjetaEncontrada && (
+                  <div className="fidelidad-card" style={{ marginTop: 12 }}>
+                    <p className="fidelidad-card-titulo">
+                      #{String(tarjetaEncontrada.folio).padStart(6, "0")} · {tarjetaEncontrada.nombre} ·{" "}
+                      {tarjetaEncontrada.centro}
+                    </p>
+                    <div className="fidelidad-grid">
+                      {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
+                        const sello = sellosTarjetaEncontrada.find((s) => s.numero === n);
+                        const esRegalo = n === 9;
+                        return (
+                          <div
+                            key={n}
+                            className={`fidelidad-casilla${sello ? " fidelidad-casilla-llena" : ""}${
+                              esRegalo ? " fidelidad-casilla-regalo" : ""
+                            }`}
+                          >
+                            {esRegalo
+                              ? "🎁"
+                              : sello
+                                ? TIPOS_ESPACIO_FIDELIDAD.find((t) => t.id === sello.tipo_espacio)?.icono
+                                : n}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="fidelidad-card-nota">
+                      {sellosTarjetaEncontrada.length}/8 sellos ·{" "}
+                      {tarjetaEncontrada.estado === "activa"
+                        ? "Activa"
+                        : tarjetaEncontrada.estado === "completada"
+                          ? "Completa — falta entregar el regalo"
+                          : "Regalo ya entregado"}
+                    </p>
+
+                    {tarjetaEncontrada.estado === "activa" && !mostrarFormSello && (
+                      <button
+                        className="reservar-btn"
+                        style={{ marginTop: 12 }}
+                        onClick={() => setMostrarFormSello(true)}
+                      >
+                        + Agregar sello
+                      </button>
+                    )}
+
+                    {tarjetaEncontrada.estado === "activa" && mostrarFormSello && (
+                      <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: 12 }}>
+                        <p className="sub-label" style={{ color: "#0d1b3e" }}>
+                          ¿Qué rentó en esta visita?
+                        </p>
+                        <select
+                          value={selloForm.tipo_espacio}
+                          onChange={(e) => setSelloForm({ ...selloForm, tipo_espacio: e.target.value as TipoEspacioFidelidad })}
+                        >
+                          {TIPOS_ESPACIO_FIDELIDAD.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.icono} {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Detalle (opcional, ej. 8 personas)"
+                          value={selloForm.detalle}
+                          onChange={(e) => setSelloForm({ ...selloForm, detalle: e.target.value })}
+                          style={{ marginTop: 8 }}
+                        />
+                        {errorSello && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorSello}</p>}
+                        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                          <button
+                            className="tel-borrar-btn"
+                            onClick={() => setMostrarFormSello(false)}
+                            disabled={guardandoSello}
+                          >
+                            Cancelar
+                          </button>
+                          <button className="reservar-btn" onClick={registrarSello} disabled={guardandoSello}>
+                            {guardandoSello ? "Guardando..." : "Guardar sello"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {tarjetaEncontrada.estado === "completada" && (
+                      <button
+                        className="reservar-btn"
+                        style={{ marginTop: 12 }}
+                        onClick={() => marcarRegaloEntregado(tarjetaEncontrada)}
+                      >
+                        🎁 Marcar regalo como entregado
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <p className="panel-section-label" style={{ marginTop: 16 }}>
+                  Tarjetas de {centro} ({tarjetasFidelidad.length})
+                </p>
+                {tarjetasFidelidad.length === 0 ? (
+                  <div className="empty-card">Sin tarjetas de fidelidad todavía</div>
+                ) : (
+                  tarjetasFidelidad.map((t) => (
+                    <div className="item-card" key={t.id}>
+                      <div className="item-card-info">
+                        <p className="item-card-titulo">
+                          #{String(t.folio).padStart(6, "0")} · {t.nombre}
+                        </p>
+                        <p className="item-card-sub">{t.telefono || "Sin teléfono"}</p>
+                      </div>
+                      <span
+                        className="factura-badge"
+                        style={{
+                          background: t.estado === "canjeada" ? "#E1F5EE" : t.estado === "completada" ? "#FFF3E8" : "#E6F1FB",
+                        }}
+                      >
+                        <span className="factura-badge-text">
+                          {t.estado === "canjeada" ? "✓ Canjeada" : t.estado === "completada" ? "🎁 Completa" : "Activa"}
+                        </span>
+                      </span>
+                    </div>
+                  ))
+                )}
               </>
             )}
 
@@ -3574,6 +3899,21 @@ export default function CentroPanel({
         </div>
       )}
 
+      {regaloModal && (
+        <div className="modal-overlay" onClick={() => setRegaloModal(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">🎉 ¡Tarjeta completa!</p>
+            <p className="modal-email">
+              El regalo de la casilla 9 es: <strong>{LABEL_TIPO_ESPACIO_FIDELIDAD[regaloModal.tipo_espacio]}</strong>
+              {regaloModal.detalle ? ` (${regaloModal.detalle})` : ""} — fue lo que más rentó en sus 8 visitas.
+            </p>
+            <button className="reservar-btn" style={{ marginTop: 10 }} onClick={() => setRegaloModal(null)}>
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {mostrarGeneradorDayPass && (
         <div
           className="modal-overlay"
@@ -3588,10 +3928,13 @@ export default function CentroPanel({
                 <p className="sub-label">Tipo</p>
                 <select
                   value={dayPassForm.tipo}
-                  onChange={(e) => setDayPassForm({ ...dayPassForm, tipo: e.target.value as "coworking" | "oficina_privada" })}
+                  onChange={(e) =>
+                    setDayPassForm({ ...dayPassForm, tipo: e.target.value as "coworking" | "oficina_privada" | "working_desk" })
+                  }
                 >
                   <option value="coworking">Coworking</option>
                   <option value="oficina_privada">Oficina privada</option>
+                  <option value="working_desk">Working desk</option>
                 </select>
                 <p className="sub-label">Nombre de quien lo va a usar</p>
                 <input
@@ -3652,14 +3995,16 @@ export default function CentroPanel({
                                 <div className="daypass-brand-sub">Flex Center</div>
                               </div>
                             </div>
-                            <span className="daypass-type-badge">
-                              {dayPassGenerado.tipo === "coworking" ? "Coworking" : "Oficina privada"}
-                            </span>
+                            <span className="daypass-type-badge">{LABEL_TIPO_DAYPASS[dayPassGenerado.tipo]}</span>
                           </div>
                           <p className="daypass-title">Day Pass</p>
                           <p className="daypass-subtitle">
                             Disfruta de trabajar un día en{" "}
-                            {dayPassGenerado.tipo === "coworking" ? "nuestro coworking" : "tu oficina privada"}
+                            {dayPassGenerado.tipo === "coworking"
+                              ? "nuestro coworking"
+                              : dayPassGenerado.tipo === "working_desk"
+                                ? "tu working desk"
+                                : "tu oficina privada"}
                           </p>
                           <div className="daypass-details">
                             <div className="daypass-detail-item">

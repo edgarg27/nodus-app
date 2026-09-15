@@ -24,7 +24,35 @@ function hoyISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-type TipoSolicitud = "sala_juntas" | "coworking" | "oficina_privada" | "day_pass_coworking" | "day_pass_oficina_privada";
+function formatFechaCorta(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("es-MX", { day: "numeric", month: "long" });
+}
+
+// Suma 6 días a una fecha 'YYYY-MM-DD' para obtener el fin de la semana
+// que empieza en esa fecha (una semana = 7 días naturales desde el inicio).
+function sumarSeisDias(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const fin = new Date(y, m - 1, d);
+  fin.setDate(fin.getDate() + 6);
+  const yyyy = fin.getFullYear();
+  const mm = String(fin.getMonth() + 1).padStart(2, "0");
+  const dd = String(fin.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+type DuracionTipo = "hora" | "dia" | "semana";
+
+type TipoSolicitud =
+  | "sala_juntas"
+  | "coworking"
+  | "oficina_privada"
+  | "working_desk"
+  | "day_pass_coworking"
+  | "day_pass_oficina_privada"
+  | "day_pass_working_desk";
 
 const TIPOS: { id: TipoSolicitud; icono: string; label: string; desc: string; esDayPass: boolean }[] = [
   {
@@ -49,6 +77,13 @@ const TIPOS: { id: TipoSolicitud; icono: string; label: string; desc: string; es
     esDayPass: false,
   },
   {
+    id: "working_desk",
+    icono: "🪑",
+    label: "Agendar working desk",
+    desc: "Aparta tu escritorio individual",
+    esDayPass: false,
+  },
+  {
     id: "day_pass_coworking",
     icono: "🎫",
     label: "Day Pass — Coworking",
@@ -60,6 +95,13 @@ const TIPOS: { id: TipoSolicitud; icono: string; label: string; desc: string; es
     icono: "🎟️",
     label: "Day Pass — Oficina privada",
     desc: "Acceso de un día a una oficina privada",
+    esDayPass: true,
+  },
+  {
+    id: "day_pass_working_desk",
+    icono: "🪪",
+    label: "Day Pass — Working Desk",
+    desc: "Acceso de un día a un escritorio individual",
     esDayPass: true,
   },
 ];
@@ -79,6 +121,7 @@ export default function AgendarInvitadoPage() {
     centro: CENTROS[0],
   });
 
+  const [duracionTipo, setDuracionTipo] = useState<DuracionTipo>("hora");
   const [fechaDeseada, setFechaDeseada] = useState(hoyISO());
   const [horaInicio, setHoraInicio] = useState<number>(9);
   const [horaFin, setHoraFin] = useState<number>(10);
@@ -123,7 +166,9 @@ export default function AgendarInvitadoPage() {
     if (!tipo) return;
     setError("");
 
-    if (!tipoInfo?.esDayPass && horaFin <= horaInicio) {
+    const duracionEfectiva: DuracionTipo = tipoInfo?.esDayPass ? "dia" : duracionTipo;
+
+    if (duracionEfectiva === "hora" && horaFin <= horaInicio) {
       setError("La hora de fin debe ser después de la hora de inicio");
       return;
     }
@@ -137,8 +182,10 @@ export default function AgendarInvitadoPage() {
       email: form.email.trim(),
       empresa: form.empresa.trim() || null,
       fecha_deseada: fechaDeseada || null,
-      hora_inicio_deseada: tipoInfo?.esDayPass ? null : `${String(horaInicio).padStart(2, "0")}:00`,
-      hora_fin_deseada: tipoInfo?.esDayPass ? null : `${String(horaFin).padStart(2, "0")}:00`,
+      duracion_tipo: duracionEfectiva,
+      fecha_fin_deseada: duracionEfectiva === "semana" ? sumarSeisDias(fechaDeseada) : null,
+      hora_inicio_deseada: duracionEfectiva === "hora" ? `${String(horaInicio).padStart(2, "0")}:00` : null,
+      hora_fin_deseada: duracionEfectiva === "hora" ? `${String(horaFin).padStart(2, "0")}:00` : null,
       notas: notas.trim() || null,
       estado: "pendiente",
     });
@@ -169,6 +216,7 @@ export default function AgendarInvitadoPage() {
     setPaso("menu");
     setTipo(null);
     setForm({ nombre: "", telefono: "", email: "", empresa: "", centro: CENTROS[0] });
+    setDuracionTipo("hora");
     setFechaDeseada(hoyISO());
     setHoraInicio(9);
     setHoraFin(10);
@@ -244,6 +292,15 @@ export default function AgendarInvitadoPage() {
                 </button>
               ))}
             </div>
+
+            <a className="invitado-menu-item daypass" href="/tarjeta-fidelidad">
+              <span className="invitado-menu-icon">💳</span>
+              <span className="invitado-menu-text">
+                <p className="invitado-menu-title">¿Eres cliente frecuente?</p>
+                <p className="invitado-menu-desc">Pide tu tarjeta de fidelidad</p>
+              </span>
+              <span className="invitado-menu-chevron">›</span>
+            </a>
           </>
         )}
 
@@ -300,10 +357,42 @@ export default function AgendarInvitadoPage() {
 
         {paso === "horario" && (
           <div className="form-card">
-            <p className="sub-label">{tipoInfo?.esDayPass ? "Fecha del Day Pass" : "Fecha que te gustaría"}</p>
+            {!tipoInfo?.esDayPass && (
+              <>
+                <p className="sub-label">¿Por cuánto tiempo?</p>
+                <div className="invitado-duracion-grupo">
+                  {(
+                    [
+                      { id: "hora", label: "Por hora" },
+                      { id: "dia", label: "Por día" },
+                      { id: "semana", label: "Por semana" },
+                    ] as { id: DuracionTipo; label: string }[]
+                  ).map((op) => (
+                    <button
+                      key={op.id}
+                      type="button"
+                      className={`invitado-duracion-btn${duracionTipo === op.id ? " activo" : ""}`}
+                      onClick={() => setDuracionTipo(op.id)}
+                    >
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <p className="sub-label">
+              {tipoInfo?.esDayPass ? "Fecha del Day Pass" : duracionTipo === "semana" ? "Semana que empieza el" : "Fecha que te gustaría"}
+            </p>
             <input type="date" min={hoyISO()} value={fechaDeseada} onChange={(e) => setFechaDeseada(e.target.value)} />
 
-            {!tipoInfo?.esDayPass && (
+            {!tipoInfo?.esDayPass && duracionTipo === "semana" && fechaDeseada && (
+              <p className="nota-info" style={{ marginTop: 4 }}>
+                📅 Del {formatFechaCorta(fechaDeseada)} al {formatFechaCorta(sumarSeisDias(fechaDeseada))}
+              </p>
+            )}
+
+            {!tipoInfo?.esDayPass && duracionTipo === "hora" && (
               <>
                 <p className="sub-label">Horario que te gustaría</p>
                 <div style={{ display: "flex", gap: 8 }}>
