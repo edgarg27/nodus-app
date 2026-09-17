@@ -138,6 +138,11 @@ const SALA_JUNTAS_TIPO = "Sala de Juntas";
 type CatalogoAdicional = { id: string; nombre: string; descripcion: string | null; costo_unitario: number };
 type AdicionalDraft = {
   clave: string;
+  // Presente solo si ya existe en contrato_adicionales (se cargó del
+  // contrato que se está renovando/agregando) — sin esto no hay manera de
+  // saber, al guardar, si hay que actualizar/eliminar la fila real o
+  // insertar una nueva.
+  id?: string;
   adicional_id: string | null;
   concepto: string;
   descripcion: string | null;
@@ -637,6 +642,19 @@ export default function CotizarForm({
     setPersonasCoffee("");
   }
 
+  // En modo "agregar" este mismo <select> de Tipo de espacio no elige la
+  // oficina principal (esa sigue siendo la del contrato, bloqueada) — solo
+  // filtra la cuadrícula de la oficina EXTRA que se va a sumar. Por eso no
+  // puede llamar a seleccionarTipoEspacio: esa función limpia oficinaId/
+  // paqueteId asumiendo que se está eligiendo la oficina principal, y
+  // vaciarlos aquí rompía espacioListo (la tarjeta de Desglose completa
+  // desaparecía) cada vez que el staff cambiaba de tipo para buscar la
+  // oficina que quería agregar.
+  function seleccionarTipoEspacioParaAgregar(t: string) {
+    setTipoEspacio(t);
+    setOficinaNuevaId("");
+  }
+
   // La oficina (espacio físico a asignar) y el paquete (tarifa a aplicar)
   // son selecciones independientes: elegir una NO desmarca la otra. El
   // depósito siempre lo determina el paquete cuando hay uno elegido; si no
@@ -761,6 +779,7 @@ export default function CotizarForm({
     oficina_id: string | null;
     horas_sala_juntas: number | null;
     renta_mensual: number | null;
+    deposito_garantia: number | null;
     fecha_vencimiento: string;
   };
   const [contratosClienteVigentes, setContratosClienteVigentes] = useState<ContratoVigenteCliente[]>([]);
@@ -776,6 +795,14 @@ export default function CotizarForm({
   // oficina principal (que sigue siendo la del contrato que se renueva).
   const [oficinaNuevaId, setOficinaNuevaId] = useState("");
   const oficinaNueva = oficinas.find((o) => o.id === oficinaNuevaId) || null;
+  // Tipo/oficina originales del contrato elegido — se guardan aparte porque
+  // "Cambiar tipo de espacio" reutiliza tipoEspacio/oficinaId (los mismos
+  // campos que muestran la oficina bloqueada en "Renovación") para que el
+  // staff elija la oficina nueva. Sin este respaldo, al volver a la pestaña
+  // "Renovación" se quedaba viendo la oficina nueva en vez de la original.
+  const [oficinaOriginalRenovacion, setOficinaOriginalRenovacion] = useState<{ id: string; tipo: string } | null>(
+    null
+  );
 
   useEffect(() => {
     if (!clienteId) {
@@ -786,7 +813,7 @@ export default function CotizarForm({
     (async () => {
       const { data } = await supabase
         .from("contratos")
-        .select("id, oficina_id, horas_sala_juntas, renta_mensual, fecha_vencimiento")
+        .select("id, oficina_id, horas_sala_juntas, renta_mensual, deposito_garantia, fecha_vencimiento")
         .eq("user_id", clienteId)
         .eq("estatus", "vigente")
         .order("fecha_vencimiento", { ascending: false });
@@ -817,6 +844,7 @@ export default function CotizarForm({
       return;
     }
     seleccionarOficina(oficinaDelContrato.id);
+    setOficinaOriginalRenovacion({ id: oficinaDelContrato.id, tipo: oficinaDelContrato.tipo });
     contratoARenovarAplicadoRef.current = contratoARenovarId;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contratoARenovarId, contratosClienteVigentes, oficinas, tipoEspacio]);
@@ -951,25 +979,121 @@ export default function CotizarForm({
   const [nuevoTipoCosto, setNuevoTipoCosto] = useState("");
   const [procesandoAdicional, setProcesandoAdicional] = useState(false);
   const [errorAdicional, setErrorAdicional] = useState("");
+  // Ids de contrato_adicionales (ya existentes en BD) marcados para borrar
+  // al guardar la renovación — no se borran al momento del click porque el
+  // staff puede seguir editando el formulario antes de confirmar.
+  const [idsAdicionalesAEliminar, setIdsAdicionalesAEliminar] = useState<string[]>([]);
+  // Copia congelada de los adicionales tal como estaban en BD al cargar el
+  // contrato — a diferencia de adicionalesDraft (que el staff edita/borra
+  // libremente), esto no cambia, es lo que alimenta el lado "Desglose
+  // anterior" del comparativo más abajo.
+  const [adicionalesExistentesOriginal, setAdicionalesExistentesOriginal] = useState<AdicionalDraft[]>([]);
+
+  // Si el contrato que se está renovando/agregando ya tenía adicionales
+  // (contrato_adicionales), se cargan aquí para que se vean y se puedan
+  // editar/eliminar/agregar en la misma sección de abajo — antes esta
+  // sección solo servía para adicionales nuevos y los de un contrato
+  // existente eran invisibles para este formulario.
+  const adicionalesExistentesCargadosRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!contratoARenovarId) {
+      adicionalesExistentesCargadosRef.current = null;
+      return;
+    }
+    if (adicionalesExistentesCargadosRef.current === contratoARenovarId) return;
+    adicionalesExistentesCargadosRef.current = contratoARenovarId;
+    (async () => {
+      const { data } = await supabase
+        .from("contrato_adicionales")
+        .select("id, adicional_id, concepto, descripcion, costo_unitario, cantidad")
+        .eq("contrato_id", contratoARenovarId);
+      if (data && data.length > 0) {
+        const existentes = data.map((a) => ({
+          clave: `existente-${a.id}`,
+          id: a.id as string,
+          adicional_id: a.adicional_id,
+          concepto: a.concepto,
+          descripcion: a.descripcion,
+          costo_unitario: Number(a.costo_unitario) || 0,
+          cantidad: Number(a.cantidad) || 1,
+        }));
+        setAdicionalesDraft((prev) => [...prev, ...existentes]);
+        setAdicionalesExistentesOriginal(existentes);
+      }
+    })();
+  }, [contratoARenovarId]);
 
   const totalAdicionales = useMemo(
     () => adicionalesDraft.reduce((s, a) => s + a.costo_unitario * a.cantidad, 0),
     [adicionalesDraft]
   );
-  // El Estacionamiento es el único adicional que lleva IVA — se aplica
-  // aquí (en el desglose ya cotizado), no en la lista editable de arriba
-  // ni en el catálogo, que siguen mostrando el precio base.
-  const totalAdicionalesConIva = useMemo(
-    () =>
-      round2(
-        adicionalesDraft.reduce((s, a) => {
-          const subtotal = a.costo_unitario * a.cantidad;
-          return s + (a.concepto.trim().toLowerCase() === "estacionamiento" ? subtotal * 1.16 : subtotal);
-        }, 0)
-      ),
-    [adicionalesDraft]
-  );
+  // El Estacionamiento es el único adicional que lleva IVA. costo_unitario
+  // se sigue guardando sin IVA por dentro (igual que antes); esta suma es
+  // la que refleja lo que realmente se cobra y se usa para mostrar al
+  // staff (encabezado de Adicionales, Desglose) — el campo editable de
+  // cada adicional ya muestra/captura el monto con IVA para Estacionamiento
+  // (ver el input de costo_unitario más abajo), pero por dentro sigue
+  // siendo el mismo valor base.
+  function sumarAdicionalesConIva(items: { concepto: string; costo_unitario: number; cantidad: number }[]) {
+    return round2(
+      items.reduce((s, a) => {
+        const subtotal = a.costo_unitario * a.cantidad;
+        return s + (a.concepto.trim().toLowerCase() === "estacionamiento" ? subtotal * 1.16 : subtotal);
+      }, 0)
+    );
+  }
+  const totalAdicionalesConIva = useMemo(() => sumarAdicionalesConIva(adicionalesDraft), [adicionalesDraft]);
   const totalPrimerPago = round2(precioNeto + depositoConIvaNum + totalAdicionalesConIva);
+
+  // ---------- "Desglose anterior" en las pestañas de renovación ----------
+  const contratoOriginalRenovacion = contratosClienteVigentes.find((c) => c.id === contratoARenovarId) || null;
+  const rentaOriginalRenovacion = contratoOriginalRenovacion?.renta_mensual ?? null;
+  const oficinaOriginalRenovacionObj = oficinas.find((o) => o.id === contratoOriginalRenovacion?.oficina_id) || null;
+  const contratoOriginalOficinaLabel = oficinaOriginalRenovacionObj
+    ? `${oficinaOriginalRenovacionObj.tipo} ${oficinaOriginalRenovacionObj.numero}`
+    : "—";
+  // Cualquiera de las 3 pestañas de renovación con contrato ya elegido —
+  // controla el layout de dos columnas del Desglose (igual en las 3).
+  const esRenovacionActiva = esRenovacion && !!contratoARenovarId && !!modoRenovacion;
+  // Solo para el renglón extra de "Agregar tipo de espacio" en el
+  // Desglose — mismo cálculo que ejecutarAgregarEspacio, nada más para
+  // que se vea reflejado ANTES de guardar (el guardado real vive allá).
+  const incrementoRenovacionNum = Number(porcentajeIncremento) || 0;
+  const rentaConIncrementoPreview =
+    incrementoRenovacionNum > 0 && rentaOriginalRenovacion != null
+      ? round2(Number(rentaOriginalRenovacion) * (1 + incrementoRenovacionNum / 100))
+      : rentaOriginalRenovacion;
+  // La oficina nueva (agregar) puede tener un paquete vinculado igual que
+  // la principal — si lo tiene, su tarifa mensual sale de ahí (oficina.precio
+  // se queda en 0 a propósito para esas oficinas, el precio real vive en el
+  // paquete). Sin paquete, se usa el precio propio de la oficina. No se
+  // cobra depósito aparte por esta oficina — el del cliente ya cubre todo
+  // el contrato.
+  const paqueteVinculadoOficinaNueva = oficinaNueva?.paquete_default_id
+    ? paquetes.find((p) => p.id === oficinaNueva.paquete_default_id) || null
+    : null;
+  const costoMensualOficinaNueva = paqueteVinculadoOficinaNueva
+    ? Number(tarifaPaquete(paqueteVinculadoOficinaNueva, "Mes") ?? 0)
+    : Number(oficinaNueva?.precio || 0);
+  const rentaNuevaConOficinaAgregada =
+    modoRenovacion === "agregar" && oficinaNueva && rentaConIncrementoPreview != null
+      ? round2(Number(rentaConIncrementoPreview) + costoMensualOficinaNueva)
+      : null;
+  // "Cambiar tipo de espacio" sí usa el desglose completo de precio de
+  // lista/IVA/depósito (crea un contrato nuevo con esa oficina/paquete).
+  // "Renovación"/"Agregar" actualizan el contrato en su lugar — ese
+  // desglose no aplica ahí, así que se reemplaza por uno simplificado con
+  // solo lo que de verdad se guarda (renta + incremento + oficina agregada
+  // + adicionales), para no mostrar un "Total primer pago" que nunca se
+  // cobra.
+  const esRenovarOAgregarActiva =
+    esRenovacion && !!contratoARenovarId && (modoRenovacion === "renovar" || modoRenovacion === "agregar");
+  const totalMensualNuevoSimplificado = round2(
+    (modoRenovacion === "agregar" ? rentaNuevaConOficinaAgregada : rentaConIncrementoPreview) != null
+      ? Number(modoRenovacion === "agregar" ? rentaNuevaConOficinaAgregada : rentaConIncrementoPreview) +
+          totalAdicionalesConIva
+      : totalAdicionalesConIva
+  );
 
   const catalogoFiltrado = useMemo(() => {
     if (!busquedaAdicional.trim()) return catalogoAdicionales;
@@ -1006,7 +1130,15 @@ export default function CotizarForm({
   }
 
   function eliminarAdicionalDraft(clave: string) {
-    setAdicionalesDraft((prev) => prev.filter((a) => a.clave !== clave));
+    setAdicionalesDraft((prev) => {
+      const item = prev.find((a) => a.clave === clave);
+      if (item?.id) {
+        // Ya existe en BD — se marca para borrar hasta que se guarde,
+        // no se toca la base de datos todavía.
+        setIdsAdicionalesAEliminar((ids) => [...ids, item.id!]);
+      }
+      return prev.filter((a) => a.clave !== clave);
+    });
   }
 
   async function crearTipoAdicionalYAgregar() {
@@ -1296,6 +1428,44 @@ export default function CotizarForm({
     // "Cotizar otra Sala de Juntas") en crearOtraCotizacionSala().
   }
 
+  // Aplica al contrato que se está renovando/agregando los cambios que se
+  // hicieron en la sección "Adicionales": borra los marcados con la 🗑,
+  // actualiza costo/cantidad de los que ya existían y edita, e inserta los
+  // que se agregaron nuevos desde el catálogo. Se usa en "Renovación" y
+  // "Agregar tipo de espacio" (ambas actualizan el mismo contrato); "Cambiar
+  // tipo de espacio" no la usa porque crea un contrato nuevo — ahí solo se
+  // insertan los adicionales nuevos, los del contrato anterior no se
+  // trasladan solos.
+  async function sincronizarAdicionalesDelContrato(contratoId: string) {
+    if (idsAdicionalesAEliminar.length > 0) {
+      await supabase.from("contrato_adicionales").delete().in("id", idsAdicionalesAEliminar);
+    }
+    const existentesEditados = adicionalesDraft.filter((a) => a.id);
+    await Promise.all(
+      existentesEditados.map((a) =>
+        supabase
+          .from("contrato_adicionales")
+          .update({ costo_unitario: a.costo_unitario, cantidad: a.cantidad, monto: a.costo_unitario * a.cantidad })
+          .eq("id", a.id!)
+      )
+    );
+    const nuevos = adicionalesDraft.filter((a) => !a.id);
+    if (nuevos.length > 0) {
+      await supabase.from("contrato_adicionales").insert(
+        nuevos.map((a) => ({
+          contrato_id: contratoId,
+          adicional_id: a.adicional_id,
+          concepto: a.concepto,
+          descripcion: a.descripcion,
+          costo_unitario: a.costo_unitario,
+          cantidad: a.cantidad,
+          monto: a.costo_unitario * a.cantidad,
+        }))
+      );
+    }
+    setIdsAdicionalesAEliminar([]);
+  }
+
   // Renovación "en línea": actualiza el contrato elegido en su lugar (misma
   // oficina, mismo registro) — no crea cotización ni contrato nuevos. El %
   // de incremento se aplica sobre la renta que YA tenía ese contrato
@@ -1325,19 +1495,29 @@ export default function CotizarForm({
       })
       .eq("id", contratoARenovarId);
 
-    setGuardando(false);
     if (updateError) {
+      setGuardando(false);
       setError("No se pudo renovar el contrato. Intenta de nuevo.");
       return;
     }
+    await sincronizarAdicionalesDelContrato(contratoARenovarId);
+    setGuardando(false);
     setEnviado(true);
     setTimeout(() => setEnviado(false), 1800);
     setEspacioResultado({ mensaje: "El contrato se renovó correctamente." });
   }
 
   // Renovación + agregar oficina: mismo cálculo de renta que arriba, pero
-  // además suma la oficina elegida como un adicional del MISMO contrato
-  // (no crea uno nuevo) y la marca como ocupada por este cliente.
+  // además suma el costo mensual de la oficina elegida DIRECTO a
+  // renta_mensual (no se queda solo en contrato_adicionales, que el cron
+  // diario de facturación — app/api/cron/facturacion-diaria — nunca lee;
+  // si no se suma ahí, la oficina nueva jamás se volvería a cobrar después
+  // del primer mes). contrato_adicionales sigue llevando un renglón
+  // descriptivo para que se vea desglosado qué parte de la renta
+  // corresponde a la oficina agregada, pero ya no es lo que genera el cobro
+  // recurrente. Además se genera de una vez el cobro proporcional de lo que
+  // resta del mes actual (contrato.dia_pago sigue intacto — arranca a
+  // cobrar el total combinado hasta el siguiente ciclo).
   async function ejecutarAgregarEspacio() {
     if (!fechaFin) {
       setError("Completa la fecha de vencimiento");
@@ -1351,16 +1531,26 @@ export default function CotizarForm({
     setGuardando(true);
     const contratoOriginal = contratosClienteVigentes.find((c) => c.id === contratoARenovarId);
     const incremento = Number(porcentajeIncremento) || 0;
-    const nuevaRenta =
+    const rentaConIncremento =
       incremento > 0 && contratoOriginal?.renta_mensual != null
         ? round2(Number(contratoOriginal.renta_mensual) * (1 + incremento / 100))
         : contratoOriginal?.renta_mensual ?? null;
+    // costoMensualOficinaNueva/depositoOficinaNueva ya consideran el
+    // paquete vinculado de la oficina (si tiene) — usar oficinaNueva.precio
+    // directo se quedaba en $0 para oficinas cuyo precio real vive en su
+    // paquete, no en la oficina misma (mismo criterio que ya usa la
+    // oficina principal vía tarifaUnitaria/actualizarDepositoSegunSeleccion).
+    const costoOficinaNueva = costoMensualOficinaNueva;
+    const nuevaRenta = rentaConIncremento != null ? round2(rentaConIncremento + costoOficinaNueva) : costoOficinaNueva;
+    // No se cobra depósito aparte por la oficina agregada — el cliente ya
+    // pagó el depósito de su primera oficina y eso cubre todo el contrato,
+    // no se duplica al sumar más espacio.
 
     const { error: updateError } = await supabase
       .from("contratos")
       .update({
         fecha_vencimiento: fechaFin,
-        ...(nuevaRenta != null ? { renta_mensual: nuevaRenta } : {}),
+        renta_mensual: nuevaRenta,
         horas_sala_juntas: Number(horasSalaJuntasManual) || 0,
       })
       .eq("id", contratoARenovarId);
@@ -1370,26 +1560,56 @@ export default function CotizarForm({
       return;
     }
 
-    const costoOficinaNueva = Number(oficinaNueva.precio) || 0;
     await supabase.from("contrato_adicionales").insert({
       contrato_id: contratoARenovarId,
       adicional_id: null,
       concepto: `Oficina agregada: ${oficinaNueva.tipo} ${oficinaNueva.numero}`,
-      descripcion: null,
+      descripcion: "Ya incluida en la renta mensual del contrato — este renglón es solo para desglose, no genera cobro aparte.",
       costo_unitario: costoOficinaNueva,
       cantidad: 1,
       monto: costoOficinaNueva,
     });
+    await sincronizarAdicionalesDelContrato(contratoARenovarId);
 
     if (cliente?.id) {
       await supabase.from("oficinas").update({ cliente_id: cliente.id, estado: "ocupada" }).eq("id", oficinaNuevaId);
+    }
+
+    // Cobro proporcional de lo que queda del mes en curso — desde hoy hasta
+    // fin de mes, sobre el costo mensual de la oficina nueva únicamente (la
+    // oficina que ya tenía sigue su ciclo de cobro normal sin tocarse).
+    const hoy = new Date();
+    const diasEnElMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+    const diasRestantes = Math.max(0, diasEnElMes - hoy.getDate());
+    const montoProporcional = round2((costoOficinaNueva / diasEnElMes) * diasRestantes);
+    if (cliente?.id && montoProporcional > 0) {
+      try {
+        await fetch("/api/pagos/crear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clienteId: cliente.id,
+            monto: montoProporcional,
+            concepto: `Oficina agregada (prorrateo ${diasRestantes} días): ${oficinaNueva.tipo} ${oficinaNueva.numero}`,
+            contratoId: contratoARenovarId,
+            centro,
+          }),
+        });
+      } catch {
+        // no crítico — el cobro completo de todas formas ya queda
+        // reflejado en renta_mensual para el siguiente ciclo.
+      }
     }
 
     setGuardando(false);
     setEnviado(true);
     setTimeout(() => setEnviado(false), 1800);
     setEspacioResultado({
-      mensaje: `Se agregó ${oficinaNueva.tipo} ${oficinaNueva.numero} al contrato ($${costoOficinaNueva.toLocaleString("es-MX")}/mes).`,
+      mensaje:
+        `Se agregó ${oficinaNueva.tipo} ${oficinaNueva.numero} al contrato (+$${costoOficinaNueva.toLocaleString("es-MX")}/mes, renta nueva $${nuevaRenta.toLocaleString("es-MX")}/mes).` +
+        (montoProporcional > 0
+          ? ` Se generó el cobro proporcional de $${montoProporcional.toLocaleString("es-MX")} por los ${diasRestantes} días que restan del mes.`
+          : ""),
     });
   }
 
@@ -1564,9 +1784,14 @@ export default function CotizarForm({
     // Se insertan los adicionales ya (para que el contrato quede completo),
     // pero SIN generar su pago todavía — eso pasa hasta que se apruebe el
     // contrato (ver ContratoModal.tsx → aprobar()), igual que la renta.
-    if (adicionalesDraft.length > 0) {
+    // Los que ya tienen "id" vienen del contrato anterior (se cargaron solo
+    // para poder verlos/editarlos en esta misma pantalla) — no se
+    // trasladan solos al nuevo, se quedan en el contrato viejo ya dado de
+    // baja; aquí solo entran los que el staff agregó de verdad para este.
+    const adicionalesNuevosParaCrear = adicionalesDraft.filter((a) => !a.id);
+    if (adicionalesNuevosParaCrear.length > 0) {
       await supabase.from("contrato_adicionales").insert(
-        adicionalesDraft.map((a) => ({
+        adicionalesNuevosParaCrear.map((a) => ({
           contrato_id: contratoIdCreado,
           adicional_id: a.adicional_id,
           concepto: a.concepto,
@@ -2062,7 +2287,11 @@ export default function CotizarForm({
                     // pestaña si en realidad quiere cambiar/agregar oficina.
                     setModoRenovacion(e.target.value ? "renovar" : "");
                     setOficinaNuevaId("");
+                    setOficinaOriginalRenovacion(null);
                     setAdicionalesDraft([]);
+                    setIdsAdicionalesAEliminar([]);
+                    setAdicionalesExistentesOriginal([]);
+                    adicionalesExistentesCargadosRef.current = null;
                     setComentarios("");
                     setComentariosPrecio("");
                     setNumeroPersonas("");
@@ -2116,7 +2345,18 @@ export default function CotizarForm({
                 <button
                   type="button"
                   className={"centro-tab" + (modoRenovacion === "renovar" ? " active" : "")}
-                  onClick={() => setModoRenovacion("renovar")}
+                  onClick={() => {
+                    // Al volver a "Renovación" se restaura la oficina/tipo
+                    // original del contrato — "Cambiar tipo de espacio"
+                    // reutiliza estos mismos campos para elegir la oficina
+                    // nueva y, sin este reset, se quedaban pegados aquí.
+                    if (oficinaOriginalRenovacion) {
+                      setTipoEspacio(oficinaOriginalRenovacion.tipo);
+                      seleccionarOficina(oficinaOriginalRenovacion.id);
+                    }
+                    setOficinaNuevaId("");
+                    setModoRenovacion("renovar");
+                  }}
                 >
                   Renovación
                 </button>
@@ -2139,25 +2379,20 @@ export default function CotizarForm({
               {modoRenovacion === "renovar" && (
                 <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
                   Se queda con la misma oficina y los mismos datos del contrato anterior — solo se ajusta lo que
-                  cambies arriba (fecha, % de incremento, horas de sala de juntas).
+                  cambies arriba (fecha, % de incremento, horas de sala de juntas). El comparativo anterior/nuevo
+                  se ve abajo, en el Desglose.
                 </p>
               )}
               {modoRenovacion === "cambiar" && (
                 <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
                   Elige abajo la oficina nueva — se crea un contrato nuevo con esa oficina y el anterior se marca
-                  como terminado.
+                  como terminado. El comparativo anterior/nuevo se ve abajo, en el Desglose.
                 </p>
               )}
               {modoRenovacion === "agregar" && (
                 <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0" }}>
                   Se queda con todos los mismos datos y además suma la oficina que elijas abajo, con su propio
-                  costo desglosado.
-                  {oficinaNueva && (
-                    <span style={{ display: "block", color: "#0d1b3e", fontWeight: 600, marginTop: 4 }}>
-                      + ${Number(oficinaNueva.precio || 0).toLocaleString("es-MX")}/mes por {oficinaNueva.tipo}{" "}
-                      {oficinaNueva.numero}
-                    </span>
-                  )}
+                  costo desglosado. El comparativo anterior/nuevo se ve abajo, en el Desglose.
                 </p>
               )}
             </div>
@@ -2170,7 +2405,11 @@ export default function CotizarForm({
         <p className="panel-section-label">Tipo de espacio</p>
         <select
           value={tipoEspacio}
-          onChange={(e) => seleccionarTipoEspacio(e.target.value)}
+          onChange={(e) =>
+            modoRenovacion === "agregar"
+              ? seleccionarTipoEspacioParaAgregar(e.target.value)
+              : seleccionarTipoEspacio(e.target.value)
+          }
           disabled={esRenovacion && contratoARenovarId !== "" && modoRenovacion === "renovar"}
           style={estiloSelect}
         >
@@ -2750,8 +2989,16 @@ export default function CotizarForm({
           otro apartado más adelante); el precio ya se calculó automático
           arriba a partir de las horas elegidas en el calendario y se sigue
           usando tal cual para la cotización, solo no se muestra ni se deja
-          editar aquí. */}
-      {espacioListo && tipoCotizacionVenta && !esSalaJuntas && (
+          editar aquí.
+          También se oculta en Renovación/Agregar tipo de espacio: ninguno
+          de estos campos (precio de lista, descuento, precio pactado,
+          depósito, moneda, comentarios, cargo recurrente) se guarda ahí —
+          ejecutarRenovacionEnLinea/ejecutarAgregarEspacio solo tocan fecha
+          de vencimiento, renta (con el % de incremento) y adicionales.
+          Se probó mostrarlo igual con etiqueta de "solo referencia" y
+          seguía confundiendo (números de dos orígenes distintos en la
+          misma pantalla), así que se queda oculto para estos dos modos. */}
+      {espacioListo && tipoCotizacionVenta && !esSalaJuntas && !esRenovarOAgregarActiva && (
         <div>
           <p className="panel-section-label">Precio</p>
           <div className="tel-form-grid">
@@ -2807,14 +3054,17 @@ export default function CotizarForm({
               <input
                 type="number"
                 step="0.01"
-                value={depositoGarantia}
-                onChange={(e) => setDepositoGarantia(e.target.value)}
+                // El campo muestra y captura el monto ya con IVA incluido
+                // (lo que realmente se le cobra al cliente) para no
+                // confundir al staff con dos números distintos. Por dentro
+                // se sigue guardando sin IVA en depositoGarantia — igual
+                // que antes — dividiendo entre 1.16 lo que se escriba aquí.
+                value={depositoGarantia === "" ? "" : depositoConIvaNum}
+                onChange={(e) => {
+                  const conIva = Number(e.target.value) || 0;
+                  setDepositoGarantia(e.target.value === "" ? "" : String(round2(conIva / 1.16)));
+                }}
               />
-              {depositoNum > 0 && (
-                <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
-                  Con IVA: ${depositoConIvaNum.toLocaleString("es-MX")}
-                </p>
-              )}
             </div>
           </div>
           <textarea
@@ -2846,7 +3096,7 @@ export default function CotizarForm({
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p className="panel-section-label" style={{ margin: 0 }}>
-              Adicionales {totalAdicionales > 0 && `· $${totalAdicionales.toLocaleString("es-MX")}`}
+              Adicionales {totalAdicionalesConIva > 0 && `· $${totalAdicionalesConIva.toLocaleString("es-MX")}`}
             </p>
             <button
               className="tel-borrar-btn"
@@ -2888,7 +3138,12 @@ export default function CotizarForm({
                           <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{item.nombre}</p>
                           {item.descripcion && <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{item.descripcion}</p>}
                           <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
-                            ${Number(item.costo_unitario).toLocaleString("es-MX")} c/u
+                            $
+                            {(item.nombre.trim().toLowerCase() === "estacionamiento"
+                              ? round2(Number(item.costo_unitario) * 1.16)
+                              : Number(item.costo_unitario)
+                            ).toLocaleString("es-MX")}{" "}
+                            c/u
                           </p>
                         </div>
                         <button
@@ -2986,7 +3241,24 @@ export default function CotizarForm({
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{a.concepto}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                    {a.concepto}
+                    {a.id && (
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "#888",
+                          border: "1px solid #eee",
+                          borderRadius: 6,
+                          padding: "1px 5px",
+                        }}
+                      >
+                        ya en el contrato
+                      </span>
+                    )}
+                  </p>
                   {a.descripcion && <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{a.descripcion}</p>}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -2994,8 +3266,21 @@ export default function CotizarForm({
                   <input
                     type="number"
                     step="0.01"
-                    value={a.costo_unitario}
-                    onChange={(e) => actualizarAdicionalDraft(a.clave, "costo_unitario", e.target.value)}
+                    // Estacionamiento es el único adicional que lleva IVA
+                    // (ver totalAdicionalesConIva) — el campo muestra y
+                    // captura el monto ya con IVA para que coincida con lo
+                    // que se le cobra al cliente; por dentro se sigue
+                    // guardando sin IVA en costo_unitario, igual que antes.
+                    value={
+                      a.concepto.trim().toLowerCase() === "estacionamiento" ? round2(a.costo_unitario * 1.16) : a.costo_unitario
+                    }
+                    onChange={(e) => {
+                      const esEstacionamiento = a.concepto.trim().toLowerCase() === "estacionamiento";
+                      const valor = esEstacionamiento
+                        ? String(round2((Number(e.target.value) || 0) / 1.16))
+                        : e.target.value;
+                      actualizarAdicionalDraft(a.clave, "costo_unitario", valor);
+                    }}
                     style={{ width: 70, border: "1px solid #eee", borderRadius: 8, padding: "6px 8px", fontSize: 12 }}
                   />
                   <span style={{ fontSize: 11, color: "#888" }}>×</span>
@@ -3008,7 +3293,11 @@ export default function CotizarForm({
                   />
                 </div>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0d1b3e", minWidth: 70, textAlign: "right" }}>
-                  ${(a.costo_unitario * a.cantidad).toLocaleString("es-MX")}
+                  $
+                  {(a.concepto.trim().toLowerCase() === "estacionamiento"
+                    ? round2(a.costo_unitario * 1.16 * a.cantidad)
+                    : a.costo_unitario * a.cantidad
+                  ).toLocaleString("es-MX")}
                 </p>
                 <button className="tel-borrar-btn" onClick={() => eliminarAdicionalDraft(a.clave)}>
                   🗑
@@ -3023,81 +3312,188 @@ export default function CotizarForm({
       {espacioListo && tipoCotizacionVenta && (
         <div className="resumen-reserva-card">
           <p className="resumen-reserva-title">Desglose</p>
-          <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">Precio de lista</span>
-            <span className="resumen-reserva-val" style={{ textDecoration: descuentoPorcentaje && Number(descuentoPorcentaje) > 0 ? "line-through" : "none" }}>
-              ${precioListaNum.toLocaleString("es-MX")}
-            </span>
-          </div>
-          <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">Descuento ({Number(descuentoPorcentaje) || 0}%)</span>
-            <span className="resumen-reserva-val">-${round2(precioListaNum - precioPactadoNum).toLocaleString("es-MX")}</span>
-          </div>
-          <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">Precio unitario (pactado)</span>
-            <span className="resumen-reserva-val">${precioPactadoNum.toLocaleString("es-MX")}</span>
-          </div>
-          <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">IVA (16%)</span>
-            <span className="resumen-reserva-val">${ivaMonto.toLocaleString("es-MX")}</span>
-          </div>
-          <div className="resumen-reserva-row" style={{ fontWeight: 700 }}>
-            <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
-              Precio neto (con IVA)
-            </span>
-            <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
-              ${precioNeto.toLocaleString("es-MX")}
-            </span>
-          </div>
-          {mostrarUSD && (
-            <div className="resumen-reserva-row">
-              <span className="resumen-reserva-label" style={{ fontSize: 11 }}>
-                ≈ equivalente en USD
-              </span>
-              <span className="resumen-reserva-val" style={{ fontSize: 11 }}>
-                ${aUSD(precioNeto)?.toLocaleString("en-US")} USD
-              </span>
-            </div>
-          )}
-          {totalAdicionalesConIva > 0 && (
-            <div className="resumen-reserva-row">
-              <span className="resumen-reserva-label">
-                Adicionales{totalAdicionalesConIva !== totalAdicionales ? " (Estacionamiento incl. IVA)" : ""}
-              </span>
-              <span className="resumen-reserva-val">${totalAdicionalesConIva.toLocaleString("es-MX")}</span>
-            </div>
-          )}
-          <div className="resumen-reserva-row">
-            <span className="resumen-reserva-label">Depósito en garantía (incl. IVA)</span>
-            <span className="resumen-reserva-val">${depositoConIvaNum.toLocaleString("es-MX")}</span>
-          </div>
-          {esSalaJuntas && quiereCoffee && paqueteCoffee && (
-            <div className="resumen-reserva-row">
-              <span className="resumen-reserva-label">☕ Coffee Break ({personasCoffeeNum} personas)</span>
-              <span className="resumen-reserva-val">${totalCoffeeBreak.toLocaleString("es-MX")}</span>
-            </div>
-          )}
+
+          {/* Las 3 pestañas de renovación comparten el layout de dos
+              columnas ("Desglose anterior" con la oficina/renta que ya
+              tenía). El contenido de "Desglose nuevo" SÍ cambia por modo:
+              en Renovación/Agregar solo se muestra lo que de verdad se
+              guarda (renta + incremento + oficina agregada + adicionales,
+              ver esRenovarOAgregarActiva más abajo) — se probó mostrar
+              también el desglose de precio de lista/IVA/depósito ahí como
+              referencia y solo confundía (dos números de origen distinto
+              en la misma pantalla). En "Cambiar tipo de espacio" ese
+              desglose completo sí es el real (crea un contrato nuevo). */}
           <div
-            className="resumen-reserva-row"
-            style={{ fontWeight: 700, borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, marginTop: 4 }}
+            style={
+              esRenovacionActiva
+                ? { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }
+                : undefined
+            }
           >
-            <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
-              Total primer pago
-            </span>
-            <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
-              ${totalPrimerPagoConCoffee.toLocaleString("es-MX")}
-            </span>
-          </div>
-          {mostrarUSD && (
-            <div className="resumen-reserva-row">
-              <span className="resumen-reserva-label" style={{ fontSize: 11 }}>
-                ≈ equivalente en USD (tipo de cambio ${tipoCambioNum.toLocaleString("es-MX")})
-              </span>
-              <span className="resumen-reserva-val" style={{ fontSize: 11 }}>
-                ${aUSD(totalPrimerPagoConCoffee)?.toLocaleString("en-US")} USD
-              </span>
+            {esRenovacionActiva && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "rgba(255,255,255,0.6)",
+                      margin: 0,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Desglose anterior
+                  </p>
+                  <div className="resumen-reserva-row">
+                    <span className="resumen-reserva-label">{contratoOriginalOficinaLabel}</span>
+                    <span className="resumen-reserva-val">
+                      {rentaOriginalRenovacion != null ? `$${Number(rentaOriginalRenovacion).toLocaleString("es-MX")}` : "—"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {esRenovacionActiva && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "rgba(255,255,255,0.6)",
+                      margin: 0,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Desglose nuevo
+                  </p>
+                )}
+                {esRenovarOAgregarActiva && (
+                  // Esto de aquí SÍ es lo que de verdad se guarda/cobra en
+                  // Renovación/Agregar (renta_mensual + incremento +
+                  // oficina agregada + adicionales) — se muestra primero y
+                  // resaltado, antes del desglose de precio de
+                  // lista/IVA/depósito de abajo, que es solo de referencia.
+                  <>
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">
+                        Renta mensual{incrementoRenovacionNum > 0 && ` (+${incrementoRenovacionNum}%)`}
+                      </span>
+                      <span className="resumen-reserva-val">
+                        {rentaConIncrementoPreview != null
+                          ? `$${Number(rentaConIncrementoPreview).toLocaleString("es-MX")}`
+                          : "—"}
+                      </span>
+                    </div>
+                    {modoRenovacion === "agregar" && oficinaNueva && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label">
+                          + Oficina agregada: {oficinaNueva.tipo} {oficinaNueva.numero}
+                        </span>
+                        <span className="resumen-reserva-val">${costoMensualOficinaNueva.toLocaleString("es-MX")}</span>
+                      </div>
+                    )}
+                    {totalAdicionalesConIva > 0 && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label">Adicionales</span>
+                        <span className="resumen-reserva-val">${totalAdicionalesConIva.toLocaleString("es-MX")}</span>
+                      </div>
+                    )}
+                    <div
+                      className="resumen-reserva-row"
+                      style={{ fontWeight: 700, borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, marginTop: 4 }}
+                    >
+                      <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
+                        Total mensual nuevo
+                      </span>
+                      <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
+                        ${totalMensualNuevoSimplificado.toLocaleString("es-MX")}/mes
+                      </span>
+                    </div>
+                  </>
+                )}
+                {!esRenovarOAgregarActiva && (
+                  <>
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">Precio de lista</span>
+                      <span
+                        className="resumen-reserva-val"
+                        style={{ textDecoration: descuentoPorcentaje && Number(descuentoPorcentaje) > 0 ? "line-through" : "none" }}
+                      >
+                        ${precioListaNum.toLocaleString("es-MX")}
+                      </span>
+                    </div>
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">Descuento ({Number(descuentoPorcentaje) || 0}%)</span>
+                      <span className="resumen-reserva-val">
+                        -${round2(precioListaNum - precioPactadoNum).toLocaleString("es-MX")}
+                      </span>
+                    </div>
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">Precio unitario (pactado)</span>
+                      <span className="resumen-reserva-val">${precioPactadoNum.toLocaleString("es-MX")}</span>
+                    </div>
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">IVA (16%)</span>
+                      <span className="resumen-reserva-val">${ivaMonto.toLocaleString("es-MX")}</span>
+                    </div>
+                    <div className="resumen-reserva-row" style={{ fontWeight: 700 }}>
+                      <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
+                        Precio neto (con IVA)
+                      </span>
+                      <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
+                        ${precioNeto.toLocaleString("es-MX")}
+                      </span>
+                    </div>
+                    {mostrarUSD && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label" style={{ fontSize: 11 }}>
+                          ≈ equivalente en USD
+                        </span>
+                        <span className="resumen-reserva-val" style={{ fontSize: 11 }}>
+                          ${aUSD(precioNeto)?.toLocaleString("en-US")} USD
+                        </span>
+                      </div>
+                    )}
+                    {totalAdicionalesConIva > 0 && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label">Adicionales</span>
+                        <span className="resumen-reserva-val">${totalAdicionalesConIva.toLocaleString("es-MX")}</span>
+                      </div>
+                    )}
+                    <div className="resumen-reserva-row">
+                      <span className="resumen-reserva-label">Depósito en garantía</span>
+                      <span className="resumen-reserva-val">${depositoConIvaNum.toLocaleString("es-MX")}</span>
+                    </div>
+                    {esSalaJuntas && quiereCoffee && paqueteCoffee && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label">☕ Coffee Break ({personasCoffeeNum} personas)</span>
+                        <span className="resumen-reserva-val">${totalCoffeeBreak.toLocaleString("es-MX")}</span>
+                      </div>
+                    )}
+                    <div
+                      className="resumen-reserva-row"
+                      style={{ fontWeight: 700, borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, marginTop: 4 }}
+                    >
+                      <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
+                        Total primer pago
+                      </span>
+                      <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
+                        ${totalPrimerPagoConCoffee.toLocaleString("es-MX")}
+                      </span>
+                    </div>
+                    {mostrarUSD && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label" style={{ fontSize: 11 }}>
+                          ≈ equivalente en USD (tipo de cambio ${tipoCambioNum.toLocaleString("es-MX")})
+                        </span>
+                        <span className="resumen-reserva-val" style={{ fontSize: 11 }}>
+                          ${aUSD(totalPrimerPagoConCoffee)?.toLocaleString("en-US")} USD
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          )}
         </div>
       )}
 
