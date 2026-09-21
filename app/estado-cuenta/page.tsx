@@ -12,7 +12,33 @@ type Factura = {
   fecha_vencimiento: string;
   estado: string;
   archivo_url: string | null;
+  xml_url?: string | null;
 };
+
+// Ver y descargar el PDF/XML de una factura (la descarga pasa por el servidor,
+// que valida que la factura sea del cliente).
+function ArchivosFactura({ f }: { f: Factura }) {
+  if (!f.archivo_url && !f.xml_url) return null;
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+      {f.archivo_url && (
+        <a className="ver-pdf-btn" href={f.archivo_url} target="_blank" rel="noopener noreferrer">
+          📄 Ver factura
+        </a>
+      )}
+      {f.archivo_url && (
+        <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=pdf`}>
+          ⬇ Descargar PDF
+        </a>
+      )}
+      {f.xml_url && (
+        <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=xml`}>
+          ⬇ Descargar XML
+        </a>
+      )}
+    </div>
+  );
+}
 
 // Pagos sin factura_id (renta/depósito/adicionales del flujo simulado de
 // Cotizar/Contratos) — se excluyen los que SÍ tienen factura_id porque
@@ -174,11 +200,7 @@ export default function EstadoCuentaPage() {
                         <p className="factura-folio">{f.folio}</p>
                         <p className="factura-concepto">{f.concepto}</p>
                         <p className="factura-fecha">Venció: {formatFecha(f.fecha_vencimiento)}</p>
-                        {f.archivo_url && (
-                          <a className="ver-pdf-btn" href={f.archivo_url} target="_blank">
-                            📄 Ver factura
-                          </a>
-                        )}
+                        <ArchivosFactura f={f} />
                       </div>
                       <div className="factura-right">
                         <p className="factura-monto" style={{ color: "#A32D2D" }}>
@@ -221,11 +243,7 @@ export default function EstadoCuentaPage() {
                         <p className="factura-folio">{f.folio}</p>
                         <p className="factura-concepto">{f.concepto}</p>
                         <p className="factura-fecha">Vence: {formatFecha(f.fecha_vencimiento)}</p>
-                        {f.archivo_url && (
-                          <a className="ver-pdf-btn" href={f.archivo_url} target="_blank">
-                            📄 Ver factura
-                          </a>
-                        )}
+                        <ArchivosFactura f={f} />
                       </div>
                       <div className="factura-right">
                         <p className="factura-monto">{formatMonto(f.monto)}</p>
@@ -302,11 +320,7 @@ export default function EstadoCuentaPage() {
                       <p className="factura-folio">{f.folio}</p>
                       <p className="factura-concepto">{f.concepto}</p>
                       <p className="factura-fecha">Pagada el {formatFecha(f.fecha_emision)}</p>
-                      {f.archivo_url && (
-                        <a className="ver-pdf-btn" href={f.archivo_url} target="_blank">
-                          📄 Ver factura
-                        </a>
-                      )}
+                      <ArchivosFactura f={f} />
                     </div>
                     <div className="factura-right">
                       <p className="factura-monto" style={{ color: "#0F6E56" }}>

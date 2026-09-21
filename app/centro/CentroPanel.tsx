@@ -8,6 +8,7 @@ import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { TIPOS_ESPACIO_FIDELIDAD, LABEL_TIPO_ESPACIO_FIDELIDAD, calcularRegalo, type TipoEspacioFidelidad } from "@/lib/fidelidad";
 import FidelidadCard from "@/app/components/FidelidadCard";
+import { ROLES_PAQUETERIA } from "@/lib/paqueteria";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
 type VoucherCentro = { id: string; codigo: string; folio: string; user_id: string; created_at: string; expira_en: string | null };
@@ -274,7 +275,7 @@ export default function CentroPanel({
   const puedeEditarInternet = rol === "sistemas" || (rol === "superadmin" || rol === "gerente");
   const puedeEditarTelefonia = rol === "admin" || (rol === "superadmin" || rol === "gerente");
   const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones";
-  const TABS =
+  const TABS_POR_ROL =
     rol === "sistemas"
       ? TABS_TODAS.filter(
           (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes" && t.id !== "visitas" && t.id !== "paqueteria"
@@ -282,6 +283,8 @@ export default function CentroPanel({
       : rol === "operaciones"
       ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
       : TABS_TODAS;
+  // Paquetería solo para los roles que atienden recepción (ver lib/paqueteria.ts).
+  const TABS = TABS_POR_ROL.filter((t) => t.id !== "paqueteria" || ROLES_PAQUETERIA.includes(rol));
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const [centro, setCentro] = useState(

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
+import { ROLES_PAQUETERIA } from "@/lib/paqueteria";
 
 type Cliente = {
   id: string;
@@ -902,6 +903,12 @@ export default function AdminPanel({
               <a className="modulo-card" href="/centro">
                 <span className="modulo-icon">🏢</span>
                 <span className="modulo-name">Panel de Centro</span>
+              </a>
+            )}
+            {ROLES_PAQUETERIA.includes(rol) && (
+              <a className="modulo-card" href="/centro?tab=paqueteria">
+                <span className="modulo-icon">📦</span>
+                <span className="modulo-name">Paquetes</span>
               </a>
             )}
             {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
