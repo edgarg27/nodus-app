@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { conIva } from "@/lib/adicionales";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -30,6 +31,7 @@ type ContratoPendiente = {
   fecha_inicio: string;
   fecha_vencimiento: string;
   renta_mensual: number;
+  forma_pago: string | null;
   horas_sala_juntas: number | null;
   deposito_garantia: number | null;
   estatus: string | null;
@@ -163,7 +165,7 @@ function AltaClienteInner() {
     const { data: conts } = await supabase
       .from("contratos")
       .select(
-        "id, fecha_inicio, fecha_vencimiento, renta_mensual, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc, cliente_empresa_historico"
+        "id, fecha_inicio, fecha_vencimiento, renta_mensual, forma_pago, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc, cliente_empresa_historico"
       )
       .is("user_id", null)
       .eq("centro", c)
@@ -287,7 +289,7 @@ function AltaClienteInner() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               clienteId,
-              monto: Number(a.monto),
+              monto: conIva(a.concepto, Number(a.monto)),
               concepto: `Adicional: ${a.concepto}`,
               contratoId,
               centro,
@@ -344,7 +346,11 @@ function AltaClienteInner() {
       setErrorCliente("Nombre y correo son obligatorios");
       return;
     }
-    if (!formCliente.diaPago.trim()) {
+    // Contrato de Oficina Privada mes a mes: siempre se paga del 1 al 10, no
+    // se captura un día personalizado.
+    const esMensualLigado = contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual";
+    const diaPagoEfectivo = esMensualLigado ? "1" : formCliente.diaPago;
+    if (!diaPagoEfectivo.trim()) {
       setErrorCliente("El día del mes que paga es obligatorio");
       return;
     }
@@ -368,7 +374,7 @@ function AltaClienteInner() {
           empresa: formCliente.empresa,
           rfc: formCliente.rfc,
           telefono: formCliente.telefono,
-          diaPago: formCliente.diaPago,
+          diaPago: diaPagoEfectivo,
           centro,
         }),
       });
@@ -394,7 +400,7 @@ function AltaClienteInner() {
         // contrato para que no queden desincronizados.
         const { error: updateError } = await supabase
           .from("contratos")
-          .update({ user_id: nuevoClienteId, dia_pago: Number(formCliente.diaPago) })
+          .update({ user_id: nuevoClienteId, dia_pago: Number(diaPagoEfectivo) })
           .eq("id", contratoSeleccionadoId);
 
         if (updateError) {
@@ -626,14 +632,23 @@ function AltaClienteInner() {
               </div>
               <div>
                 <p className="sub-label">Día del mes que paga</p>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  placeholder="15"
-                  value={formCliente.diaPago}
-                  onChange={(e) => setFormCliente({ ...formCliente, diaPago: e.target.value })}
-                />
+                {contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual" ? (
+                  <>
+                    <input value="Del 1 al 10 de cada mes" disabled style={{ background: "#f2f2f2", color: "#555" }} />
+                    <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
+                      Contrato mes a mes: siempre paga del 1 al 10; después del 10 se cobra un recargo del 3%.
+                    </p>
+                  </>
+                ) : (
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    placeholder="15"
+                    value={formCliente.diaPago}
+                    onChange={(e) => setFormCliente({ ...formCliente, diaPago: e.target.value })}
+                  />
+                )}
               </div>
             </div>
 
