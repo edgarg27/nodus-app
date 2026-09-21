@@ -664,6 +664,20 @@ export default function AdminPanel({
                 <span className="modulo-name">Quejas y Sugerencias</span>
               </a>
             )}
+            {/* Atención a clientes: por ahora solo admin y superadmin (misma
+                lista que las políticas de migracion_atencion_clientes_modulos.sql). */}
+            {(rol === "admin" || rol === "superadmin") && (
+              <>
+                <a className="modulo-card" href="/decoraciones">
+                  <span className="modulo-icon">🎄</span>
+                  <span className="modulo-name">Decoraciones y festividades</span>
+                </a>
+                <a className="modulo-card" href="/documentacion-centro">
+                  <span className="modulo-icon">📁</span>
+                  <span className="modulo-name">Documentación del centro</span>
+                </a>
+              </>
+            )}
             {(rol === "diseno" || rol === "superadmin" || rol === "gerente") && (
               <a className="modulo-card" href="/diseno">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
