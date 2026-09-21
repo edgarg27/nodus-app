@@ -8,6 +8,8 @@ type FileDropzoneProps = {
   maxFiles?: number;
   accept?: string;
   maxSizeMB?: number;
+  // Texto que se muestra como tipos permitidos (por defecto "Fotos o PDF").
+  etiquetaTipos?: string;
 };
 
 function formatBytes(bytes: number) {
@@ -25,6 +27,7 @@ export default function FileDropzone({
   maxFiles = 5,
   accept = "image/*,.pdf",
   maxSizeMB = 8,
+  etiquetaTipos,
 }: FileDropzoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [aviso, setAviso] = useState("");
@@ -107,7 +110,7 @@ export default function FileDropzone({
           <span>Arrastra tus archivos aquí</span> o haz clic para elegirlos
         </p>
         <p className="dropzone-sub">
-          {accept.includes("pdf") ? "Fotos o PDF" : "Fotos"} · hasta {maxSizeMB}MB c/u · máximo {maxFiles}
+          {etiquetaTipos || (accept.includes("pdf") ? "Fotos o PDF" : "Fotos")} · hasta {maxSizeMB}MB c/u · máximo {maxFiles}
         </p>
         <input
           ref={inputRef}

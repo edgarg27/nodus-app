@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { generarContratoDocx, normalizarTipoEspacioContrato } from "@/lib/contratoDocx";
+import { rentaMensualConIva } from "@/lib/formaPago";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
 // datos de la venta ya capturados en CotizarForm.tsx (cotizaciones_comerciales)
@@ -69,6 +70,12 @@ export async function POST(req: NextRequest) {
 
     const precioMensual = Number(venta.precio_pactado ?? venta.cargo_recurrente ?? venta.precio_neto ?? 0);
     const depositoGarantia = Number(venta.deposito_garantia ?? 0);
+    const rentaPeriodoConIva =
+      venta.precio_neto != null ? Number(venta.precio_neto) : Math.round(precioMensual * 1.16 * 100) / 100;
+    const rentaContrato =
+      venta.forma_pago === "mensual"
+        ? rentaMensualConIva(rentaPeriodoConIva, Number(venta.duracion_meses) || 1)
+        : rentaPeriodoConIva;
 
     // Se necesita el nombre del paquete para detectar el paquete "30
     // Horas" (contrato de término fijo distinto al resto de Coworking) —
@@ -152,7 +159,16 @@ export async function POST(req: NextRequest) {
       cliente_email_historico: venta.correo_contesta ?? null,
       fecha_inicio: venta.fecha_inicio ?? null,
       fecha_vencimiento: venta.fecha_fin ?? null,
-      renta_mensual: precioMensual,
+      // La renta del contrato se guarda con IVA incluido, igual que la
+      // cotización y que al crearse desde CotizarForm.tsx (renta_mensual:
+      // precioNeto). Antes se guardaba precio_pactado (sin IVA) y
+      // sobrescribía ese valor al aceptar la cotización — y como
+      // ContratoModal.tsx → aprobar() cobra renta_mensual tal cual, el
+      // cliente quedaba sin IVA en el cobro. El texto del contrato en Word
+      // (precioMensual, arriba) no cambia. En mes a mes (Oficina Privada)
+      // se guarda la renta de UN mes: precio_neto es el de todo el periodo.
+      renta_mensual: rentaContrato,
+      forma_pago: venta.forma_pago ?? null,
       deposito_garantia: depositoGarantia,
       horas_sala_juntas: horasSalaJuntas ?? 0,
       paquete_id: venta.paquete_id ?? null,

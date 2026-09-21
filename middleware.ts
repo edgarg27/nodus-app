@@ -56,6 +56,8 @@ export async function middleware(req: NextRequest) {
   const isProveedores = path.startsWith("/proveedores");
   const isAtencionCliente = path.startsWith("/atencion-cliente");
   const isDiseno = path.startsWith("/diseno");
+  const isDecoraciones = path.startsWith("/decoraciones");
+  const isDocumentacionCentro = path.startsWith("/documentacion-centro");
   // El QR del Day Pass manda aquí — es la pantalla donde el staff acepta
   // la llegada del invitado. Requiere sesión, a diferencia del resto de
   // /day-pass/[id] que es público (el link que se le manda al invitado).
@@ -72,8 +74,9 @@ export async function middleware(req: NextRequest) {
     "/quejas-sugerencias",
     "/logros",
     "/mis-encuestas",
+    "/calendario-eventos",
   ].some((p) => path === p || path.startsWith(p + "/"));
-  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin;
+  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin;
 
   if (!session && isProtected) {
     // A diferencia de las demás secciones (que se abren desde dentro de la
@@ -121,7 +124,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     // panel admin, reportes y telefonía son solo para staff (no clientes)
-    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isExperienciaCliente || isIngresosCentro || isDayPassCheckin) && role === "cliente") {
+    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isDayPassCheckin) && role === "cliente") {
       return NextResponse.redirect(new URL("/dashboard-cliente", req.url));
     }
     // el dashboard de cliente es solo para clientes
@@ -160,6 +163,9 @@ export const config = {
     "/proveedores/:path*",
     "/atencion-cliente/:path*",
     "/diseno/:path*",
+    "/decoraciones/:path*",
+    "/documentacion-centro/:path*",
+    "/calendario-eventos/:path*",
     "/quejas-sugerencias/:path*",
     "/logros/:path*",
     "/estado-cuenta/:path*",

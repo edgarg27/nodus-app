@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
+import { conIva } from "@/lib/adicionales";
+import { etiquetaFormaPago } from "@/lib/formaPago";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
 
 // Lead de la pestaña Prospectos de Centro — todavía sin cuenta (profiles.id).
@@ -42,6 +44,7 @@ export type Contrato = {
   fecha_inicio: string;
   fecha_vencimiento: string;
   renta_mensual: number;
+  forma_pago?: string | null;
   horas_sala_juntas: number | null;
   horas_bolsa: number | null;
   deposito_garantia: number | null;
@@ -311,7 +314,7 @@ export default function ContratosPage() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 clienteId: c.user_id,
-                monto: a.monto,
+                monto: conIva(a.concepto, Number(a.monto)),
                 concepto: `Adicional: ${a.concepto}`,
                 contratoId: c.id,
                 centro: c.centro,
@@ -636,6 +639,7 @@ export default function ContratosPage() {
                         <p className="contrato-detalle">{c.cliente_email}</p>
                         <p className="contrato-detalle">
                           ${c.renta_mensual.toLocaleString("es-MX")}/mes {c.plan_nombre ? `· ${c.plan_nombre}` : ""}
+                          {etiquetaFormaPago(c.forma_pago) ? ` · ${etiquetaFormaPago(c.forma_pago)}` : ""}
                         </p>
                       </div>
                       <span className="factura-badge" style={{ background: ESTATUS_LABEL.pre_aprobado.bg }}>
