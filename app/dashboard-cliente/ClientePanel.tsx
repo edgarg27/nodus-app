@@ -342,7 +342,7 @@ export default function ClientePanel({
     if (n.tipo === "encuesta_pendiente") {
       router.push("/mis-encuestas");
     } else if (n.tipo === "reservacion_rechazada" || n.tipo === "reservacion_confirmada") {
-      router.push("/mis-reservaciones");
+      router.push("/reservaciones?tab=mis");
     }
   }
 
@@ -698,21 +698,25 @@ export default function ClientePanel({
                   <span className="servicio-arrow">›</span>
                 </a>
               )}
+              {/* Mis Reservaciones ya vive dentro de Sala de Juntas (pestaña).
+                  Solo se deja esta tarjeta si el cliente NO tiene la de Sala de
+                  Juntas, para que nunca se quede sin acceso a sus reservaciones. */}
+              {!(horasSalaTotales > 0 || sinHorasDefinidas) && (
+                <a className="servicio-card" href="/reservaciones?tab=mis">
+                  <div className="servicio-icono">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/icons/reserva.png" alt="" className="icon-img-24" />
+                  </div>
+                  <div className="servicio-info">
+                    <p className="servicio-nombre">Mis Reservaciones</p>
+                    <p className="servicio-desc">Ver y gestionar tus reservaciones</p>
+                  </div>
+                  <span className="servicio-arrow">›</span>
+                </a>
+              )}
             </>
           );
         })()}
-
-        <a className="servicio-card" href="/mis-reservaciones">
-          <div className="servicio-icono">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/reserva.png" alt="" className="icon-img-24" />
-          </div>
-          <div className="servicio-info">
-            <p className="servicio-nombre">Mis Reservaciones</p>
-            <p className="servicio-desc">Ver y gestionar tus reservaciones</p>
-          </div>
-          <span className="servicio-arrow">›</span>
-        </a>
       </div>
 
       {perfilVisible && (
