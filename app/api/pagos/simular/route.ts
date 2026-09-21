@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { enviarGraciasPorPago } from "@/lib/correosPagos";
 
 // Público, sin sesión — el link de /pagar-simulado se manda directo al
 // cliente (o a quien lo tenga) sin exigirle iniciar sesión, es solo un
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
   if (pago.user_id) {
     await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
   }
+  await enviarGraciasPorPago(admin, pagoId);
 
   return NextResponse.json({ ok: true });
 }

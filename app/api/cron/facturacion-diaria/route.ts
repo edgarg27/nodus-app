@@ -5,6 +5,7 @@ import { crearCargoSPEI } from "@/lib/openpay";
 import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
+import { enviarAvisoPago } from "@/lib/correosPagos";
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -194,6 +195,30 @@ async function procesarMensual(
       tipo: "recordatorio_pago",
       mensaje: `📅 Recuerda pagar tu renta a más tardar el día ${DIA_LIMITE_PAGO_MENSUAL} para evitar el recargo del 3%.`,
     });
+    await enviarAvisoPago({
+      to: cliente.email,
+      nombre: cliente.nombre,
+      tipo: "antes",
+      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+      diasFaltan: 2,
+    });
+    resumen.recordatorios++;
+  }
+
+  // ---------- Último día para pagar sin recargo ----------
+  if (diaHoy === DIA_LIMITE_PAGO_MENSUAL && !(await yaExisteNotifHoy(admin, userId, "recordatorio_pago", hoyISO))) {
+    await admin.from("notificaciones").insert({
+      centro: cliente.centro,
+      user_id: userId,
+      tipo: "recordatorio_pago",
+      mensaje: "⏰ Hoy es el último día para pagar tu renta sin recargo.",
+    });
+    await enviarAvisoPago({
+      to: cliente.email,
+      nombre: cliente.nombre,
+      tipo: "ultimo_dia",
+      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+    });
     resumen.recordatorios++;
   }
 
@@ -236,6 +261,18 @@ function inicioFinDeMes(fecha: Date) {
   const inicio = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().split("T")[0];
   const fin = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).toISOString().split("T")[0];
   return { inicio, fin };
+}
+
+async function yaExisteNotifHoy(admin: ReturnType<typeof createAdminClient>, userId: string, tipo: string, hoyISO: string) {
+  const { data } = await admin
+    .from("notificaciones")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("tipo", tipo)
+    .gte("created_at", `${hoyISO}T00:00:00`)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
 }
 
 async function yaExisteNotifEsteMs(admin: ReturnType<typeof createAdminClient>, userId: string, tipo: string) {
@@ -351,21 +388,14 @@ export async function POST(req: NextRequest) {
             tipo: "recordatorio_pago",
             mensaje: `📅 No se te olvide, tu fecha de pago es el día ${diaPago} de este mes.`,
           });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "recordatorio_pago",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  diaPago,
-                  monto: contrato.renta_mensual,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
+          await enviarAvisoPago({
+            to: cliente.email,
+            nombre: cliente.nombre,
+            tipo: "antes",
+            monto: montoMes,
+            diaPago,
+            diasFaltan: DIAS_RECORDATORIO_ANTES,
+          });
           resumen.recordatorios++;
         }
       }
@@ -460,20 +490,7 @@ export async function POST(req: NextRequest) {
             tipo: "pago_hoy",
             mensaje: `💰 Hoy es tu fecha de pago (día ${diaPago}).`,
           });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "fecha_pago_hoy",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  monto: contrato.renta_mensual,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
+          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoMes, diaPago });
         }
       }
 

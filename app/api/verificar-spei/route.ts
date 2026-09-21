@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { consultarCargo } from "@/lib/openpay";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+import { enviarGraciasPorPago } from "@/lib/correosPagos";
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -59,6 +61,8 @@ export async function POST(req: NextRequest) {
           mensaje: `💰 Se confirmó el pago de ${cliente?.nombre || "un cliente"} — factura ${factura.folio} · $${Number(factura.monto).toLocaleString("es-MX")}`,
         });
       }
+
+      await enviarGraciasPorPago(createAdminClient(), pago.id);
 
       return NextResponse.json({ ok: true, estado: "pagado" });
     }
