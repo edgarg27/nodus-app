@@ -1041,7 +1041,7 @@ export default function CotizarForm({
     () => adicionalesDraft.reduce((s, a) => s + a.costo_unitario * a.cantidad, 0),
     [adicionalesDraft]
   );
-  // El Estacionamiento es el único adicional que lleva IVA. costo_unitario
+  // El Estacionamiento y el DID son los adicionales que llevan IVA. costo_unitario
   // se sigue guardando sin IVA por dentro (igual que antes); esta suma es
   // la que refleja lo que realmente se cobra y se usa para mostrar al
   // staff (encabezado de Adicionales, Desglose) — el campo editable de
@@ -1052,7 +1052,7 @@ export default function CotizarForm({
     return round2(
       items.reduce((s, a) => {
         const subtotal = a.costo_unitario * a.cantidad;
-        return s + (a.concepto.trim().toLowerCase() === "estacionamiento" ? subtotal * 1.16 : subtotal);
+        return s + (llevaIva(a.concepto) ? subtotal * 1.16 : subtotal);
       }, 0)
     );
   }
@@ -3208,7 +3208,7 @@ export default function CotizarForm({
                           {item.descripcion && <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{item.descripcion}</p>}
                           <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
                             $
-                            {(item.nombre.trim().toLowerCase() === "estacionamiento"
+                            {(llevaIva(item.nombre)
                               ? round2(Number(item.costo_unitario) * 1.16)
                               : Number(item.costo_unitario)
                             ).toLocaleString("es-MX")}{" "}
@@ -3341,10 +3341,10 @@ export default function CotizarForm({
                     // que se le cobra al cliente; por dentro se sigue
                     // guardando sin IVA en costo_unitario, igual que antes.
                     value={
-                      a.concepto.trim().toLowerCase() === "estacionamiento" ? round2(a.costo_unitario * 1.16) : a.costo_unitario
+                      llevaIva(a.concepto) ? round2(a.costo_unitario * 1.16) : a.costo_unitario
                     }
                     onChange={(e) => {
-                      const esEstacionamiento = a.concepto.trim().toLowerCase() === "estacionamiento";
+                      const esEstacionamiento = llevaIva(a.concepto);
                       const valor = esEstacionamiento
                         ? String(round2((Number(e.target.value) || 0) / 1.16))
                         : e.target.value;
@@ -3363,7 +3363,7 @@ export default function CotizarForm({
                 </div>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0d1b3e", minWidth: 70, textAlign: "right" }}>
                   $
-                  {(a.concepto.trim().toLowerCase() === "estacionamiento"
+                  {(llevaIva(a.concepto)
                     ? round2(a.costo_unitario * 1.16 * a.cantidad)
                     : a.costo_unitario * a.cantidad
                   ).toLocaleString("es-MX")}

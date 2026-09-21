@@ -239,7 +239,7 @@ export default function ContratoPage() {
                     {(a.cantidad || 1) > 1 ? ` (x${a.cantidad})` : ""}
                   </span>
                   <span className="modal-val">
-                    ${conIva(a.concepto, Number(a.monto) || 0).toLocaleString("es-MX")}
+                    {Number(a.monto) > 0 ? `$${conIva(a.concepto, Number(a.monto)).toLocaleString("es-MX")}` : "Incluida"}
                   </span>
                 </div>
               ))}
