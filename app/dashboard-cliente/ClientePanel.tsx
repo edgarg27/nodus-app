@@ -671,6 +671,12 @@ export default function ClientePanel({
             <img src="/icons/insignia.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Logros</span>
           </a>
+          <a className="quick-card" href="/mis-visitas">
+            <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
+              👥
+            </span>
+            <span className="quick-name">Visitas</span>
+          </a>
           <a className="quick-card" href="/calendario-eventos">
             <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
               📅
