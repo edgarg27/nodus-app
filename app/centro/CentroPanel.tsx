@@ -102,6 +102,22 @@ type SolicitudCliente = {
   estado: "pendiente" | "atendida";
 };
 
+type VisitaCliente = {
+  id: string;
+  created_at: string;
+  user_id: string;
+  visitante_nombre: string;
+  visitante_empresa: string | null;
+  visitante_telefono: string | null;
+  fecha: string;
+  hora: string;
+  motivo: string | null;
+  cliente_nombre: string | null;
+  cliente_empresa: string | null;
+  numero_oficina: string | null;
+  estado: "esperada" | "llego" | "cancelada";
+};
+
 const LABEL_SOLICITUD_CLIENTE: Record<SolicitudCliente["tipo"], string> = {
   renovar: "Renovar contrato",
   mas_horas: "Más horas de sala de juntas",
@@ -199,6 +215,7 @@ const TABS_TODAS = [
   { id: "reservaciones", label: "📅 Reservaciones" },
   { id: "invitados", label: "🙋 Invitados" },
   { id: "solicitudes", label: "📨 Solicitudes" },
+  { id: "visitas", label: "🚪 Visitas" },
   { id: "fidelidad", label: "💳 Fidelidad" },
   { id: "vouchers", label: "🎟️ Vouchers" },
   { id: "telefonia", label: "☎️ Telefonía" },
@@ -239,7 +256,7 @@ export default function CentroPanel({
   const TABS =
     rol === "sistemas"
       ? TABS_TODAS.filter(
-          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes"
+          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes" && t.id !== "visitas"
         )
       : rol === "operaciones"
       ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
@@ -323,6 +340,7 @@ export default function CentroPanel({
   const [linkDayPassCopiado, setLinkDayPassCopiado] = useState(false);
   const [tarjetasFidelidad, setTarjetasFidelidad] = useState<TarjetaFidelidad[]>([]);
   const [solicitudesCliente, setSolicitudesCliente] = useState<SolicitudCliente[]>([]);
+  const [visitasCliente, setVisitasCliente] = useState<VisitaCliente[]>([]);
   const [folioBuscado, setFolioBuscado] = useState("");
   const [buscandoTarjeta, setBuscandoTarjeta] = useState(false);
   const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
@@ -457,6 +475,7 @@ export default function CentroPanel({
       { data: dps },
       { data: tarjs },
       { data: solsCli },
+      { data: visitasCli },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -488,7 +507,7 @@ export default function CentroPanel({
             ? ["ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_ticket", "nuevo_voucher", "nuevo_did"]
             : rol === "operaciones"
             ? ["ticket_en_proceso", "ticket_resuelto", "nuevo_ticket", "proximo_mantenimiento"]
-            : ["nueva_reservacion", "ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_tour", "pago_confirmado", "servicio_pausado_admin", "nuevo_ticket", "nueva_solicitud_invitado", "solicitud_cliente"]
+            : ["nueva_reservacion", "ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_tour", "pago_confirmado", "servicio_pausado_admin", "nuevo_ticket", "nueva_solicitud_invitado", "solicitud_cliente", "visita_cliente"]
         )
         .order("created_at", { ascending: false })
         .limit(20),
@@ -520,6 +539,13 @@ export default function CentroPanel({
         .eq("centro", c)
         .order("created_at", { ascending: false })
         .limit(100),
+      supabase
+        .from("visitas_cliente")
+        .select("*")
+        .eq("centro", c)
+        .order("fecha", { ascending: false })
+        .order("hora", { ascending: false })
+        .limit(200),
     ]);
     setClientes(clis || []);
     setOficinas(ofis || []);
@@ -608,6 +634,7 @@ export default function CentroPanel({
     setDayPasses(dps || []);
     setTarjetasFidelidad(tarjs || []);
     setSolicitudesCliente(solsCli || []);
+    setVisitasCliente(visitasCli || []);
     setLoading(false);
   }
 
@@ -1193,6 +1220,20 @@ export default function CentroPanel({
       setTimeout(() => setLinkDayPassCopiado(false), 2500);
     } catch {
       alert(link);
+    }
+  }
+
+  // Recepción marca que el visitante de un cliente ya llegó.
+  async function marcarVisitaLlego(id: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("visitas_cliente")
+      .update({ estado: "llego", llego_en: new Date().toISOString(), atendido_por: user?.id || null })
+      .eq("id", id);
+    if (!error) {
+      setVisitasCliente((prev) => prev.map((v) => (v.id === id ? { ...v, estado: "llego" } : v)));
     }
   }
 
@@ -2586,6 +2627,97 @@ export default function CentroPanel({
                             </div>
                             <span className="factura-badge" style={{ background: "#E1F5EE" }}>
                               <span className="factura-badge-text">✓ Atendida</span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* ---------------- VISITAS DE CLIENTES ---------------- */}
+            {tab === "visitas" && (
+              <>
+                {(() => {
+                  const hoyStr = calFormatFechaISO(new Date());
+                  const esperadas = visitasCliente
+                    .filter((v) => v.estado === "esperada" && v.fecha >= hoyStr)
+                    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+                  const deHoy = esperadas.filter((v) => v.fecha === hoyStr);
+                  const proximas = esperadas.filter((v) => v.fecha > hoyStr);
+                  const historial = visitasCliente.filter((v) => !esperadas.includes(v)).slice(0, 30);
+                  const tarjeta = (v: VisitaCliente, conBoton: boolean) => (
+                    <div className="reserva-admin-card" key={v.id}>
+                      <div className="reserva-admin-top">
+                        <div>
+                          <p className="reserva-admin-cliente">
+                            {v.visitante_nombre}
+                            {v.visitante_empresa ? ` · ${v.visitante_empresa}` : ""}
+                          </p>
+                          <p className="reserva-admin-detalle">
+                            🕐 {v.fecha} · {v.hora}
+                          </p>
+                          <p className="reserva-admin-detalle">
+                            Visita a {v.cliente_nombre || "cliente"}
+                            {v.cliente_empresa ? ` (${v.cliente_empresa})` : ""}
+                            {v.numero_oficina ? ` · oficina ${v.numero_oficina}` : ""}
+                          </p>
+                          {v.visitante_telefono && <p className="reserva-admin-detalle">📞 {v.visitante_telefono}</p>}
+                          {v.motivo && <p className="reserva-admin-detalle">📝 {v.motivo}</p>}
+                        </div>
+                      </div>
+                      {conBoton && (
+                        <div className="reserva-admin-acciones">
+                          <button className="btn-aceptar" onClick={() => marcarVisitaLlego(v.id)}>
+                            ✓ Ya llegó
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                  return (
+                    <>
+                      <p className="sec-label-red">🚪 Hoy ({deHoy.length})</p>
+                      {deHoy.length === 0 ? (
+                        <div className="empty-card">No hay visitas esperadas hoy</div>
+                      ) : (
+                        deHoy.map((v) => tarjeta(v, true))
+                      )}
+
+                      <p className="panel-section-label" style={{ marginTop: 8 }}>
+                        Próximos días ({proximas.length})
+                      </p>
+                      {proximas.length === 0 ? (
+                        <div className="empty-card">Sin visitas próximas</div>
+                      ) : (
+                        proximas.map((v) => tarjeta(v, false))
+                      )}
+
+                      <p className="panel-section-label" style={{ marginTop: 8 }}>
+                        Historial reciente
+                      </p>
+                      {historial.length === 0 ? (
+                        <div className="empty-card">Sin historial todavía</div>
+                      ) : (
+                        historial.map((v) => (
+                          <div className="item-card" key={v.id}>
+                            <div className="item-card-info">
+                              <p className="item-card-titulo">{v.visitante_nombre}</p>
+                              <p className="item-card-sub">
+                                {v.fecha} · {v.hora} · {v.cliente_nombre || "cliente"}
+                              </p>
+                            </div>
+                            <span
+                              className="factura-badge"
+                              style={{
+                                background: v.estado === "llego" ? "#E1F5EE" : v.estado === "cancelada" ? "#FCEBEB" : "#FAEEDA",
+                              }}
+                            >
+                              <span className="factura-badge-text">
+                                {v.estado === "llego" ? "✓ Llegó" : v.estado === "cancelada" ? "✗ Cancelada" : "Sin llegar"}
+                              </span>
                             </span>
                           </div>
                         ))

@@ -1097,7 +1097,7 @@ export default function AdminPanel({
                 {puedeGestionarClientes && (
                   <>
                     <p className="sub-label">Nombre</p>
-                    <input value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Nombre completo" />
+                    <input type="text" value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Nombre completo" />
                     <p className="sub-label">Correo (con el que entra)</p>
                     <input
                       type="email"
@@ -1106,7 +1106,7 @@ export default function AdminPanel({
                       placeholder="correo@empresa.com"
                     />
                     <p className="sub-label">RFC</p>
-                    <input value={formRfc} onChange={(e) => setFormRfc(e.target.value)} placeholder="RFC" />
+                    <input type="text" value={formRfc} onChange={(e) => setFormRfc(e.target.value)} placeholder="RFC" />
                     <p className="sub-label">Centro</p>
                     <select value={formCentro} onChange={(e) => setFormCentro(e.target.value)}>
                       <option value="">Sin centro</option>
