@@ -118,6 +118,26 @@ type VisitaCliente = {
   estado: "esperada" | "llego" | "cancelada";
 };
 
+type PaqueteCliente = {
+  id: string;
+  created_at: string;
+  user_id: string;
+  tipo: "paquete" | "correspondencia" | "otro";
+  remitente: string | null;
+  descripcion: string | null;
+  cliente_nombre: string | null;
+  cliente_empresa: string | null;
+  numero_oficina: string | null;
+  estado: "por_recoger" | "entregado";
+  entregado_en: string | null;
+};
+
+const LABEL_PAQUETE: Record<PaqueteCliente["tipo"], string> = {
+  paquete: "Paquete",
+  correspondencia: "Correspondencia",
+  otro: "Otro",
+};
+
 const LABEL_SOLICITUD_CLIENTE: Record<SolicitudCliente["tipo"], string> = {
   renovar: "Renovar contrato",
   mas_horas: "Más horas de sala de juntas",
@@ -216,6 +236,7 @@ const TABS_TODAS = [
   { id: "invitados", label: "🙋 Invitados" },
   { id: "solicitudes", label: "📨 Solicitudes" },
   { id: "visitas", label: "🚪 Visitas" },
+  { id: "paqueteria", label: "📦 Paquetería" },
   { id: "fidelidad", label: "💳 Fidelidad" },
   { id: "vouchers", label: "🎟️ Vouchers" },
   { id: "telefonia", label: "☎️ Telefonía" },
@@ -256,7 +277,7 @@ export default function CentroPanel({
   const TABS =
     rol === "sistemas"
       ? TABS_TODAS.filter(
-          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes" && t.id !== "visitas"
+          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes" && t.id !== "visitas" && t.id !== "paqueteria"
         )
       : rol === "operaciones"
       ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
@@ -341,6 +362,15 @@ export default function CentroPanel({
   const [tarjetasFidelidad, setTarjetasFidelidad] = useState<TarjetaFidelidad[]>([]);
   const [solicitudesCliente, setSolicitudesCliente] = useState<SolicitudCliente[]>([]);
   const [visitasCliente, setVisitasCliente] = useState<VisitaCliente[]>([]);
+  const [paqueteria, setPaqueteria] = useState<PaqueteCliente[]>([]);
+  const [busquedaPaq, setBusquedaPaq] = useState("");
+  const [paqClienteId, setPaqClienteId] = useState("");
+  const [paqTipo, setPaqTipo] = useState<PaqueteCliente["tipo"]>("paquete");
+  const [paqRemitente, setPaqRemitente] = useState("");
+  const [paqDescripcion, setPaqDescripcion] = useState("");
+  const [registrandoPaq, setRegistrandoPaq] = useState(false);
+  const [errorPaq, setErrorPaq] = useState("");
+  const [okPaq, setOkPaq] = useState("");
   const [folioBuscado, setFolioBuscado] = useState("");
   const [buscandoTarjeta, setBuscandoTarjeta] = useState(false);
   const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
@@ -476,6 +506,7 @@ export default function CentroPanel({
       { data: tarjs },
       { data: solsCli },
       { data: visitasCli },
+      { data: paqCli },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -546,6 +577,12 @@ export default function CentroPanel({
         .order("fecha", { ascending: false })
         .order("hora", { ascending: false })
         .limit(200),
+      supabase
+        .from("paqueteria_cliente")
+        .select("*")
+        .eq("centro", c)
+        .order("created_at", { ascending: false })
+        .limit(150),
     ]);
     setClientes(clis || []);
     setOficinas(ofis || []);
@@ -635,6 +672,7 @@ export default function CentroPanel({
     setTarjetasFidelidad(tarjs || []);
     setSolicitudesCliente(solsCli || []);
     setVisitasCliente(visitasCli || []);
+    setPaqueteria(paqCli || []);
     setLoading(false);
   }
 
@@ -1220,6 +1258,71 @@ export default function CentroPanel({
       setTimeout(() => setLinkDayPassCopiado(false), 2500);
     } catch {
       alert(link);
+    }
+  }
+
+  async function cargarPaqueteria() {
+    if (!centro) return;
+    const { data } = await supabase
+      .from("paqueteria_cliente")
+      .select("*")
+      .eq("centro", centro)
+      .order("created_at", { ascending: false })
+      .limit(150);
+    setPaqueteria(data || []);
+  }
+
+  // Recepción registra un paquete/correspondencia; el servidor avisa al
+  // cliente en su panel y por correo.
+  async function registrarPaquete() {
+    setErrorPaq("");
+    setOkPaq("");
+    if (!paqClienteId) {
+      setErrorPaq("Elige a qué cliente le llegó");
+      return;
+    }
+    setRegistrandoPaq(true);
+    try {
+      const res = await fetch("/api/paqueteria", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clienteId: paqClienteId,
+          tipo: paqTipo,
+          remitente: paqRemitente,
+          descripcion: paqDescripcion,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorPaq(data.error || "No se pudo registrar");
+      } else {
+        const c = clientes.find((x) => x.id === paqClienteId);
+        setOkPaq(`Registrado. Se le avisó a ${c?.nombre || "el cliente"}.`);
+        setPaqClienteId("");
+        setPaqRemitente("");
+        setPaqDescripcion("");
+        setBusquedaPaq("");
+        await cargarPaqueteria();
+      }
+    } catch {
+      setErrorPaq("No se pudo conectar. Intenta de nuevo.");
+    }
+    setRegistrandoPaq(false);
+  }
+
+  async function marcarPaqueteEntregado(id: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("paqueteria_cliente")
+      .update({ estado: "entregado", entregado_en: new Date().toISOString(), entregado_por: user?.id || null })
+      .eq("id", id);
+    if (!error) {
+      setPaqueteria((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, estado: "entregado", entregado_en: new Date().toISOString() } : x))
+      );
     }
   }
 
@@ -2718,6 +2821,138 @@ export default function CentroPanel({
                               <span className="factura-badge-text">
                                 {v.estado === "llego" ? "✓ Llegó" : v.estado === "cancelada" ? "✗ Cancelada" : "Sin llegar"}
                               </span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* ---------------- PAQUETERÍA ---------------- */}
+            {tab === "paqueteria" && (
+              <>
+                <div className="form-card">
+                  <p className="modal-nombre" style={{ margin: 0 }}>
+                    Registrar paquete o correspondencia
+                  </p>
+                  <p className="sub-label">Cliente</p>
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, empresa u oficina"
+                    value={busquedaPaq}
+                    onChange={(e) => setBusquedaPaq(e.target.value)}
+                  />
+                  <select value={paqClienteId} onChange={(e) => setPaqClienteId(e.target.value)}>
+                    <option value="">Elige el cliente</option>
+                    {clientes
+                      .filter((c) => {
+                        const q = busquedaPaq.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          (c.nombre || "").toLowerCase().includes(q) ||
+                          (c.empresa || "").toLowerCase().includes(q) ||
+                          (c.numero_oficina || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                          {c.empresa ? ` · ${c.empresa}` : ""}
+                          {c.numero_oficina ? ` · Of. ${c.numero_oficina}` : ""}
+                        </option>
+                      ))}
+                  </select>
+
+                  <p className="sub-label">Tipo</p>
+                  <select value={paqTipo} onChange={(e) => setPaqTipo(e.target.value as PaqueteCliente["tipo"])}>
+                    <option value="paquete">Paquete</option>
+                    <option value="correspondencia">Correspondencia</option>
+                    <option value="otro">Otro</option>
+                  </select>
+
+                  <p className="sub-label">Remitente o paquetería (opcional)</p>
+                  <input
+                    type="text"
+                    placeholder="Ej. Amazon, DHL, Banco"
+                    value={paqRemitente}
+                    onChange={(e) => setPaqRemitente(e.target.value)}
+                  />
+
+                  <p className="sub-label">Descripción (opcional)</p>
+                  <input
+                    type="text"
+                    placeholder="Ej. Caja mediana, sobre"
+                    value={paqDescripcion}
+                    onChange={(e) => setPaqDescripcion(e.target.value)}
+                  />
+
+                  {errorPaq && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorPaq}</p>}
+                  {okPaq && <p style={{ color: "#0F6E56", fontSize: 13 }}>{okPaq}</p>}
+
+                  <button className="reservar-btn" onClick={registrarPaquete} disabled={registrandoPaq}>
+                    {registrandoPaq ? "Registrando..." : "Registrar y avisar al cliente"}
+                  </button>
+                </div>
+
+                {(() => {
+                  const porRecoger = paqueteria.filter((x) => x.estado === "por_recoger");
+                  const entregados = paqueteria.filter((x) => x.estado === "entregado").slice(0, 30);
+                  return (
+                    <>
+                      <p className="sec-label-red">📦 Por recoger ({porRecoger.length})</p>
+                      {porRecoger.length === 0 ? (
+                        <div className="empty-card">No hay paquetes pendientes</div>
+                      ) : (
+                        porRecoger.map((x) => (
+                          <div className="reserva-admin-card" key={x.id}>
+                            <div className="reserva-admin-top">
+                              <div>
+                                <p className="reserva-admin-cliente">
+                                  {x.cliente_nombre || "Cliente"}
+                                  {x.cliente_empresa ? ` · ${x.cliente_empresa}` : ""}
+                                  {x.numero_oficina ? ` · Of. ${x.numero_oficina}` : ""}
+                                </p>
+                                <p className="reserva-admin-detalle">
+                                  {LABEL_PAQUETE[x.tipo]}
+                                  {x.remitente ? ` de ${x.remitente}` : ""}
+                                  {x.descripcion ? ` — ${x.descripcion}` : ""}
+                                </p>
+                                <p className="reserva-admin-detalle">
+                                  Llegó el {new Date(x.created_at).toLocaleString("es-MX")}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="reserva-admin-acciones">
+                              <button className="btn-aceptar" onClick={() => marcarPaqueteEntregado(x.id)}>
+                                ✓ Entregado
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+
+                      <p className="panel-section-label" style={{ marginTop: 8 }}>
+                        Entregados recientemente
+                      </p>
+                      {entregados.length === 0 ? (
+                        <div className="empty-card">Sin entregas todavía</div>
+                      ) : (
+                        entregados.map((x) => (
+                          <div className="item-card" key={x.id}>
+                            <div className="item-card-info">
+                              <p className="item-card-titulo">{x.cliente_nombre || "Cliente"}</p>
+                              <p className="item-card-sub">
+                                {LABEL_PAQUETE[x.tipo]}
+                                {x.remitente ? ` de ${x.remitente}` : ""} ·{" "}
+                                {x.entregado_en ? new Date(x.entregado_en).toLocaleDateString("es-MX") : "—"}
+                              </p>
+                            </div>
+                            <span className="factura-badge" style={{ background: "#E1F5EE" }}>
+                              <span className="factura-badge-text">✓ Entregado</span>
                             </span>
                           </div>
                         ))
