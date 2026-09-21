@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { conIva, totalAdicionalesMensuales } from "@/lib/adicionales";
+import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
+
+type Adicional = { id: string; concepto: string; cantidad: number | null; monto: number | null };
 
 type Contrato = {
   id: string;
@@ -14,6 +18,7 @@ type Contrato = {
   horas_sala_juntas: number | null;
   dia_pago: number | null;
   deposito_garantia: number | null;
+  forma_pago: string | null;
 };
 
 const CONCEPTO_PAGO_DEPOSITO = "Depósito en garantía (incl. IVA)";
@@ -34,6 +39,17 @@ export default function ContratoPage() {
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState("");
   const [depositoPagado, setDepositoPagado] = useState(false);
+  const [adicionales, setAdicionales] = useState<Adicional[]>([]);
+
+  // Solicitudes al staff (renovar, más horas, cambiar espacio, otro).
+  type SolicitudCliente = { id: string; tipo: string; estado: string; created_at: string };
+  const [misSolicitudes, setMisSolicitudes] = useState<SolicitudCliente[]>([]);
+  const [mostrarSolicitud, setMostrarSolicitud] = useState(false);
+  const [tipoSolicitud, setTipoSolicitud] = useState("renovar");
+  const [mensajeSolicitud, setMensajeSolicitud] = useState("");
+  const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
+  const [errorSolicitud, setErrorSolicitud] = useState("");
+  const [solicitudEnviada, setSolicitudEnviada] = useState(false);
 
   useEffect(() => {
     fetchContrato();
@@ -64,6 +80,16 @@ export default function ContratoPage() {
     const { data } = await query.limit(1).maybeSingle();
 
     setContrato(data);
+
+    if (data) {
+      const { data: adics } = await supabase
+        .from("contrato_adicionales")
+        .select("id, concepto, cantidad, monto")
+        .eq("contrato_id", data.id)
+        .order("created_at");
+      setAdicionales(adics || []);
+      await cargarSolicitudes(user.id);
+    }
 
     if (data && data.deposito_garantia) {
       const { data: pago } = await supabase
@@ -107,6 +133,50 @@ export default function ContratoPage() {
   }
 
   const { mesesRestantes, porcentaje } = calcularInfo();
+
+  const ETIQUETA_SOLICITUD: Record<string, string> = {
+    renovar: "Renovar mi contrato",
+    mas_horas: "Más horas de sala de juntas",
+    cambiar_espacio: "Cambiar o ampliar mi espacio",
+    otro: "Otra solicitud",
+  };
+
+  async function cargarSolicitudes(userId: string) {
+    const { data } = await supabase
+      .from("solicitudes_cliente")
+      .select("id, tipo, estado, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    setMisSolicitudes(data || []);
+  }
+
+  async function enviarSolicitud() {
+    setEnviandoSolicitud(true);
+    setErrorSolicitud("");
+    try {
+      const res = await fetch("/api/solicitudes-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: tipoSolicitud, mensaje: mensajeSolicitud, contratoId: contrato?.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorSolicitud(data.error || "No se pudo enviar la solicitud");
+      } else {
+        setSolicitudEnviada(true);
+        setMensajeSolicitud("");
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) await cargarSolicitudes(user.id);
+      }
+    } catch {
+      setErrorSolicitud("No se pudo conectar. Intenta de nuevo.");
+    }
+    setEnviandoSolicitud(false);
+  }
+  const totalMensualAdicionales = totalAdicionalesMensuales(adicionales);
 
   return (
     <div className="panel">
@@ -162,17 +232,49 @@ export default function ContratoPage() {
                   </span>
                 </div>
               )}
+              {adicionales.map((a) => (
+                <div className="contrato-row" key={a.id}>
+                  <span className="modal-label">
+                    Adicional: {a.concepto}
+                    {(a.cantidad || 1) > 1 ? ` (x${a.cantidad})` : ""}
+                  </span>
+                  <span className="modal-val">
+                    ${conIva(a.concepto, Number(a.monto) || 0).toLocaleString("es-MX")}
+                  </span>
+                </div>
+              ))}
+              {contrato.renta_mensual != null && totalMensualAdicionales > 0 && contrato.forma_pago !== "adelantado" && (
+                <div className="contrato-row">
+                  <span className="modal-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>
+                    Total por pagar al mes
+                  </span>
+                  <span className="modal-val" style={{ fontWeight: 700 }}>
+                    $
+                    {(Number(contrato.renta_mensual) + totalMensualAdicionales).toLocaleString("es-MX", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              )}
               {contrato.horas_sala_juntas != null && contrato.horas_sala_juntas > 0 && (
                 <div className="contrato-row">
                   <span className="modal-label">Horas sala de juntas</span>
                   <span className="modal-val">{contrato.horas_sala_juntas}h / mes</span>
                 </div>
               )}
-              {contrato.dia_pago != null && (
+              {contrato.forma_pago === "mensual" ? (
                 <div className="contrato-row">
-                  <span className="modal-label">Día de pago</span>
-                  <span className="modal-val">Día {contrato.dia_pago} de cada mes</span>
+                  <span className="modal-label">Fecha de pago</span>
+                  <span className="modal-val">Del 1 al {DIA_LIMITE_PAGO_MENSUAL} de cada mes</span>
                 </div>
+              ) : (
+                contrato.dia_pago != null && (
+                  <div className="contrato-row">
+                    <span className="modal-label">Día de pago</span>
+                    <span className="modal-val">Día {contrato.dia_pago} de cada mes</span>
+                  </div>
+                )
               )}
               <div className="contrato-row">
                 <span className="modal-label">Estatus</span>
@@ -209,6 +311,93 @@ export default function ContratoPage() {
                 </div>
               )}
             </div>
+
+            <p className="panel-section-label">Renovar o ampliar</p>
+            <div className="contrato-card">
+              <p style={{ fontSize: 13, color: "#666", margin: "0 0 10px" }}>
+                ¿Quieres renovar tu contrato, más horas de sala o cambiar de espacio? Mándale la solicitud al equipo del
+                centro y te contactarán.
+              </p>
+              <button
+                className="reservar-btn"
+                onClick={() => {
+                  setSolicitudEnviada(false);
+                  setErrorSolicitud("");
+                  setMostrarSolicitud(true);
+                }}
+              >
+                Hacer una solicitud
+              </button>
+              {misSolicitudes.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  {misSolicitudes.map((s) => (
+                    <div className="contrato-row" key={s.id}>
+                      <span className="modal-label">
+                        {ETIQUETA_SOLICITUD[s.tipo] || s.tipo} · {formatFecha(s.created_at)}
+                      </span>
+                      <span
+                        className="factura-badge"
+                        style={{ background: s.estado === "atendida" ? "#E1F5EE" : "#FAEEDA" }}
+                      >
+                        <span
+                          className="factura-badge-text"
+                          style={{ color: s.estado === "atendida" ? "#0F6E56" : "#854F0B" }}
+                        >
+                          {s.estado === "atendida" ? "✓ Atendida" : "⏳ Pendiente"}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {mostrarSolicitud && (
+              <div className="modal-overlay" onClick={() => !enviandoSolicitud && setMostrarSolicitud(false)}>
+                <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                  {solicitudEnviada ? (
+                    <>
+                      <p className="modal-nombre">¡Solicitud enviada!</p>
+                      <p className="modal-email">
+                        El equipo de tu centro ya la recibió y te contactará pronto para darle seguimiento.
+                      </p>
+                      <button className="reservar-btn" style={{ marginTop: 10 }} onClick={() => setMostrarSolicitud(false)}>
+                        Listo
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="modal-nombre">Hacer una solicitud</p>
+                      <p className="sub-label">¿Qué necesitas?</p>
+                      <select value={tipoSolicitud} onChange={(e) => setTipoSolicitud(e.target.value)}>
+                        {Object.entries(ETIQUETA_SOLICITUD).map(([valor, texto]) => (
+                          <option key={valor} value={valor}>
+                            {texto}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="sub-label" style={{ marginTop: 8 }}>
+                        Cuéntanos más (opcional)
+                      </p>
+                      <textarea
+                        placeholder="Ej. Quiero renovar por 6 meses / necesito 4 horas más de sala al mes"
+                        value={mensajeSolicitud}
+                        onChange={(e) => setMensajeSolicitud(e.target.value)}
+                      />
+                      {errorSolicitud && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorSolicitud}</p>}
+                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                        <button className="tel-borrar-btn" onClick={() => setMostrarSolicitud(false)} disabled={enviandoSolicitud}>
+                          Cancelar
+                        </button>
+                        <button className="reservar-btn" onClick={enviarSolicitud} disabled={enviandoSolicitud}>
+                          {enviandoSolicitud ? "Enviando..." : "Enviar solicitud"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="tiempo-card">
               <p className="tiempo-label">Tiempo restante del contrato</p>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { enviarGraciasPorPago } from "@/lib/correosPagos";
 
 // Requiere sesión de staff — a diferencia de /api/pagos/simular (público,
 // solo para pagos sin factura_id), este endpoint puede marcar pagado
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: pago } = await admin.from("pagos").select("id, user_id").eq("id", pagoId).maybeSingle();
+  const { data: pago } = await admin.from("pagos").select("id, user_id, estado").eq("id", pagoId).maybeSingle();
 
   const datosActualizar: { estado: string; comprobante_url?: string } = { estado: "pagado" };
   if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
@@ -39,6 +40,10 @@ export async function POST(req: NextRequest) {
   }
   if (pago?.user_id) {
     await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
+  }
+  // Solo la primera vez que pasa a pagado (evita dos correos por doble clic).
+  if (pago && pago.estado !== "pagado") {
+    await enviarGraciasPorPago(admin, pagoId);
   }
 
   return NextResponse.json({ ok: true });

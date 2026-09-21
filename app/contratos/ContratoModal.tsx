@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Contrato } from "./page";
@@ -31,6 +31,17 @@ type AdicionalRow = {
   monto: number;
 };
 
+type CambioContrato = {
+  id: string;
+  campo: string;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  cambiado_por_nombre: string | null;
+  created_at: string;
+};
+
+const dinero = (n: number) => `$${n.toLocaleString("es-MX")}`;
+
 export const ESTATUS_LABEL: Record<string, { label: string; bg: string; color: string }> = {
   pre_aprobado: { label: "⏳ Pre-aprobado", bg: "#FAEEDA", color: "#854F0B" },
   vigente: { label: "✓ Activo", bg: "#E1F5EE", color: "#0F6E56" },
@@ -41,7 +52,7 @@ export const ESTATUS_LABEL: Record<string, { label: string; bg: string; color: s
 
 export default function ContratoModal({
   contrato,
-  onClose,
+  onClose: onCloseProp,
   onGuardado,
   onRefrescar,
 }: {
@@ -93,6 +104,75 @@ export default function ContratoModal({
   const [nuevoTipoDescripcion, setNuevoTipoDescripcion] = useState("");
   const [nuevoTipoCosto, setNuevoTipoCosto] = useState("");
 
+  const [historial, setHistorial] = useState<CambioContrato[]>([]);
+  // Foto de los adicionales tal como estaban al abrir (o al último guardado),
+  // para registrar en el historial solo lo que de verdad cambió.
+  const snapshotAdicionales = useRef<Map<string, AdicionalRow>>(new Map());
+
+  // Guarda renglones en el historial de cambios. Es best-effort: si falla (ej.
+  // la tabla aún no existe) NO bloquea el guardado del contrato.
+  async function insertarCambios(cambios: { campo: string; anterior: string; nuevo: string }[]) {
+    if (cambios.length === 0) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: perfil } = user
+      ? await supabase.from("profiles").select("nombre").eq("id", user.id).maybeSingle()
+      : { data: null };
+    await supabase.from("contrato_cambios").insert(
+      cambios.map((c) => ({
+        contrato_id: contrato.id,
+        campo: c.campo,
+        valor_anterior: c.anterior || null,
+        valor_nuevo: c.nuevo || null,
+        cambiado_por: user?.id || null,
+        cambiado_por_nombre: perfil?.nombre || user?.email || null,
+      }))
+    );
+  }
+
+  // Compara los adicionales de ahora contra la foto y devuelve los cambios;
+  // deja la foto al día para no registrar dos veces lo mismo.
+  function cambiosDeAdicionales() {
+    const foto = snapshotAdicionales.current;
+    const cambios: { campo: string; anterior: string; nuevo: string }[] = [];
+    for (const a of adicionales) {
+      const antes = foto.get(a.id);
+      if (!antes) {
+        cambios.push({ campo: `Adicional agregado: ${a.concepto}`, anterior: "", nuevo: dinero(conIva(a.concepto, a.monto)) });
+        continue;
+      }
+      if (antes.costo_unitario !== a.costo_unitario) {
+        cambios.push({
+          campo: `Adicional ${a.concepto}: costo unitario`,
+          anterior: dinero(conIva(a.concepto, antes.costo_unitario)),
+          nuevo: dinero(conIva(a.concepto, a.costo_unitario)),
+        });
+      }
+      if (antes.cantidad !== a.cantidad) {
+        cambios.push({ campo: `Adicional ${a.concepto}: cantidad`, anterior: String(antes.cantidad), nuevo: String(a.cantidad) });
+      }
+    }
+    for (const [id, antes] of Array.from(foto.entries())) {
+      if (!adicionales.some((a) => a.id === id)) {
+        cambios.push({
+          campo: `Adicional eliminado: ${antes.concepto}`,
+          anterior: dinero(conIva(antes.concepto, antes.monto)),
+          nuevo: "",
+        });
+      }
+    }
+    snapshotAdicionales.current = new Map(adicionales.map((a) => [a.id, a]));
+    return cambios;
+  }
+
+  // Cerrar el modal también registra los cambios de adicionales hechos sin
+  // dar "Guardar cambios" (los adicionales se guardan al instante).
+  function onClose() {
+    if (!cargandoAdicionales) void insertarCambios(cambiosDeAdicionales());
+    onCloseProp();
+  }
+
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +180,7 @@ export default function ContratoModal({
 
   async function cargarTodo() {
     setCargandoAdicionales(true);
-    const [{ data: cat }, { data: adi }, { data: vers }] = await Promise.all([
+    const [{ data: cat }, { data: adi }, { data: vers }, { data: hist }] = await Promise.all([
       supabase.from("adicionales_catalogo").select("*").eq("centro", contrato.centro).eq("activo", true).order("nombre"),
       supabase.from("contrato_adicionales").select("*").eq("contrato_id", contrato.id).order("created_at"),
       supabase
@@ -108,20 +188,27 @@ export default function ContratoModal({
         .select("id, archivo_url, nombre_archivo, created_at")
         .eq("contrato_id", contrato.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("contrato_cambios")
+        .select("id, campo, valor_anterior, valor_nuevo, cambiado_por_nombre, created_at")
+        .eq("contrato_id", contrato.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
     ]);
+    setHistorial(hist || []);
     setVersiones(vers || []);
     setCatalogo(cat || []);
-    setAdicionales(
-      (adi || []).map((a) => ({
-        id: a.id,
-        adicional_id: a.adicional_id,
-        concepto: a.concepto,
-        descripcion: a.descripcion,
-        costo_unitario: Number(a.costo_unitario) || 0,
-        cantidad: Number(a.cantidad) || 1,
-        monto: Number(a.monto) || 0,
-      }))
-    );
+    const filasAdicionales: AdicionalRow[] = (adi || []).map((a) => ({
+      id: a.id,
+      adicional_id: a.adicional_id,
+      concepto: a.concepto,
+      descripcion: a.descripcion,
+      costo_unitario: Number(a.costo_unitario) || 0,
+      cantidad: Number(a.cantidad) || 1,
+      monto: Number(a.monto) || 0,
+    }));
+    snapshotAdicionales.current = new Map(filasAdicionales.map((a) => [a.id, a]));
+    setAdicionales(filasAdicionales);
     setCargandoAdicionales(false);
   }
 
@@ -292,6 +379,26 @@ export default function ContratoModal({
       setError("No se pudo guardar el contrato. Intenta de nuevo.");
       return;
     }
+
+    // Historial: qué campos cambiaron respecto a como se abrió el contrato
+    // (más los adicionales editados). No bloquea nada si falla.
+    const num = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(Number(v)));
+    const camposPrincipales: { campo: string; anterior: string; nuevo: string; dinero?: boolean }[] = [
+      { campo: "Fecha de inicio", anterior: contrato.fecha_inicio || "", nuevo: form.fecha_inicio || "" },
+      { campo: "Fecha de vencimiento", anterior: contrato.fecha_vencimiento || "", nuevo: form.fecha_vencimiento || "" },
+      { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(form.renta_mensual), dinero: true },
+      { campo: "Horas sala de juntas", anterior: num(contrato.horas_sala_juntas), nuevo: num(form.horas_sala_juntas) },
+      { campo: "Día de pago", anterior: num(contrato.dia_pago), nuevo: num(form.dia_pago) },
+      { campo: "Depósito en garantía", anterior: num(contrato.deposito_garantia), nuevo: num(form.deposito_garantia), dinero: true },
+    ];
+    const cambiosPrincipales = camposPrincipales
+      .filter((c) => c.anterior !== c.nuevo)
+      .map((c) => ({
+        campo: c.campo,
+        anterior: c.dinero && c.anterior ? dinero(Number(c.anterior)) : c.anterior,
+        nuevo: c.dinero && c.nuevo ? dinero(Number(c.nuevo)) : c.nuevo,
+      }));
+    void insertarCambios([...cambiosPrincipales, ...cambiosDeAdicionales()]);
 
     setEnviado(true);
     setTimeout(() => setEnviado(false), 1800);
@@ -894,6 +1001,26 @@ export default function ContratoModal({
             ${totalContrato.toLocaleString("es-MX")}
           </span>
         </div>
+
+        {historial.length > 0 && (
+          <>
+            <p className="modal-seccion" style={{ marginTop: 12 }}>
+              🕓 Historial de cambios
+            </p>
+            <div style={{ maxHeight: 180, overflowY: "auto" }}>
+              {historial.map((h) => (
+                <div key={h.id} style={{ padding: "6px 0", borderBottom: "1px solid #f2f2f2" }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                    {h.campo}: {h.valor_anterior || "—"} → {h.valor_nuevo || "—"}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 11, color: "#888" }}>
+                    {h.cambiado_por_nombre || "—"} · {new Date(h.created_at).toLocaleString("es-MX")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {error && <p style={{ color: "#A32D2D", fontSize: 13, marginTop: 8 }}>{error}</p>}
 

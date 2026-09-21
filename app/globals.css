@@ -4677,6 +4677,14 @@ body {
   margin-top: 1px;
 }
 
+.invitado-intro-icon-img {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  margin-top: 1px;
+}
+
 .invitado-menu-list {
   display: flex;
   flex-direction: column;
@@ -4701,6 +4709,7 @@ body {
   border-radius: 14px;
   padding: 14px 16px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   width: 100%;
   box-shadow: 0 1px 2px rgba(7, 28, 75, 0.04);
@@ -4735,6 +4744,12 @@ body {
   background: rgba(240, 126, 58, 0.14);
 }
 
+.invitado-menu-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .invitado-menu-text {
   flex: 1;
   min-width: 0;
@@ -4764,6 +4779,217 @@ body {
   display: flex;
   justify-content: center;
   margin-top: 4px;
+}
+
+.invitado-duracion-grupo {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.invitado-duracion-btn {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #eef0f6;
+  border-radius: 10px;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.invitado-duracion-btn.activo {
+  border-color: #0d1b3e;
+  background: #0d1b3e;
+  color: #fff;
+}
+
+/* ---------- Tarjeta de fidelidad (diseño de marca, ver FidelidadCard.tsx).
+   Usa container queries (cqw) para que el layout de logo+título+grid
+   escale de forma proporcional sin importar el ancho del contenedor
+   (móvil angosto o el panel de escritorio). ---------- */
+.fidcard {
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 1050 / 600;
+  border-radius: 14px;
+  background: radial-gradient(circle at 82% 78%, #1e3c72 0%, #0d1b3e 55%, #091430 100%);
+  padding: 5cqw 5.5cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px rgba(13, 27, 62, 0.28);
+  overflow: hidden;
+}
+
+.fidcard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 3cqw;
+}
+
+.fidcard-logo {
+  flex: none;
+}
+
+.fidcard-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+  color: #fff;
+  font-weight: 800;
+  font-size: 7cqw;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.fidcard-logo-icon {
+  width: 6.4cqw;
+  height: 6.4cqw;
+  object-fit: contain;
+}
+
+.fidcard-flex {
+  margin: 0.8cqw 0 0;
+  color: #fff;
+  font-size: 2cqw;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+}
+
+.fidcard-titulos {
+  text-align: right;
+}
+
+.fidcard-titulo {
+  margin: 0;
+  color: #fff;
+  font-size: 4.4cqw;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.fidcard-subtitulo {
+  margin: 0.8cqw 0 0;
+  color: #f07e3a;
+  font-size: 2.7cqw;
+  font-weight: 700;
+}
+
+.fidcard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.2cqw;
+}
+
+.fidcard-casilla {
+  background: #fff;
+  border-radius: 1.4cqw;
+  aspect-ratio: 291 / 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1cqw;
+  font-size: 2.4cqw;
+  font-weight: 700;
+  color: #0d1b3e;
+  text-align: center;
+  padding: 0 1cqw;
+}
+
+.fidcard-casilla-regalo {
+  color: #185fa5;
+}
+
+.fidcard-icon {
+  width: 3.6cqw;
+  height: 3.6cqw;
+  object-fit: contain;
+  flex: none;
+}
+
+.fidcard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fidcard-web {
+  margin: 0;
+  color: #fff;
+  font-size: 2.7cqw;
+  font-weight: 800;
+}
+
+.fidcard-social {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqw;
+}
+
+.fidcard-social-icon {
+  width: 5.4cqw;
+  height: 5.4cqw;
+  border-radius: 50%;
+  background: #fff;
+  color: #0d1b3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fidcard-social-icon svg {
+  width: 60%;
+  height: 60%;
+}
+
+.fidcard-social-icon-f {
+  font-weight: 800;
+  font-size: 3cqw;
+  font-family: Georgia, serif;
+}
+
+.fidcard-social-label {
+  margin: 0;
+  color: #fff;
+  font-size: 2.7cqw;
+  font-weight: 700;
+}
+
+.fidelidad-card-nota {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.fidelidad-folio-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: #f5f6fa;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+
+.fidelidad-folio-label {
+  font-size: 11px;
+  color: #8b93a7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fidelidad-folio-valor {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0d1b3e;
+  letter-spacing: 0.02em;
 }
 
 /* ---------- Alerta urgente (barra de error reutilizable en todos los paneles) ---------- */

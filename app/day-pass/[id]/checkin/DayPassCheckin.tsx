@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 type DayPassRow = {
   id: string;
   folio: number;
-  tipo: "coworking" | "oficina_privada";
+  tipo: "coworking" | "oficina_privada" | "working_desk";
   centro: string;
   nombre: string;
   fecha: string; // 'YYYY-MM-DD'
@@ -106,7 +106,7 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
 
   const hoy = hoyISO();
   const folioMostrar = "NODUS-" + String(pase.folio).padStart(3, "0");
-  const tipoLabel = pase.tipo === "coworking" ? "Coworking" : "Oficina privada";
+  const tipoLabel = pase.tipo === "coworking" ? "Coworking" : pase.tipo === "working_desk" ? "Working desk" : "Oficina privada";
 
   let estado: "usado" | "vencido" | "futuro" | "listo" = "listo";
   if (pase.usado) estado = "usado";

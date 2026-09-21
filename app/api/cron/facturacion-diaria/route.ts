@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoSPEI } from "@/lib/openpay";
 import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
+import { totalAdicionalesMensuales } from "@/lib/adicionales";
+import { enviarAvisoPago } from "@/lib/correosPagos";
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -17,6 +19,15 @@ type Resumen = {
   suspendidos: number;
   errores: string[];
 };
+
+// Lo que se cobra cada mes: la renta del contrato MÁS los adicionales de cobro
+// mensual (hoy el Estacionamiento, ver lib/adicionales.ts). El primer mes ya
+// lo cobró ContratoModal.tsx → aprobar(), por eso esto aplica desde el
+// siguiente cobro.
+async function montoMensualConAdicionales(admin: Admin, contratoId: string, renta: number): Promise<number> {
+  const { data } = await admin.from("contrato_adicionales").select("concepto, monto").eq("contrato_id", contratoId);
+  return Math.round((renta + totalAdicionalesMensuales(data || [])) * 100) / 100;
+}
 
 // Crea una factura pendiente y su cargo SPEI (mismo mecanismo que la renta
 // del flujo normal de abajo). Devuelve el id de la factura.
@@ -91,7 +102,7 @@ async function procesarMensual(
   resumen: Resumen,
   ctx: {
     userId: string;
-    contrato: { renta_mensual: number | null; fecha_inicio: string | null; fecha_vencimiento: string | null };
+    contrato: { id: string; renta_mensual: number | null; fecha_inicio: string | null; fecha_vencimiento: string | null };
     cliente: { nombre: string | null; email: string | null; centro: string | null };
     hoy: Date;
     hoyISO: string;
@@ -125,15 +136,21 @@ async function procesarMensual(
 
   // ---------- Días 1 al 10: facturar la renta del mes (una sola vez) ----------
   if (!facturaRenta && diaHoy <= DIA_LIMITE_PAGO_MENSUAL) {
+    // Renta + adicionales de cobro mensual (Estacionamiento). El concepto se
+    // deja igual porque es la llave para no facturar dos veces el mismo mes.
+    const montoMes = await montoMensualConAdicionales(admin, contrato.id, renta);
     const facturaId = await crearFacturaConSpei(admin, resumen, {
       userId,
       cliente,
-      monto: renta,
+      monto: montoMes,
       concepto: conceptoRenta,
       folio: `FAC-${sufijoFolio}`,
       hoyISO,
       fechaVencimiento: fechaLimiteISO,
-      notaSpei: "Cargo SPEI generado automático (renta mensual, mes a mes)",
+      notaSpei:
+        montoMes !== renta
+          ? "Cargo SPEI generado automático (renta mensual + adicionales, mes a mes)"
+          : "Cargo SPEI generado automático (renta mensual, mes a mes)",
     });
 
     if (facturaId && cliente.centro && centroTieneUnifi(cliente.centro)) {
@@ -162,7 +179,7 @@ async function procesarMensual(
         centro: cliente.centro,
         user_id: userId,
         tipo: "pago_hoy",
-        mensaje: `💰 Tu renta de ${nombreMes} ya está disponible. Tienes hasta el día ${DIA_LIMITE_PAGO_MENSUAL} para pagarla sin recargo.`,
+        mensaje: `💰 Tu renta${montoMes !== renta ? " y adicionales" : ""} de ${nombreMes} ya está disponible. Tienes hasta el día ${DIA_LIMITE_PAGO_MENSUAL} para pagarla sin recargo.`,
       });
     }
     return;
@@ -177,6 +194,30 @@ async function procesarMensual(
       user_id: userId,
       tipo: "recordatorio_pago",
       mensaje: `📅 Recuerda pagar tu renta a más tardar el día ${DIA_LIMITE_PAGO_MENSUAL} para evitar el recargo del 3%.`,
+    });
+    await enviarAvisoPago({
+      to: cliente.email,
+      nombre: cliente.nombre,
+      tipo: "antes",
+      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+      diasFaltan: 2,
+    });
+    resumen.recordatorios++;
+  }
+
+  // ---------- Último día para pagar sin recargo ----------
+  if (diaHoy === DIA_LIMITE_PAGO_MENSUAL && !(await yaExisteNotifHoy(admin, userId, "recordatorio_pago", hoyISO))) {
+    await admin.from("notificaciones").insert({
+      centro: cliente.centro,
+      user_id: userId,
+      tipo: "recordatorio_pago",
+      mensaje: "⏰ Hoy es el último día para pagar tu renta sin recargo.",
+    });
+    await enviarAvisoPago({
+      to: cliente.email,
+      nombre: cliente.nombre,
+      tipo: "ultimo_dia",
+      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
     });
     resumen.recordatorios++;
   }
@@ -220,6 +261,18 @@ function inicioFinDeMes(fecha: Date) {
   const inicio = new Date(fecha.getFullYear(), fecha.getMonth(), 1).toISOString().split("T")[0];
   const fin = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).toISOString().split("T")[0];
   return { inicio, fin };
+}
+
+async function yaExisteNotifHoy(admin: ReturnType<typeof createAdminClient>, userId: string, tipo: string, hoyISO: string) {
+  const { data } = await admin
+    .from("notificaciones")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("tipo", tipo)
+    .gte("created_at", `${hoyISO}T00:00:00`)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
 }
 
 async function yaExisteNotifEsteMs(admin: ReturnType<typeof createAdminClient>, userId: string, tipo: string) {
@@ -321,6 +374,9 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      // Renta + adicionales de cobro mensual (Estacionamiento).
+      const montoMes = await montoMensualConAdicionales(admin, contrato.id, Number(contrato.renta_mensual) || 0);
+
       // ---------- Recordatorio X días antes ----------
       const diaRecordatorio = diaPago - DIAS_RECORDATORIO_ANTES;
       if (diaRecordatorio >= 1 && diaHoy === diaRecordatorio) {
@@ -332,21 +388,14 @@ export async function POST(req: NextRequest) {
             tipo: "recordatorio_pago",
             mensaje: `📅 No se te olvide, tu fecha de pago es el día ${diaPago} de este mes.`,
           });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "recordatorio_pago",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  diaPago,
-                  monto: contrato.renta_mensual,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
+          await enviarAvisoPago({
+            to: cliente.email,
+            nombre: cliente.nombre,
+            tipo: "antes",
+            monto: montoMes,
+            diaPago,
+            diasFaltan: DIAS_RECORDATORIO_ANTES,
+          });
           resumen.recordatorios++;
         }
       }
@@ -371,7 +420,7 @@ export async function POST(req: NextRequest) {
               user_id: userId,
               folio: `FAC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
               concepto: `Renta mensual - ${nombreMes}`,
-              monto: contrato.renta_mensual,
+              monto: montoMes,
               fecha_emision: hoyISO,
               fecha_vencimiento: hoyISO,
               estado: "pendiente",
@@ -386,7 +435,7 @@ export async function POST(req: NextRequest) {
           if (facturaId) {
             try {
               const cargo = await crearCargoSPEI({
-                monto: Number(contrato.renta_mensual),
+                monto: Number(montoMes),
                 descripcion: `Renta mensual - ${nombreMes}`,
                 ordenId: facturaId,
                 nombre: cliente.nombre || "Cliente Nodus",
@@ -395,7 +444,7 @@ export async function POST(req: NextRequest) {
               await admin.from("pagos").insert({
                 factura_id: facturaId,
                 user_id: userId,
-                monto: contrato.renta_mensual,
+                monto: montoMes,
                 estado: "pendiente_spei",
                 notas: "Cargo SPEI generado automático (cobranza mensual)",
                 openpay_charge_id: cargo.id,
@@ -441,20 +490,7 @@ export async function POST(req: NextRequest) {
             tipo: "pago_hoy",
             mensaje: `💰 Hoy es tu fecha de pago (día ${diaPago}).`,
           });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "fecha_pago_hoy",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  monto: contrato.renta_mensual,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
+          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoMes, diaPago });
         }
       }
 

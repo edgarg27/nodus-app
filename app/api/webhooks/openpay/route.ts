@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { consultarCargo } from "@/lib/openpay";
+import { enviarGraciasPorPago } from "@/lib/correosPagos";
 
 // Openpay manda un POST aquí cuando cambia el estatus de un cargo. Nunca
 // confiamos en el contenido del webhook a ciegas — siempre se vuelve a
@@ -54,9 +55,11 @@ export async function POST(req: NextRequest) {
         await admin.from("notificaciones").insert({
           centro: factura.centro,
           tipo: "pago_confirmado",
-          mensaje: `💰 Se confirmó el pago de ${cliente?.nombre || "un cliente"} — factura ${factura.folio} · $${Number(factura.monto).toLocaleString("es-MX")}`,
+          mensaje: `💰 Se confirmó el pago de ${cliente?.nombre || "un cliente"} — factura ${factura.folio} · ${Number(factura.monto).toLocaleString("es-MX")}`,
         });
       }
+
+      await enviarGraciasPorPago(admin, pago.id);
     }
   } catch (err) {
     console.error("Error procesando webhook de Openpay:", err);

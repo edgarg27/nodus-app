@@ -11,8 +11,10 @@ const LABEL_TIPO: Record<string, string> = {
   sala_juntas: "Sala de juntas",
   coworking: "Coworking",
   oficina_privada: "Oficina privada",
+  working_desk: "Working desk",
   day_pass_coworking: "Day Pass · Coworking",
   day_pass_oficina_privada: "Day Pass · Oficina privada",
+  day_pass_working_desk: "Day Pass · Working desk",
 };
 
 export async function POST(req: NextRequest) {

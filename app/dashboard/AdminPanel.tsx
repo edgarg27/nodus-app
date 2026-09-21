@@ -18,7 +18,12 @@ type Cliente = {
   empresa: string | null;
   telefono: string | null;
   ocupantes_oficina: string | null;
+  dia_pago?: number | null;
 };
+
+// Centros que se pueden asignar a un cliente al editarlo (mismos que usa el
+// resto de la app).
+const CENTROS_CLIENTE = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 type Factura = {
   id: string;
@@ -107,6 +112,19 @@ export default function AdminPanel({
   const [formOficina, setFormOficina] = useState("");
   const [formTelefono, setFormTelefono] = useState("");
   const [formOcupantes, setFormOcupantes] = useState("");
+  // Edición completa (solo admin/gerente/superadmin, vía /api/gestion-clientes).
+  const puedeGestionarClientes = rol === "admin" || rol === "gerente" || rol === "superadmin";
+  const [formNombre, setFormNombre] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formRfc, setFormRfc] = useState("");
+  const [formDiaPago, setFormDiaPago] = useState("");
+  const [formCentro, setFormCentro] = useState("");
+  const [formActivo, setFormActivo] = useState(true);
+  const [errorDatos, setErrorDatos] = useState("");
+  const [enviandoReset, setEnviandoReset] = useState(false);
+  const [nuevaPassword, setNuevaPassword] = useState("");
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+  const [mensajeAcceso, setMensajeAcceso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [guardandoDatos, setGuardandoDatos] = useState(false);
   const [datosClienteEnviado, setDatosClienteEnviado] = useState(false);
   const [ticketsUrgentes, setTicketsUrgentes] = useState<{ id: string; folio: string; asunto: string; categoria: string }[]>([]);
@@ -271,6 +289,15 @@ export default function AdminPanel({
     setFormOficina(cliente.numero_oficina || "");
     setFormTelefono(cliente.telefono || "");
     setFormOcupantes(cliente.ocupantes_oficina || "");
+    setFormNombre(cliente.nombre || "");
+    setFormEmail(cliente.email || "");
+    setFormRfc(cliente.rfc || "");
+    setFormDiaPago(cliente.dia_pago != null ? String(cliente.dia_pago) : "");
+    setFormCentro(cliente.centro || "");
+    setFormActivo(cliente.activo !== false);
+    setErrorDatos("");
+    setMensajeAcceso(null);
+    setNuevaPassword("");
     setClienteSeleccionado(cliente);
     setLoadingDetalle(true);
     setErrorVoucher("");
@@ -321,8 +348,106 @@ export default function AdminPanel({
     setBorrandoVoucher(null);
   }
 
+  async function llamarGestionClientes(payload: Record<string, unknown>) {
+    const res = await fetch("/api/gestion-clientes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: clienteSeleccionado?.id, ...payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, data };
+  }
+
+  async function guardarDatosClienteCompleto() {
+    if (!clienteSeleccionado) return;
+    setGuardandoDatos(true);
+    setErrorDatos("");
+    try {
+      const { ok, data } = await llamarGestionClientes({
+        accion: "actualizar",
+        nombre: formNombre,
+        email: formEmail,
+        telefono: formTelefono,
+        empresa: formEmpresa,
+        rfc: formRfc,
+        diaPago: formDiaPago,
+        centro: formCentro,
+        numeroOficina: formOficina,
+        ocupantes: formOcupantes,
+        activo: formActivo,
+      });
+      if (!ok) {
+        setErrorDatos(data.error || "No se pudieron guardar los cambios");
+      } else {
+        const c = data.cliente;
+        const actualizado: Cliente = {
+          ...clienteSeleccionado,
+          nombre: c.nombre,
+          email: c.email,
+          telefono: c.telefono,
+          empresa: c.empresa,
+          rfc: c.rfc,
+          centro: c.centro,
+          numero_oficina: c.numero_oficina,
+          ocupantes_oficina: c.ocupantes_oficina,
+          dia_pago: c.dia_pago,
+          activo: c.activo,
+        };
+        setClienteSeleccionado(actualizado);
+        setClientes((prev) => prev.map((x) => (x.id === actualizado.id ? actualizado : x)));
+        setEditandoDatos(false);
+        setDatosClienteEnviado(true);
+        setTimeout(() => setDatosClienteEnviado(false), 1800);
+      }
+    } catch {
+      setErrorDatos("No se pudo conectar. Intenta de nuevo.");
+    }
+    setGuardandoDatos(false);
+  }
+
+  async function enviarCorreoRestablecer() {
+    if (!clienteSeleccionado) return;
+    setEnviandoReset(true);
+    setMensajeAcceso(null);
+    try {
+      const { ok, data } = await llamarGestionClientes({ accion: "restablecer_correo" });
+      setMensajeAcceso(
+        ok
+          ? { tipo: "ok", texto: `Se envió el correo para restablecer la contraseña a ${data.correo}.` }
+          : { tipo: "error", texto: data.error || "No se pudo enviar el correo" }
+      );
+    } catch {
+      setMensajeAcceso({ tipo: "error", texto: "No se pudo conectar. Intenta de nuevo." });
+    }
+    setEnviandoReset(false);
+  }
+
+  async function ponerPasswordNueva() {
+    if (!clienteSeleccionado) return;
+    if (nuevaPassword.length < 8) {
+      setMensajeAcceso({ tipo: "error", texto: "La contraseña debe tener al menos 8 caracteres" });
+      return;
+    }
+    if (!confirm(`¿Cambiar la contraseña de ${clienteSeleccionado.nombre}? La anterior dejará de funcionar.`)) return;
+    setGuardandoPassword(true);
+    setMensajeAcceso(null);
+    try {
+      const { ok, data } = await llamarGestionClientes({ accion: "poner_password", password: nuevaPassword });
+      if (ok) {
+        setNuevaPassword("");
+        setMensajeAcceso({ tipo: "ok", texto: "Contraseña cambiada. Ya puede entrar con la nueva." });
+      } else {
+        setMensajeAcceso({ tipo: "error", texto: data.error || "No se pudo cambiar la contraseña" });
+      }
+    } catch {
+      setMensajeAcceso({ tipo: "error", texto: "No se pudo conectar. Intenta de nuevo." });
+    }
+    setGuardandoPassword(false);
+  }
+
   async function guardarDatosCliente() {
     if (!clienteSeleccionado) return;
+    if (puedeGestionarClientes) return guardarDatosClienteCompleto();
     setGuardandoDatos(true);
     const { error } = await supabase
       .from("profiles")
@@ -952,14 +1077,6 @@ export default function AdminPanel({
               </button>
             </div>
 
-            <a
-              className="btn-enviar"
-              style={{ textDecoration: "none", display: "block", textAlign: "center", marginBottom: 8 }}
-              href={`/registrar-plan?clienteId=${clienteSeleccionado.id}`}
-            >
-              🧾 Cotizar
-            </a>
-
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="modal-seccion" style={{ margin: 0 }}>
                 📋 Datos del cliente
@@ -977,6 +1094,44 @@ export default function AdminPanel({
 
             {editandoDatos ? (
               <div className="form-card" style={{ padding: 0, border: "none" }}>
+                {puedeGestionarClientes && (
+                  <>
+                    <p className="sub-label">Nombre</p>
+                    <input value={formNombre} onChange={(e) => setFormNombre(e.target.value)} placeholder="Nombre completo" />
+                    <p className="sub-label">Correo (con el que entra)</p>
+                    <input
+                      type="email"
+                      value={formEmail}
+                      onChange={(e) => setFormEmail(e.target.value)}
+                      placeholder="correo@empresa.com"
+                    />
+                    <p className="sub-label">RFC</p>
+                    <input value={formRfc} onChange={(e) => setFormRfc(e.target.value)} placeholder="RFC" />
+                    <p className="sub-label">Centro</p>
+                    <select value={formCentro} onChange={(e) => setFormCentro(e.target.value)}>
+                      <option value="">Sin centro</option>
+                      {(formCentro && !CENTROS_CLIENTE.includes(formCentro) ? [formCentro, ...CENTROS_CLIENTE] : CENTROS_CLIENTE).map(
+                        (c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        )
+                      )}
+                    </select>
+                    <p className="sub-label">Día del mes que paga</p>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={formDiaPago}
+                      onChange={(e) => setFormDiaPago(e.target.value)}
+                      placeholder="Ej. 15"
+                    />
+                    <p style={{ fontSize: 11, color: "#aaa", margin: "2px 0 0" }}>
+                      Se aplica también a sus contratos vigentes. Los contratos mes a mes siempre pagan del 1 al 10.
+                    </p>
+                  </>
+                )}
                 <p className="sub-label">Empresa</p>
                 <input
                   value={formEmpresa}
@@ -1001,6 +1156,18 @@ export default function AdminPanel({
                   onChange={(e) => setFormOcupantes(e.target.value)}
                   placeholder="Ej. Juan Pérez, María López"
                 />
+                {puedeGestionarClientes && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#555", marginTop: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={formActivo}
+                      onChange={(e) => setFormActivo(e.target.checked)}
+                      style={{ width: "auto" }}
+                    />
+                    Cuenta activa
+                  </label>
+                )}
+                {errorDatos && <p style={{ color: "#A32D2D", fontSize: 12, margin: "6px 0 0" }}>{errorDatos}</p>}
                 <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                   <button
                     className={"btn-enviar" + (guardandoDatos ? " sending" : "") + (datosClienteEnviado ? " sent" : "")}
@@ -1122,6 +1289,17 @@ export default function AdminPanel({
                       {ct.archivo_url && (
                         <a className="ver-pdf-btn" href={ct.archivo_url} target="_blank" download>
                           📥 Ver PDF
+                        </a>
+                      )}
+                      {puedeGestionarClientes && (
+                        <a
+                          className="ver-pdf-btn"
+                          style={{ marginLeft: ct.archivo_url ? 8 : 0 }}
+                          href={`/contratos?contratoId=${ct.id}${
+                            clienteSeleccionado.centro ? `&centro=${encodeURIComponent(clienteSeleccionado.centro)}` : ""
+                          }`}
+                        >
+                          ✎ Editar contrato
                         </a>
                       )}
                     </div>
@@ -1388,6 +1566,52 @@ export default function AdminPanel({
                         </div>
                       </div>
                     ))}
+                  </>
+                )}
+
+                {puedeGestionarClientes && (
+                  <>
+                    <p className="panel-section-label" style={{ marginTop: 12 }}>
+                      Contraseña y acceso
+                    </p>
+                    <p style={{ fontSize: 11, color: "#aaa", margin: "0 0 4px" }}>
+                      Si el cliente perdió su contraseña, mándale un correo para restablecerla o ponle una nueva
+                      tú mismo (útil si el correo no le llega).
+                    </p>
+                    <button className="btn-enviar" onClick={enviarCorreoRestablecer} disabled={enviandoReset}>
+                      <span className="btn-enviar-text">
+                        {enviandoReset ? "Enviando..." : "🔑 Enviar correo para restablecer contraseña"}
+                      </span>
+                    </button>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <input
+                        type="text"
+                        value={nuevaPassword}
+                        onChange={(e) => setNuevaPassword(e.target.value)}
+                        placeholder="Contraseña nueva (mín. 8 caracteres)"
+                        autoComplete="off"
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        className="tel-borrar-btn"
+                        style={{ color: "#0d1b3e", fontWeight: 600 }}
+                        onClick={ponerPasswordNueva}
+                        disabled={guardandoPassword || !nuevaPassword}
+                      >
+                        {guardandoPassword ? "..." : "Guardar"}
+                      </button>
+                    </div>
+                    {mensajeAcceso && (
+                      <p
+                        style={{
+                          fontSize: 12,
+                          margin: "6px 0 0",
+                          color: mensajeAcceso.tipo === "ok" ? "#0F6E56" : "#A32D2D",
+                        }}
+                      >
+                        {mensajeAcceso.texto}
+                      </p>
+                    )}
                   </>
                 )}
 

@@ -3,6 +3,7 @@
 import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import MisReservaciones from "../mis-reservaciones/MisReservaciones";
 
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const HORAS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8am a 8pm
@@ -105,6 +106,9 @@ function ReservacionesInner() {
   const categoriaDesdeUrl: Categoria = searchParams.get("categoria") === "bolsa" ? "bolsa" : "sala";
   const contratoIdDesdeUrl = searchParams.get("contratoId") || "";
 
+  // Pestañas de arriba: reservar o ver mis reservaciones (antes era otra
+  // pantalla, /mis-reservaciones, que ahora redirige aquí con ?tab=mis).
+  const [vista, setVista] = useState<"reservar" | "mis">(searchParams.get("tab") === "mis" ? "mis" : "reservar");
   const [categoria, setCategoria] = useState<Categoria>(categoriaDesdeUrl);
   const [espacio, setEspacio] = useState("");
   const [inicioSemana, setInicioSemana] = useState(lunesDeLaSemana(new Date()));
@@ -563,10 +567,45 @@ function ReservacionesInner() {
             <p className="exito-mensaje">
               Tu solicitud está pendiente. Te avisaremos aquí y por correo en cuanto el centro la confirme.
             </p>
-            <button className="exito-btn" onClick={() => router.push("/mis-reservaciones")}>
+            <button
+              className="exito-btn"
+              onClick={() => {
+                setEnviado(false);
+                setVista("mis");
+              }}
+            >
               Ver mis reservaciones
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  const tabsVista = (
+    <div className="cal-espacio-tabs">
+      <button className={"cal-espacio-tab" + (vista === "reservar" ? " active" : "")} onClick={() => setVista("reservar")}>
+        Reservar
+      </button>
+      <button className={"cal-espacio-tab" + (vista === "mis" ? " active" : "")} onClick={() => setVista("mis")}>
+        Mis reservaciones
+      </button>
+    </div>
+  );
+
+  if (vista === "mis") {
+    return (
+      <div className="panel">
+        <div className="rep-header">
+          <a className="rep-back" href="/dashboard-cliente">
+            ← Regresar
+          </a>
+          <p className="rep-title">Sala de Juntas</p>
+          <p className="rep-sub">{miCentro || "Mis reservaciones"}</p>
+        </div>
+        <div className="sub-content">
+          {tabsVista}
+          <MisReservaciones onHacerReservacion={() => setVista("reservar")} />
         </div>
       </div>
     );
@@ -583,6 +622,7 @@ function ReservacionesInner() {
       </div>
 
       <div className="sub-content">
+        {tabsVista}
         {puedeMostrarSala && puedeMostrarBolsa && (
           <div className="cal-espacio-tabs">
             <button
