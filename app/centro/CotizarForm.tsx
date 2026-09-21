@@ -904,6 +904,9 @@ export default function CotizarForm({
   const [comentariosPrecio, setComentariosPrecio] = useState("");
   const [precioPactado, setPrecioPactado] = useState("");
   const [depositoGarantia, setDepositoGarantia] = useState("");
+  // Promoción: no se cobra depósito en garantía. No borra el monto capturado
+  // (depositoGarantia) para poder recuperarlo al desmarcar; solo lo anula.
+  const [sinDepositoPromo, setSinDepositoPromo] = useState(false);
   const [cargoRecurrente, setCargoRecurrente] = useState(true);
   const [comentarios, setComentarios] = useState("");
   // Forma de pago: solo Oficina Privada puede elegir mes a mes; Coworking
@@ -953,7 +956,8 @@ export default function CotizarForm({
 
   const precioPactadoNum = Number(precioPactado) || 0;
   const precioListaNum = Number(precioLista) || 0;
-  const depositoNum = Number(depositoGarantia) || 0;
+  const depositoNum = sinDepositoPromo ? 0 : Number(depositoGarantia) || 0;
+  const notaSinDepositoPromo = "Sin depósito en garantía por promoción";
   // El depósito se cobra con IVA al aprobar el contrato (ver
   // ContratoModal.tsx → aprobar()) — se muestra aquí igual para que el
   // "Total primer pago" que ve el staff/cliente ya refleje el monto real
@@ -1728,7 +1732,8 @@ export default function CotizarForm({
         fecha_fin: fechaFin,
         precio_lista: precioListaNum,
         descuento_porcentaje: Number(descuentoPorcentaje) || 0,
-        comentarios_precio: comentariosPrecio || null,
+        comentarios_precio:
+          [comentariosPrecio.trim(), sinDepositoPromo ? notaSinDepositoPromo : ""].filter(Boolean).join(" · ") || null,
         precio_pactado: precioPactadoNum,
         iva_monto: ivaMonto,
         precio_neto: precioNeto,
@@ -1934,10 +1939,15 @@ export default function CotizarForm({
         // eso NO entra a la base sobre la que se calcula el IVA de abajo;
         // el resto (paquete/oficina y demás adicionales) sigue igual. El
         // total resultante es el mismo de antes, solo cambia cómo se ve.
-        const subtotalConAdicionales = round2(precioPactadoNum + totalAdicionalesConIva);
+        // Mes a mes: el PowerPoint que recibe el cliente es de UN mes
+        // (cantidad 1 y montos mensuales), no del periodo completo — la
+        // cotización/contrato guardados arriba sí conservan el periodo
+        // completo, que es lo que espera la aceptación para dividirlo.
+        const precioPactadoPptx = round2(precioPactadoNum / divisorMes);
+        const subtotalConAdicionales = round2(precioPactadoPptx + totalAdicionalesConIva);
         const baseGravable = adicionalesDraft
           .filter((a) => !llevaIva(a.concepto))
-          .reduce((s, a) => s + a.costo_unitario * a.cantidad, precioPactadoNum);
+          .reduce((s, a) => s + a.costo_unitario * a.cantidad, precioPactadoPptx);
         const ivaMontoConAdicionales = round2(baseGravable * 0.16);
         const totalConAdicionales = round2(subtotalConAdicionales + ivaMontoConAdicionales);
         // Cada adicional se lista en su propio renglón dentro de la tabla
@@ -1954,16 +1964,16 @@ export default function CotizarForm({
             cotizacionComercialId: cotizacion.id,
             tipoEspacio,
             descripcion: nombreEspacio,
-            cantidad: cantidadPeriodo ? Number(cantidadPeriodo) : 1,
+            cantidad: esMensual ? 1 : cantidadPeriodo ? Number(cantidadPeriodo) : 1,
             personas: numeroPersonas ? Number(numeroPersonas) : 1,
             horasSalaJuntas: esRenovacion ? Number(horasSalaJuntasManual) || 0 : paquete?.incluye_horas_sala_juntas ?? 0,
-            precioUnitario: tarifaUnitaria ?? precioPactadoNum,
-            totalFila: precioPactadoNum,
+            precioUnitario: esMensual ? precioPactadoPptx : tarifaUnitaria ?? precioPactadoNum,
+            totalFila: precioPactadoPptx,
             subtotal: subtotalConAdicionales,
             ivaMonto: ivaMontoConAdicionales,
             total: totalConAdicionales,
             nombreCotizacion: `${nombreParaMostradorEspacio} · ${tipoEspacio}`,
-            notas: `${nombreEspacio} · ${fechaInicio}${fechaFin ? ` a ${fechaFin}` : ""}`,
+            notas: `${nombreEspacio} · ${fechaInicio}${fechaFin ? ` a ${fechaFin}` : ""}${esMensual ? " · Pago mes a mes (cotización de 1 mes)" : ""}${sinDepositoPromo ? ` · ${notaSinDepositoPromo}` : ""}`,
             nombreDestinatario: nombreParaMostradorEspacio,
             adicionales: adicionalesDraft.map((a) => ({
               concepto: a.concepto,
@@ -3111,11 +3121,19 @@ export default function CotizarForm({
                 // se sigue guardando sin IVA en depositoGarantia — igual
                 // que antes — dividiendo entre 1.16 lo que se escriba aquí.
                 value={depositoGarantia === "" ? "" : depositoConIvaNum}
+                disabled={sinDepositoPromo}
                 onChange={(e) => {
                   const conIva = Number(e.target.value) || 0;
                   setDepositoGarantia(e.target.value === "" ? "" : String(round2(conIva / 1.16)));
                 }}
               />
+              <Checkbox
+                checked={sinDepositoPromo}
+                onChange={setSinDepositoPromo}
+                style={{ fontSize: 12, color: "#555", marginTop: 6 }}
+              >
+                No se cobra depósito en garantía por promoción
+              </Checkbox>
             </div>
           </div>
           <textarea
