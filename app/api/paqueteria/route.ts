@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCorreo } from "@/lib/email";
+import { ROLES_PAQUETERIA } from "@/lib/paqueteria";
 
 // Recepción (staff) registra un paquete o correspondencia para un cliente.
 // Se guarda, se le avisa al cliente en su panel y por correo.
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!miProfile || !ROLES_PAQUETERIA.includes(miProfile.rol)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
