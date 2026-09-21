@@ -75,6 +75,7 @@ export async function middleware(req: NextRequest) {
     "/logros",
     "/mis-encuestas",
     "/mis-visitas",
+    "/mi-paqueteria",
     "/calendario-eventos",
   ].some((p) => path === p || path.startsWith(p + "/"));
   const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin;
@@ -180,6 +181,7 @@ export const config = {
     "/experiencia-cliente/:path*",
     "/mis-encuestas/:path*",
     "/mis-visitas/:path*",
+    "/mi-paqueteria/:path*",
     "/ingresos-centro/:path*",
     "/day-pass/:id/checkin",
     "/login",

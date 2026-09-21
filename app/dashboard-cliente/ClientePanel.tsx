@@ -343,6 +343,8 @@ export default function ClientePanel({
       router.push("/mis-encuestas");
     } else if (n.tipo === "reservacion_rechazada" || n.tipo === "reservacion_confirmada") {
       router.push("/reservaciones?tab=mis");
+    } else if (n.tipo === "paquete_recibido") {
+      router.push("/mi-paqueteria");
     }
   }
 
@@ -676,6 +678,12 @@ export default function ClientePanel({
               👥
             </span>
             <span className="quick-name">Visitas</span>
+          </a>
+          <a className="quick-card" href="/mi-paqueteria">
+            <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
+              📦
+            </span>
+            <span className="quick-name">Paquetes</span>
           </a>
           <a className="quick-card" href="/calendario-eventos">
             <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
