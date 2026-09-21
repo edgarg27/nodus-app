@@ -4677,6 +4677,14 @@ body {
   margin-top: 1px;
 }
 
+.invitado-intro-icon-img {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  margin-top: 1px;
+}
+
 .invitado-menu-list {
   display: flex;
   flex-direction: column;
@@ -4701,6 +4709,7 @@ body {
   border-radius: 14px;
   padding: 14px 16px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   width: 100%;
   box-shadow: 0 1px 2px rgba(7, 28, 75, 0.04);
@@ -4733,6 +4742,12 @@ body {
 
 .invitado-menu-item.daypass .invitado-menu-icon {
   background: rgba(240, 126, 58, 0.14);
+}
+
+.invitado-menu-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .invitado-menu-text {
@@ -4792,51 +4807,157 @@ body {
   color: #fff;
 }
 
-/* ---------- Tarjeta de fidelidad (placeholder visual — se reemplaza cuando
-   llegue el diseño final de la "tarjetita" de 9 casillas) ---------- */
-.fidelidad-card {
-  background: linear-gradient(135deg, #0d1b3e 0%, #16295e 100%);
-  border-radius: 18px;
-  padding: 20px;
+/* ---------- Tarjeta de fidelidad (diseño de marca, ver FidelidadCard.tsx).
+   Usa container queries (cqw) para que el layout de logo+título+grid
+   escale de forma proporcional sin importar el ancho del contenedor
+   (móvil angosto o el panel de escritorio). ---------- */
+.fidcard {
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 1050 / 600;
+  border-radius: 14px;
+  background: radial-gradient(circle at 82% 78%, #1e3c72 0%, #0d1b3e 55%, #091430 100%);
+  padding: 5cqw 5.5cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 10px 24px rgba(13, 27, 62, 0.28);
+  overflow: hidden;
+}
+
+.fidcard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 3cqw;
+}
+
+.fidcard-logo {
+  flex: none;
+}
+
+.fidcard-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
   color: #fff;
-  box-shadow: 0 10px 24px rgba(13, 27, 62, 0.22);
+  font-weight: 800;
+  font-size: 7cqw;
+  letter-spacing: 0.01em;
+  line-height: 1;
 }
 
-.fidelidad-card-titulo {
-  font-size: 14px;
+.fidcard-logo-icon {
+  width: 6.4cqw;
+  height: 6.4cqw;
+  object-fit: contain;
+}
+
+.fidcard-flex {
+  margin: 0.8cqw 0 0;
+  color: #fff;
+  font-size: 2cqw;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+}
+
+.fidcard-titulos {
+  text-align: right;
+}
+
+.fidcard-titulo {
+  margin: 0;
+  color: #fff;
+  font-size: 4.4cqw;
   font-weight: 700;
-  margin: 0 0 14px;
+  line-height: 1.15;
 }
 
-.fidelidad-grid {
+.fidcard-subtitulo {
+  margin: 0.8cqw 0 0;
+  color: #f07e3a;
+  font-size: 2.7cqw;
+  font-weight: 700;
+}
+
+.fidcard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 2.2cqw;
 }
 
-.fidelidad-casilla {
-  aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1.5px dashed rgba(255, 255, 255, 0.35);
-  border-radius: 12px;
+.fidcard-casilla {
+  background: #fff;
+  border-radius: 1.4cqw;
+  aspect-ratio: 291 / 55;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  gap: 1cqw;
+  font-size: 2.4cqw;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
+  color: #0d1b3e;
+  text-align: center;
+  padding: 0 1cqw;
 }
 
-.fidelidad-casilla-llena {
-  background: rgba(43, 189, 126, 0.22);
-  border: 1.5px solid #2bbd7e;
-  color: #fff;
+.fidcard-casilla-regalo {
+  color: #185fa5;
 }
 
-.fidelidad-casilla-regalo {
-  background: rgba(240, 126, 58, 0.22);
-  border: 1.5px solid #f07e3a;
+.fidcard-icon {
+  width: 3.6cqw;
+  height: 3.6cqw;
+  object-fit: contain;
+  flex: none;
+}
+
+.fidcard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fidcard-web {
+  margin: 0;
   color: #fff;
+  font-size: 2.7cqw;
+  font-weight: 800;
+}
+
+.fidcard-social {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqw;
+}
+
+.fidcard-social-icon {
+  width: 5.4cqw;
+  height: 5.4cqw;
+  border-radius: 50%;
+  background: #fff;
+  color: #0d1b3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fidcard-social-icon svg {
+  width: 60%;
+  height: 60%;
+}
+
+.fidcard-social-icon-f {
+  font-weight: 800;
+  font-size: 3cqw;
+  font-family: Georgia, serif;
+}
+
+.fidcard-social-label {
+  margin: 0;
+  color: #fff;
+  font-size: 2.7cqw;
+  font-weight: 700;
 }
 
 .fidelidad-card-nota {

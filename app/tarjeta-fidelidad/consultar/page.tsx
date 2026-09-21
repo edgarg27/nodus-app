@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LABEL_TIPO_ESPACIO_FIDELIDAD, TipoEspacioFidelidad, calcularRegalo, type SelloFidelidad } from "@/lib/fidelidad";
+import { LABEL_TIPO_ESPACIO_FIDELIDAD, calcularRegalo, type SelloFidelidad } from "@/lib/fidelidad";
+import FidelidadCard from "@/app/components/FidelidadCard";
 
 type TarjetaConsulta = {
   folio: number;
@@ -70,25 +71,12 @@ export default function ConsultarTarjetaFidelidadPage() {
         </form>
 
         {tarjeta && (
-          <div className="fidelidad-card" style={{ marginTop: 16 }}>
-            <p className="fidelidad-card-titulo">
+          <>
+            <p className="sub-label" style={{ marginTop: 4 }}>
               Hola, {tarjeta.nombre.split(" ")[0]} · {tarjeta.centro}
             </p>
-            <div className="fidelidad-grid">
-              {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
-                const sello = tarjeta.sellos.find((s) => s.numero === n);
-                const esRegalo = n === 9;
-                return (
-                  <div
-                    key={n}
-                    className={`fidelidad-casilla${sello ? " fidelidad-casilla-llena" : ""}${esRegalo ? " fidelidad-casilla-regalo" : ""}`}
-                  >
-                    {esRegalo ? "🎁" : sello ? TIPOS_ICONO[sello.tipo_espacio] : n}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="fidelidad-card-nota">
+            <FidelidadCard sellos={tarjeta.sellos} regalo={regalo} />
+            <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
               {tarjeta.sellos.length}/8 sellos · {LABEL_ESTADO[tarjeta.estado]}
             </p>
             {regalo && (
@@ -98,16 +86,9 @@ export default function ConsultarTarjetaFidelidadPage() {
                 {regalo.detalle ? ` (${regalo.detalle})` : ""}
               </p>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
-
-const TIPOS_ICONO: Record<TipoEspacioFidelidad, string> = {
-  sala_juntas: "🤝",
-  coworking: "💻",
-  oficina_privada: "🏢",
-  working_desk: "🪑",
-};

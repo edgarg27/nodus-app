@@ -54,52 +54,54 @@ type TipoSolicitud =
   | "day_pass_oficina_privada"
   | "day_pass_working_desk";
 
+// `icono` es la ruta a un icono real (ver /public/images/icons), no un
+// emoji. Los Day Pass reusan el icono de su mismo tipo de espacio.
 const TIPOS: { id: TipoSolicitud; icono: string; label: string; desc: string; esDayPass: boolean }[] = [
   {
     id: "sala_juntas",
-    icono: "🤝",
+    icono: "/images/icons/sala-juntas.png",
     label: "Agendar sala de juntas",
     desc: "Reserva un horario para tu junta o reunión",
     esDayPass: false,
   },
   {
     id: "coworking",
-    icono: "💻",
+    icono: "/images/icons/coworking.png",
     label: "Agendar coworking",
     desc: "Aparta tu espacio en el área de coworking",
     esDayPass: false,
   },
   {
     id: "oficina_privada",
-    icono: "🏢",
+    icono: "/images/icons/oficina-privada.png",
     label: "Agendar oficina privada",
     desc: "Solicita una oficina privada para tu equipo",
     esDayPass: false,
   },
   {
     id: "working_desk",
-    icono: "🪑",
+    icono: "/images/icons/working-desk.png",
     label: "Agendar working desk",
     desc: "Aparta tu escritorio individual",
     esDayPass: false,
   },
   {
     id: "day_pass_coworking",
-    icono: "🎫",
+    icono: "/images/icons/coworking.png",
     label: "Day Pass — Coworking",
     desc: "Acceso de un día al área de coworking",
     esDayPass: true,
   },
   {
     id: "day_pass_oficina_privada",
-    icono: "🎟️",
+    icono: "/images/icons/oficina-privada.png",
     label: "Day Pass — Oficina privada",
     desc: "Acceso de un día a una oficina privada",
     esDayPass: true,
   },
   {
     id: "day_pass_working_desk",
-    icono: "🪪",
+    icono: "/images/icons/working-desk.png",
     label: "Day Pass — Working Desk",
     desc: "Acceso de un día a un escritorio individual",
     esDayPass: true,
@@ -248,8 +250,8 @@ export default function AgendarInvitadoPage() {
         <p className="rep-title">Nodus Flex Center</p>
         <p className="rep-sub">
           {paso === "menu" && "¿Qué te gustaría hacer?"}
-          {paso === "datos" && tipoInfo && `${tipoInfo.icono} ${tipoInfo.label}`}
-          {paso === "horario" && tipoInfo && `${tipoInfo.icono} ${tipoInfo.label}`}
+          {paso === "datos" && tipoInfo && tipoInfo.label}
+          {paso === "horario" && tipoInfo && tipoInfo.label}
           {paso === "enviado" && "Solicitud enviada"}
         </p>
       </div>
@@ -269,7 +271,9 @@ export default function AgendarInvitadoPage() {
             <div className="invitado-menu-list">
               {TIPOS.filter((t) => !t.esDayPass).map((t) => (
                 <button key={t.id} className="invitado-menu-item" onClick={() => elegirTipo(t.id)}>
-                  <span className="invitado-menu-icon">{t.icono}</span>
+                  <span className="invitado-menu-icon">
+                    <img src={t.icono} alt="" className="invitado-menu-icon-img" />
+                  </span>
                   <span className="invitado-menu-text">
                     <p className="invitado-menu-title">{t.label}</p>
                     <p className="invitado-menu-desc">{t.desc}</p>
@@ -283,7 +287,9 @@ export default function AgendarInvitadoPage() {
             <div className="invitado-menu-list">
               {TIPOS.filter((t) => t.esDayPass).map((t) => (
                 <button key={t.id} className="invitado-menu-item daypass" onClick={() => elegirTipo(t.id)}>
-                  <span className="invitado-menu-icon">{t.icono}</span>
+                  <span className="invitado-menu-icon">
+                    <img src={t.icono} alt="" className="invitado-menu-icon-img" />
+                  </span>
                   <span className="invitado-menu-text">
                     <p className="invitado-menu-title">{t.label}</p>
                     <p className="invitado-menu-desc">{t.desc}</p>
@@ -294,7 +300,9 @@ export default function AgendarInvitadoPage() {
             </div>
 
             <a className="invitado-menu-item daypass" href="/tarjeta-fidelidad">
-              <span className="invitado-menu-icon">💳</span>
+              <span className="invitado-menu-icon">
+                <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="invitado-menu-icon-img" />
+              </span>
               <span className="invitado-menu-text">
                 <p className="invitado-menu-title">¿Eres cliente frecuente?</p>
                 <p className="invitado-menu-desc">Pide tu tarjeta de fidelidad</p>

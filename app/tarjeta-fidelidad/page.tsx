@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import FidelidadCard from "@/app/components/FidelidadCard";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -10,7 +10,6 @@ const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Pu
 type Paso = "intro" | "datos" | "enviado";
 
 export default function TarjetaFidelidadPage() {
-  const supabase = createClient();
   const [paso, setPaso] = useState<Paso>("intro");
 
   const [form, setForm] = useState({
@@ -45,19 +44,31 @@ export default function TarjetaFidelidadPage() {
     }
 
     setEnviando(true);
-    const { data, error: insertError } = await supabase
-      .from("tarjetas_fidelidad")
-      .insert({
-        centro: form.centro,
-        nombre: form.nombre.trim(),
-        telefono: form.telefono.trim(),
-        email: form.email.trim() || null,
-      })
-      .select("folio")
-      .single();
+    let data: { folio: number } | null = null;
+    try {
+      const res = await fetch("/api/tarjeta-fidelidad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          centro: form.centro,
+          nombre: form.nombre.trim(),
+          telefono: form.telefono.trim(),
+          email: form.email.trim(),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.folio) data = { folio: json.folio };
+      else if (json.error) {
+        setEnviando(false);
+        setError(json.error);
+        return;
+      }
+    } catch {
+      // cae al mensaje genérico de abajo
+    }
     setEnviando(false);
 
-    if (insertError || !data) {
+    if (!data) {
       setError("No se pudo crear tu tarjeta. Intenta de nuevo en un momento.");
       return;
     }
@@ -124,24 +135,17 @@ export default function TarjetaFidelidadPage() {
         {paso === "intro" && (
           <>
             <div className="invitado-intro">
-              <span className="invitado-intro-icon">💳</span>
+              <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="invitado-intro-icon-img" />
               <span>
                 ¿Eres cliente frecuente? Junta 8 sellos por tus rentas y la 9ª casilla es un regalo — de lo que más
                 hayas rentado.
               </span>
             </div>
 
-            <div className="fidelidad-card">
-              <p className="fidelidad-card-titulo">Tu tarjeta de fidelidad</p>
-              <div className="fidelidad-grid">
-                {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
-                  <div key={n} className={`fidelidad-casilla${n === 9 ? " fidelidad-casilla-regalo" : ""}`}>
-                    {n === 9 ? "🎁" : n}
-                  </div>
-                ))}
-              </div>
-              <p className="fidelidad-card-nota">La casilla 9 es gratis: el espacio que más hayas rentado en tus 8 visitas</p>
-            </div>
+            <FidelidadCard />
+            <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
+              La casilla 9 es gratis: el espacio que más hayas rentado en tus 8 visitas
+            </p>
 
             <button className="reservar-btn" onClick={() => setPaso("datos")}>
               Pedir mi tarjeta

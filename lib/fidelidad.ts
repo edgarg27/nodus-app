@@ -4,11 +4,13 @@
 
 export type TipoEspacioFidelidad = "sala_juntas" | "coworking" | "oficina_privada" | "working_desk";
 
+// `icono` es la ruta a un icono real (ver /public/images/icons), no un
+// emoji — se usa en <img>, así que no es válido dentro de <option>.
 export const TIPOS_ESPACIO_FIDELIDAD: { id: TipoEspacioFidelidad; icono: string; label: string }[] = [
-  { id: "sala_juntas", icono: "🤝", label: "Sala de juntas" },
-  { id: "coworking", icono: "💻", label: "Coworking" },
-  { id: "oficina_privada", icono: "🏢", label: "Oficina privada" },
-  { id: "working_desk", icono: "🪑", label: "Working desk" },
+  { id: "sala_juntas", icono: "/images/icons/sala-juntas.png", label: "Sala de juntas" },
+  { id: "coworking", icono: "/images/icons/coworking.png", label: "Coworking" },
+  { id: "oficina_privada", icono: "/images/icons/oficina-privada.png", label: "Oficina privada" },
+  { id: "working_desk", icono: "/images/icons/working-desk.png", label: "Working desk" },
 ];
 
 export const LABEL_TIPO_ESPACIO_FIDELIDAD: Record<TipoEspacioFidelidad, string> = {

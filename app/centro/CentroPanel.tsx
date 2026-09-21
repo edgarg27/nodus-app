@@ -7,6 +7,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { TIPOS_ESPACIO_FIDELIDAD, LABEL_TIPO_ESPACIO_FIDELIDAD, calcularRegalo, type TipoEspacioFidelidad } from "@/lib/fidelidad";
+import FidelidadCard from "@/app/components/FidelidadCard";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
 type VoucherCentro = { id: string; codigo: string; folio: string; user_id: string; created_at: string; expira_en: string | null };
@@ -2505,32 +2506,13 @@ export default function CentroPanel({
                 </form>
 
                 {tarjetaEncontrada && (
-                  <div className="fidelidad-card" style={{ marginTop: 12 }}>
-                    <p className="fidelidad-card-titulo">
+                  <div style={{ marginTop: 12 }}>
+                    <p className="sub-label">
                       #{String(tarjetaEncontrada.folio).padStart(6, "0")} · {tarjetaEncontrada.nombre} ·{" "}
                       {tarjetaEncontrada.centro}
                     </p>
-                    <div className="fidelidad-grid">
-                      {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
-                        const sello = sellosTarjetaEncontrada.find((s) => s.numero === n);
-                        const esRegalo = n === 9;
-                        return (
-                          <div
-                            key={n}
-                            className={`fidelidad-casilla${sello ? " fidelidad-casilla-llena" : ""}${
-                              esRegalo ? " fidelidad-casilla-regalo" : ""
-                            }`}
-                          >
-                            {esRegalo
-                              ? "🎁"
-                              : sello
-                                ? TIPOS_ESPACIO_FIDELIDAD.find((t) => t.id === sello.tipo_espacio)?.icono
-                                : n}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="fidelidad-card-nota">
+                    <FidelidadCard sellos={sellosTarjetaEncontrada} regalo={calcularRegalo(sellosTarjetaEncontrada)} />
+                    <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
                       {sellosTarjetaEncontrada.length}/8 sellos ·{" "}
                       {tarjetaEncontrada.estado === "activa"
                         ? "Activa"
@@ -2560,7 +2542,7 @@ export default function CentroPanel({
                         >
                           {TIPOS_ESPACIO_FIDELIDAD.map((t) => (
                             <option key={t.id} value={t.id}>
-                              {t.icono} {t.label}
+                              {t.label}
                             </option>
                           ))}
                         </select>
