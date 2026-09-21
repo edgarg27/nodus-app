@@ -139,10 +139,10 @@ export default function MisVisitasPage() {
           </p>
 
           <p className="sub-label">Nombre del visitante</p>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre completo" />
+          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre completo" />
 
           <p className="sub-label">Empresa (opcional)</p>
-          <input value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Empresa del visitante" />
+          <input type="text" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Empresa del visitante" />
 
           <p className="sub-label">Teléfono (opcional)</p>
           <input type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Para contactarlo" />
@@ -159,7 +159,7 @@ export default function MisVisitasPage() {
           </div>
 
           <p className="sub-label">Motivo (opcional)</p>
-          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. Reunión, entrega de documentos" />
+          <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. Reunión, entrega de documentos" />
 
           {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
           {registrada && <p style={{ color: "#0F6E56", fontSize: 13 }}>Listo, recepción ya recibió el aviso.</p>}
