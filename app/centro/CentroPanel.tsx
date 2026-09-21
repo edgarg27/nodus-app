@@ -88,6 +88,27 @@ type DayPass = {
   emitido_por_nombre: string | null;
   created_at: string;
 };
+type SolicitudCliente = {
+  id: string;
+  created_at: string;
+  user_id: string;
+  contrato_id: string | null;
+  centro: string | null;
+  tipo: "renovar" | "mas_horas" | "cambiar_espacio" | "otro";
+  mensaje: string | null;
+  cliente_nombre: string | null;
+  cliente_email: string | null;
+  cliente_telefono: string | null;
+  estado: "pendiente" | "atendida";
+};
+
+const LABEL_SOLICITUD_CLIENTE: Record<SolicitudCliente["tipo"], string> = {
+  renovar: "Renovar contrato",
+  mas_horas: "Más horas de sala de juntas",
+  cambiar_espacio: "Cambiar o ampliar espacio",
+  otro: "Otra solicitud",
+};
+
 type TarjetaFidelidad = {
   id: string;
   folio: number;
@@ -177,6 +198,7 @@ const TABS_TODAS = [
   { id: "resumen", label: "📊 Resumen" },
   { id: "reservaciones", label: "📅 Reservaciones" },
   { id: "invitados", label: "🙋 Invitados" },
+  { id: "solicitudes", label: "📨 Solicitudes" },
   { id: "fidelidad", label: "💳 Fidelidad" },
   { id: "vouchers", label: "🎟️ Vouchers" },
   { id: "telefonia", label: "☎️ Telefonía" },
@@ -217,7 +239,7 @@ export default function CentroPanel({
   const TABS =
     rol === "sistemas"
       ? TABS_TODAS.filter(
-          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad"
+          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "fidelidad" && t.id !== "solicitudes"
         )
       : rol === "operaciones"
       ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
@@ -300,6 +322,7 @@ export default function CentroPanel({
   const [motivoRechazoInvitado, setMotivoRechazoInvitado] = useState("");
   const [linkDayPassCopiado, setLinkDayPassCopiado] = useState(false);
   const [tarjetasFidelidad, setTarjetasFidelidad] = useState<TarjetaFidelidad[]>([]);
+  const [solicitudesCliente, setSolicitudesCliente] = useState<SolicitudCliente[]>([]);
   const [folioBuscado, setFolioBuscado] = useState("");
   const [buscandoTarjeta, setBuscandoTarjeta] = useState(false);
   const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
@@ -433,6 +456,7 @@ export default function CentroPanel({
       { data: sols },
       { data: dps },
       { data: tarjs },
+      { data: solsCli },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -464,7 +488,7 @@ export default function CentroPanel({
             ? ["ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_ticket", "nuevo_voucher", "nuevo_did"]
             : rol === "operaciones"
             ? ["ticket_en_proceso", "ticket_resuelto", "nuevo_ticket", "proximo_mantenimiento"]
-            : ["nueva_reservacion", "ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_tour", "pago_confirmado", "servicio_pausado_admin", "nuevo_ticket", "nueva_solicitud_invitado"]
+            : ["nueva_reservacion", "ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_tour", "pago_confirmado", "servicio_pausado_admin", "nuevo_ticket", "nueva_solicitud_invitado", "solicitud_cliente"]
         )
         .order("created_at", { ascending: false })
         .limit(20),
@@ -490,6 +514,12 @@ export default function CentroPanel({
         .eq("centro", c)
         .order("created_at", { ascending: false })
         .limit(50),
+      supabase
+        .from("solicitudes_cliente")
+        .select("*")
+        .eq("centro", c)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     setClientes(clis || []);
     setOficinas(ofis || []);
@@ -577,6 +607,7 @@ export default function CentroPanel({
     setSolicitudesInvitados(sols || []);
     setDayPasses(dps || []);
     setTarjetasFidelidad(tarjs || []);
+    setSolicitudesCliente(solsCli || []);
     setLoading(false);
   }
 
@@ -1162,6 +1193,20 @@ export default function CentroPanel({
       setTimeout(() => setLinkDayPassCopiado(false), 2500);
     } catch {
       alert(link);
+    }
+  }
+
+  // El staff da por atendida una solicitud que el cliente mandó desde su panel.
+  async function marcarSolicitudAtendida(id: string) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("solicitudes_cliente")
+      .update({ estado: "atendida", atendido_por: user?.id || null, atendido_en: new Date().toISOString() })
+      .eq("id", id);
+    if (!error) {
+      setSolicitudesCliente((prev) => prev.map((s) => (s.id === id ? { ...s, estado: "atendida" } : s)));
     }
   }
 
@@ -2478,6 +2523,72 @@ export default function CentroPanel({
                             </div>
                           ))}
                         </>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {/* ---------------- SOLICITUDES DE CLIENTES ---------------- */}
+            {tab === "solicitudes" && (
+              <>
+                {(() => {
+                  const pendientes = solicitudesCliente.filter((s) => s.estado === "pendiente");
+                  const atendidas = solicitudesCliente.filter((s) => s.estado !== "pendiente");
+                  return (
+                    <>
+                      <p className="sec-label-red">⏳ Pendientes de atender ({pendientes.length})</p>
+                      {pendientes.length === 0 && <div className="empty-card">No hay solicitudes pendientes</div>}
+                      {pendientes.map((s) => (
+                        <div className="reserva-admin-card" key={s.id}>
+                          <div className="reserva-admin-top">
+                            <div>
+                              <p className="reserva-admin-cliente">{s.cliente_nombre || "Cliente"}</p>
+                              <p className="reserva-admin-detalle">📨 {LABEL_SOLICITUD_CLIENTE[s.tipo]}</p>
+                              <p className="reserva-admin-detalle">
+                                {s.cliente_telefono || "Sin teléfono"} · {s.cliente_email || "Sin correo"}
+                              </p>
+                              {s.mensaje && <p className="reserva-admin-detalle">📝 {s.mensaje}</p>}
+                              <p className="reserva-admin-detalle">{new Date(s.created_at).toLocaleString("es-MX")}</p>
+                            </div>
+                          </div>
+                          <div className="reserva-admin-acciones">
+                            {s.contrato_id && (
+                              <a
+                                className="btn-aceptar"
+                                style={{ textDecoration: "none" }}
+                                href={`/contratos?contratoId=${s.contrato_id}${centro ? `&centro=${encodeURIComponent(centro)}` : ""}`}
+                              >
+                                Ver contrato
+                              </a>
+                            )}
+                            <button className="btn-aceptar" onClick={() => marcarSolicitudAtendida(s.id)}>
+                              ✓ Marcar atendida
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      <p className="panel-section-label" style={{ marginTop: 8 }}>
+                        Historial ({atendidas.length})
+                      </p>
+                      {atendidas.length === 0 ? (
+                        <div className="empty-card">Sin solicitudes atendidas todavía</div>
+                      ) : (
+                        atendidas.map((s) => (
+                          <div className="item-card" key={s.id}>
+                            <div className="item-card-info">
+                              <p className="item-card-titulo">{s.cliente_nombre || "Cliente"}</p>
+                              <p className="item-card-sub">
+                                {LABEL_SOLICITUD_CLIENTE[s.tipo]} · {new Date(s.created_at).toLocaleDateString("es-MX")}
+                              </p>
+                            </div>
+                            <span className="factura-badge" style={{ background: "#E1F5EE" }}>
+                              <span className="factura-badge-text">✓ Atendida</span>
+                            </span>
+                          </div>
+                        ))
                       )}
                     </>
                   );
