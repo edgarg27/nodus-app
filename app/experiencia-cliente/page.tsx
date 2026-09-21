@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { empresasDistintas } from "@/lib/empresa";
+import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -54,6 +55,7 @@ export default function ExperienciaClientePage() {
   const [empresasDisponibles, setEmpresasDisponibles] = useState<string[]>([]);
   const [encuestas, setEncuestas] = useState<Encuesta[]>([]);
   const [clientesPortal, setClientesPortal] = useState<ClientePortal[]>([]);
+  const [diasCentro, setDiasCentro] = useState<DiaCentro[]>([]);
 
   useEffect(() => {
     init();
@@ -85,19 +87,27 @@ export default function ExperienciaClientePage() {
 
   async function fetchTodo(c: string) {
     setLoading(true);
-    const [{ data: contactosData }, { data: eventosData }, { data: perfilesCentro }, { data: encuestasData }, { data: clientesData }] =
-      await Promise.all([
-        supabase.from("clientes").select("*").eq("centro", c).order("nombre"),
-        supabase.from("eventos_centro").select("*").eq("centro", c).order("fecha"),
-        supabase.from("profiles").select("empresa").eq("centro", c).eq("rol", "cliente"),
-        supabase.from("encuestas").select("*").eq("centro", c).order("created_at", { ascending: false }),
-        supabase.from("profiles").select("id, nombre, email, empresa").eq("centro", c).eq("rol", "cliente").order("nombre"),
-      ]);
+    const [
+      { data: contactosData },
+      { data: eventosData },
+      { data: perfilesCentro },
+      { data: encuestasData },
+      { data: clientesData },
+      { data: diasData },
+    ] = await Promise.all([
+      supabase.from("clientes").select("*").eq("centro", c).order("nombre"),
+      supabase.from("eventos_centro").select("*").eq("centro", c).order("fecha"),
+      supabase.from("profiles").select("empresa").eq("centro", c).eq("rol", "cliente"),
+      supabase.from("encuestas").select("*").eq("centro", c).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, nombre, email, empresa").eq("centro", c).eq("rol", "cliente").order("nombre"),
+      supabase.from("dias_centro").select("id, fecha, tipo, motivo").eq("centro", c).order("fecha"),
+    ]);
     setContactos(contactosData || []);
     setEventos(eventosData || []);
     setEmpresasDisponibles(empresasDistintas(perfilesCentro || []));
     setEncuestas(encuestasData || []);
     setClientesPortal(clientesData || []);
+    setDiasCentro((diasData as DiaCentro[]) || []);
     setLoading(false);
   }
 
@@ -150,7 +160,7 @@ export default function ExperienciaClientePage() {
               ))}
             </div>
 
-            {tab === "calendario" && <TabCalendario contactos={contactos} eventos={eventos} />}
+            {tab === "calendario" && <TabCalendario contactos={contactos} eventos={eventos} diasCentro={diasCentro} />}
             {tab === "cumpleanos" && (
               <TabCumpleanos
                 contactos={contactos}
@@ -160,7 +170,15 @@ export default function ExperienciaClientePage() {
                 onCambio={() => fetchTodo(centro)}
               />
             )}
-            {tab === "eventos" && <TabEventos eventos={eventos} centro={centro} miId={miId} onCambio={() => fetchTodo(centro)} />}
+            {tab === "eventos" && (
+              <TabEventos
+                eventos={eventos}
+                diasCentro={diasCentro}
+                centro={centro}
+                miId={miId}
+                onCambio={() => fetchTodo(centro)}
+              />
+            )}
             {tab === "encuestas" && puedeVerEncuestas && (
               <TabEncuestas
                 encuestas={encuestas}
@@ -180,7 +198,15 @@ export default function ExperienciaClientePage() {
 
 // ============================= Calendario =============================
 
-function TabCalendario({ contactos, eventos }: { contactos: Contacto[]; eventos: Evento[] }) {
+function TabCalendario({
+  contactos,
+  eventos,
+  diasCentro,
+}: {
+  contactos: Contacto[];
+  eventos: Evento[];
+  diasCentro: DiaCentro[];
+}) {
   const hoy = new Date();
   const [mesVisto, setMesVisto] = useState(hoy.getMonth());
   const [anioVisto, setAnioVisto] = useState(hoy.getFullYear());
@@ -212,6 +238,17 @@ function TabCalendario({ contactos, eventos }: { contactos: Contacto[]; eventos:
     });
     return map;
   }, [eventos, mesVisto, anioVisto]);
+
+  // Días sin servicio de este centro (festivos oficiales + ajustes), del
+  // mes que se está viendo, por número de día.
+  const sinServicioPorDia = useMemo(() => {
+    const map: Record<number, string> = {};
+    Object.entries(diasSinServicio(anioVisto, diasCentro)).forEach(([fecha, motivo]) => {
+      const [, mes, dia] = fecha.split("-").map(Number);
+      if (mes - 1 === mesVisto) map[dia] = motivo;
+    });
+    return map;
+  }, [diasCentro, mesVisto, anioVisto]);
 
   function cambiarMes(delta: number) {
     let m = mesVisto + delta;
@@ -253,23 +290,26 @@ function TabCalendario({ contactos, eventos }: { contactos: Contacto[]; eventos:
         {celdas.map((dia, i) => {
           const tieneCumples = dia && cumplesPorDia[dia]?.length > 0;
           const tieneEventos = dia && eventosPorDia[dia]?.length > 0;
+          const sinServicio = dia ? sinServicioPorDia[dia] : undefined;
+          const clicable = !!dia && (tieneCumples || tieneEventos || !!sinServicio);
           return (
             <div
               key={i}
-              onClick={() => dia && (tieneCumples || tieneEventos) && setDiaAbierto(diaAbierto === dia ? null : dia)}
+              onClick={() => dia && clicable && setDiaAbierto(diaAbierto === dia ? null : dia)}
               style={{
                 minHeight: 44,
                 borderRadius: 8,
-                background: dia ? "#F7F7F7" : "transparent",
+                background: dia ? (sinServicio ? "#FBE9E9" : "#F7F7F7") : "transparent",
                 padding: 4,
-                cursor: dia && (tieneCumples || tieneEventos) ? "pointer" : "default",
+                cursor: clicable ? "pointer" : "default",
                 border: diaAbierto === dia ? "2px solid #0d1b3e" : "1px solid transparent",
               }}
             >
               {dia && (
                 <>
-                  <p style={{ fontSize: 12, margin: 0, color: "#555" }}>{dia}</p>
+                  <p style={{ fontSize: 12, margin: 0, color: sinServicio ? "#A32D2D" : "#555" }}>{dia}</p>
                   <div style={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                    {sinServicio && <span style={{ fontSize: 11 }}>🚫</span>}
                     {tieneCumples && <span style={{ fontSize: 11 }}>🎂</span>}
                     {tieneEventos && <span style={{ fontSize: 11 }}>🎪</span>}
                   </div>
@@ -285,6 +325,11 @@ function TabCalendario({ contactos, eventos }: { contactos: Contacto[]; eventos:
           <p className="sub-label">
             {diaAbierto} de {MESES[mesVisto]}
           </p>
+          {sinServicioPorDia[diaAbierto] && (
+            <p className="contrato-detalle" style={{ color: "#A32D2D", fontWeight: 600 }}>
+              🚫 {sinServicioPorDia[diaAbierto]} — el centro no abre
+            </p>
+          )}
           {(cumplesPorDia[diaAbierto] || []).map((c) => (
             <p className="contrato-detalle" key={c.id}>
               🎂 {c.nombre} — {c.empresa}
@@ -435,13 +480,20 @@ function TabCumpleanos({
 
 // ============================= Eventos =============================
 
+function fechaLargaMx(f: string) {
+  const [y, m, d] = f.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
 function TabEventos({
   eventos,
+  diasCentro,
   centro,
   miId,
   onCambio,
 }: {
   eventos: Evento[];
+  diasCentro: DiaCentro[];
   centro: string;
   miId: string;
   onCambio: () => void;
@@ -451,6 +503,68 @@ function TabEventos({
   const [form, setForm] = useState({ titulo: "", descripcion: "", fecha: "", hora: "", lugar: "" });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+
+  // ---------- Días sin servicio ----------
+  const [mostrarFormCierre, setMostrarFormCierre] = useState(false);
+  const [formCierre, setFormCierre] = useState({ fecha: "", motivo: "" });
+  const [guardandoCierre, setGuardandoCierre] = useState(false);
+  const [errorCierre, setErrorCierre] = useState("");
+
+  const hoyD = new Date();
+  const hoyISO = `${hoyD.getFullYear()}-${String(hoyD.getMonth() + 1).padStart(2, "0")}-${String(hoyD.getDate()).padStart(2, "0")}`;
+  const anioActual = hoyD.getFullYear();
+  const oficiales = { ...festivosMx(anioActual), ...festivosMx(anioActual + 1) };
+  const sinServicio = Object.entries({
+    ...diasSinServicio(anioActual, diasCentro),
+    ...diasSinServicio(anioActual + 1, diasCentro),
+  })
+    .filter(([fecha]) => fecha >= hoyISO)
+    .sort(([a], [b]) => a.localeCompare(b));
+  const festivosQueAbren = diasCentro.filter((a) => a.tipo === "abre" && a.fecha >= hoyISO);
+  const cierresExtra = new Set(diasCentro.filter((a) => a.tipo === "cierre").map((a) => a.fecha));
+
+  async function guardarAjuste(fecha: string, tipo: "cierre" | "abre", motivo: string | null) {
+    return supabase
+      .from("dias_centro")
+      .upsert({ centro, fecha, tipo, motivo, created_by: miId }, { onConflict: "centro,fecha" });
+  }
+
+  async function agregarCierre(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorCierre("");
+    if (!formCierre.fecha || !formCierre.motivo.trim()) {
+      setErrorCierre("Elige la fecha y escribe el motivo");
+      return;
+    }
+    setGuardandoCierre(true);
+    const { error: err } = await guardarAjuste(formCierre.fecha, "cierre", formCierre.motivo.trim());
+    setGuardandoCierre(false);
+    if (err) {
+      setErrorCierre("No se pudo guardar: " + err.message);
+      return;
+    }
+    setFormCierre({ fecha: "", motivo: "" });
+    setMostrarFormCierre(false);
+    onCambio();
+  }
+
+  async function centroSiAbre(fecha: string) {
+    const { error: err } = await guardarAjuste(fecha, "abre", null);
+    if (err) {
+      setErrorCierre("No se pudo guardar: " + err.message);
+      return;
+    }
+    onCambio();
+  }
+
+  async function quitarAjuste(fecha: string) {
+    const { error: err } = await supabase.from("dias_centro").delete().eq("centro", centro).eq("fecha", fecha);
+    if (err) {
+      setErrorCierre("No se pudo quitar: " + err.message);
+      return;
+    }
+    onCambio();
+  }
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -542,6 +656,97 @@ function TabEventos({
             </div>
           </div>
         ))
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 22 }}>
+        <p className="panel-section-label" style={{ margin: 0 }}>
+          🚫 Días sin servicio ({sinServicio.length})
+        </p>
+        <button
+          className="tel-borrar-btn"
+          style={{ color: "#0d1b3e", fontWeight: 600 }}
+          onClick={() => setMostrarFormCierre((v) => !v)}
+        >
+          {mostrarFormCierre ? "Cancelar" : "+ Agregar día de cierre"}
+        </button>
+      </div>
+      <p style={{ fontSize: 12, color: "#aaa", margin: "4px 0 8px" }}>
+        Los festivos oficiales cierran por defecto. Aquí agregas otros días en que {centro} no abre, o marcas un festivo en que
+        sí abre. Los clientes de {centro} lo ven en su calendario.
+      </p>
+
+      {mostrarFormCierre && (
+        <form className="form-card" onSubmit={agregarCierre}>
+          <div className="tel-form-grid">
+            <div>
+              <p className="sub-label">Fecha</p>
+              <input type="date" value={formCierre.fecha} onChange={(e) => setFormCierre({ ...formCierre, fecha: e.target.value })} />
+            </div>
+            <div>
+              <p className="sub-label">Motivo</p>
+              <input
+                placeholder="Ej. Jueves Santo"
+                value={formCierre.motivo}
+                onChange={(e) => setFormCierre({ ...formCierre, motivo: e.target.value })}
+              />
+            </div>
+          </div>
+          <button className={"btn-enviar" + (guardandoCierre ? " sending" : "")} type="submit" disabled={guardandoCierre}>
+            <span className="btn-enviar-text">+ Guardar día de cierre</span>
+          </button>
+        </form>
+      )}
+      {errorCierre && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorCierre}</p>}
+
+      {sinServicio.length === 0 ? (
+        <div className="empty-card">No hay días sin servicio próximos</div>
+      ) : (
+        sinServicio.map(([fecha, motivo]) => {
+          const esOficial = !!oficiales[fecha];
+          const esCierreExtra = cierresExtra.has(fecha);
+          return (
+            <div className="contrato-card-admin" key={fecha}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div>
+                  <p className="contrato-cliente-nombre">{motivo}</p>
+                  <p className="contrato-detalle">
+                    {fechaLargaMx(fecha)} · {esCierreExtra ? "Cierre agregado" : "Festivo oficial"}
+                  </p>
+                </div>
+                {esCierreExtra ? (
+                  <button className="tel-borrar-btn" style={{ color: "#A32D2D" }} onClick={() => quitarAjuste(fecha)}>
+                    Quitar
+                  </button>
+                ) : esOficial ? (
+                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => centroSiAbre(fecha)}>
+                    Este centro sí abre
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          );
+        })
+      )}
+
+      {festivosQueAbren.length > 0 && (
+        <>
+          <p className="panel-section-label" style={{ marginTop: 14 }}>
+            ✅ Festivos en que {centro} sí abre
+          </p>
+          {festivosQueAbren.map((a) => (
+            <div className="contrato-card-admin" key={a.id}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div>
+                  <p className="contrato-cliente-nombre">{oficiales[a.fecha] || "Día festivo"}</p>
+                  <p className="contrato-detalle">{fechaLargaMx(a.fecha)}</p>
+                </div>
+                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => quitarAjuste(a.fecha)}>
+                  Volver a cerrar
+                </button>
+              </div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );
