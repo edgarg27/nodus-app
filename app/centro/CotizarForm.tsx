@@ -5,6 +5,8 @@ import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import Checkbox from "@/app/components/Checkbox";
+import { conIva, llevaIva } from "@/lib/adicionales";
+import { esOficinaPrivada, rentaMensualConIva, type FormaPago } from "@/lib/formaPago";
 import CapacidadSalaIcono, { extraerCapacidadSala } from "@/app/components/CapacidadSalaIcono";
 
 // Mismo look que ya usan los inputs de .tel-form-grid (ver app/globals.css)
@@ -904,6 +906,14 @@ export default function CotizarForm({
   const [depositoGarantia, setDepositoGarantia] = useState("");
   const [cargoRecurrente, setCargoRecurrente] = useState(true);
   const [comentarios, setComentarios] = useState("");
+  // Forma de pago: solo Oficina Privada puede elegir mes a mes; Coworking
+  // siempre es por adelantado (ver lib/formaPago.ts).
+  const [formaPago, setFormaPago] = useState<FormaPago>("adelantado");
+  const permiteMensual = esOficinaPrivada(tipoEspacio);
+  const esMensual = permiteMensual && formaPago === "mensual";
+  useEffect(() => {
+    if (!permiteMensual && formaPago !== "adelantado") setFormaPago("adelantado");
+  }, [permiteMensual, formaPago]);
 
   // Tarifa unitaria vigente (por hora/día/semana/mes según corresponda):
   // la del paquete si hay uno elegido, si no la de la oficina.
@@ -1043,7 +1053,13 @@ export default function CotizarForm({
     );
   }
   const totalAdicionalesConIva = useMemo(() => sumarAdicionalesConIva(adicionalesDraft), [adicionalesDraft]);
-  const totalPrimerPago = round2(precioNeto + depositoConIvaNum + totalAdicionalesConIva);
+  // Mes a mes: lo que se guarda como renta del contrato (y se cobra al
+  // aprobarlo) es UN mes con IVA; por adelantado, todo el periodo.
+  const mesesCotizados = Math.max(1, Number(cantidadPeriodo) || 1);
+  const rentaContrato = esMensual ? rentaMensualConIva(precioNeto, mesesCotizados) : precioNeto;
+  // Divide los montos del Desglose por mes cuando es mes a mes.
+  const divisorMes = esMensual ? mesesCotizados : 1;
+  const totalPrimerPago = round2(rentaContrato + depositoConIvaNum + totalAdicionalesConIva);
 
   // ---------- "Desglose anterior" en las pestañas de renovación ----------
   const contratoOriginalRenovacion = contratosClienteVigentes.find((c) => c.id === contratoARenovarId) || null;
@@ -1674,6 +1690,14 @@ export default function CotizarForm({
 
     const clienteIdEfectivo = cliente?.id || null;
     const esCambioDeEspacio = esRenovacion && modoRenovacion === "cambiar" && !!contratoARenovarId;
+    // Oficina Privada guarda lo que se eligió; Coworking siempre es por
+    // adelantado; el resto de tipos se queda en null (sin cambio de
+    // comportamiento en el cron de facturación).
+    const formaPagoGuardar: FormaPago | null = permiteMensual
+      ? formaPago
+      : tipoEspacio.trim().toLowerCase() === "coworking"
+      ? "adelantado"
+      : null;
 
     const { data: cotizacion, error: cotError } = await supabase
       .from("cotizaciones_comerciales")
@@ -1708,6 +1732,7 @@ export default function CotizarForm({
         precio_pactado: precioPactadoNum,
         iva_monto: ivaMonto,
         precio_neto: precioNeto,
+        forma_pago: formaPagoGuardar,
         deposito_garantia: depositoNum,
         cargo_recurrente: cargoRecurrente,
         moneda,
@@ -1757,13 +1782,17 @@ export default function CotizarForm({
         // (cargo_recurrente arriba) — el monto del contrato SIEMPRE se
         // registra aquí; de lo contrario el contrato queda en $0/mes en
         // /contratos y el pago que se genera al aprobarlo también sale en $0.
-        renta_mensual: precioNeto,
+        // Mes a mes guarda la renta de UN mes con IVA (rentaContrato);
+        // por adelantado sigue siendo el precio de todo el periodo.
+        renta_mensual: rentaContrato,
+        forma_pago: formaPagoGuardar,
         deposito_garantia: depositoNum,
         horas_sala_juntas: esRenovacion ? Number(horasSalaJuntasManual) || 0 : paquete?.incluye_horas_sala_juntas || 0,
         horas_bolsa: paquete?.horas_bolsa || 0,
         // El día de pago ya no se pregunta aquí — se vuelve a pedir,
         // opcional, hasta /alta-cliente (ver app/alta-cliente/page.tsx).
-        dia_pago: null,
+        // Mes a mes siempre es del 1 al 10, así que ya nace con día 1.
+        dia_pago: esMensual ? 1 : null,
         // "Cambiar tipo de espacio" entra vigente de inmediato (el cliente
         // ya estaba vetado, no es alguien nuevo) — el resto de los casos
         // sigue el ciclo normal pre_aprobado → subir firmado → aprobar.
@@ -1865,7 +1894,7 @@ export default function CotizarForm({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   clienteId: clienteIdEfectivo,
-                  monto: a.costo_unitario * a.cantidad,
+                  monto: conIva(a.concepto, a.costo_unitario * a.cantidad),
                   concepto: `Adicional: ${a.concepto}`,
                   contratoId: contratoIdCreado,
                   centro,
@@ -1900,8 +1929,16 @@ export default function CotizarForm({
         // PowerPoint refleje el precio real cotizado — antes se mandaba
         // solo el precio base y el PPT quedaba por debajo de lo que
         // realmente se le cobraría al cliente en cuanto tuviera adicionales.
-        const subtotalConAdicionales = round2(precioPactadoNum + totalAdicionales);
-        const ivaMontoConAdicionales = round2(subtotalConAdicionales * 0.16);
+        // El Estacionamiento se lista ya con IVA incluido (ver
+        // lib/adicionales.ts) — su renglón muestra el precio final y por
+        // eso NO entra a la base sobre la que se calcula el IVA de abajo;
+        // el resto (paquete/oficina y demás adicionales) sigue igual. El
+        // total resultante es el mismo de antes, solo cambia cómo se ve.
+        const subtotalConAdicionales = round2(precioPactadoNum + totalAdicionalesConIva);
+        const baseGravable = adicionalesDraft
+          .filter((a) => !llevaIva(a.concepto))
+          .reduce((s, a) => s + a.costo_unitario * a.cantidad, precioPactadoNum);
+        const ivaMontoConAdicionales = round2(baseGravable * 0.16);
         const totalConAdicionales = round2(subtotalConAdicionales + ivaMontoConAdicionales);
         // Cada adicional se lista en su propio renglón dentro de la tabla
         // del PowerPoint — ambas plantillas ya traían renglones en blanco
@@ -1931,7 +1968,7 @@ export default function CotizarForm({
             adicionales: adicionalesDraft.map((a) => ({
               concepto: a.concepto,
               cantidad: a.cantidad,
-              costoUnitario: a.costo_unitario,
+              costoUnitario: conIva(a.concepto, a.costo_unitario),
             })),
           }),
         });
@@ -3002,6 +3039,20 @@ export default function CotizarForm({
         <div>
           <p className="panel-section-label">Precio</p>
           <div className="tel-form-grid">
+            {permiteMensual && (
+              <div>
+                <p className="sub-label">Forma de pago</p>
+                <select value={formaPago} onChange={(e) => setFormaPago(e.target.value as FormaPago)}>
+                  <option value="adelantado">Por adelantado (todo el periodo)</option>
+                  <option value="mensual">Mes a mes</option>
+                </select>
+                {esMensual && (
+                  <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
+                    Paga del 1 al 10 de cada mes; si no paga a tiempo, la siguiente factura lleva un recargo del 3%.
+                  </p>
+                )}
+              </div>
+            )}
             <div>
               <p className="sub-label">Moneda</p>
               <select value={moneda} onChange={(e) => setMoneda(e.target.value as "MXN" | "USD")}>
@@ -3412,35 +3463,43 @@ export default function CotizarForm({
                 )}
                 {!esRenovarOAgregarActiva && (
                   <>
+                    {/* Mes a mes: todo el desglose es de UN solo mes (el que se
+                        cobra al aprobar y luego cada mes); por adelantado es el
+                        de todo el periodo, como siempre. */}
+                    {esMensual && (
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+                        Mes a mes · por un mes ({mesesCotizados} {mesesCotizados === 1 ? "mes" : "meses"} de contrato)
+                      </p>
+                    )}
                     <div className="resumen-reserva-row">
-                      <span className="resumen-reserva-label">Precio de lista</span>
+                      <span className="resumen-reserva-label">Precio de lista{esMensual ? " (por mes)" : ""}</span>
                       <span
                         className="resumen-reserva-val"
                         style={{ textDecoration: descuentoPorcentaje && Number(descuentoPorcentaje) > 0 ? "line-through" : "none" }}
                       >
-                        ${precioListaNum.toLocaleString("es-MX")}
+                        ${round2(precioListaNum / divisorMes).toLocaleString("es-MX")}
                       </span>
                     </div>
                     <div className="resumen-reserva-row">
                       <span className="resumen-reserva-label">Descuento ({Number(descuentoPorcentaje) || 0}%)</span>
                       <span className="resumen-reserva-val">
-                        -${round2(precioListaNum - precioPactadoNum).toLocaleString("es-MX")}
+                        -${round2((precioListaNum - precioPactadoNum) / divisorMes).toLocaleString("es-MX")}
                       </span>
                     </div>
                     <div className="resumen-reserva-row">
                       <span className="resumen-reserva-label">Precio unitario (pactado)</span>
-                      <span className="resumen-reserva-val">${precioPactadoNum.toLocaleString("es-MX")}</span>
+                      <span className="resumen-reserva-val">${round2(precioPactadoNum / divisorMes).toLocaleString("es-MX")}</span>
                     </div>
                     <div className="resumen-reserva-row">
                       <span className="resumen-reserva-label">IVA (16%)</span>
-                      <span className="resumen-reserva-val">${ivaMonto.toLocaleString("es-MX")}</span>
+                      <span className="resumen-reserva-val">${round2(ivaMonto / divisorMes).toLocaleString("es-MX")}</span>
                     </div>
                     <div className="resumen-reserva-row" style={{ fontWeight: 700 }}>
                       <span className="resumen-reserva-label" style={{ fontWeight: 700 }}>
-                        Precio neto (con IVA)
+                        {esMensual ? "Renta mensual (con IVA)" : "Precio neto (con IVA)"}
                       </span>
                       <span className="resumen-reserva-val" style={{ fontWeight: 700 }}>
-                        ${precioNeto.toLocaleString("es-MX")}
+                        ${rentaContrato.toLocaleString("es-MX")}
                       </span>
                     </div>
                     {mostrarUSD && (
@@ -3449,7 +3508,7 @@ export default function CotizarForm({
                           ≈ equivalente en USD
                         </span>
                         <span className="resumen-reserva-val" style={{ fontSize: 11 }}>
-                          ${aUSD(precioNeto)?.toLocaleString("en-US")} USD
+                          ${aUSD(rentaContrato)?.toLocaleString("en-US")} USD
                         </span>
                       </div>
                     )}

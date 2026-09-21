@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
+import { conIva, sinIva } from "@/lib/adicionales";
 
 type VersionContrato = {
   id: string;
@@ -124,7 +125,9 @@ export default function ContratoModal({
     setCargandoAdicionales(false);
   }
 
-  const totalAdicionales = useMemo(() => adicionales.reduce((s, a) => s + a.monto, 0), [adicionales]);
+  // Lo que se muestra y se cobra: el Estacionamiento ya con IVA incluido
+  // (en la base se guarda sin IVA, ver lib/adicionales.ts).
+  const totalAdicionales = useMemo(() => adicionales.reduce((s, a) => s + conIva(a.concepto, a.monto), 0), [adicionales]);
   const totalContrato = (Number(form.renta_mensual) || 0) + totalAdicionales;
 
   const catalogoFiltrado = useMemo(() => {
@@ -177,7 +180,7 @@ export default function ContratoModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             clienteId: contrato.user_id,
-            monto: item.costo_unitario,
+            monto: conIva(item.nombre, item.costo_unitario),
             concepto: `Adicional: ${item.nombre}`,
             contratoId: contrato.id,
             centro: contrato.centro,
@@ -391,7 +394,7 @@ export default function ContratoModal({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 clienteId: contrato.user_id,
-                monto: a.monto,
+                monto: conIva(a.concepto, a.monto),
                 concepto: `Adicional: ${a.concepto}`,
                 contratoId: contrato.id,
                 centro: contrato.centro,
@@ -737,7 +740,7 @@ export default function ContratoModal({
                           <p style={{ margin: 0, fontSize: 11, color: "#888" }}>{item.descripcion}</p>
                         )}
                         <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
-                          ${Number(item.costo_unitario).toLocaleString("es-MX")} c/u
+                          ${conIva(item.nombre, Number(item.costo_unitario)).toLocaleString("es-MX")} c/u
                         </p>
                       </div>
                       <button
@@ -853,8 +856,15 @@ export default function ContratoModal({
                 <input
                   type="number"
                   step="0.01"
-                  value={a.costo_unitario}
-                  onChange={(e) => actualizarLinea(a, "costo_unitario", e.target.value)}
+                  value={conIva(a.concepto, a.costo_unitario)}
+                  onChange={(e) => {
+                    const capturado = Number(e.target.value);
+                    actualizarLinea(
+                      a,
+                      "costo_unitario",
+                      Number.isNaN(capturado) ? e.target.value : String(sinIva(a.concepto, capturado))
+                    );
+                  }}
                   style={{ width: 70, border: "1px solid #eee", borderRadius: 8, padding: "6px 8px", fontSize: 12 }}
                 />
                 <span style={{ fontSize: 11, color: "#888" }}>×</span>
@@ -867,7 +877,7 @@ export default function ContratoModal({
                 />
               </div>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#0d1b3e", minWidth: 70, textAlign: "right" }}>
-                ${a.monto.toLocaleString("es-MX")}
+                ${conIva(a.concepto, a.monto).toLocaleString("es-MX")}
               </p>
               <button className="tel-borrar-btn" onClick={() => eliminarAdicional(a.id)}>
                 🗑
