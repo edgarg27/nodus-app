@@ -681,22 +681,25 @@ export default function AdminPanel({
         </div>
       </div>
 
-      <div className="panel-tabs">
-        <button
-          className={"panel-tab" + (tab === "admin" ? " active" : "")}
-          onClick={() => setTab("admin")}
-        >
-          Administrador
-        </button>
-        {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+      {rol !== "diseno" && (
+        <div className="panel-tabs">
           <button
-            className={"panel-tab" + (tab === "clientes" ? " active" : "")}
-            onClick={() => setTab("clientes")}
+            className={"panel-tab" + (tab === "admin" ? " active" : "")}
+            onClick={() => setTab("admin")}
           >
-            Clientes
+            Administrador
           </button>
-        )}
-      </div>
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && (
+            <button
+              className={"panel-tab" + (tab === "clientes" ? " active" : "")}
+              onClick={() => setTab("clientes")}
+            >
+              Clientes
+            </button>
+          )}
+        </div>
+      )}
+
 
       {tab === "admin" && (
         <div className="panel-content">
@@ -808,6 +811,12 @@ export default function AdminPanel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/insignia.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Logros</span>
+              </a>
+            )}
+            {rol === "diseno" && (
+              <a className="modulo-card" href="/experiencia-cliente?tab=eventos">
+                <span className="modulo-icon">🎪</span>
+                <span className="modulo-name">Eventos</span>
               </a>
             )}
             {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
