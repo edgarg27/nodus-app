@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { consultarCargo } from "@/lib/openpay";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     const cargo = await consultarCargo(pago.openpay_charge_id);
 
     if (cargo.status === "completed") {
-      await supabase.from("pagos").update({ estado: "pagado" }).eq("id", pago.id);
+      await supabase.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).eq("id", pago.id);
       await supabase.from("profiles").update({ suspendido: false }).eq("id", session.user.id);
 
       const { data: factura } = await supabase

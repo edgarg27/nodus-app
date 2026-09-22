@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Público, sin sesión — el link de /pagar-simulado se manda directo al
 // cliente (o a quien lo tenga) sin exigirle iniciar sesión, es solo un
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const { error } = await admin.from("pagos").update({ estado: "pagado" }).eq("id", pagoId);
+  const { error } = await admin.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).eq("id", pagoId);
   if (error) {
     return NextResponse.json({ error: "No se pudo confirmar el pago" }, { status: 500 });
   }

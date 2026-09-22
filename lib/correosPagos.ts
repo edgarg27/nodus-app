@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCorreo } from "@/lib/email";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Correos de cobranza al cliente: aviso de que su pago está por vencer, aviso
 // del día de pago y agradecimiento cuando paga. Ninguno truena el flujo que
@@ -8,12 +9,6 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 const moneda = (n: number) =>
   `$${Number(n).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-// Hoy en horario de México como 'YYYY-MM-DD' (para comparar contra
-// facturas.fecha_vencimiento sin desfases por UTC).
-function hoyMexicoISO() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
-}
 
 function plantilla(titulo: string, parrafos: string[]) {
   return `
