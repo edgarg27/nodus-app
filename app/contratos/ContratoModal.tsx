@@ -88,6 +88,7 @@ export default function ContratoModal({
   const [confirmacionFirma, setConfirmacionFirma] = useState(false);
   const [enviandoFirma, setEnviandoFirma] = useState(false);
   const [exitoAprobacionVisible, setExitoAprobacionVisible] = useState(false);
+  const [confirmandoRechazo, setConfirmandoRechazo] = useState(false);
 
   // ---------- Adicionales (catálogo con buscador + persistencia inmediata) ----------
   const [catalogo, setCatalogo] = useState<CatalogoItem[]>([]);
@@ -531,7 +532,7 @@ export default function ContratoModal({
   }
 
   async function rechazar() {
-    if (!confirm("¿Rechazar este contrato? El cliente no quedará activo con este plan.")) return;
+    setConfirmandoRechazo(false);
     setProcesandoAprobacion(true);
     await supabase.from("contratos").update({ estatus: "rechazado" }).eq("id", contrato.id);
     setProcesandoAprobacion(false);
@@ -563,6 +564,7 @@ export default function ContratoModal({
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header-row">
@@ -646,7 +648,7 @@ export default function ContratoModal({
             >
               ✓ Aprobar contrato
             </button>
-            <button className="btn-rechazar" onClick={rechazar} disabled={procesandoAprobacion}>
+            <button className="btn-rechazar" onClick={() => setConfirmandoRechazo(true)} disabled={procesandoAprobacion}>
               ✗ Rechazar contrato
             </button>
             {!archivoFinalUrl && (
@@ -1062,5 +1064,25 @@ export default function ContratoModal({
         </button>
       </div>
     </div>
+
+    {confirmandoRechazo && (
+      <div className="modal-overlay" onClick={() => setConfirmandoRechazo(false)}>
+        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+          <p className="modal-nombre">Rechazar contrato</p>
+          <p className="sub-label" style={{ marginTop: 8 }}>
+            ¿Rechazar este contrato? El cliente no quedará activo con este plan.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button className="tel-borrar-btn" onClick={() => setConfirmandoRechazo(false)}>
+              Cancelar
+            </button>
+            <button className="btn-rechazar" onClick={rechazar}>
+              ✗ Rechazar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
