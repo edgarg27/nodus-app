@@ -322,40 +322,35 @@ export default function PaqueteriaPage() {
           </div>
         ) : (
           listaMostrada.map((p) => (
-            <div className="ticket-card" key={p.id}>
-              <div className="ticket-top">
-                <div className="ticket-icono">📦</div>
-                <div className="ticket-info">
-                  <p className="ticket-asunto">{esStaff ? p.cliente_nombre || "Cliente" : "Paquete"}</p>
-                  <p className="ticket-categoria">
+            <div className="reserva-admin-card" key={p.id}>
+              <div className="reserva-admin-top">
+                <div>
+                  <p className="reserva-admin-cliente">{esStaff ? p.cliente_nombre || "Cliente" : "Paquete"}</p>
+                  <p className="reserva-admin-detalle">
                     {p.estado === "entregado" && p.fecha_entrega
                       ? `Entregado el ${formatearFecha(p.fecha_entrega)}`
                       : `Llegó el ${formatearFecha(p.fecha_llegada)}`}
                   </p>
+                  {p.descripcion && <p className="reserva-admin-detalle">📝 {p.descripcion}</p>}
+                  <span className="factura-badge" style={{ background: ESTADO_INFO[p.estado]?.bg, marginTop: 4 }}>
+                    <span className="factura-badge-text">{ESTADO_INFO[p.estado]?.label || p.estado}</span>
+                  </span>
                 </div>
-                <span className="estado-badge" style={{ background: ESTADO_INFO[p.estado]?.bg }}>
-                  {ESTADO_INFO[p.estado]?.label || p.estado}
-                </span>
               </div>
-              {p.descripcion && <p style={{ fontSize: 13, color: "#444", margin: "8px 0 0" }}>{p.descripcion}</p>}
               {p.foto_url && (
                 <img
                   src={p.foto_url}
                   alt="Foto del paquete"
                   className="ticket-admin-foto-mini"
-                  style={{ marginTop: 8 }}
                   onClick={() => setLightbox(p.foto_url)}
                 />
               )}
               {esStaff && p.estado === "en_espera" && (
-                <button
-                  type="button"
-                  className="cancelar-btn"
-                  style={{ marginTop: 10 }}
-                  onClick={() => marcarEntregado(p.id)}
-                >
-                  Marcar como entregado
-                </button>
+                <div className="reserva-admin-acciones">
+                  <button type="button" className="btn-aceptar" onClick={() => marcarEntregado(p.id)}>
+                    ✓ Marcar como entregado
+                  </button>
+                </div>
               )}
             </div>
           ))
