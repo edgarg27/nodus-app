@@ -291,7 +291,7 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full" href={p.link_pago || `/pagar-simulado/${p.id}`}>
+                    <a className="pagar-btn-full" href={`/pagar-simulado/${p.id}`}>
                       💳 Ir a pagar
                     </a>
                   </div>
