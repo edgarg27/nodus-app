@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Requiere sesión de staff — a diferencia de /api/pagos/simular (público,
 // solo para pagos sin factura_id), este endpoint puede marcar pagado
@@ -31,8 +32,11 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: pago } = await admin.from("pagos").select("id, user_id, estado").eq("id", pagoId).maybeSingle();
 
-  const datosActualizar: { estado: string; comprobante_url?: string } = { estado: "pagado" };
+  const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string } = { estado: "pagado" };
   if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
+  // Solo la primera vez: si ya estaba pagado y lo vuelven a mandar (doble
+  // clic, o un comprobante nuevo), no se pisa la fecha real del pago.
+  if (!pago || pago.estado !== "pagado") datosActualizar.fecha_pago = hoyMexicoISO();
 
   const { error } = await admin.from("pagos").update(datosActualizar).eq("id", pagoId);
   if (error) {
