@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
+  const { data: miProfile } = await supabase.from("profiles").select("rol, centro").eq("id", session.user.id).single();
   if (!miProfile || miProfile.rol === "cliente") {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
@@ -30,6 +30,24 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+  const esGlobal = ROLES_GLOBALES.includes(miProfile.rol);
+
+  if (!esGlobal) {
+    const [{ data: factura }, { data: pagos }] = await Promise.all([
+      admin.from("facturas").select("centro").eq("id", facturaId).single(),
+      admin.from("pagos").select("id, centro").in("id", pagoIds),
+    ]);
+
+    const facturaOk = factura?.centro === miProfile.centro;
+    const pagosOk = !!pagos && pagos.length === pagoIds.length && pagos.every((p) => p.centro === miProfile.centro);
+
+    if (!facturaOk || !pagosOk) {
+      return NextResponse.json({ error: "No puedes vincular pagos o facturas de otro centro" }, { status: 403 });
+    }
+  }
+
   const { error } = await admin.from("pagos").update({ factura_id: facturaId }).in("id", pagoIds);
   if (error) {
     return NextResponse.json({ error: "No se pudieron vincular los pagos" }, { status: 500 });
