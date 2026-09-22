@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   //    para que sigan siendo legibles cuando ya no exista el perfil,
   //    marcar el estatus final, cuánto debe si aplica, y la fecha real
   //    en que dejó el espacio.
-  await admin
+  const { data: contratosDelCliente } = await admin
     .from("contratos")
     .update({
       cliente_nombre_historico: cliente.nombre,
@@ -60,7 +60,16 @@ export async function POST(req: NextRequest) {
       fecha_baja: fechaBajaFinal,
     })
     .eq("user_id", clienteId)
-    .eq("estatus", "vigente");
+    .eq("estatus", "vigente")
+    .select("oficina_id");
+
+  // 1.1) Liberar la(s) oficina(s) que tenía — nada más lo hacía, y se
+  //      quedaban marcadas "ocupada" para siempre (ver Reportes/Ocupación
+  //      por centro), bloqueando que se le pudieran asignar a alguien más.
+  const oficinaIds = (contratosDelCliente || []).map((c) => c.oficina_id).filter(Boolean);
+  if (oficinaIds.length > 0) {
+    await admin.from("oficinas").update({ estado: "disponible", cliente_id: null }).in("id", oficinaIds);
+  }
 
   // 2) Si tenía extensión/DID asignado, avisar a sistemas ANTES de
   //    borrarla, para que la liberen del lado del conmutador real.

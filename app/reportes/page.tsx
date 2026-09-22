@@ -22,6 +22,17 @@ export default async function ReportesPage() {
   const miCentro = profile?.centro || null;
 
   let oficinasQuery = supabase.from("oficinas").select("centro, estado");
+  // Ocupación real: se cruza contra contratos vigentes con cliente de
+  // verdad (user_id no nulo), en vez de confiar en oficinas.estado — nada
+  // en el código lo libera cuando un contrato se rechaza/vence, así que se
+  // queda "ocupada" para siempre y desincroniza el reporte (ver
+  // migracion_liberar_oficinas_huerfanas.sql).
+  let contratosOcupacionQuery = supabase
+    .from("contratos")
+    .select("centro, oficina_id")
+    .eq("estatus", "vigente")
+    .not("oficina_id", "is", null)
+    .not("user_id", "is", null);
   let ticketsAbiertosQuery = supabase
     .from("tickets")
     .select("*", { count: "exact", head: true })
@@ -46,10 +57,18 @@ export default async function ReportesPage() {
     .from("reservaciones")
     .select("*", { count: "exact", head: true })
     .eq("estado", "cancelada");
-  let clientesQuery = supabase.from("profiles").select("centro").eq("rol", "cliente");
+  // Solo clientes con acceso real y activo — igual criterio que Ingresos
+  // por Centro, para que ambos reportes concuerden.
+  let clientesQuery = supabase
+    .from("profiles")
+    .select("centro")
+    .eq("rol", "cliente")
+    .eq("activo", true)
+    .eq("suspendido", false);
 
   if (!esGlobal && miCentro) {
     oficinasQuery = oficinasQuery.eq("centro", miCentro);
+    contratosOcupacionQuery = contratosOcupacionQuery.eq("centro", miCentro);
     ticketsAbiertosQuery = ticketsAbiertosQuery.eq("centro", miCentro);
     ticketsEnProcesoQuery = ticketsEnProcesoQuery.eq("centro", miCentro);
     ticketsCerradosQuery = ticketsCerradosQuery.eq("centro", miCentro);
@@ -61,6 +80,7 @@ export default async function ReportesPage() {
 
   const [
     { data: oficinasRaw },
+    { data: contratosOcupacionRaw },
     { count: ticketsAbiertos },
     { count: ticketsEnProceso },
     { count: ticketsCerrados },
@@ -70,6 +90,7 @@ export default async function ReportesPage() {
     { data: clientesRaw },
   ] = await Promise.all([
     oficinasQuery,
+    contratosOcupacionQuery,
     ticketsAbiertosQuery,
     ticketsEnProcesoQuery,
     ticketsCerradosQuery,
@@ -79,14 +100,24 @@ export default async function ReportesPage() {
     clientesQuery,
   ]);
 
-  // Ocupación por centro
+  // Ocupación por centro — "ocupadas" sale de contratosOcupacionRaw (real),
+  // "total"/"disponibles" siguen saliendo de oficinas.
   const centrosMap: Record<string, { total: number; ocupadas: number; disponibles: number }> = {};
-  (oficinasRaw || []).forEach((o) => {
+  (oficinasRaw || []).forEach((o: any) => {
     const centro = o.centro || "Sin centro";
     if (!centrosMap[centro]) centrosMap[centro] = { total: 0, ocupadas: 0, disponibles: 0 };
     centrosMap[centro].total++;
-    if (o.estado === "ocupada") centrosMap[centro].ocupadas++;
     if (o.estado === "disponible") centrosMap[centro].disponibles++;
+  });
+  (contratosOcupacionRaw || []).forEach((c) => {
+    const centro = c.centro || "Sin centro";
+    if (!centrosMap[centro]) centrosMap[centro] = { total: 0, ocupadas: 0, disponibles: 0 };
+  });
+  Object.keys(centrosMap).forEach((centro) => {
+    // Cuenta oficinas únicas ocupadas de ESTE centro (un id de oficina no
+    // se repite entre centros, así que basta con la intersección global).
+    const contratosDelCentro = (contratosOcupacionRaw || []).filter((c) => (c.centro || "Sin centro") === centro);
+    centrosMap[centro].ocupadas = new Set(contratosDelCentro.map((c) => c.oficina_id)).size;
   });
   const ocupacion = Object.entries(centrosMap).map(([centro, d]) => ({
     centro,

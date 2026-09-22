@@ -256,7 +256,11 @@ export default function CotizarForm({
         .select("oficina_id, user_id, fecha_vencimiento")
         .eq("centro", centro)
         .eq("estatus", "vigente")
-        .not("oficina_id", "is", null),
+        .not("oficina_id", "is", null)
+        // Un contrato "vigente" sin user_id nunca se concluyó (se quedó a
+        // medias antes de crear la cuenta del cliente) — no cuenta como
+        // ocupación real, o bloquearía oficinas libres para siempre.
+        .not("user_id", "is", null),
       supabase.from("precios_cotizacion_sala_juntas").select("*").eq("centro", centro).order("tamano"),
       supabase.from("coffee_break_paquetes").select("*").eq("activo", true).order("numero", { ascending: true }),
       supabase
