@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BANNERS_DESTACADOS, CarruselDestacados, type BannerDestacado } from "@/app/components/CarruselBanners";
+import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 
 type Profile = {
   nombre: string | null;
@@ -102,12 +102,14 @@ export default function ClientePanel({
   const [horasSalaRestantes, setHorasSalaRestantes] = useState(0);
   const [horasBolsaTotales, setHorasBolsaTotales] = useState(0);
 
-  // Banners de "Logros" que las empresas comparten y Diseño trabaja —
-  // se suman a los banners promocionales fijos de arriba, así el
-  // carrusel crece solo conforme se van publicando.
+  // Banners promocionales que administra Diseño desde /diseno/banners, más
+  // los banners de "Logros" que las empresas comparten y Diseño trabaja —
+  // el carrusel crece solo conforme se van publicando.
+  const [bannersPromo, setBannersPromo] = useState<BannerDestacado[]>([]);
   const [bannersLogros, setBannersLogros] = useState<BannerDestacado[]>([]);
 
   useEffect(() => {
+    fetchBannersPromocionales(supabase).then(setBannersPromo);
     supabase
       .from("logros")
       .select("banner_url, titulo, empresa")
@@ -347,7 +349,7 @@ export default function ClientePanel({
       </div>
 
       <div className="cli-content">
-        <CarruselDestacados banners={[...BANNERS_DESTACADOS, ...bannersLogros]} />
+        <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
 
         {encuestasPendientes > 0 && (
           <a className="ticket-en-proceso-banner" href="/mis-encuestas" style={{ display: "flex", textDecoration: "none" }}>

@@ -1343,6 +1343,15 @@ body {
   gap: 10px;
 }
 
+/* Paneles con pocos módulos (hoy solo Sistemas) — mismo grid flexible de
+   arriba, pero topado a ~4 columnas en pantallas anchas en vez de
+   estirarse a lo ancho, para que no se vean sueltos/regados; en pantallas
+   angostas se sigue acomodando solo, igual que .modulos-grid. */
+.modulos-grid-compacta {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
 .modulo-card {
   background: #fff;
   border-radius: 12px;

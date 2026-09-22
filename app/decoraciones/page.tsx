@@ -54,7 +54,10 @@ function fechaCorta(f: string | null) {
 
 export default function DecoracionesPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin();
+  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(
+    ["atencion_cliente"],
+    ["atencion_cliente"]
+  );
   const [decoraciones, setDecoraciones] = useState<Decoracion[]>([]);
   const [cargandoLista, setCargandoLista] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);

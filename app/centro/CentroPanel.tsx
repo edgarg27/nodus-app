@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
+import { labelRol } from "@/lib/roles";
 import { TIPOS_ESPACIO_FIDELIDAD, LABEL_TIPO_ESPACIO_FIDELIDAD, calcularRegalo, type TipoEspacioFidelidad } from "@/lib/fidelidad";
 import FidelidadCard from "@/app/components/FidelidadCard";
 import { ROLES_PAQUETERIA } from "@/lib/paqueteria";
@@ -2049,7 +2050,7 @@ export default function CentroPanel({
                 <div className="avatar-dropdown">
                   <p className="avatar-dropdown-nombre">{nombre}</p>
                   <p className="avatar-dropdown-rol">
-                    {rol}
+                    {labelRol(rol)}
                     {centro ? ` · ${centro}` : ""}
                   </p>
                   <button className="avatar-dropdown-item" onClick={handleLogout}>

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../soporte/FileDropzone";
-import { BANNERS_DESTACADOS, CarruselDestacados, type BannerDestacado } from "@/app/components/CarruselBanners";
 
 type Logro = {
   id: string;
@@ -58,15 +57,6 @@ export default function DisenoPage() {
     setLoading(false);
   }
 
-  // Los mismos banners publicados que ve el cliente en su dashboard (ver
-  // CarruselDestacados en ClientePanel.tsx) — así Diseño ve exactamente
-  // cómo va a quedar antes de publicar uno nuevo.
-  const bannersPublicados: BannerDestacado[] = [
-    ...BANNERS_DESTACADOS,
-    ...logros
-      .filter((l) => l.estado === "publicado" && l.banner_url)
-      .map((l) => ({ src: l.banner_url as string, alt: `Logro de ${l.empresa || l.cliente_nombre || "un cliente"}: ${l.titulo}` })),
-  ];
 
   function abrirTrabajar(l: Logro) {
     if (abiertoId === l.id) {
@@ -152,12 +142,7 @@ export default function DisenoPage() {
           <div className="empty-card">No tienes permiso para ver esta sección.</div>
         ) : (
           <>
-            <p className="panel-section-label" style={{ marginTop: 0 }}>
-              Así lo ve el cliente
-            </p>
-            <CarruselDestacados banners={bannersPublicados} />
-
-            <div className="categorias-row" style={{ marginBottom: 8, marginTop: 12 }}>
+            <div className="categorias-row" style={{ marginBottom: 8 }}>
               <button
                 type="button"
                 className={"categoria-card" + (filtro === "pendientes" ? " active" : "")}

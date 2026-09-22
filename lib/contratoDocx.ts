@@ -1,7 +1,6 @@
 import JSZip from "jszip";
-import path from "path";
-import fs from "fs/promises";
 import { fmtMoneda, reemplazarTodasDocx } from "./docxHelpers";
+import { cargarArchivoPlantilla } from "./plantillasStorage";
 
 // Plantillas reales de contrato (NBC) — solo centro Bosques. Coworking
 // tiene 3 variantes por tipo de persona: paquete "30 Horas" (término fijo
@@ -92,8 +91,7 @@ async function cargarPlantilla(datos: DatosContratoDocx) {
     );
   }
   const archivo = resolverArchivoPlantilla(datos);
-  const ruta = path.join(process.cwd(), "public", "plantillas-contrato", archivo);
-  const buffer = await fs.readFile(ruta);
+  const buffer = await cargarArchivoPlantilla("plantillas-contrato", archivo);
   return JSZip.loadAsync(buffer);
 }
 

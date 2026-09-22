@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type BannerDestacado = { src: string; alt: string };
 
 // Banners promocionales del carrusel de arriba del dashboard del cliente
-// (estilo "Rappi"): hoy solo llevamos el banner de Nodus Flex Center, pero
-// para sumar más (p.ej. empresas de éxito / testimoniales) basta con:
-//   1. Poner la imagen en /public/images
-//   2. Agregar un objeto { src, alt } a este arreglo
-// El carrusel se ajusta solo — muestra los puntos y hace autoplay
-// automáticamente en cuanto hay más de un banner.
+// (estilo "Rappi"): antes vivían quemados en el código, ahora Diseño los
+// administra desde /diseno/banners (tabla "banners_promocionales",
+// migracion_banners_promocionales.sql) — fetchBannersPromocionales() los
+// trae de ahí. Este arreglo se queda solo como respaldo, por si esa
+// migración todavía no corrió o la tabla vino vacía, para no dejar el
+// carrusel en blanco.
 export const BANNERS_DESTACADOS: BannerDestacado[] = [
   {
     src: "/images/nodus-flex-center-banner.jpg",
@@ -25,6 +26,19 @@ export const BANNERS_DESTACADOS: BannerDestacado[] = [
     alt: "Nodus Flex Center · Sucursal San Telmo",
   },
 ];
+
+// Trae los banners activos y en orden desde la base — usado tanto por el
+// dashboard del cliente como por la vista previa de Diseño, para que
+// ambos siempre muestren exactamente lo mismo.
+export async function fetchBannersPromocionales(supabase: SupabaseClient): Promise<BannerDestacado[]> {
+  const { data, error } = await supabase
+    .from("banners_promocionales")
+    .select("src, alt")
+    .eq("activo", true)
+    .order("orden", { ascending: true });
+  if (error || !data || data.length === 0) return BANNERS_DESTACADOS;
+  return data.map((b) => ({ src: b.src, alt: b.alt || "" }));
+}
 
 // Mismo carrusel que ve el cliente en su dashboard — se reutiliza en
 // Diseño (app/diseno/page.tsx) como vista previa de cómo se ve con los

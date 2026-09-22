@@ -14,7 +14,7 @@ type Tour = {
   tipo_espacio_interes: string | null;
 };
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente"];
 const TIPOS_ESPACIO_INTERES = ["Coworking", "Oficina Privada", "Working Desk", "Sala de Juntas"];
 
 function hoyISO() {

@@ -7,7 +7,7 @@ import MapaConPines from "./MapaConPines";
 // Operaciones necesita moverse entre todos los centros para poder subir el
 // layout de cada uno (es quien registra los planos), igual que ya puede
 // hacerlo en Panel de Centro con gastos/proveedores.
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "atencion_cliente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 type Mapa = {
