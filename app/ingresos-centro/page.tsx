@@ -160,8 +160,23 @@ export default function IngresosCentroPage() {
       .from("contratos")
       .select("id, user_id, renta_mensual, forma_pago, cliente_nombre_historico, cliente_empresa_historico")
       .eq("centro", c)
-      .eq("estatus", "vigente");
-    const contratosLista = contratosData || [];
+      .eq("estatus", "vigente")
+      // Solo contratos con un cliente real dado de alta: hay contratos
+      // "vigentes" de pruebas/cotizaciones que nunca se concluyeron (nunca
+      // se les creó la cuenta) y no deben contarse como ocupando espacio.
+      .not("user_id", "is", null);
+    let contratosLista = contratosData || [];
+    const userIds = Array.from(new Set(contratosLista.map((ct) => ct.user_id).filter(Boolean)));
+
+    // Y que el cliente siga activo (no dado de baja ni suspendido) — mismo
+    // criterio que usa el cron de facturación para decidir a quién cobrar.
+    if (userIds.length > 0) {
+      const { data: perfiles } = await supabase.from("profiles").select("id, activo, suspendido").in("id", userIds);
+      const activos = new Set((perfiles || []).filter((p) => p.activo && !p.suspendido).map((p) => p.id));
+      contratosLista = contratosLista.filter((ct) => activos.has(ct.user_id));
+    } else {
+      contratosLista = [];
+    }
     const ids = contratosLista.map((ct) => ct.id);
 
     const inicioMes = primerDiaMes();
