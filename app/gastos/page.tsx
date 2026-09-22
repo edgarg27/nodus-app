@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 
 type Gasto = {
@@ -64,6 +65,18 @@ export default function GastosPage() {
   const [proveedorId, setProveedorId] = useState("");
   const [factura, setFactura] = useState<File[]>([]);
   const [comprobante, setComprobante] = useState<File[]>([]);
+  const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
+
+  async function abrirComprobante(archivoUrl: string) {
+    setAbriendoArchivoUrl(archivoUrl);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "comprobantes", archivoUrl);
+    setAbriendoArchivoUrl(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   useEffect(() => {
     fetchTodo();
@@ -357,19 +370,24 @@ export default function GastosPage() {
                 </p>
                 <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                   {g.factura_url && (
-                    <a href={g.factura_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                      📎 Factura
-                    </a>
+                    <button
+                      type="button"
+                      onClick={() => abrirComprobante(g.factura_url!)}
+                      disabled={abriendoArchivoUrl === g.factura_url}
+                      style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                    >
+                      {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Factura"}
+                    </button>
                   )}
                   {g.comprobante_pago_url && (
-                    <a
-                      href={g.comprobante_pago_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ fontSize: 11, color: "#185FA5" }}
+                    <button
+                      type="button"
+                      onClick={() => abrirComprobante(g.comprobante_pago_url!)}
+                      disabled={abriendoArchivoUrl === g.comprobante_pago_url}
+                      style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
                     >
-                      🧾 Comprobante de pago
-                    </a>
+                      {abriendoArchivoUrl === g.comprobante_pago_url ? "Abriendo…" : "🧾 Comprobante de pago"}
+                    </button>
                   )}
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { getSignedFileUrl } from "@/lib/storage";
 
 // Datos mínimos y no sensibles de un contrato, para la página pública
 // /firmar-contrato/[id] (sin sesión) — evita exponer RFC, correo,
@@ -14,6 +15,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   if (error || !contrato) {
     return NextResponse.json({ error: "No se encontró el contrato" }, { status: 404 });
+  }
+
+  if (contrato.archivo_url) {
+    const { url } = await getSignedFileUrl(admin, "contratos", contrato.archivo_url);
+    if (url) contrato.archivo_url = url;
   }
 
   return NextResponse.json({ contrato });

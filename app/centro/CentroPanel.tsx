@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
@@ -271,6 +272,18 @@ export default function CentroPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
+
+  async function abrirComprobante(archivoUrl: string) {
+    setAbriendoArchivoUrl(archivoUrl);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "comprobantes", archivoUrl);
+    setAbriendoArchivoUrl(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   const puedeEditarInternet = rol === "sistemas" || (rol === "superadmin" || rol === "gerente");
   const puedeEditarTelefonia = rol === "admin" || (rol === "superadmin" || rol === "gerente");
@@ -3779,14 +3792,24 @@ export default function CentroPanel({
                                     {(g.factura_url || g.comprobante_pago_url) && (
                                       <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                                         {g.factura_url && (
-                                          <a href={g.factura_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                            📎 Factura
-                                          </a>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirComprobante(g.factura_url!)}
+                                            disabled={abriendoArchivoUrl === g.factura_url}
+                                            style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                          >
+                                            {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Factura"}
+                                          </button>
                                         )}
                                         {g.comprobante_pago_url && (
-                                          <a href={g.comprobante_pago_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                            🧾 Comprobante de pago
-                                          </a>
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirComprobante(g.comprobante_pago_url!)}
+                                            disabled={abriendoArchivoUrl === g.comprobante_pago_url}
+                                            style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                          >
+                                            {abriendoArchivoUrl === g.comprobante_pago_url ? "Abriendo…" : "🧾 Comprobante de pago"}
+                                          </button>
                                         )}
                                       </div>
                                     )}
@@ -3947,14 +3970,24 @@ export default function CentroPanel({
                             {(g.factura_url || g.comprobante_pago_url) && (
                               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                                 {g.factura_url && (
-                                  <a href={g.factura_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                    📎 Factura
-                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirComprobante(g.factura_url!)}
+                                    disabled={abriendoArchivoUrl === g.factura_url}
+                                    style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                  >
+                                    {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Factura"}
+                                  </button>
                                 )}
                                 {g.comprobante_pago_url && (
-                                  <a href={g.comprobante_pago_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                    🧾 Comprobante de pago
-                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirComprobante(g.comprobante_pago_url!)}
+                                    disabled={abriendoArchivoUrl === g.comprobante_pago_url}
+                                    style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                  >
+                                    {abriendoArchivoUrl === g.comprobante_pago_url ? "Abriendo…" : "🧾 Comprobante de pago"}
+                                  </button>
                                 )}
                               </div>
                             )}
@@ -4068,14 +4101,24 @@ export default function CentroPanel({
                             {(g.factura_url || g.comprobante_pago_url) && (
                               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                                 {g.factura_url && (
-                                  <a href={g.factura_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                    📎 Factura
-                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirComprobante(g.factura_url!)}
+                                    disabled={abriendoArchivoUrl === g.factura_url}
+                                    style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                  >
+                                    {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Factura"}
+                                  </button>
                                 )}
                                 {g.comprobante_pago_url && (
-                                  <a href={g.comprobante_pago_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                    🧾 Comprobante de pago
-                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => abrirComprobante(g.comprobante_pago_url!)}
+                                    disabled={abriendoArchivoUrl === g.comprobante_pago_url}
+                                    style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                                  >
+                                    {abriendoArchivoUrl === g.comprobante_pago_url ? "Abriendo…" : "🧾 Comprobante de pago"}
+                                  </button>
                                 )}
                               </div>
                             )}

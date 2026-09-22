@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 
 type Cliente = {
@@ -92,6 +93,18 @@ export default function AdminPanel({
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [abriendoArchivoId, setAbriendoArchivoId] = useState<string | null>(null);
+
+  async function abrirArchivoContrato(id: string, archivoUrl: string) {
+    setAbriendoArchivoId(id);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "contratos", archivoUrl);
+    setAbriendoArchivoId(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
   const [vouchersCliente, setVouchersCliente] = useState<Voucher[]>([]);
   const [contratosCliente, setContratosCliente] = useState<ContratoResumen[]>([]);
   const [generandoVoucher, setGenerandoVoucher] = useState(false);
@@ -217,7 +230,7 @@ export default function AdminPanel({
       lista = lista.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "mantenimiento");
     }
     // Logros, quejas y sugerencias solo le llegan al superadmin, no al admin/gerente.
-    if (rol === "gerente") {
+    if (rol === "gerente" || rol === "admin") {
       lista = lista.filter((n) => n.tipo !== "nueva_queja" && n.tipo !== "nuevo_logro");
     }
     setNotificaciones(lista);
@@ -250,7 +263,10 @@ export default function AdminPanel({
     } else if (n.tipo === "proximo_mantenimiento") {
       router.push("/mantenimiento");
     } else if (n.tipo === "nuevo_gasto") {
-      router.push("/cobranza?tab=gastos");
+      // La pestaña de gastos en /cobranza solo renderiza contenido para roles
+      // con alcance global (esGlobal); admin (alcance de un solo centro) debe
+      // ir a /gastos, que sí muestra los gastos de su centro.
+      router.push(esGlobal ? "/cobranza?tab=gastos" : "/gastos");
     } else if (
       n.tipo === "pago_confirmado" ||
       n.tipo === "fecha_pago_hoy" ||
@@ -1293,9 +1309,14 @@ export default function AdminPanel({
                       </p>
                       <p className="factura-concepto">${Number(ct.renta_mensual).toLocaleString("es-MX")}/mes</p>
                       {ct.archivo_url && (
-                        <a className="ver-pdf-btn" href={ct.archivo_url} target="_blank" download>
-                          📥 Ver PDF
-                        </a>
+                        <button
+                          type="button"
+                          className="ver-pdf-btn"
+                          onClick={() => abrirArchivoContrato(ct.id, ct.archivo_url!)}
+                          disabled={abriendoArchivoId === ct.id}
+                        >
+                          {abriendoArchivoId === ct.id ? "Abriendo…" : "📥 Ver PDF"}
+                        </button>
                       )}
                       {puedeGestionarClientes && (
                         <a

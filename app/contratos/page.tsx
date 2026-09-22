@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { conIva } from "@/lib/adicionales";
 import { etiquetaFormaPago } from "@/lib/formaPago";
@@ -86,6 +87,18 @@ export default function ContratosPage() {
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
 
   const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [abriendoArchivoId, setAbriendoArchivoId] = useState<string | null>(null);
+
+  async function abrirArchivoContrato(id: string, archivoUrl: string) {
+    setAbriendoArchivoId(id);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "contratos", archivoUrl);
+    setAbriendoArchivoId(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
   const [prospectosBusqueda, setProspectosBusqueda] = useState<ProspectoBusqueda[]>([]);
   const [oficinasDisponibles, setOficinasDisponibles] = useState<OficinaOpcion[]>([]);
 
@@ -1009,9 +1022,14 @@ export default function ContratosPage() {
                       </span>
                     </div>
                     {c.archivo_url ? (
-                      <a className="ver-pdf-btn" href={c.archivo_url} target="_blank" download>
-                        📥 Ver y descargar contrato
-                      </a>
+                      <button
+                        type="button"
+                        className="ver-pdf-btn"
+                        onClick={() => abrirArchivoContrato(c.id, c.archivo_url!)}
+                        disabled={abriendoArchivoId === c.id}
+                      >
+                        {abriendoArchivoId === c.id ? "Abriendo…" : "📥 Ver y descargar contrato"}
+                      </button>
                     ) : (
                       <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin contrato PDF adjunto</p>
                     )}

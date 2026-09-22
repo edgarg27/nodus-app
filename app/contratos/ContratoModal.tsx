@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import { conIva, sinIva } from "@/lib/adicionales";
@@ -78,6 +79,18 @@ export default function ContratoModal({
   const [archivosNuevos, setArchivosNuevos] = useState<File[]>([]);
   const [versiones, setVersiones] = useState<VersionContrato[]>([]);
   const [marcandoFinal, setMarcandoFinal] = useState<string | null>(null);
+  const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
+
+  async function abrirArchivoContrato(archivoUrl: string) {
+    setAbriendoArchivoUrl(archivoUrl);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "contratos", archivoUrl);
+    setAbriendoArchivoUrl(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -718,14 +731,16 @@ export default function ContratoModal({
         <p className="modal-seccion">📎 Contrato PDF (Machote pre-generado)</p>
         {contrato.archivo_machote_url || contrato.archivo_url ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <a
+            <button
+              type="button"
               className="ver-pdf-btn"
-              href={contrato.archivo_machote_url || contrato.archivo_url || undefined}
-              target="_blank"
-              download
+              onClick={() => abrirArchivoContrato((contrato.archivo_machote_url || contrato.archivo_url)!)}
+              disabled={abriendoArchivoUrl === (contrato.archivo_machote_url || contrato.archivo_url)}
             >
-              📥 Ver y descargar machote
-            </a>
+              {abriendoArchivoUrl === (contrato.archivo_machote_url || contrato.archivo_url)
+                ? "Abriendo…"
+                : "📥 Ver y descargar machote"}
+            </button>
             {archivoFinalUrl === (contrato.archivo_machote_url || contrato.archivo_url) ? (
               <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Es la versión final</span>
             ) : (
@@ -763,9 +778,14 @@ export default function ContratoModal({
                   <p className="item-card-sub">{new Date(v.created_at).toLocaleString("es-MX")}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <a className="ver-pdf-btn" href={v.archivo_url} target="_blank" download>
-                    📥 Ver
-                  </a>
+                  <button
+                    type="button"
+                    className="ver-pdf-btn"
+                    onClick={() => abrirArchivoContrato(v.archivo_url)}
+                    disabled={abriendoArchivoUrl === v.archivo_url}
+                  >
+                    {abriendoArchivoUrl === v.archivo_url ? "Abriendo…" : "📥 Ver"}
+                  </button>
                   {archivoFinalUrl === v.archivo_url ? (
                     <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Final</span>
                   ) : (

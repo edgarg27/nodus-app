@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getSignedFileUrl } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 import { conIva, esCobroMensual, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { CATEGORIA_PAGO_INFO, type CategoriaPago, categorizarPago, pagoEstaCubierto } from "@/lib/pagosCategoria";
@@ -73,6 +74,18 @@ export default function IngresosCentroPage() {
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const esGlobal = ROLES_GLOBALES.includes(miRol);
+  const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
+
+  async function abrirComprobante(archivoUrl: string) {
+    setAbriendoArchivoUrl(archivoUrl);
+    const { url, error: signErr } = await getSignedFileUrl(supabase, "comprobantes", archivoUrl);
+    setAbriendoArchivoUrl(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   const [tab, setTab] = useState<"resumen" | "clientes" | "gastos">("resumen");
 
@@ -802,19 +815,24 @@ export default function IngresosCentroPage() {
                         {(g.factura_url || g.comprobante_pago_url) && (
                           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                             {g.factura_url && (
-                              <a href={g.factura_url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#185FA5" }}>
-                                📎 Factura
-                              </a>
+                              <button
+                                type="button"
+                                onClick={() => abrirComprobante(g.factura_url!)}
+                                disabled={abriendoArchivoUrl === g.factura_url}
+                                style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
+                              >
+                                {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Factura"}
+                              </button>
                             )}
                             {g.comprobante_pago_url && (
-                              <a
-                                href={g.comprobante_pago_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{ fontSize: 11, color: "#185FA5" }}
+                              <button
+                                type="button"
+                                onClick={() => abrirComprobante(g.comprobante_pago_url!)}
+                                disabled={abriendoArchivoUrl === g.comprobante_pago_url}
+                                style={{ fontSize: 11, color: "#185FA5", background: "none", border: "none", padding: 0, cursor: "pointer" }}
                               >
-                                🧾 Comprobante de pago
-                              </a>
+                                {abriendoArchivoUrl === g.comprobante_pago_url ? "Abriendo…" : "🧾 Comprobante de pago"}
+                              </button>
                             )}
                           </div>
                         )}
