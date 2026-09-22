@@ -34,6 +34,7 @@ export default function CotizacionesPage() {
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
   const [aceptadoOkId, setAceptadoOkId] = useState<string | null>(null);
   const [confirmandoAceptarId, setConfirmandoAceptarId] = useState<string | null>(null);
+  const [confirmandoBorrarId, setConfirmandoBorrarId] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
@@ -106,7 +107,7 @@ export default function CotizacionesPage() {
   }
 
   async function borrarCotizacion(id: string) {
-    if (!confirm("¿Borrar esta cotización?")) return;
+    setConfirmandoBorrarId(null);
     await supabase.from("cotizaciones").delete().eq("id", id);
     if (centro) fetchCotizaciones(centro, "");
   }
@@ -313,7 +314,7 @@ export default function CotizacionesPage() {
                       </span>
                       <span className="btn-enviar-text">{c.estatus === "aceptada" ? "✓ Aceptada" : "✓ Aceptar"}</span>
                     </button>
-                    <button className="tel-borrar-btn" onClick={() => borrarCotizacion(c.id)}>
+                    <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(c.id)}>
                       🗑
                     </button>
                   </div>
@@ -337,6 +338,25 @@ export default function CotizacionesPage() {
               </button>
               <button className="btn-aceptar" onClick={() => aceptarCotizacion(confirmandoAceptarId)}>
                 ✓ Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmandoBorrarId && (
+        <div className="modal-overlay" onClick={() => setConfirmandoBorrarId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Borrar cotización</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar esta cotización? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarCotizacion(confirmandoBorrarId)}>
+                🗑 Borrar
               </button>
             </div>
           </div>

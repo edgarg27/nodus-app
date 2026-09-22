@@ -342,7 +342,7 @@ export default function ContratosPage() {
   }
 
   async function rechazarContrato(c: Contrato) {
-    if (!confirm("¿Rechazar este contrato? El cliente no quedará activo con este plan.")) return;
+    setConfirmandoRechazo(null);
     setProcesandoAprobacion(c.id);
     await supabase.from("contratos").update({ estatus: "rechazado" }).eq("id", c.id);
     setProcesandoAprobacion(null);
@@ -413,6 +413,7 @@ export default function ContratosPage() {
   const [contratoEnviado, setContratoEnviado] = useState(false);
   const [contratoExitoVisible, setContratoExitoVisible] = useState(false);
   const [aprobacionExitoNombre, setAprobacionExitoNombre] = useState<string | null>(null);
+  const [confirmandoRechazo, setConfirmandoRechazo] = useState<Contrato | null>(null);
   const [errorContrato, setErrorContrato] = useState("");
 
   // Prospecto al que se le va a crear el contrato.
@@ -666,7 +667,7 @@ export default function ContratosPage() {
                       </button>
                       <button
                         className="btn-rechazar"
-                        onClick={() => rechazarContrato(c)}
+                        onClick={() => setConfirmandoRechazo(c)}
                         disabled={procesandoAprobacion === c.id}
                       >
                         ✗ Rechazar
@@ -1120,6 +1121,25 @@ export default function ContratosPage() {
             <button className="invitado-exito-btn" onClick={() => setAprobacionExitoNombre(null)}>
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmandoRechazo && (
+        <div className="modal-overlay" onClick={() => setConfirmandoRechazo(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Rechazar contrato</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Rechazar este contrato? El cliente no quedará activo con este plan.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoRechazo(null)}>
+                Cancelar
+              </button>
+              <button className="btn-rechazar" onClick={() => rechazarContrato(confirmandoRechazo)}>
+                ✗ Rechazar
+              </button>
+            </div>
           </div>
         </div>
       )}
