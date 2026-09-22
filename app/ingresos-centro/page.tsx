@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../soporte/FileDropzone";
+import { conIva, esCobroMensual, totalAdicionalesMensuales } from "@/lib/adicionales";
+import { CATEGORIA_PAGO_INFO, type CategoriaPago, categorizarPago, pagoEstaCubierto } from "@/lib/pagosCategoria";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -21,6 +23,26 @@ type Gasto = {
 };
 type Proveedor = { id: string; nombre: string };
 
+// Fila de pagos usada para el desglose por categoría y la gráfica de la
+// pestaña Resumen — solo lo que ya entró (estado "pagado") en el rango.
+type PagoResumen = { monto: number; concepto: string | null; fecha_pago: string | null };
+
+// Lo que le toca pagar este mes a cada cliente con contrato vigente, y si ya
+// se cubrió. No depende del rango de fechas de Resumen — siempre es "este
+// mes de calendario", que es como la gente entiende "mi mensualidad".
+type ClienteIngreso = {
+  contratoId: string;
+  nombre: string;
+  empresa: string | null;
+  renta: number;
+  adicionales: { concepto: string; monto: number }[];
+  totalAdicionales: number;
+  esperado: number;
+  estadoMes: "adelantado" | "cubierto" | "pendiente" | "sin_generar";
+  montoRelevante: number;
+  tieneRecargo: boolean;
+};
+
 function primerDiaMes() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split("T")[0];
@@ -33,6 +55,7 @@ function hoyISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export default function IngresosCentroPage() {
   const supabase = createClient();
@@ -42,12 +65,17 @@ export default function IngresosCentroPage() {
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
-  const [tab, setTab] = useState<"resumen" | "gastos">("resumen");
+  const [tab, setTab] = useState<"resumen" | "clientes" | "gastos">("resumen");
 
   const [fechaDesde, setFechaDesde] = useState(primerDiaMes());
   const [fechaHasta, setFechaHasta] = useState(ultimoDiaMes());
   const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
+  const [pagosPeriodo, setPagosPeriodo] = useState<PagoResumen[]>([]);
+
+  // ---- Por cliente: mensualidad de este mes, cubierta o pendiente ----
+  const [clientesIngreso, setClientesIngreso] = useState<ClienteIngreso[]>([]);
+  const [cargandoClientes, setCargandoClientes] = useState(true);
 
   // ---- Gastos (pestaña propia, dentro de esta misma pantalla) ----
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -79,6 +107,11 @@ export default function IngresosCentroPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro]);
 
+  useEffect(() => {
+    if (centro) cargarClientes(centro);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centro]);
+
   async function init() {
     setLoading(true);
     const {
@@ -100,20 +133,114 @@ export default function IngresosCentroPage() {
     setLoading(true);
     // Ingresos = dinero que efectivamente entró (pagos.estado = 'pagado'),
     // no lo facturado — por eso sale de `pagos` y no de `facturas`, que
-    // puede incluir pendientes/vencidas.
+    // puede incluir pendientes/vencidas. concepto y fecha_pago se usan para
+    // el desglose por categoría y la gráfica de abajo.
     const [{ data: pagosData }, { data: gastosData }] = await Promise.all([
       supabase
         .from("pagos")
-        .select("monto")
+        .select("monto, concepto, fecha_pago")
         .eq("centro", c)
         .eq("estado", "pagado")
         .gte("fecha_pago", fechaDesde)
         .lte("fecha_pago", fechaHasta),
       supabase.from("gastos").select("monto").eq("centro", c).gte("fecha", fechaDesde).lte("fecha", fechaHasta),
     ]);
-    setTotalIngresos((pagosData || []).reduce((s, p) => s + Number(p.monto), 0));
+    const pagos = pagosData || [];
+    setTotalIngresos(pagos.reduce((s, p) => s + Number(p.monto), 0));
     setTotalGastos((gastosData || []).reduce((s, g) => s + Number(g.monto), 0));
+    setPagosPeriodo(pagos);
     setLoading(false);
+  }
+
+  // Contratos vigentes del centro + sus adicionales mensuales + los pagos de
+  // renta generados este mes, para saber quién ya cubrió su mensualidad.
+  async function cargarClientes(c: string) {
+    setCargandoClientes(true);
+    const { data: contratosData } = await supabase
+      .from("contratos")
+      .select("id, user_id, renta_mensual, forma_pago, cliente_nombre_historico, cliente_empresa_historico")
+      .eq("centro", c)
+      .eq("estatus", "vigente");
+    const contratosLista = contratosData || [];
+    const ids = contratosLista.map((ct) => ct.id);
+
+    const inicioMes = primerDiaMes();
+    const finMes = ultimoDiaMes();
+
+    const [{ data: adicionalesData }, { data: pagosData }] = ids.length
+      ? await Promise.all([
+          supabase.from("contrato_adicionales").select("contrato_id, concepto, monto").in("contrato_id", ids),
+          supabase
+            .from("pagos")
+            .select("contrato_id, concepto, monto, estado")
+            .eq("centro", c)
+            .in("contrato_id", ids)
+            .gte("created_at", `${inicioMes}T00:00:00`)
+            .lte("created_at", `${finMes}T23:59:59`),
+        ])
+      : [{ data: [] as any[] }, { data: [] as any[] }];
+
+    const adicionalesPorContrato = new Map<string, { concepto: string; monto: number }[]>();
+    for (const a of adicionalesData || []) {
+      const arr = adicionalesPorContrato.get(a.contrato_id) || [];
+      arr.push({ concepto: a.concepto, monto: Number(a.monto) || 0 });
+      adicionalesPorContrato.set(a.contrato_id, arr);
+    }
+
+    const pagosPorContrato = new Map<string, { concepto: string; monto: number; estado: string }[]>();
+    for (const p of pagosData || []) {
+      if (!p.contrato_id) continue;
+      const arr = pagosPorContrato.get(p.contrato_id) || [];
+      arr.push(p);
+      pagosPorContrato.set(p.contrato_id, arr);
+    }
+
+    const filas: ClienteIngreso[] = contratosLista.map((ct) => {
+      const adicionalesRaw = adicionalesPorContrato.get(ct.id) || [];
+      const adicionalesMensuales = adicionalesRaw
+        .filter((a) => esCobroMensual(a.concepto))
+        .map((a) => ({ concepto: a.concepto, monto: conIva(a.concepto, a.monto) }));
+      const totalAdicionales = round2(adicionalesMensuales.reduce((s, a) => s + a.monto, 0));
+      const renta = Number(ct.renta_mensual) || 0;
+      const esperado = round2(renta + totalAdicionales);
+
+      const pagosDelContrato = pagosPorContrato.get(ct.id) || [];
+      const pagosRenta = pagosDelContrato.filter((p) => categorizarPago(p.concepto) === "renta");
+      const pagado = pagosRenta.find((p) => pagoEstaCubierto(p.estado));
+      const pendiente = pagosRenta.find((p) => !pagoEstaCubierto(p.estado));
+      const tieneRecargo = pagosDelContrato.some((p) => categorizarPago(p.concepto) === "recargo");
+
+      let estadoMes: ClienteIngreso["estadoMes"];
+      let montoRelevante = esperado;
+      if (ct.forma_pago === "adelantado") {
+        estadoMes = "adelantado";
+      } else if (pagado) {
+        estadoMes = "cubierto";
+        montoRelevante = Number(pagado.monto) || esperado;
+      } else if (pendiente) {
+        estadoMes = "pendiente";
+        montoRelevante = Number(pendiente.monto) || esperado;
+      } else {
+        estadoMes = "sin_generar";
+      }
+
+      return {
+        contratoId: ct.id,
+        nombre: ct.cliente_nombre_historico || "Cliente",
+        empresa: ct.cliente_empresa_historico,
+        renta,
+        adicionales: adicionalesMensuales,
+        totalAdicionales,
+        esperado,
+        estadoMes,
+        montoRelevante,
+        tieneRecargo,
+      };
+    });
+
+    filas.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    setClientesIngreso(filas);
+    setCargandoClientes(false);
   }
 
   async function cargarGastos(c: string) {
@@ -197,6 +324,82 @@ export default function IngresosCentroPage() {
 
   const gananciaNeta = useMemo(() => totalIngresos - totalGastos, [totalIngresos, totalGastos]);
 
+  // Desglose de lo ya cobrado en el rango, por categoría (renta, adicionales,
+  // depósitos, recargos, oficinas agregadas, otros).
+  const porCategoria = useMemo(() => {
+    const totales = new Map<CategoriaPago, number>();
+    for (const p of pagosPeriodo) {
+      const cat = categorizarPago(p.concepto);
+      totales.set(cat, (totales.get(cat) || 0) + Number(p.monto));
+    }
+    const maxMonto = Math.max(1, ...Array.from(totales.values()));
+    return (Object.keys(CATEGORIA_PAGO_INFO) as CategoriaPago[])
+      .map((cat) => ({ cat, monto: round2(totales.get(cat) || 0), pct: ((totales.get(cat) || 0) / maxMonto) * 100, ...CATEGORIA_PAGO_INFO[cat] }))
+      .filter((c) => c.monto > 0)
+      .sort((a, b) => b.monto - a.monto);
+  }, [pagosPeriodo]);
+
+  // Ingresos por día (rangos cortos) o por semana (rangos largos), para la
+  // gráfica de barras de Resumen.
+  const rangoEnDias = useMemo(() => {
+    if (!fechaDesde || !fechaHasta) return 0;
+    const desde = new Date(fechaDesde + "T00:00:00");
+    const hasta = new Date(fechaHasta + "T00:00:00");
+    return Math.round((hasta.getTime() - desde.getTime()) / 86400000) + 1;
+  }, [fechaDesde, fechaHasta]);
+  const porSemana = rangoEnDias > 31;
+
+  const serieTiempo = useMemo(() => {
+    if (!fechaDesde || !fechaHasta) return [];
+    const buckets = new Map<string, { label: string; monto: number }>();
+
+    for (const p of pagosPeriodo) {
+      if (!p.fecha_pago) continue;
+      const fecha = new Date(p.fecha_pago + "T00:00:00");
+      let clave: string;
+      let label: string;
+      if (porSemana) {
+        const inicioSemana = new Date(fecha);
+        inicioSemana.setDate(fecha.getDate() - fecha.getDay());
+        clave = inicioSemana.toISOString().split("T")[0];
+        label = inicioSemana.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+      } else {
+        clave = p.fecha_pago;
+        label = fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+      }
+      const actual = buckets.get(clave) || { label, monto: 0 };
+      actual.monto += Number(p.monto);
+      buckets.set(clave, actual);
+    }
+    const maxMonto = Math.max(1, ...Array.from(buckets.values()).map((b) => b.monto));
+    return Array.from(buckets.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, b]) => ({ ...b, monto: round2(b.monto), pct: (b.monto / maxMonto) * 100 }));
+  }, [pagosPeriodo, fechaDesde, fechaHasta, porSemana]);
+
+  // Totales de la pestaña "Por cliente": lo que le toca al centro este mes,
+  // cuánto ya se cubrió y cuánto sigue pendiente (incluye lo que ni siquiera
+  // se ha facturado todavía, porque sigue siendo dinero que va a entrar).
+  const resumenClientes = useMemo(() => {
+    let esperado = 0;
+    let cubierto = 0;
+    let pendiente = 0;
+    for (const f of clientesIngreso) {
+      if (f.estadoMes === "adelantado") continue;
+      esperado += f.esperado;
+      if (f.estadoMes === "cubierto") cubierto += f.montoRelevante;
+      else pendiente += f.montoRelevante;
+    }
+    return { esperado: round2(esperado), cubierto: round2(cubierto), pendiente: round2(pendiente) };
+  }, [clientesIngreso]);
+
+  const ESTADO_MES_INFO: Record<ClienteIngreso["estadoMes"], { label: string; bg: string; color: string }> = {
+    cubierto: { label: "✓ Cubierto", bg: "#E1F5EE", color: "#0F6E56" },
+    pendiente: { label: "⏳ Pendiente", bg: "#FCEBEB", color: "#A32D2D" },
+    sin_generar: { label: "Aún no se genera", bg: "#F5F5F5", color: "#888" },
+    adelantado: { label: "📦 Pagado por adelantado", bg: "#E6F1FB", color: "#185FA5" },
+  };
+
   return (
     <div className="panel">
       <div className="rep-header">
@@ -227,6 +430,9 @@ export default function IngresosCentroPage() {
           <div className="centro-tabs">
             <button className={"centro-tab" + (tab === "resumen" ? " active" : "")} onClick={() => setTab("resumen")}>
               📊 Resumen
+            </button>
+            <button className={"centro-tab" + (tab === "clientes" ? " active" : "")} onClick={() => setTab("clientes")}>
+              🧑‍💼 Por cliente
             </button>
             <button className={"centro-tab" + (tab === "gastos" ? " active" : "")} onClick={() => setTab("gastos")}>
               💸 Gastos
@@ -282,9 +488,138 @@ export default function IngresosCentroPage() {
                       </div>
                     </div>
 
-                    <p style={{ fontSize: 12, color: "#999", marginTop: 12 }}>
-                      Desglose por departamento: próximamente.
+                    <p className="panel-section-label" style={{ marginTop: 16 }}>
+                      Ingresos por tipo
                     </p>
+                    {porCategoria.length === 0 ? (
+                      <div className="empty-card">Sin ingresos en este rango</div>
+                    ) : (
+                      <div className="form-card">
+                        {porCategoria.map((c) => (
+                          <div className="cat-bar-row" key={c.cat}>
+                            <div className="cat-bar-head">
+                              <span>{c.label}</span>
+                              <span style={{ fontWeight: 700 }}>${c.monto.toLocaleString("es-MX")}</span>
+                            </div>
+                            <div className="cat-bar-track">
+                              <div className="cat-bar-fill" style={{ width: `${c.pct}%`, background: c.color }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="panel-section-label" style={{ marginTop: 16 }}>
+                      Ingresos por {porSemana ? "semana" : "día"}
+                    </p>
+                    {serieTiempo.length === 0 ? (
+                      <div className="empty-card">Sin ingresos en este rango</div>
+                    ) : (
+                      <div className="form-card">
+                        <div className="serie-chart">
+                          {serieTiempo.map((b, i) => (
+                            <div className="serie-bar-col" key={i} title={`${b.label}: $${b.monto.toLocaleString("es-MX")}`}>
+                              <span className="serie-bar-val">
+                                {b.monto >= 1000 ? `${Math.round(b.monto / 100) / 10}k` : b.monto.toLocaleString("es-MX")}
+                              </span>
+                              <div className="serie-bar-track">
+                                <div className="serie-bar" style={{ height: `${Math.max(b.pct, 3)}%` }} />
+                              </div>
+                              <span className="serie-bar-lbl">{b.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {tab === "clientes" && (
+              <>
+                <p style={{ fontSize: 13, color: "#666", margin: "0 0 4px" }}>
+                  La mensualidad de {centro} este mes: renta más adicionales de cobro mensual (ej. Estacionamiento), y si
+                  ya se cubrió.
+                </p>
+
+                {cargandoClientes ? (
+                  <div className="nodus-inline-loading">
+                    <div className="nodus-spinner nodus-spinner-sm">
+                      <span className="nodus-spinner-petal"></span>
+                      <span className="nodus-spinner-petal"></span>
+                      <span className="nodus-spinner-petal"></span>
+                      <span className="nodus-spinner-petal"></span>
+                    </div>
+                    <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Cargando...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 8 }}>
+                      <div className="stat-card">
+                        <p className="stat-val" style={{ color: "#0d1b3e" }}>
+                          ${resumenClientes.esperado.toLocaleString("es-MX")}
+                        </p>
+                        <p className="stat-lbl">Le toca al centro este mes</p>
+                      </div>
+                      <div className="stat-card">
+                        <p className="stat-val" style={{ color: "#0F6E56" }}>
+                          ${resumenClientes.cubierto.toLocaleString("es-MX")}
+                        </p>
+                        <p className="stat-lbl">Ya cubierto</p>
+                      </div>
+                      <div className="stat-card">
+                        <p className="stat-val" style={{ color: "#A32D2D" }}>
+                          ${resumenClientes.pendiente.toLocaleString("es-MX")}
+                        </p>
+                        <p className="stat-lbl">Pendiente</p>
+                      </div>
+                    </div>
+
+                    <p className="panel-section-label" style={{ marginTop: 16 }}>
+                      Clientes con contrato vigente ({clientesIngreso.length})
+                    </p>
+                    {clientesIngreso.length === 0 ? (
+                      <div className="empty-card">Sin clientes con contrato vigente en {centro}</div>
+                    ) : (
+                      clientesIngreso.map((f) => (
+                        <div className="reserva-admin-card" key={f.contratoId}>
+                          <div className="reserva-admin-top">
+                            <div>
+                              <p className="reserva-admin-cliente">
+                                {f.nombre}
+                                {f.empresa ? ` · ${f.empresa}` : ""}
+                              </p>
+                              <p className="reserva-admin-detalle">Renta: ${f.renta.toLocaleString("es-MX")}</p>
+                              {f.adicionales.map((a, i) => (
+                                <p className="reserva-admin-detalle" key={i}>
+                                  + {a.concepto}: ${a.monto.toLocaleString("es-MX")}
+                                </p>
+                              ))}
+                              <p className="reserva-admin-detalle" style={{ fontWeight: 700, color: "#1a1a1a" }}>
+                                Total del mes: ${f.esperado.toLocaleString("es-MX")}
+                              </p>
+                              <span
+                                className="factura-badge"
+                                style={{ background: ESTADO_MES_INFO[f.estadoMes].bg, marginTop: 4 }}
+                              >
+                                <span className="factura-badge-text" style={{ color: ESTADO_MES_INFO[f.estadoMes].color }}>
+                                  {ESTADO_MES_INFO[f.estadoMes].label}
+                                  {f.estadoMes === "pendiente" && ` · $${f.montoRelevante.toLocaleString("es-MX")}`}
+                                </span>
+                              </span>
+                              {f.tieneRecargo && (
+                                <span className="factura-badge" style={{ background: "#FCEBEB", marginTop: 4, marginLeft: 6 }}>
+                                  <span className="factura-badge-text" style={{ color: "#A32D2D" }}>
+                                    ⚠️ Con recargo por pago tardío
+                                  </span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </>
                 )}
               </>

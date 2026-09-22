@@ -327,6 +327,81 @@ body {
   margin: 4px 0 0;
 }
 
+/* Ingresos por Centro: barras de "Ingresos por tipo" y gráfica de "Ingresos
+   por día/semana" (app/ingresos-centro/page.tsx). CSS puro, sin librería de
+   gráficas, para no sumar una dependencia nueva. */
+.cat-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.cat-bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.cat-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #444;
+}
+
+.cat-bar-track {
+  background: #f0f0f0;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.cat-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+}
+
+.serie-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+
+.serie-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 34px;
+}
+
+.serie-bar-val {
+  font-size: 9px;
+  color: #888;
+}
+
+.serie-bar-track {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.serie-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: #185fa5;
+  min-height: 2px;
+}
+
+.serie-bar-lbl {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
+}
+
 .stat-delta {
   font-size: 11px;
   color: #0f6e56;
