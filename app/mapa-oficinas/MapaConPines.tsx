@@ -14,6 +14,12 @@ type Oficina = {
   paquete_default_id: string | null;
 };
 
+// "libre" es un valor heredado de datos viejos con el mismo significado
+// que "disponible" — sin este alias se pintaba gris (como "otro estado")
+// en vez de verde, dando la falsa impresión de que la oficina no estaba
+// libre de verdad.
+const ESTADO_ALIAS: Record<string, string> = { libre: "disponible" };
+
 // El pin no es un emoji — un emoji no se puede colorear vía CSS.
 const COLOR_POR_ESTADO: Record<string, string> = {
   disponible: "#0F6E56", // verde
@@ -22,8 +28,22 @@ const COLOR_POR_ESTADO: Record<string, string> = {
 };
 const COLOR_DEFAULT = "#8A8A8A"; // gris — cualquier otro valor de estado
 
+const LABEL_POR_ESTADO: Record<string, string> = {
+  disponible: "Disponible",
+  ocupada: "Ocupada",
+  mantenimiento: "Mantenimiento",
+};
+
+function estadoCanonico(estado: string) {
+  return ESTADO_ALIAS[estado] || estado;
+}
+
 function colorPorEstado(estado: string) {
-  return COLOR_POR_ESTADO[estado] || COLOR_DEFAULT;
+  return COLOR_POR_ESTADO[estadoCanonico(estado)] || COLOR_DEFAULT;
+}
+
+function labelEstado(estado: string) {
+  return LABEL_POR_ESTADO[estadoCanonico(estado)] || "Otro estado";
 }
 
 export default function MapaConPines({
@@ -145,7 +165,7 @@ export default function MapaConPines({
         {oficinasConPin.map((o) => (
           <button
             key={o.id}
-            title={`${o.numero} · ${o.tipo} · ${o.estado}`}
+            title={`${o.numero} · ${o.tipo} · ${labelEstado(o.estado)}`}
             onClick={(e) => {
               e.stopPropagation();
               if (!modoEdicion) abrirModal(o.id);
@@ -171,7 +191,7 @@ export default function MapaConPines({
       <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 11, color: "#666" }}>
         <span>🟢 Disponible</span>
         <span>🔵 Ocupada</span>
-        <span>⚪ Otro estado</span>
+        <span>⚪ Mantenimiento / otro estado</span>
       </div>
 
       {oficinas.length > 0 && (
@@ -181,7 +201,7 @@ export default function MapaConPines({
               key={o.id}
               type="button"
               className="oficina-box"
-              title={`${o.numero} · ${o.tipo} · ${o.estado}`}
+              title={`${o.numero} · ${o.tipo} · ${labelEstado(o.estado)}`}
               onClick={() => abrirModal(o.id)}
             >
               <span className="oficina-box-dot" style={{ background: colorPorEstado(o.estado) }} />
