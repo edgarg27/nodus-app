@@ -25,7 +25,16 @@ type Proveedor = { id: string; nombre: string };
 
 // Fila de pagos usada para el desglose por categoría y la gráfica de la
 // pestaña Resumen — solo lo que ya entró (estado "pagado") en el rango.
-type PagoResumen = { monto: number; concepto: string | null; fecha_pago: string | null };
+type PagoResumen = { monto: number; concepto: string | null; fecha_pago: string | null; contrato_id: string | null };
+
+// Colores para "Ingresos por servicio" — mismos 3 valores que ya usa el
+// catálogo de paquetes (paquetes.tipo_espacio / oficinas.tipo).
+const COLOR_TIPO_ESPACIO: Record<string, string> = {
+  Coworking: "#F07E3A",
+  "Oficina Privada": "#0F6E56",
+  "Working Desk": "#185FA5",
+};
+const colorTipoEspacio = (tipo: string) => COLOR_TIPO_ESPACIO[tipo] || "#888";
 
 // Lo que le toca pagar este mes a cada cliente con contrato vigente, y si ya
 // se cubrió. No depende del rango de fechas de Resumen — siempre es "este
@@ -72,6 +81,10 @@ export default function IngresosCentroPage() {
   const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
   const [pagosPeriodo, setPagosPeriodo] = useState<PagoResumen[]>([]);
+  // contrato_id -> tipo_espacio ("Coworking" | "Oficina Privada" | "Working
+  // Desk"), para saber qué servicio generó cada pago. No depende del rango
+  // de fechas, solo del centro.
+  const [tipoEspacioPorContrato, setTipoEspacioPorContrato] = useState<Map<string, string>>(new Map());
 
   // ---- Por cliente: mensualidad de este mes, cubierta o pendiente ----
   const [clientesIngreso, setClientesIngreso] = useState<ClienteIngreso[]>([]);
@@ -112,6 +125,11 @@ export default function IngresosCentroPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro]);
 
+  useEffect(() => {
+    if (centro) cargarTiposEspacio(centro);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centro]);
+
   async function init() {
     setLoading(true);
     const {
@@ -138,7 +156,7 @@ export default function IngresosCentroPage() {
     const [{ data: pagosData }, { data: gastosData }] = await Promise.all([
       supabase
         .from("pagos")
-        .select("monto, concepto, fecha_pago")
+        .select("monto, concepto, fecha_pago, contrato_id")
         .eq("centro", c)
         .eq("estado", "pagado")
         .gte("fecha_pago", fechaDesde)
@@ -258,6 +276,25 @@ export default function IngresosCentroPage() {
     setCargandoClientes(false);
   }
 
+  // contrato -> paquete -> tipo_espacio, para poder decir qué servicio
+  // (Coworking / Oficina Privada / Working Desk) generó cada pago. Se
+  // guardan todos los contratos del centro (no solo los vigentes) porque un
+  // pago cobrado el mes pasado puede venir de un contrato ya terminado.
+  async function cargarTiposEspacio(c: string) {
+    const [{ data: contratosData }, { data: paquetesData }] = await Promise.all([
+      supabase.from("contratos").select("id, paquete_id").eq("centro", c),
+      supabase.from("paquetes").select("id, tipo_espacio").eq("centro", c),
+    ]);
+    const tipoPorPaquete = new Map<string, string>();
+    for (const p of paquetesData || []) tipoPorPaquete.set(p.id, p.tipo_espacio);
+    const tipoPorContrato = new Map<string, string>();
+    for (const ct of contratosData || []) {
+      const tipo = ct.paquete_id ? tipoPorPaquete.get(ct.paquete_id) : undefined;
+      if (tipo) tipoPorContrato.set(ct.id, tipo);
+    }
+    setTipoEspacioPorContrato(tipoPorContrato);
+  }
+
   async function cargarGastos(c: string) {
     setCargandoGastos(true);
     const [{ data: gastosData }, { data: provsData }] = await Promise.all([
@@ -353,6 +390,23 @@ export default function IngresosCentroPage() {
       .filter((c) => c.monto > 0)
       .sort((a, b) => b.monto - a.monto);
   }, [pagosPeriodo]);
+
+  // Desglose de lo ya cobrado en el rango por tipo de servicio (Coworking /
+  // Oficina Privada / Working Desk) — para ver qué se vende más. Un pago sin
+  // contrato asociado, o de un contrato sin paquete reconocido, cae en
+  // "Otros" (ej. un adicional suelto).
+  const porServicio = useMemo(() => {
+    const totales = new Map<string, number>();
+    for (const p of pagosPeriodo) {
+      const tipo = (p.contrato_id && tipoEspacioPorContrato.get(p.contrato_id)) || "Otros";
+      totales.set(tipo, (totales.get(tipo) || 0) + Number(p.monto));
+    }
+    const maxMonto = Math.max(1, ...Array.from(totales.values()));
+    return Array.from(totales.entries())
+      .map(([tipo, monto]) => ({ tipo, monto: round2(monto), pct: (monto / maxMonto) * 100 }))
+      .filter((s) => s.monto > 0)
+      .sort((a, b) => b.monto - a.monto);
+  }, [pagosPeriodo, tipoEspacioPorContrato]);
 
   // Ingresos por día (rangos cortos) o por semana (rangos largos), para la
   // gráfica de barras de Resumen.
@@ -518,6 +572,30 @@ export default function IngresosCentroPage() {
                             </div>
                             <div className="cat-bar-track">
                               <div className="cat-bar-fill" style={{ width: `${c.pct}%`, background: c.color }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="panel-section-label" style={{ marginTop: 16 }}>
+                      Ingresos por servicio — qué se vende más
+                    </p>
+                    {porServicio.length === 0 ? (
+                      <div className="empty-card">Sin ingresos en este rango</div>
+                    ) : (
+                      <div className="form-card">
+                        {porServicio.map((s, i) => (
+                          <div className="cat-bar-row" key={s.tipo}>
+                            <div className="cat-bar-head">
+                              <span>
+                                {i === 0 ? "🏆 " : ""}
+                                {s.tipo}
+                              </span>
+                              <span style={{ fontWeight: 700 }}>${s.monto.toLocaleString("es-MX")}</span>
+                            </div>
+                            <div className="cat-bar-track">
+                              <div className="cat-bar-fill" style={{ width: `${s.pct}%`, background: colorTipoEspacio(s.tipo) }} />
                             </div>
                           </div>
                         ))}
