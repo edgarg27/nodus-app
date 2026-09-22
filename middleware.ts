@@ -77,6 +77,10 @@ export async function middleware(req: NextRequest) {
     "/mis-visitas",
     "/mi-paqueteria",
     "/calendario-eventos",
+    // "Paquetería y Mensajería": la usan tanto clientes como staff, igual
+    // que /reservaciones — sin esto, alguien sin sesión se quedaba viendo
+    // "Cargando..." sin fin en vez de que lo mandara a /login.
+    "/paqueteria",
   ].some((p) => path === p || path.startsWith(p + "/"));
   const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin;
 
@@ -182,6 +186,7 @@ export const config = {
     "/mis-encuestas/:path*",
     "/mis-visitas/:path*",
     "/mi-paqueteria/:path*",
+    "/paqueteria/:path*",
     "/ingresos-centro/:path*",
     "/day-pass/:id/checkin",
     "/login",
