@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ImagenPrivada from "@/app/components/ImagenPrivada";
 import FileDropzone from "../soporte/FileDropzone";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -338,7 +339,7 @@ export default function PaqueteriaPage() {
                 </div>
               </div>
               {p.foto_url && (
-                <img
+                <ImagenPrivada
                   src={p.foto_url}
                   alt="Foto del paquete"
                   className="ticket-admin-foto-mini"
@@ -359,7 +360,7 @@ export default function PaqueteriaPage() {
 
       {lightbox && (
         <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
-          <img src={lightbox} className="lightbox-img" alt="Foto ampliada" />
+          <ImagenPrivada src={lightbox} className="lightbox-img" alt="Foto ampliada" />
         </div>
       )}
     </div>
