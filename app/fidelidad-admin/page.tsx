@@ -46,6 +46,7 @@ export default function FidelidadAdminPage() {
   const [folioBuscado, setFolioBuscado] = useState("");
   const [buscandoTarjeta, setBuscandoTarjeta] = useState(false);
   const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
+  const [resultadosNombre, setResultadosNombre] = useState<TarjetaFidelidad[] | null>(null);
   const [tarjetaEncontrada, setTarjetaEncontrada] = useState<TarjetaFidelidad | null>(null);
   const [sellosTarjetaEncontrada, setSellosTarjetaEncontrada] = useState<SelloFidelidadRow[]>([]);
   const [casillaSel, setCasillaSel] = useState<number | null>(null);
@@ -82,27 +83,63 @@ export default function FidelidadAdminPage() {
     setLoading(false);
   }
 
-  // Búsqueda por folio — sin filtrar por centro, porque el cliente puede
-  // presentarse en cualquier Nodus con su tarjeta.
-  async function buscarTarjetaPorFolio(e: React.FormEvent) {
+  // Búsqueda por folio o por nombre — sin filtrar por centro, porque el
+  // cliente puede presentarse en cualquier Nodus con su tarjeta.
+  async function buscarTarjeta(e: React.FormEvent) {
     e.preventDefault();
     setErrorBusquedaTarjeta("");
     setTarjetaEncontrada(null);
     setSellosTarjetaEncontrada([]);
-    const folioNum = Number(folioBuscado.replace(/\D/g, ""));
-    if (!folioNum) {
-      setErrorBusquedaTarjeta("Escribe el folio de la tarjeta");
+    setResultadosNombre(null);
+    const termino = folioBuscado.trim();
+    if (!termino) {
+      setErrorBusquedaTarjeta("Escribe el folio o el nombre del cliente");
       return;
     }
     setBuscandoTarjeta(true);
-    const { data: tarjeta } = await supabase.from("tarjetas_fidelidad").select("*").eq("folio", folioNum).maybeSingle();
-    if (!tarjeta) {
+
+    // "123" o "NODUS-FID-000123" -> folio; cualquier otra cosa -> nombre.
+    if (/^(nodus-fid-)?\d+$/i.test(termino)) {
+      const folioNum = Number(termino.replace(/\D/g, ""));
+      const { data: tarjeta } = await supabase.from("tarjetas_fidelidad").select("*").eq("folio", folioNum).maybeSingle();
       setBuscandoTarjeta(false);
-      setErrorBusquedaTarjeta("No se encontró ninguna tarjeta con ese folio");
+      if (!tarjeta) {
+        setErrorBusquedaTarjeta("No se encontró ninguna tarjeta con ese folio");
+        return;
+      }
+      await cargarTarjeta(tarjeta);
       return;
     }
-    await cargarTarjeta(tarjeta);
+
+    // Por nombre: sin distinguir mayúsculas ni acentos, y cada palabra por
+    // separado ("juan magana" encuentra "Juan Carlos Magaña Antunez").
+    const normalizar = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const palabras = normalizar(termino).split(/\s+/).filter(Boolean);
+    const { data: todas } = await supabase
+      .from("tarjetas_fidelidad")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1000);
     setBuscandoTarjeta(false);
+    const coincidencias = ((todas || []) as TarjetaFidelidad[]).filter((t) => {
+      const nombre = normalizar(t.nombre || "");
+      return palabras.every((p) => nombre.includes(p));
+    });
+    if (coincidencias.length === 0) {
+      setErrorBusquedaTarjeta("No se encontró ninguna tarjeta con ese nombre");
+      return;
+    }
+    if (coincidencias.length === 1) {
+      await cargarTarjeta(coincidencias[0]);
+      return;
+    }
+    setResultadosNombre(coincidencias);
+  }
+
+  function limpiarBusqueda() {
+    setFolioBuscado("");
+    setResultadosNombre(null);
+    setErrorBusquedaTarjeta("");
   }
 
   // Trae los sellos de una tarjeta y la deja abierta en pantalla.
@@ -242,6 +279,47 @@ export default function FidelidadAdminPage() {
     if (tarjetaEncontrada?.id === tarjeta.id) setTarjetaEncontrada(actualizada);
   }
 
+  // Renglón de una tarjeta en las listas. `mostrarCentro`: en los resultados
+  // de búsqueda puede ser de cualquier centro, así que se indica cuál.
+  function renderTarjeta(t: TarjetaFidelidad, mostrarCentro: boolean) {
+    return (
+      <div
+        className="item-card"
+        key={t.id}
+        role="button"
+        tabIndex={0}
+        style={{
+          cursor: "pointer",
+          outline: tarjetaEncontrada?.id === t.id ? "2px solid #f07e3a" : undefined,
+        }}
+        onClick={() => abrirTarjetaDeLista(t)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") abrirTarjetaDeLista(t);
+        }}
+      >
+        <div className="item-card-info">
+          <p className="item-card-titulo">
+            {formatFolioFidelidad(t.folio).replace("NODUS-FID-", "#")} · {t.nombre}
+          </p>
+          <p className="item-card-sub">
+            {t.telefono || "Sin teléfono"}
+            {mostrarCentro ? ` · ${t.centro}` : ""}
+          </p>
+        </div>
+        <span
+          className="factura-badge"
+          style={{
+            background: t.estado === "canjeada" ? "#E1F5EE" : t.estado === "completada" ? "#FFF3E8" : "#E6F1FB",
+          }}
+        >
+          <span className="factura-badge-text">
+            {t.estado === "canjeada" ? "✓ Canjeada" : t.estado === "completada" ? "🎁 Completa" : "Activa"}
+          </span>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="panel">
       <div className="rep-header">
@@ -257,12 +335,12 @@ export default function FidelidadAdminPage() {
           <p className="empty-card">Cargando...</p>
         ) : (
           <>
-            <form className="form-card" onSubmit={buscarTarjetaPorFolio}>
-              <p className="sub-label">Buscar tarjeta por folio</p>
+            <form className="form-card" onSubmit={buscarTarjeta}>
+              <p className="sub-label">Buscar tarjeta por folio o nombre</p>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="text"
-                  placeholder="Ej. 123 o NODUS-FID-000123"
+                  placeholder="Folio (ej. 123) o nombre del cliente"
                   value={folioBuscado}
                   onChange={(e) => setFolioBuscado(e.target.value)}
                   style={{ flex: 1 }}
@@ -407,48 +485,29 @@ export default function FidelidadAdminPage() {
               </div>
             )}
 
+            {resultadosNombre && (
+              <>
+                <p className="panel-section-label" style={{ marginTop: 16 }}>
+                  Resultados de “{folioBuscado.trim()}” ({resultadosNombre.length})
+                </p>
+                {resultadosNombre.map((t) => renderTarjeta(t, true))}
+                <button
+                  className="tel-borrar-btn"
+                  style={{ marginTop: 8, color: "#0d1b3e", fontWeight: 600 }}
+                  onClick={limpiarBusqueda}
+                >
+                  Limpiar búsqueda
+                </button>
+              </>
+            )}
+
             <p className="panel-section-label" style={{ marginTop: 16 }}>
               {esGlobal ? "Todas las tarjetas" : `Tarjetas de ${centro || "tu centro"}`} ({tarjetasFidelidad.length})
             </p>
             {tarjetasFidelidad.length === 0 ? (
               <div className="empty-card">Sin tarjetas de fidelidad todavía</div>
             ) : (
-              tarjetasFidelidad.map((t) => (
-                <div
-                  className="item-card"
-                  key={t.id}
-                  role="button"
-                  tabIndex={0}
-                  style={{
-                    cursor: "pointer",
-                    outline: tarjetaEncontrada?.id === t.id ? "2px solid #f07e3a" : undefined,
-                  }}
-                  onClick={() => abrirTarjetaDeLista(t)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") abrirTarjetaDeLista(t);
-                  }}
-                >
-                  <div className="item-card-info">
-                    <p className="item-card-titulo">
-                      {formatFolioFidelidad(t.folio).replace("NODUS-FID-", "#")} · {t.nombre}
-                    </p>
-                    <p className="item-card-sub">
-                      {t.telefono || "Sin teléfono"}
-                      {esGlobal ? ` · ${t.centro}` : ""}
-                    </p>
-                  </div>
-                  <span
-                    className="factura-badge"
-                    style={{
-                      background: t.estado === "canjeada" ? "#E1F5EE" : t.estado === "completada" ? "#FFF3E8" : "#E6F1FB",
-                    }}
-                  >
-                    <span className="factura-badge-text">
-                      {t.estado === "canjeada" ? "✓ Canjeada" : t.estado === "completada" ? "🎁 Completa" : "Activa"}
-                    </span>
-                  </span>
-                </div>
-              ))
+              tarjetasFidelidad.map((t) => renderTarjeta(t, esGlobal))
             )}
           </>
         )}

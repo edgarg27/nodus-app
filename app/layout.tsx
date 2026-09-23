@@ -2,6 +2,10 @@ import "./globals.css";
 
 export const metadata = {
   title: "Nodus",
+  icons: {
+    icon: "/icons/logo-nodus.png",
+    apple: "/icons/logo-nodus.png",
+  },
 };
 
 export default function RootLayout({
