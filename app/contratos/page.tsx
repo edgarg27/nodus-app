@@ -658,7 +658,7 @@ export default function ContratosPage() {
                       </div>
                       <span className="factura-badge" style={{ background: ESTATUS_LABEL.pre_aprobado.bg }}>
                         <span className="factura-badge-text" style={{ color: ESTATUS_LABEL.pre_aprobado.color }}>
-                          {ESTATUS_LABEL.pre_aprobado.label}
+                          {!c.archivo_url ? "📄 Falta el contrato" : c.enviado_a_firma_at ? "📨 En Cincel" : "✍ Listo para firma"}
                         </span>
                       </span>
                     </div>
@@ -668,7 +668,7 @@ export default function ContratosPage() {
                         checked={!!confirmacionFirma[c.id]}
                         onChange={(e) => setConfirmacionFirma((prev) => ({ ...prev, [c.id]: e.target.checked }))}
                       />
-                      Confirmo que el documento cargado es la versión firmada
+                      Confirmo que el documento cargado es la versión firmada en Cincel
                     </label>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                       <button
