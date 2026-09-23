@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AdminPanel from "./AdminPanel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -78,7 +79,7 @@ export default async function DashboardPage() {
     { count: reservacionesPendientes },
     { count: ticketsAbiertos },
     { count: ticketsUrgentes },
-    { count: oficinasTotal },
+    { data: oficinasRows },
     { data: contratosOcupados },
     { count: contratosPorVencer },
   ] = await Promise.all([
@@ -100,7 +101,7 @@ export default async function DashboardPage() {
         .in("estado", ["abierto", "en_proceso"])
         .eq("urgencia", "urgente")
     ),
-    filtrarCentro(supabase.from("oficinas").select("*", { count: "exact", head: true })),
+    filtrarCentro(supabase.from("oficinas").select("id, centro, tipo").limit(5000)),
     // Ocupación real: contratos vigentes con cliente de verdad (mismo criterio
     // que Reportes), no oficinas.estado.
     filtrarCentro(
@@ -119,7 +120,10 @@ export default async function DashboardPage() {
 
   const facturasVencidas = facturasVencidasRows?.length || 0;
   const montoVencido = (facturasVencidasRows || []).reduce((suma, f: any) => suma + Number(f.monto || 0), 0);
-  const oficinasOcupadas = new Set((contratosOcupados || []).map((c: any) => c.oficina_id)).size;
+  // Todo el coworking de un centro cuenta como un solo espacio (ver lib/ocupacion.ts).
+  const ocupacionPorCentro = Object.values(calcularOcupacionPorCentro(oficinasRows || [], contratosOcupados || []));
+  const oficinasTotal = ocupacionPorCentro.reduce((suma, c) => suma + c.total, 0);
+  const oficinasOcupadas = ocupacionPorCentro.reduce((suma, c) => suma + c.ocupadas, 0);
 
   return (
     <AdminPanel
@@ -137,7 +141,7 @@ export default async function DashboardPage() {
         reservacionesPendientes: reservacionesPendientes || 0,
         ticketsAbiertos: ticketsAbiertos || 0,
         ticketsUrgentes: ticketsUrgentes || 0,
-        oficinasTotal: oficinasTotal || 0,
+        oficinasTotal,
         oficinasOcupadas,
         contratosPorVencer: contratosPorVencer || 0,
       }}
