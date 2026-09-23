@@ -1029,10 +1029,6 @@ export default function AdminPanel({
                 migracion_atencion_cliente_servicio.sql). */}
             {(rol === "admin" || rol === "superadmin" || rol === "atencion_cliente") && (
               <>
-                <a className="modulo-card" href="/decoraciones">
-                  <span className="modulo-icon">🎄</span>
-                  <span className="modulo-name">Decoraciones y festividades</span>
-                </a>
                 <a className="modulo-card" href="/documentacion-centro">
                   <span className="modulo-icon">📁</span>
                   <span className="modulo-name">Documentación del centro</span>

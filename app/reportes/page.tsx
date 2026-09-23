@@ -1,3 +1,4 @@
+import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,7 +22,7 @@ export default async function ReportesPage() {
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;
 
-  let oficinasQuery = supabase.from("oficinas").select("centro, estado");
+  let oficinasQuery = supabase.from("oficinas").select("id, centro, tipo").limit(5000);
   // Ocupación real: se cruza contra contratos vigentes con cliente de
   // verdad (user_id no nulo), en vez de confiar en oficinas.estado — nada
   // en el código lo libera cuando un contrato se rechaza/vence, así que se
@@ -100,27 +101,9 @@ export default async function ReportesPage() {
     clientesQuery,
   ]);
 
-  // Ocupación por centro — "ocupadas" sale de contratosOcupacionRaw (real),
-  // "total"/"disponibles" siguen saliendo de oficinas.
-  const centrosMap: Record<string, { total: number; ocupadas: number; disponibles: number }> = {};
-  (oficinasRaw || []).forEach((o: any) => {
-    const centro = o.centro || "Sin centro";
-    if (!centrosMap[centro]) centrosMap[centro] = { total: 0, ocupadas: 0, disponibles: 0 };
-    centrosMap[centro].total++;
-    // "libre" es un valor heredado de datos viejos, mismo significado que
-    // "disponible" (ver app/mapa-oficinas/MapaConPines.tsx).
-    if (o.estado === "disponible" || o.estado === "libre") centrosMap[centro].disponibles++;
-  });
-  (contratosOcupacionRaw || []).forEach((c) => {
-    const centro = c.centro || "Sin centro";
-    if (!centrosMap[centro]) centrosMap[centro] = { total: 0, ocupadas: 0, disponibles: 0 };
-  });
-  Object.keys(centrosMap).forEach((centro) => {
-    // Cuenta oficinas únicas ocupadas de ESTE centro (un id de oficina no
-    // se repite entre centros, así que basta con la intersección global).
-    const contratosDelCentro = (contratosOcupacionRaw || []).filter((c) => (c.centro || "Sin centro") === centro);
-    centrosMap[centro].ocupadas = new Set(contratosDelCentro.map((c) => c.oficina_id)).size;
-  });
+  // Ocupación por centro (todo el coworking de un centro cuenta como un solo
+  // espacio; ver lib/ocupacion.ts — mismo cálculo que el dashboard).
+  const centrosMap = calcularOcupacionPorCentro(oficinasRaw || [], contratosOcupacionRaw || []);
   const ocupacion = Object.entries(centrosMap).map(([centro, d]) => ({
     centro,
     ...d,
