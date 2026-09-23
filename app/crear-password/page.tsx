@@ -15,6 +15,9 @@ export default function CrearPasswordPage() {
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [exito, setExito] = useState(false);
+  // El enlace de "¿Olvidaste tu contraseña?" trae type=recovery; el de una
+  // invitación de alta trae type=invite. Cambia el texto y a dónde se va.
+  const [esReset, setEsReset] = useState(false);
 
   useEffect(() => {
     async function activarSesion() {
@@ -29,6 +32,7 @@ export default function CrearPasswordPage() {
       const refresh_token = params.get("refresh_token");
 
       if (access_token && refresh_token) {
+        setEsReset(params.get("type") === "recovery");
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         setSesionValida(!error);
         // Limpia el token de la URL para que no se quede visible/copiable
@@ -59,12 +63,18 @@ export default function CrearPasswordPage() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
     setGuardando(false);
     if (updateError) {
-      setError("No se pudo guardar tu contraseña. Intenta de nuevo.");
+      setError(
+        updateError.code === "same_password"
+          ? "La nueva contraseña debe ser distinta a la anterior."
+          : "No se pudo guardar tu contraseña. Intenta de nuevo."
+      );
       return;
     }
     setExito(true);
     setTimeout(() => {
-      router.push("/dashboard-cliente");
+      // Tras recuperar contraseña puede ser cliente o staff: /login los manda
+      // a su panel (el middleware redirige según el rol de la sesión).
+      router.push(esReset ? "/login" : "/dashboard-cliente");
       router.refresh();
     }, 1800);
   }
@@ -79,8 +89,15 @@ export default function CrearPasswordPage() {
         <div className="login-card">
           <h1>Enlace no válido</h1>
           <p className="subtitle">
-            Este enlace ya expiró o ya se usó. Pide al centro que te reenvíe la invitación.
+            {esReset
+              ? "Este enlace ya expiró o ya se usó. Pide uno nuevo desde “¿Olvidaste tu contraseña?” en el inicio de sesión."
+              : "Este enlace ya expiró o ya se usó. Pide al centro que te reenvíe la invitación."}
           </p>
+          {esReset && (
+            <a href="/login" style={{ display: "block", textAlign: "center", marginTop: 12, fontWeight: 600, color: "#0d1b3e" }}>
+              Ir al inicio de sesión
+            </a>
+          )}
         </div>
       </div>
     );
@@ -101,8 +118,10 @@ export default function CrearPasswordPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>Bienvenido a Nodus</h1>
-        <p className="subtitle">Crea una contraseña para tu cuenta</p>
+        <h1>{esReset ? "Nueva contraseña" : "Bienvenido a Nodus"}</h1>
+        <p className="subtitle">
+          {esReset ? "Escribe la nueva contraseña de tu cuenta" : "Crea una contraseña para tu cuenta"}
+        </p>
 
         <label htmlFor="password">Contraseña</label>
         <input
@@ -126,7 +145,7 @@ export default function CrearPasswordPage() {
         <p className="error">{error}</p>
 
         <button type="submit" disabled={guardando}>
-          {guardando ? "Guardando..." : "Guardar y entrar"}
+          {guardando ? "Guardando..." : esReset ? "Guardar contraseña" : "Guardar y entrar"}
         </button>
       </form>
     </div>

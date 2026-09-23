@@ -107,7 +107,9 @@ export default async function ReportesPage() {
     const centro = o.centro || "Sin centro";
     if (!centrosMap[centro]) centrosMap[centro] = { total: 0, ocupadas: 0, disponibles: 0 };
     centrosMap[centro].total++;
-    if (o.estado === "disponible") centrosMap[centro].disponibles++;
+    // "libre" es un valor heredado de datos viejos, mismo significado que
+    // "disponible" (ver app/mapa-oficinas/MapaConPines.tsx).
+    if (o.estado === "disponible" || o.estado === "libre") centrosMap[centro].disponibles++;
   });
   (contratosOcupacionRaw || []).forEach((c) => {
     const centro = c.centro || "Sin centro";

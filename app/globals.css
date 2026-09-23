@@ -4932,9 +4932,11 @@ body {
 }
 
 .fidcard-logo-icon {
-  width: 6.4cqw;
-  height: 6.4cqw;
+  /* Misma altura que las mayúsculas "N" y "DUS" (≈0.72em del wordmark). */
+  width: 0.72em;
+  height: 0.72em;
   object-fit: contain;
+  flex: none;
 }
 
 .fidcard-flex {
@@ -4964,6 +4966,32 @@ body {
   font-weight: 700;
 }
 
+.fidcard-titular {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2cqw;
+}
+
+.fidcard-titular-nombre {
+  margin: 0;
+  color: #fff;
+  font-size: 3cqw;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fidcard-titular-folio {
+  margin: 0;
+  flex: none;
+  color: #f07e3a;
+  font-size: 2.6cqw;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
 .fidcard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -4983,6 +5011,20 @@ body {
   color: #0d1b3e;
   text-align: center;
   padding: 0 1cqw;
+}
+
+.fidcard-casilla-click {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fidcard-casilla-click:hover {
+  box-shadow: 0 0 0 0.35cqw #f07e3a;
+}
+
+.fidcard-casilla-sel {
+  box-shadow: 0 0 0 0.5cqw #f07e3a;
 }
 
 .fidcard-casilla-regalo {
@@ -5031,10 +5073,9 @@ body {
   height: 60%;
 }
 
-.fidcard-social-icon-f {
-  font-weight: 800;
-  font-size: 3cqw;
-  font-family: Georgia, serif;
+.fidcard-social-icon-f svg {
+  width: 56%;
+  height: 56%;
 }
 
 .fidcard-social-label {
