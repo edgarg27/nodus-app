@@ -26,6 +26,8 @@ export default function MapaOficinasPage() {
   // Solo operaciones puede subir/reemplazar layouts — el resto (admins de
   // centro, sistemas, cobranza, etc.) únicamente los puede ver y descargar.
   const puedeSubir = rol === "operaciones";
+  // Mover pines en el plano: además de operaciones, el admin del centro y gerencia.
+  const puedeEditarPines = puedeSubir || rol === "admin" || rol === "gerente" || rol === "superadmin";
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [archivoImagen, setArchivoImagen] = useState<File | null>(null);
@@ -145,7 +147,7 @@ export default function MapaOficinasPage() {
         )}
       </div>
 
-      <div className="rep-content">
+      <div className="rep-content rep-content-ancho">
         {loading ? (
           <div className="nodus-inline-loading">
             <div className="nodus-spinner nodus-spinner-sm">
@@ -163,7 +165,7 @@ export default function MapaOficinasPage() {
             {mapa?.imagen_url || mapa?.dwg_url ? (
               <div className="mapa-imagen-wrap">
                 {mapa.imagen_url && centro && (
-                  <MapaConPines centro={centro} imagenUrl={mapa.imagen_url} puedeEditar={puedeSubir} />
+                  <MapaConPines centro={centro} imagenUrl={mapa.imagen_url} puedeEditar={puedeEditarPines} />
                 )}
                 <div className="mapa-descargas">
                   {mapa.imagen_url && (

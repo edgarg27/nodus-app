@@ -4003,6 +4003,246 @@ body {
   border-radius: 8px;
 }
 
+/* Pantalla del mapa más ancha que el resto de las pantallas (700px) para que
+   el plano se lea bien. */
+.rep-content.rep-content-ancho {
+  max-width: 1280px;
+}
+
+.mapa-imagen-wrap img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mapa-bandeja {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.mapa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #eee;
+  border-radius: 999px;
+  background: #fafafa;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mapa-chip:hover {
+  border-color: #f07e3a;
+}
+
+.mapa-chip-sel {
+  border-color: #f07e3a;
+  background: #fff3e8;
+}
+
+.mapa-pin-etiqueta {
+  position: absolute;
+  left: 50%;
+  bottom: 115%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #0d1b3e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mapa-fantasma {
+  position: fixed;
+  z-index: 60;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f07e3a;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ---------- Modal "Verificar disponibilidad" ---------- */
+.disp-modal {
+  max-width: 480px;
+  gap: 16px;
+  text-align: left;
+}
+
+.disp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.disp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.disp-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.disp-campo > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+}
+
+.disp-form input,
+.disp-form select {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.disp-form input:focus,
+.disp-form select:focus {
+  outline: none;
+  border-color: #f07e3a;
+  background: #fff;
+}
+
+.disp-form select:disabled {
+  color: #999;
+  background: #f3f3f3;
+}
+
+.disp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.disp-nota {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff6e5;
+  color: #a3701f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.disp-verificar {
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  background: #0d1b3e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.disp-verificar:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.disp-resultado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.disp-resultado.ok {
+  background: #e1f5ee;
+  color: #0f6e56;
+}
+
+.disp-resultado.no {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.disp-resultado-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 13px;
+}
+
+.disp-resultado.ok .disp-resultado-icono {
+  background: #0f6e56;
+}
+
+.disp-resultado.no .disp-resultado-icono {
+  background: #a32d2d;
+}
+
+.disp-acciones {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.disp-cerrar {
+  border: 1px solid #e3e3e3;
+  background: #fff;
+  color: #555;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.disp-continuar {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.disp-ayuda {
+  margin: -6px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #8b93a7;
+}
+
 .mapa-descargas {
   display: flex;
   gap: 8px;
