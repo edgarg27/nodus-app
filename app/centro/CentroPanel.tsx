@@ -3113,7 +3113,7 @@ export default function CentroPanel({
                     )}
 
                     {casillaSel !== null && sellosTarjetaEncontrada.find((s) => s.numero === casillaSel) && (
-                      <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: 12 }}>
+                      <div className="form-card" style={{ marginTop: 12 }}>
                         {(() => {
                           const sello = sellosTarjetaEncontrada.find((s) => s.numero === casillaSel)!;
                           return (
@@ -3144,7 +3144,7 @@ export default function CentroPanel({
                     {tarjetaEncontrada.estado !== "canjeada" &&
                       casillaSel !== null &&
                       !sellosTarjetaEncontrada.some((s) => s.numero === casillaSel) && (
-                      <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: 12 }}>
+                      <div className="form-card" style={{ marginTop: 12 }}>
                         <p className="sub-label" style={{ color: "#0d1b3e" }}>
                           Sello {casillaSel} · ¿Qué rentó en esta visita?
                         </p>
@@ -3163,7 +3163,6 @@ export default function CentroPanel({
                           placeholder="Detalle (opcional, ej. 8 personas)"
                           value={selloForm.detalle}
                           onChange={(e) => setSelloForm({ ...selloForm, detalle: e.target.value })}
-                          style={{ marginTop: 8 }}
                         />
                         {errorSello && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorSello}</p>}
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
