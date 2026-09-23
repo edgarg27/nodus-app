@@ -70,7 +70,16 @@ type Resumen = {
   totalClientes: number;
   facturasPendientes: number;
   facturasVencidas: number;
+  montoVencido: number;
   comprobantesRevisar: number;
+  solicitudesInvitados: number;
+  solicitudesClientes: number;
+  reservacionesPendientes: number;
+  ticketsAbiertos: number;
+  ticketsUrgentes: number;
+  oficinasTotal: number;
+  oficinasOcupadas: number;
+  contratosPorVencer: number;
 };
 
 // Mismos colores que ya usa /tickets para la urgencia.
@@ -823,25 +832,78 @@ export default function AdminPanel({
 
           {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
             <>
-              <p className="panel-section-label">Resumen general</p>
+              <p className="panel-section-label">Por atender</p>
+              <div className="stats-row">
+                {(() => {
+                  const solicitudes = resumen.solicitudesInvitados + resumen.solicitudesClientes;
+                  return (
+                    <a
+                      className={`stat-card${solicitudes > 0 ? " stat-card-alerta" : ""}`}
+                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro?tab=solicitudes" : "/centro?tab=invitados"}
+                    >
+                      <p className="stat-val">{solicitudes}</p>
+                      <p className="stat-lbl">Solicitudes por atender</p>
+                      <p className="stat-delta">
+                        {resumen.solicitudesInvitados} de invitados · {resumen.solicitudesClientes} de clientes
+                      </p>
+                    </a>
+                  );
+                })()}
+                <a
+                  className={`stat-card${resumen.reservacionesPendientes > 0 ? " stat-card-alerta" : ""}`}
+                  href="/centro?tab=reservaciones"
+                >
+                  <p className="stat-val">{resumen.reservacionesPendientes}</p>
+                  <p className="stat-lbl">Reservaciones por confirmar</p>
+                  <p className="stat-delta">Salas pendientes →</p>
+                </a>
+                <a
+                  className={`stat-card${resumen.facturasVencidas > 0 ? " stat-card-alerta" : ""}`}
+                  href="/facturas-admin"
+                >
+                  <p className="stat-val">{resumen.facturasVencidas}</p>
+                  <p className="stat-lbl">Pagos vencidos</p>
+                  <p className="stat-delta" style={resumen.facturasVencidas > 0 ? { color: "#A32D2D" } : undefined}>
+                    ${resumen.montoVencido.toLocaleString("es-MX")} por cobrar · {resumen.facturasPendientes} pendientes
+                  </p>
+                </a>
+                <a className={`stat-card${resumen.ticketsAbiertos > 0 ? " stat-card-alerta" : ""}`} href="/tickets">
+                  <p className="stat-val">{resumen.ticketsAbiertos}</p>
+                  <p className="stat-lbl">Tickets abiertos</p>
+                  <p className="stat-delta" style={resumen.ticketsUrgentes > 0 ? { color: "#A32D2D", fontWeight: 700 } : undefined}>
+                    {resumen.ticketsUrgentes > 0 ? `🔴 ${resumen.ticketsUrgentes} urgente${resumen.ticketsUrgentes === 1 ? "" : "s"}` : "Sin urgentes"}
+                  </p>
+                </a>
+              </div>
+
+              <p className="panel-section-label" style={{ marginTop: 8 }}>
+                Resumen del centro
+              </p>
               <div className="stats-row">
                 <button className="stat-card" onClick={() => setTab("clientes")}>
                   <p className="stat-val">{resumen.totalClientes}</p>
                   <p className="stat-lbl">Clientes activos</p>
                   <p className="stat-delta">Ver clientes →</p>
                 </button>
-                <div className="stat-card">
-                  <p className="stat-val">{resumen.facturasPendientes}</p>
-                  <p className="stat-lbl">Facturas pendientes</p>
-                </div>
-                <div className="stat-card">
-                  <p className="stat-val">{resumen.facturasVencidas}</p>
-                  <p className="stat-lbl">Facturas vencidas</p>
-                </div>
-                <div className="stat-card">
+                <a className="stat-card" href="/reportes">
+                  <p className="stat-val">
+                    {resumen.oficinasOcupadas}
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "#888" }}> de {resumen.oficinasTotal}</span>
+                  </p>
+                  <p className="stat-lbl">Oficinas ocupadas</p>
+                  <p className="stat-delta">
+                    {resumen.oficinasTotal > 0 ? Math.round((resumen.oficinasOcupadas / resumen.oficinasTotal) * 100) : 0}% de ocupación
+                  </p>
+                </a>
+                <a className={`stat-card${resumen.contratosPorVencer > 0 ? " stat-card-alerta" : ""}`} href="/contratos">
+                  <p className="stat-val">{resumen.contratosPorVencer}</p>
+                  <p className="stat-lbl">Contratos por vencer</p>
+                  <p className="stat-delta">En los próximos 30 días</p>
+                </a>
+                <a className="stat-card" href="/pagos">
                   <p className="stat-val">{resumen.comprobantesRevisar}</p>
                   <p className="stat-lbl">Comprobantes por revisar</p>
-                </div>
+                </a>
               </div>
             </>
           )}

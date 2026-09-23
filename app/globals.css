@@ -314,6 +314,23 @@ body {
   text-align: left;
 }
 
+/* Tarjeta del resumen con algo pendiente: se resalta para que se vea a
+   simple vista qué requiere atención. */
+a.stat-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.stat-card-alerta {
+  border-color: #f5c7a5;
+  background: #fffaf5;
+}
+
+.stat-card-alerta .stat-val {
+  color: #c2570f;
+}
+
 .stat-val {
   font-size: 24px;
   font-weight: 700;

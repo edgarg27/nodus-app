@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AdminPanel from "./AdminPanel";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -42,10 +43,7 @@ export default async function DashboardPage() {
     .from("facturas")
     .select("*", { count: "exact", head: true })
     .eq("estado", "pendiente");
-  let facturasVencQuery = supabase
-    .from("facturas")
-    .select("*", { count: "exact", head: true })
-    .eq("estado", "vencida");
+  let facturasVencQuery = supabase.from("facturas").select("monto").eq("estado", "vencida");
   if (!esGlobal && miCentro) {
     facturasPendQuery = facturasPendQuery.eq("centro", miCentro);
     facturasVencQuery = facturasVencQuery.eq("centro", miCentro);
@@ -63,11 +61,65 @@ export default async function DashboardPage() {
     );
   }
 
+  // Lo que la administradora tiene que atender hoy. Todo se acota al centro
+  // del usuario salvo en roles globales.
+  const filtrarCentro = (q: any) => (!esGlobal && miCentro ? q.eq("centro", miCentro) : q);
+  const hoy = hoyMexicoISO();
+  const en30Dias = new Date(hoy + "T00:00:00Z");
+  en30Dias.setUTCDate(en30Dias.getUTCDate() + 30);
+  const limite30 = en30Dias.toISOString().slice(0, 10);
+
   const [
     { count: facturasPendientes },
-    { count: facturasVencidas },
+    { data: facturasVencidasRows },
     { count: comprobantesRevisar },
-  ] = await Promise.all([facturasPendQuery, facturasVencQuery, comprobantesQuery]);
+    { count: solicitudesInvitados },
+    { count: solicitudesClientes },
+    { count: reservacionesPendientes },
+    { count: ticketsAbiertos },
+    { count: ticketsUrgentes },
+    { count: oficinasTotal },
+    { data: contratosOcupados },
+    { count: contratosPorVencer },
+  ] = await Promise.all([
+    facturasPendQuery,
+    facturasVencQuery,
+    comprobantesQuery,
+    filtrarCentro(supabase.from("solicitudes_invitados").select("*", { count: "exact", head: true }).eq("estado", "pendiente")),
+    filtrarCentro(supabase.from("solicitudes_cliente").select("*", { count: "exact", head: true }).eq("estado", "pendiente")),
+    filtrarCentro(
+      supabase.from("reservaciones").select("*", { count: "exact", head: true }).eq("estado", "pendiente").gte("fecha", hoy)
+    ),
+    filtrarCentro(
+      supabase.from("tickets").select("*", { count: "exact", head: true }).in("estado", ["abierto", "en_proceso"])
+    ),
+    filtrarCentro(
+      supabase
+        .from("tickets")
+        .select("*", { count: "exact", head: true })
+        .in("estado", ["abierto", "en_proceso"])
+        .eq("urgencia", "urgente")
+    ),
+    filtrarCentro(supabase.from("oficinas").select("*", { count: "exact", head: true })),
+    // Ocupación real: contratos vigentes con cliente de verdad (mismo criterio
+    // que Reportes), no oficinas.estado.
+    filtrarCentro(
+      supabase.from("contratos").select("oficina_id").eq("estatus", "vigente").not("oficina_id", "is", null).not("user_id", "is", null)
+    ),
+    filtrarCentro(
+      supabase
+        .from("contratos")
+        .select("*", { count: "exact", head: true })
+        .eq("estatus", "vigente")
+        .not("user_id", "is", null)
+        .gte("fecha_vencimiento", hoy)
+        .lte("fecha_vencimiento", limite30)
+    ),
+  ]);
+
+  const facturasVencidas = facturasVencidasRows?.length || 0;
+  const montoVencido = (facturasVencidasRows || []).reduce((suma, f: any) => suma + Number(f.monto || 0), 0);
+  const oficinasOcupadas = new Set((contratosOcupados || []).map((c: any) => c.oficina_id)).size;
 
   return (
     <AdminPanel
@@ -75,10 +127,19 @@ export default async function DashboardPage() {
       rol={profile?.rol || ""}
       centro={miCentro}
       resumen={{
-        totalClientes: clientes?.length || 0,
+        totalClientes: (clientes || []).filter((c) => c.activo !== false && !c.suspendido).length,
         facturasPendientes: facturasPendientes || 0,
-        facturasVencidas: facturasVencidas || 0,
+        facturasVencidas,
+        montoVencido,
         comprobantesRevisar: comprobantesRevisar || 0,
+        solicitudesInvitados: solicitudesInvitados || 0,
+        solicitudesClientes: solicitudesClientes || 0,
+        reservacionesPendientes: reservacionesPendientes || 0,
+        ticketsAbiertos: ticketsAbiertos || 0,
+        ticketsUrgentes: ticketsUrgentes || 0,
+        oficinasTotal: oficinasTotal || 0,
+        oficinasOcupadas,
+        contratosPorVencer: contratosPorVencer || 0,
       }}
       clientesIniciales={clientes || []}
     />
