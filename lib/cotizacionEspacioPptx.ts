@@ -1,6 +1,4 @@
 import JSZip from "jszip";
-import path from "path";
-import fs from "fs/promises";
 import {
   escaparXml,
   fmtMoneda,
@@ -10,6 +8,7 @@ import {
   dividirCeldasFila,
   reemplazarTablaEnSlide,
 } from "./pptxHelpers";
+import { cargarArchivoPlantilla } from "./plantillasStorage";
 
 // Mismo mecanismo que ya se usa para Sala de Juntas (ver
 // lib/cotizacionSalaPptx.ts), extendido a otros tipos de espacio:
@@ -74,8 +73,7 @@ async function cargarPlantilla(tipoEspacio: string, centro: string) {
   if (!archivo) {
     throw new Error(`Sin plantilla de cotización en PowerPoint para "${tipoEspacio}" en "${centro}" todavía.`);
   }
-  const ruta = path.join(process.cwd(), "public", "plantillas-cotizacion", archivo);
-  const buffer = await fs.readFile(ruta);
+  const buffer = await cargarArchivoPlantilla("plantillas-cotizacion", archivo);
   return JSZip.loadAsync(buffer);
 }
 

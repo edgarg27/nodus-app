@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getSignedFileUrl } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
+import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
+import { labelRol } from "@/lib/roles";
 
 type Cliente = {
   id: string;
@@ -69,6 +71,13 @@ type Resumen = {
   facturasPendientes: number;
   facturasVencidas: number;
   comprobantesRevisar: number;
+};
+
+// Mismos colores que ya usa /tickets para la urgencia.
+const URGENCIA_INFO: Record<string, { label: string; color: string; bg: string }> = {
+  urgente: { label: "🔴 Urgente", color: "#A32D2D", bg: "#FCEBEB" },
+  media: { label: "🟡 Media", color: "#8A6D00", bg: "#FEF6D8" },
+  baja: { label: "🟢 No urgente", color: "#0F6E56", bg: "#E1F5EE" },
 };
 
 export default function AdminPanel({
@@ -141,6 +150,26 @@ export default function AdminPanel({
   const [guardandoDatos, setGuardandoDatos] = useState(false);
   const [datosClienteEnviado, setDatosClienteEnviado] = useState(false);
   const [ticketsUrgentes, setTicketsUrgentes] = useState<{ id: string; folio: string; asunto: string; categoria: string }[]>([]);
+  // Solo para Diseño: mismos banners que ve el cliente en su dashboard
+  // (promocionales + logros publicados, ver CarruselDestacados), para
+  // corroborar que un cambio se refleja, sin salir al dashboard de un
+  // cliente.
+  const [bannersPromo, setBannersPromo] = useState<BannerDestacado[]>([]);
+  const [bannersLogros, setBannersLogros] = useState<BannerDestacado[]>([]);
+  // Solo para Sistemas: los últimos 3 tickets abiertos, para no dejar el
+  // dashboard tan vacío.
+  const [ultimosTicketsSistemas, setUltimosTicketsSistemas] = useState<
+    {
+      id: string;
+      folio: string;
+      asunto: string;
+      centro: string | null;
+      urgencia: string | null;
+      created_at: string;
+      cliente_nombre: string | null;
+      cliente_email: string | null;
+    }[]
+  >([]);
 
   const esGlobal =
     rol === "sistemas" ||
@@ -154,8 +183,39 @@ export default function AdminPanel({
     fetchNotificaciones();
     fetchMisReportes();
     fetchTicketsUrgentes();
+    if (rol === "diseno" || rol === "atencion_cliente") {
+      fetchBannersPromocionales(supabase).then(setBannersPromo);
+      fetchBannersLogros();
+    }
+    if (rol === "sistemas") fetchUltimosTicketsSistemas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function fetchUltimosTicketsSistemas() {
+    const { data } = await supabase
+      .from("tickets")
+      .select("id, folio, asunto, centro, urgencia, created_at, cliente_nombre, cliente_email")
+      .eq("categoria", "sistemas")
+      .neq("estado", "cerrado")
+      .neq("asunto", "📶 Solicitud de nuevo WiFi")
+      .order("created_at", { ascending: false })
+      .limit(3);
+    setUltimosTicketsSistemas(data || []);
+  }
+
+  async function fetchBannersLogros() {
+    const { data } = await supabase
+      .from("logros")
+      .select("banner_url, titulo, empresa")
+      .eq("estado", "publicado")
+      .not("banner_url", "is", null)
+      .order("updated_at", { ascending: false });
+    setBannersLogros(
+      (data || [])
+        .filter((l) => l.banner_url)
+        .map((l) => ({ src: l.banner_url as string, alt: `Logro de ${l.empresa || "un cliente"}: ${l.titulo}` }))
+    );
+  }
 
   async function fetchTicketsUrgentes() {
     let query = supabase
@@ -684,7 +744,7 @@ export default function AdminPanel({
                 <div className="avatar-dropdown">
                   <p className="avatar-dropdown-nombre">{nombre}</p>
                   <p className="avatar-dropdown-rol">
-                    {rol}
+                    {labelRol(rol)}
                     {centro ? ` · ${centro}` : ""}
                   </p>
                   <button className="avatar-dropdown-item" onClick={handleLogout}>
@@ -697,22 +757,25 @@ export default function AdminPanel({
         </div>
       </div>
 
-      <div className="panel-tabs">
-        <button
-          className={"panel-tab" + (tab === "admin" ? " active" : "")}
-          onClick={() => setTab("admin")}
-        >
-          Administrador
-        </button>
-        {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && (
+        <div className="panel-tabs">
           <button
-            className={"panel-tab" + (tab === "clientes" ? " active" : "")}
-            onClick={() => setTab("clientes")}
+            className={"panel-tab" + (tab === "admin" ? " active" : "")}
+            onClick={() => setTab("admin")}
           >
-            Clientes
+            Administrador
           </button>
-        )}
-      </div>
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && (
+            <button
+              className={"panel-tab" + (tab === "clientes" ? " active" : "")}
+              onClick={() => setTab("clientes")}
+            >
+              Clientes
+            </button>
+          )}
+        </div>
+      )}
+
 
       {tab === "admin" && (
         <div className="panel-content">
@@ -772,10 +835,92 @@ export default function AdminPanel({
             </>
           )}
 
-          <p className="panel-section-label" style={{ marginTop: 8 }}>
-            Módulos
-          </p>
-          <div className="modulos-grid">
+          {rol === "sistemas" && (
+            <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
+              <p className="panel-section-label">Últimos tickets</p>
+              {ultimosTicketsSistemas.length === 0 ? (
+                <div className="empty-card" style={{ marginTop: 8 }}>
+                  Sin tickets abiertos por ahora
+                </div>
+              ) : (
+                <div style={{ marginTop: 8, background: "#fff", borderRadius: 12, border: "1px solid #eee", overflow: "hidden" }}>
+                  {ultimosTicketsSistemas.map((t, i) => (
+                    <a
+                      key={t.id}
+                      href="/tickets"
+                      style={{
+                        textDecoration: "none",
+                        color: "inherit",
+                        display: "block",
+                        padding: "10px 12px",
+                        borderTop: i === 0 ? "none" : "1px solid #f0f0f0",
+                      }}
+                    >
+                      <div className="ticket-top">
+                        <div className="ticket-icono">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/icons/sistemas.png" alt="" className="icon-img-20" />
+                        </div>
+                        <div className="ticket-info">
+                          <p className="ticket-folio">{t.folio}</p>
+                          <p className="ticket-asunto">{t.asunto}</p>
+                          <p className="ticket-categoria">
+                            {t.cliente_nombre || t.cliente_email || "Cliente"} · {t.centro || "Sin centro"} ·{" "}
+                            {new Date(t.created_at).toLocaleDateString("es-MX")}
+                          </p>
+                          {(() => {
+                            const info = (t.urgencia && URGENCIA_INFO[t.urgencia]) || {
+                              label: "⚪ Sin urgencia",
+                              color: "#666",
+                              bg: "#EEE",
+                            };
+                            return (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  background: info.bg,
+                                  color: info.color,
+                                }}
+                              >
+                                {info.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(rol === "diseno" || rol === "atencion_cliente") && (
+            <div style={{ maxWidth: 700, margin: "0 auto" }}>
+              <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
+              {rol === "diseno" && (
+                <div style={{ textAlign: "right", marginTop: 6 }}>
+                  <a href="/diseno/banners" className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }}>
+                    ✎ Editar banners
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={rol === "sistemas" || rol === "atencion_cliente" ? { maxWidth: 620, margin: "0 auto", width: "100%" } : undefined}>
+            <p className="panel-section-label" style={{ marginTop: 8 }}>
+              Módulos
+            </p>
+            <div
+              className={"modulos-grid" + (rol === "sistemas" || rol === "atencion_cliente" ? " modulos-grid-compacta" : "")}
+              style={{ marginTop: 8 }}
+            >
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/centro?tab=reservaciones">
                 <span className="modulo-icon">📋</span>
@@ -805,9 +950,11 @@ export default function AdminPanel({
                 <span className="modulo-name">Quejas y Sugerencias</span>
               </a>
             )}
-            {/* Atención a clientes: por ahora solo admin y superadmin (misma
-                lista que las políticas de migracion_atencion_clientes_modulos.sql). */}
-            {(rol === "admin" || rol === "superadmin") && (
+            {/* Atención a clientes: admin, superadmin y atencion_cliente
+                (misma lista que las políticas de
+                migracion_atencion_clientes_modulos.sql y
+                migracion_atencion_cliente_servicio.sql). */}
+            {(rol === "admin" || rol === "superadmin" || rol === "atencion_cliente") && (
               <>
                 <a className="modulo-card" href="/decoraciones">
                   <span className="modulo-icon">🎄</span>
@@ -824,6 +971,24 @@ export default function AdminPanel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/insignia.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Logros</span>
+              </a>
+            )}
+            {rol === "diseno" && (
+              <a className="modulo-card" href="/experiencia-cliente?tab=eventos">
+                <span className="modulo-icon">🎪</span>
+                <span className="modulo-name">Eventos</span>
+              </a>
+            )}
+            {rol === "diseno" && (
+              <a className="modulo-card" href="/documentacion-centro">
+                <span className="modulo-icon">📁</span>
+                <span className="modulo-name">Documentación del centro</span>
+              </a>
+            )}
+            {rol === "diseno" && (
+              <a className="modulo-card" href="/diseno/plantillas">
+                <span className="modulo-icon">📝</span>
+                <span className="modulo-name">Plantillas</span>
               </a>
             )}
             {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
@@ -882,7 +1047,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Facturas</span>
               </a>
             )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno" && (
               <a className="modulo-card" href="/experiencia-cliente">
                 <span className="modulo-icon">🎉</span>
                 <span className="modulo-name">Experiencia de Cliente</span>
@@ -926,7 +1091,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Panel de Centro</span>
               </a>
             )}
-            {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "cobranza" && rol !== "diseno" && (
               <a className="modulo-card" href="/mapa-oficinas">
                 <span className="modulo-icon">🗺️</span>
                 <span className="modulo-name">Mapa oficinas</span>
@@ -950,7 +1115,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Baja de cliente</span>
               </a>
             )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "diseno" && (
               <a className="modulo-card" href="/tours">
                 <span className="modulo-icon">🚶</span>
                 <span className="modulo-name">Tours</span>
@@ -988,6 +1153,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Equipos</span>
               </a>
             )}
+            </div>
           </div>
         </div>
       )}

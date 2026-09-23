@@ -57,6 +57,7 @@ export default function DisenoPage() {
     setLoading(false);
   }
 
+
   function abrirTrabajar(l: Logro) {
     if (abiertoId === l.id) {
       setAbiertoId(null);

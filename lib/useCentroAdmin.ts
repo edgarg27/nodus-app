@@ -19,8 +19,15 @@ export const CENTROS = [
 export const ROLES_ADMIN_CENTRO = ["admin", "superadmin"];
 
 // Superadmin ve todos los centros con un selector; admin queda fijo al
-// centro de su propio perfil.
-export function useCentroAdmin() {
+// centro de su propio perfil. `rolesExtra` permite que una pantalla en
+// particular abra el acceso a más roles sin tocar ROLES_ADMIN_CENTRO (que
+// comparten Decoraciones, Eventos y Documentación) — hoy lo usan
+// Documentación del centro y Decoraciones para sumar a "diseno" y
+// "atencion_cliente". `rolesGlobales` es aparte: son los roles de esos
+// que además deben ver TODOS los centros con selector (no quedar fijos a
+// su propio perfil) — hoy solo "atencion_cliente", que es una cuenta
+// compartida sin centro propio.
+export function useCentroAdmin(rolesExtra: string[] = [], rolesGlobales: string[] = []) {
   const [cargando, setCargando] = useState(true);
   const [rol, setRol] = useState("");
   const [nombre, setNombre] = useState("");
@@ -39,10 +46,11 @@ export function useCentroAdmin() {
       }
       const { data: perfil } = await supabase.from("profiles").select("rol, nombre, centro").eq("id", user.id).single();
       const r = perfil?.rol || "";
+      const esGlobalParaMi = r === "superadmin" || rolesGlobales.includes(r);
       setRol(r);
       setNombre(perfil?.nombre || "");
       setUserId(user.id);
-      setCentro(r === "superadmin" ? perfil?.centro || CENTROS[0] : perfil?.centro || null);
+      setCentro(esGlobalParaMi ? perfil?.centro || CENTROS[0] : perfil?.centro || null);
       setCargando(false);
     })();
   }, []);
@@ -54,7 +62,7 @@ export function useCentroAdmin() {
     userId,
     centro,
     setCentro,
-    esGlobal: rol === "superadmin",
-    permitido: ROLES_ADMIN_CENTRO.includes(rol),
+    esGlobal: rol === "superadmin" || rolesGlobales.includes(rol),
+    permitido: ROLES_ADMIN_CENTRO.includes(rol) || rolesExtra.includes(rol),
   };
 }

@@ -48,7 +48,10 @@ function iconoArchivo(a: Archivo) {
 
 export default function DocumentacionCentroPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin();
+  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(
+    ["diseno", "atencion_cliente"],
+    ["atencion_cliente"]
+  );
 
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [archivos, setArchivos] = useState<Archivo[]>([]);

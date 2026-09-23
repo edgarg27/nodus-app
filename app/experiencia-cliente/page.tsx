@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { empresasDistintas } from "@/lib/empresa";
 import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -38,12 +39,14 @@ function diasHastaProximoCumple(fechaNacimiento: string): number {
 
 export default function ExperienciaClientePage() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [miRol, setMiRol] = useState("");
   const [miId, setMiId] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
-  const [tab, setTab] = useState<"calendario" | "cumpleanos" | "eventos" | "encuestas">("calendario");
+  const tabInicial = searchParams.get("tab") === "eventos" ? "eventos" : "calendario";
+  const [tab, setTab] = useState<"calendario" | "cumpleanos" | "eventos" | "encuestas">(tabInicial);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
   // El apartado de Encuestas es solo para superadmin — el resto de roles

@@ -5,6 +5,7 @@ import os from "os";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { escaparXml, fmtMoneda, reemplazarTodas, reemplazarSecuencia } from "./pptxHelpers";
+import { cargarArchivoPlantilla } from "./plantillasStorage";
 
 // RECONSTRUCCIÓN (2026-09-07): este archivo tenía por error el código de
 // Coworking/Oficina Privada (se movió a lib/cotizacionEspacioPptx.ts,
@@ -56,8 +57,7 @@ async function cargarPlantilla(centro: string) {
   if (!archivo) {
     throw new Error(`Sin plantilla de cotización en PowerPoint de Sala de Juntas para "${centro}" todavía.`);
   }
-  const ruta = path.join(process.cwd(), "public", "plantillas-cotizacion", archivo);
-  const buffer = await fs.readFile(ruta);
+  const buffer = await cargarArchivoPlantilla("plantillas-cotizacion", archivo);
   return JSZip.loadAsync(buffer);
 }
 
