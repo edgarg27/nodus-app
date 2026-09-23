@@ -1054,6 +1054,13 @@ export default function AdminPanel({
               </a>
             )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+              <a className="modulo-card" href="/centro?tab=fidelidad">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tarjeta de fidelidad</span>
+              </a>
+            )}
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/reportes">
                 <span className="modulo-icon">📊</span>
                 <span className="modulo-name">Reportes</span>
