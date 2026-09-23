@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ImagenPrivada from "@/app/components/ImagenPrivada";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 
@@ -494,7 +495,7 @@ export default function TicketsPage() {
           if (fotos.length === 0) return null;
           if (fotos.length === 1) {
             return (
-              <img
+              <ImagenPrivada
                 src={fotos[0]}
                 alt="Foto del reporte"
                 className="ticket-admin-foto"
@@ -508,7 +509,7 @@ export default function TicketsPage() {
           return (
             <div className="ticket-admin-foto-grid">
               {fotos.map((url, i) => (
-                <img
+                <ImagenPrivada
                   key={url}
                   src={url}
                   alt={`Foto del reporte ${i + 1}`}
@@ -557,7 +558,7 @@ export default function TicketsPage() {
                   {c.fotos_urls && c.fotos_urls.length > 0 && (
                     <div className="ticket-admin-foto-grid">
                       {c.fotos_urls.map((url, i) => (
-                        <img
+                        <ImagenPrivada
                           key={url}
                           src={url}
                           alt={`Foto del comentario ${i + 1}`}
@@ -789,7 +790,7 @@ export default function TicketsPage() {
 
       {lightboxIndex !== null && lightboxFotos[lightboxIndex] && (
         <div className="lightbox-overlay" onClick={() => setLightboxIndex(null)}>
-          <img src={lightboxFotos[lightboxIndex]} className="lightbox-img" alt="Foto ampliada" />
+          <ImagenPrivada src={lightboxFotos[lightboxIndex]} className="lightbox-img" alt="Foto ampliada" />
           {lightboxFotos.length > 1 && (
             <>
               <button

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -1074,15 +1075,9 @@ export default function EquiposPage() {
                     </p>
                   </div>
                   {r.archivo_url ? (
-                    <a
-                      className="ver-pdf-btn"
-                      href={r.archivo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Ver o descargar el documento"
-                    >
+                    <BotonArchivo url={r.archivo_url} bucket="responsivas-equipo" title="Ver o descargar el documento">
                       📥 Ver / descargar
-                    </a>
+                    </BotonArchivo>
                   ) : (
                     <span style={{ fontSize: 12, color: "#aaa" }}>Sin PDF</span>
                   )}

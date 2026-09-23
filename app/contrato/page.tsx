@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 import { conIva, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
 
@@ -56,7 +56,7 @@ export default function ContratoPage() {
   async function abrirContrato() {
     if (!contrato?.archivo_url) return;
     setAbriendoContrato(true);
-    const { url, error } = await getSignedFileUrl(supabase, "contratos", contrato.archivo_url);
+    const { url, error } = await pedirLinkFirmado(contrato.archivo_url);
     setAbriendoContrato(false);
     if (!url) {
       alert("No se pudo abrir el contrato: " + (error || "intenta de nuevo"));

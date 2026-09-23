@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -50,7 +50,7 @@ export default function DepositoGarantiaPage() {
 
   async function abrirComprobante(id: string, comprobanteUrl: string) {
     setAbriendoComprobanteId(id);
-    const { url, error: signErr } = await getSignedFileUrl(supabase, "comprobantes", comprobanteUrl);
+    const { url, error: signErr } = await pedirLinkFirmado(comprobanteUrl);
     setAbriendoComprobanteId(null);
     if (!url) {
       alert("No se pudo abrir el comprobante: " + (signErr || "intenta de nuevo"));

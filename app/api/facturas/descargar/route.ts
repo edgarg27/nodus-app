@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { parseStorageUrl } from "@/lib/storage";
 
 // Descarga real (con nombre de archivo) del PDF o XML de una factura. El
 // cliente solo puede bajar las suyas; el staff cualquiera. Se sirve a través
@@ -35,15 +36,18 @@ export async function GET(req: NextRequest) {
   const url = tipo === "xml" ? factura.xml_url : factura.archivo_url;
   if (!url) return NextResponse.json({ error: `Esta factura no tiene ${tipo.toUpperCase()}` }, { status: 404 });
 
-  // Solo se sirven archivos del almacenamiento de este proyecto de Supabase.
+  // Solo se sirven archivos del almacenamiento de este proyecto de Supabase
+  // (no se pide una URL arbitraria) y se descargan con permisos de servidor,
+  // así funciona igual si el bucket es público o privado.
   const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/`;
-  if (!url.startsWith(base)) {
+  const ubicacion = url.startsWith(base) ? parseStorageUrl(url) : null;
+  if (!ubicacion) {
     return NextResponse.json({ error: "Archivo no disponible" }, { status: 400 });
   }
 
-  const upstream = await fetch(url);
-  if (!upstream.ok) return NextResponse.json({ error: "No se pudo obtener el archivo" }, { status: 502 });
-  const contenido = await upstream.arrayBuffer();
+  const { data: blob, error: descargaError } = await admin.storage.from(ubicacion.bucket).download(ubicacion.path);
+  if (descargaError || !blob) return NextResponse.json({ error: "No se pudo obtener el archivo" }, { status: 502 });
+  const contenido = await blob.arrayBuffer();
 
   const nombre = String(factura.folio || "factura").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-|-$/g, "") || "factura";
   return new NextResponse(contenido, {
