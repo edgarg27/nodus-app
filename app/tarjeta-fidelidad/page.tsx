@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import FidelidadCard from "@/app/components/FidelidadCard";
+import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -11,6 +12,7 @@ type Paso = "intro" | "datos" | "enviado";
 
 export default function TarjetaFidelidadPage() {
   const [paso, setPaso] = useState<Paso>("intro");
+  const [vistaIntro, setVistaIntro] = useState<"pedir" | "consultar">("pedir");
 
   const [form, setForm] = useState({
     nombre: "",
@@ -142,14 +144,37 @@ export default function TarjetaFidelidadPage() {
               </span>
             </div>
 
-            <FidelidadCard />
-            <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
-              La casilla 9 es gratis: el espacio que más hayas rentado en tus 8 visitas
-            </p>
+            <div className="invitado-duracion-grupo">
+              <button
+                type="button"
+                className={`invitado-duracion-btn${vistaIntro === "pedir" ? " activo" : ""}`}
+                onClick={() => setVistaIntro("pedir")}
+              >
+                Pedir mi tarjeta
+              </button>
+              <button
+                type="button"
+                className={`invitado-duracion-btn${vistaIntro === "consultar" ? " activo" : ""}`}
+                onClick={() => setVistaIntro("consultar")}
+              >
+                Ya tengo mi tarjeta
+              </button>
+            </div>
 
-            <button className="reservar-btn" onClick={() => setPaso("datos")}>
-              Pedir mi tarjeta
-            </button>
+            {vistaIntro === "pedir" ? (
+              <>
+                <FidelidadCard />
+                <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
+                  La casilla 9 es gratis: el espacio que más hayas rentado en tus 8 visitas
+                </p>
+
+                <button className="reservar-btn" onClick={() => setPaso("datos")}>
+                  Pedir mi tarjeta
+                </button>
+              </>
+            ) : (
+              <ConsultaTarjetaFidelidad />
+            )}
           </>
         )}
 
@@ -227,6 +252,9 @@ export default function TarjetaFidelidadPage() {
               <span className="fidelidad-folio-label">Tu folio</span>
               <span className="fidelidad-folio-valor">{folioMostrar}</span>
             </p>
+            <div style={{ width: "100%", margin: "8px 0" }}>
+              <FidelidadCard nombre={form.nombre.trim()} folio={folio || undefined} />
+            </div>
             <p className="exito-mensaje">
               Guarda este folio — es lo que usarás para identificarte y sellar tu tarjeta en cada visita. También te
               lo mandamos por correo si nos lo diste.

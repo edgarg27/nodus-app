@@ -156,124 +156,126 @@ export default function ModalDisponibilidad({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <p className="modal-nombre">🔍 Verificar disponibilidad</p>
-
-        <p className="sub-label">Oficina</p>
-        <select
-          value={oficinaId}
-          onChange={(e) => {
-            setOficinaId(e.target.value);
-            setResultado(null);
-          }}
-        >
-          <option value="">Selecciona una oficina</option>
-          {oficinas.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.numero} · {o.tipo}
-            </option>
-          ))}
-        </select>
-
-        {oficina && paquetesDelTipo.length > 0 && (
-          <>
-            <p className="sub-label" style={{ marginTop: 8 }}>
-              Paquete (opcional)
-            </p>
-            <select value={paqueteId} onChange={(e) => elegirPaquete(e.target.value)} disabled={paqueteBloqueado}>
-              <option value="">Sin paquete (tarifa directa de la oficina)</option>
-              {paquetesDelTipo.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
-            {paqueteBloqueado && (
-              <p style={{ fontSize: 11, color: "#a3701f", margin: "4px 0 0" }}>
-                🔒 Este paquete se asignó automáticamente por la oficina elegida y no se puede cambiar.
-              </p>
-            )}
-          </>
-        )}
-
-        <p className="sub-label" style={{ marginTop: 8 }}>
-          Fecha de inicio
-        </p>
-        <input
-          type="date"
-          value={fechaInicio}
-          onChange={(e) => {
-            setFechaInicio(e.target.value);
-            setResultado(null);
-          }}
-        />
-
-        <div className="tel-form-grid" style={{ marginTop: 8 }}>
+      <div className="modal-card disp-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="disp-header">
           <div>
-            <p className="sub-label">Modalidad</p>
+            <p className="modal-nombre">🔍 Verificar disponibilidad</p>
+            <p className="modal-email">Consulta si una oficina está libre antes de cotizar</p>
+          </div>
+          <button className="modal-cerrar" onClick={onClose} aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+
+        <div className="disp-form">
+          <div className="disp-campo">
+            <span>Oficina</span>
             <select
-              value={modalidadEfectiva}
-              disabled={!paquete}
+              value={oficinaId}
               onChange={(e) => {
-                setModalidad(e.target.value as Modalidad);
+                setOficinaId(e.target.value);
                 setResultado(null);
               }}
             >
-              {MODALIDADES.map((m) => (
-                <option key={m} value={m} disabled={!!paquete && tarifaPaquete(paquete, m) == null}>
-                  {m}
+              <option value="">Selecciona una oficina</option>
+              {oficinas.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.numero} · {o.tipo}
                 </option>
               ))}
             </select>
           </div>
-          <div>
-            <p className="sub-label">Cantidad</p>
+
+          {oficina && paquetesDelTipo.length > 0 && (
+            <div className="disp-campo">
+              <span>Paquete (opcional)</span>
+              <select value={paqueteId} onChange={(e) => elegirPaquete(e.target.value)} disabled={paqueteBloqueado}>
+                <option value="">Sin paquete (tarifa directa de la oficina)</option>
+                {paquetesDelTipo.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+                ))}
+              </select>
+              {paqueteBloqueado && (
+                <p className="disp-nota">🔒 Este paquete se asignó automáticamente por la oficina elegida y no se puede cambiar.</p>
+              )}
+            </div>
+          )}
+
+          <div className="disp-campo">
+            <span>Fecha de inicio</span>
             <input
-              type="number"
-              min={1}
-              value={cantidad}
+              type="date"
+              value={fechaInicio}
               onChange={(e) => {
-                setCantidad(e.target.value);
+                setFechaInicio(e.target.value);
                 setResultado(null);
               }}
             />
           </div>
+
+          <div className="disp-grid">
+            <div className="disp-campo">
+              <span>Modalidad</span>
+              <select
+                value={modalidadEfectiva}
+                disabled={!paquete}
+                onChange={(e) => {
+                  setModalidad(e.target.value as Modalidad);
+                  setResultado(null);
+                }}
+              >
+                {MODALIDADES.map((m) => (
+                  <option key={m} value={m} disabled={!!paquete && tarifaPaquete(paquete, m) == null}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="disp-campo">
+              <span>Cantidad</span>
+              <input
+                type="number"
+                min={1}
+                value={cantidad}
+                onChange={(e) => {
+                  setCantidad(e.target.value);
+                  setResultado(null);
+                }}
+              />
+            </div>
+          </div>
         </div>
 
-        <button
-          className="tel-borrar-btn"
-          style={{ color: "#0d1b3e", fontWeight: 600, marginTop: 10 }}
-          disabled={!oficinaId || !fechaInicio || verificando}
-          onClick={verificar}
-        >
+        <button className="disp-verificar" disabled={!oficinaId || !fechaInicio || verificando} onClick={verificar}>
           {verificando ? "Verificando..." : "Verificar disponibilidad"}
         </button>
 
         {verificado && resultado && (
-          <p
-            style={{
-              fontSize: 13,
-              marginTop: 8,
-              color: resultado.disponible ? "#0F6E56" : "#A32D2D",
-              fontWeight: 600,
-            }}
-          >
-            {resultado.disponible ? "✓ Disponible" : `✗ Ocupado — ${resultado.motivo}`}
-          </p>
+          <div className={`disp-resultado ${resultado.disponible ? "ok" : "no"}`}>
+            <span className="disp-resultado-icono">{resultado.disponible ? "✓" : "✗"}</span>
+            <span>{resultado.disponible ? "Disponible en esas fechas" : `Ocupada — ${resultado.motivo}`}</span>
+          </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button className="tel-borrar-btn" onClick={onClose}>
+        <div className="disp-acciones">
+          <button className="disp-cerrar" onClick={onClose}>
             Cerrar
           </button>
           <button
-            className="reservar-btn"
+            className="reservar-btn disp-continuar"
             disabled={!verificado || !resultado?.disponible}
             onClick={continuarARegistrarPlan}
           >
             Continuar a Registrar Plan →
           </button>
         </div>
+        {(!verificado || !resultado?.disponible) && (
+          <p className="disp-ayuda">
+            {verificado ? "Elige otra oficina o fecha para continuar." : "Verifica la disponibilidad para poder continuar."}
+          </p>
+        )}
       </div>
     </div>
   );

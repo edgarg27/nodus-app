@@ -314,6 +314,23 @@ body {
   text-align: left;
 }
 
+/* Tarjeta del resumen con algo pendiente: se resalta para que se vea a
+   simple vista qué requiere atención. */
+a.stat-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.stat-card-alerta {
+  border-color: #f5c7a5;
+  background: #fffaf5;
+}
+
+.stat-card-alerta .stat-val {
+  color: #c2570f;
+}
+
 .stat-val {
   font-size: 24px;
   font-weight: 700;
@@ -325,6 +342,81 @@ body {
   font-size: 12px;
   color: #888;
   margin: 4px 0 0;
+}
+
+/* Ingresos por Centro: barras de "Ingresos por tipo" y gráfica de "Ingresos
+   por día/semana" (app/ingresos-centro/page.tsx). CSS puro, sin librería de
+   gráficas, para no sumar una dependencia nueva. */
+.cat-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.cat-bar-row:last-child {
+  margin-bottom: 0;
+}
+
+.cat-bar-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #444;
+}
+
+.cat-bar-track {
+  background: #f0f0f0;
+  border-radius: 6px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.cat-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+}
+
+.serie-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+
+.serie-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 34px;
+}
+
+.serie-bar-val {
+  font-size: 9px;
+  color: #888;
+}
+
+.serie-bar-track {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.serie-bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: #185fa5;
+  min-height: 2px;
+}
+
+.serie-bar-lbl {
+  font-size: 9px;
+  color: #888;
+  text-align: center;
 }
 
 .stat-delta {
@@ -4024,6 +4116,246 @@ body {
   border-radius: 8px;
 }
 
+/* Pantalla del mapa más ancha que el resto de las pantallas (700px) para que
+   el plano se lea bien. */
+.rep-content.rep-content-ancho {
+  max-width: 1280px;
+}
+
+.mapa-imagen-wrap img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mapa-bandeja {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.mapa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #eee;
+  border-radius: 999px;
+  background: #fafafa;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mapa-chip:hover {
+  border-color: #f07e3a;
+}
+
+.mapa-chip-sel {
+  border-color: #f07e3a;
+  background: #fff3e8;
+}
+
+.mapa-pin-etiqueta {
+  position: absolute;
+  left: 50%;
+  bottom: 115%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #0d1b3e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mapa-fantasma {
+  position: fixed;
+  z-index: 60;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f07e3a;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ---------- Modal "Verificar disponibilidad" ---------- */
+.disp-modal {
+  max-width: 480px;
+  gap: 16px;
+  text-align: left;
+}
+
+.disp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.disp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.disp-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.disp-campo > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+}
+
+.disp-form input,
+.disp-form select {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #fafafa;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.disp-form input:focus,
+.disp-form select:focus {
+  outline: none;
+  border-color: #f07e3a;
+  background: #fff;
+}
+
+.disp-form select:disabled {
+  color: #999;
+  background: #f3f3f3;
+}
+
+.disp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.disp-nota {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff6e5;
+  color: #a3701f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.disp-verificar {
+  border: none;
+  border-radius: 12px;
+  padding: 13px;
+  background: #0d1b3e;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.disp-verificar:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.disp-resultado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.disp-resultado.ok {
+  background: #e1f5ee;
+  color: #0f6e56;
+}
+
+.disp-resultado.no {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.disp-resultado-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 13px;
+}
+
+.disp-resultado.ok .disp-resultado-icono {
+  background: #0f6e56;
+}
+
+.disp-resultado.no .disp-resultado-icono {
+  background: #a32d2d;
+}
+
+.disp-acciones {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.disp-cerrar {
+  border: 1px solid #e3e3e3;
+  background: #fff;
+  color: #555;
+  border-radius: 12px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.disp-continuar {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px;
+  font-size: 15px;
+}
+
+.disp-ayuda {
+  margin: -6px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #8b93a7;
+}
+
 .mapa-descargas {
   display: flex;
   gap: 8px;
@@ -4953,9 +5285,11 @@ body {
 }
 
 .fidcard-logo-icon {
-  width: 6.4cqw;
-  height: 6.4cqw;
+  /* Misma altura que las mayúsculas "N" y "DUS" (≈0.72em del wordmark). */
+  width: 0.72em;
+  height: 0.72em;
   object-fit: contain;
+  flex: none;
 }
 
 .fidcard-flex {
@@ -4985,6 +5319,32 @@ body {
   font-weight: 700;
 }
 
+.fidcard-titular {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2cqw;
+}
+
+.fidcard-titular-nombre {
+  margin: 0;
+  color: #fff;
+  font-size: 3cqw;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fidcard-titular-folio {
+  margin: 0;
+  flex: none;
+  color: #f07e3a;
+  font-size: 2.6cqw;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
 .fidcard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5004,6 +5364,20 @@ body {
   color: #0d1b3e;
   text-align: center;
   padding: 0 1cqw;
+}
+
+.fidcard-casilla-click {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fidcard-casilla-click:hover {
+  box-shadow: 0 0 0 0.35cqw #f07e3a;
+}
+
+.fidcard-casilla-sel {
+  box-shadow: 0 0 0 0.5cqw #f07e3a;
 }
 
 .fidcard-casilla-regalo {
@@ -5052,10 +5426,9 @@ body {
   height: 60%;
 }
 
-.fidcard-social-icon-f {
-  font-weight: 800;
-  font-size: 3cqw;
-  font-family: Georgia, serif;
+.fidcard-social-icon-f svg {
+  width: 56%;
+  height: 56%;
 }
 
 .fidcard-social-label {

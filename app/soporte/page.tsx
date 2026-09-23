@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ImagenPrivada from "@/app/components/ImagenPrivada";
 import FileDropzone from "./FileDropzone";
 
 type Ticket = {
@@ -454,7 +455,7 @@ export default function SoportePage() {
                         {c.fotos_urls && c.fotos_urls.length > 0 && (
                           <div className="ticket-admin-foto-grid">
                             {c.fotos_urls.map((url, i) => (
-                              <img
+                              <ImagenPrivada
                                 key={url}
                                 src={url}
                                 alt={`Foto de la respuesta ${i + 1}`}
@@ -479,7 +480,7 @@ export default function SoportePage() {
 
       {lightboxIndex !== null && lightboxFotos[lightboxIndex] && (
         <div className="lightbox-overlay" onClick={() => setLightboxIndex(null)}>
-          <img src={lightboxFotos[lightboxIndex]} className="lightbox-img" alt="Foto ampliada" />
+          <ImagenPrivada src={lightboxFotos[lightboxIndex]} className="lightbox-img" alt="Foto ampliada" />
           {lightboxFotos.length > 1 && (
             <>
               <button

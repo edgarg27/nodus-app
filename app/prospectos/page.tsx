@@ -143,7 +143,7 @@ export default function ProspectosPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    await supabase.from("prospectos").insert({
+    const { error: insertError } = await supabase.from("prospectos").insert({
       centro: formProspecto.centroInteres,
       nombre: formProspecto.nombre,
       telefono: formProspecto.telefono,
@@ -155,6 +155,10 @@ export default function ProspectosPage() {
       rfc: formProspecto.rfc || null,
       registrado_por: user?.id,
     });
+    if (insertError) {
+      alert("No se pudo guardar el prospecto. Intenta de nuevo.");
+      return;
+    }
     setNombreRegistrado(formProspecto.nombre);
     setFormProspecto({
       nombre: "",

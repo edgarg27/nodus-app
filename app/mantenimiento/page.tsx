@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
@@ -455,15 +456,13 @@ export default function MantenimientoPage() {
                         );
                       })()}
                     {r.archivo_url && (
-                      <a
-                        className="ver-pdf-btn"
-                        href={r.archivo_url}
-                        target="_blank"
-                        download
+                      <BotonArchivo
+                        url={r.archivo_url}
+                        bucket="mantenimientos"
                         style={{ marginTop: 8, display: "inline-block" }}
                       >
                         📥 Ver archivo
-                      </a>
+                      </BotonArchivo>
                     )}
                   </div>
                   <button className="tel-borrar-btn" onClick={() => borrarMantenimiento(r.id)}>

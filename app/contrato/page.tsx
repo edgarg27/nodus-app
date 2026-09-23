@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { pedirLinkFirmado } from "@/lib/storage";
 import { conIva, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
 
@@ -50,6 +51,19 @@ export default function ContratoPage() {
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(false);
   const [errorSolicitud, setErrorSolicitud] = useState("");
   const [solicitudEnviada, setSolicitudEnviada] = useState(false);
+  const [abriendoContrato, setAbriendoContrato] = useState(false);
+
+  async function abrirContrato() {
+    if (!contrato?.archivo_url) return;
+    setAbriendoContrato(true);
+    const { url, error } = await pedirLinkFirmado(contrato.archivo_url);
+    setAbriendoContrato(false);
+    if (!url) {
+      alert("No se pudo abrir el contrato: " + (error || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   useEffect(() => {
     fetchContrato();
@@ -410,7 +424,13 @@ export default function ContratoPage() {
 
             <p className="panel-section-label">Documento</p>
             {contrato.archivo_url ? (
-              <a className="doc-row" href={contrato.archivo_url} target="_blank">
+              <button
+                type="button"
+                className="doc-row"
+                style={{ border: "none", width: "100%", textAlign: "left", cursor: "pointer", font: "inherit" }}
+                onClick={abrirContrato}
+                disabled={abriendoContrato}
+              >
                 <div className="doc-icono">
                   <img src="/icons/contrato.png" alt="" className="icon-img-24" />
                 </div>
@@ -418,8 +438,8 @@ export default function ContratoPage() {
                   <p className="doc-nombre">Contrato de Arrendamiento</p>
                   <p className="doc-fecha">Firmado el {formatFecha(contrato.fecha_inicio)}</p>
                 </div>
-                <div className="doc-download-btn">👁️</div>
-              </a>
+                <div className="doc-download-btn">{abriendoContrato ? "…" : "👁️"}</div>
+              </button>
             ) : (
               <div className="doc-row">
                 <div className="doc-icono">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { pedirLinkFirmado } from "@/lib/storage";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import { conIva, sinIva } from "@/lib/adicionales";
@@ -78,6 +79,18 @@ export default function ContratoModal({
   const [archivosNuevos, setArchivosNuevos] = useState<File[]>([]);
   const [versiones, setVersiones] = useState<VersionContrato[]>([]);
   const [marcandoFinal, setMarcandoFinal] = useState<string | null>(null);
+  const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
+
+  async function abrirArchivoContrato(archivoUrl: string) {
+    setAbriendoArchivoUrl(archivoUrl);
+    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl);
+    setAbriendoArchivoUrl(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -86,7 +99,7 @@ export default function ContratoModal({
   const [estatus, setEstatus] = useState(contrato.estatus || "");
   const [archivoFinalUrl, setArchivoFinalUrl] = useState(contrato.archivo_url);
   const [confirmacionFirma, setConfirmacionFirma] = useState(false);
-  const [enviandoFirma, setEnviandoFirma] = useState(false);
+  const [marcandoCincel, setMarcandoCincel] = useState(false);
   const [exitoAprobacionVisible, setExitoAprobacionVisible] = useState(false);
   const [confirmandoRechazo, setConfirmandoRechazo] = useState(false);
 
@@ -420,24 +433,22 @@ export default function ContratoModal({
     onGuardado();
   }
 
-  async function enviarAFirma() {
-    setEnviandoFirma(true);
+  // La firma legal se hace en Cincel: ventas descarga el contrato final, lo
+  // sube a Cincel y aquí solo se deja constancia de que ya se mandó (o se
+  // deshace si fue un error). Reusa la columna enviado_a_firma_at.
+  async function marcarEnviadoACincel(enviado: boolean) {
+    setMarcandoCincel(true);
     setError("");
-    try {
-      const res = await fetch("/api/contratos/enviar-a-firma", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contratoId: contrato.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "No se pudo mandar el contrato a firma");
-        return;
-      }
-      onGuardado();
-    } finally {
-      setEnviandoFirma(false);
+    const { error: updateError } = await supabase
+      .from("contratos")
+      .update({ enviado_a_firma_at: enviado ? new Date().toISOString() : null })
+      .eq("id", contrato.id);
+    setMarcandoCincel(false);
+    if (updateError) {
+      setError("No se pudo actualizar el estado de la firma: " + updateError.message);
+      return;
     }
+    onGuardado();
   }
 
   async function aprobar() {
@@ -615,21 +626,46 @@ export default function ContratoModal({
 
         {estatus === "pre_aprobado" && (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            {archivoFinalUrl && !contrato.firmado && (
-              <div style={{ width: "100%" }}>
-                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={enviarAFirma} disabled={enviandoFirma}>
-                  {enviandoFirma ? "Mandando…" : contrato.enviado_a_firma_at ? "📧 Reenviar a firma" : "📧 Enviar a firma"}
-                </button>
-                {contrato.enviado_a_firma_at && (
-                  <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
-                    Mandado a firma el {new Date(contrato.enviado_a_firma_at).toLocaleDateString("es-MX")} — todavía no lo firma el cliente.
-                  </p>
+            {!contrato.firmado && (
+              <div className="nota-info" style={{ width: "100%", margin: 0, lineHeight: 1.5 }}>
+                <strong>Firma en Cincel</strong>
+                {!archivoFinalUrl ? (
+                  <p style={{ margin: "4px 0 0" }}>1. Sube el contrato final (PDF) y dale "Guardar cambios".</p>
+                ) : !contrato.enviado_a_firma_at ? (
+                  <>
+                    <p style={{ margin: "4px 0 6px" }}>
+                      ✍ <strong>Listo para firma.</strong> Descárgalo, súbelo a Cincel y luego marca aquí que ya se mandó.
+                    </p>
+                    <button
+                      className="tel-borrar-btn"
+                      style={{ color: "#0d1b3e", fontWeight: 700 }}
+                      onClick={() => marcarEnviadoACincel(true)}
+                      disabled={marcandoCincel}
+                    >
+                      {marcandoCincel ? "Guardando…" : "📨 Marcar como enviado a Cincel"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: "4px 0 6px" }}>
+                      📨 <strong>En Cincel</strong> desde el {new Date(contrato.enviado_a_firma_at).toLocaleDateString("es-MX")}.
+                      Cuando el cliente firme, descarga el PDF firmado, súbelo aquí como versión final y confirma abajo.
+                    </p>
+                    <button
+                      className="tel-borrar-btn"
+                      style={{ color: "#888" }}
+                      onClick={() => marcarEnviadoACincel(false)}
+                      disabled={marcandoCincel}
+                    >
+                      Deshacer (no se ha mandado)
+                    </button>
+                  </>
                 )}
               </div>
             )}
             {contrato.firmado ? (
               <p style={{ fontSize: 12, color: "#0F6E56", width: "100%", margin: 0 }}>
-                ✓ Firmado por el cliente{contrato.firmado_at ? ` el ${new Date(contrato.firmado_at).toLocaleDateString("es-MX")}` : ""}.
+                ✓ Firmado{contrato.firmado_at ? ` el ${new Date(contrato.firmado_at).toLocaleDateString("es-MX")}` : ""}.
               </p>
             ) : (
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, width: "100%", color: "#333" }}>
@@ -638,7 +674,7 @@ export default function ContratoModal({
                   checked={confirmacionFirma}
                   onChange={(e) => setConfirmacionFirma(e.target.checked)}
                 />
-                Confirmo que el documento cargado es la versión firmada
+                Confirmo que el documento cargado es la versión firmada en Cincel
               </label>
             )}
             <button
@@ -718,14 +754,16 @@ export default function ContratoModal({
         <p className="modal-seccion">📎 Contrato PDF (Machote pre-generado)</p>
         {contrato.archivo_machote_url || contrato.archivo_url ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <a
+            <button
+              type="button"
               className="ver-pdf-btn"
-              href={contrato.archivo_machote_url || contrato.archivo_url || undefined}
-              target="_blank"
-              download
+              onClick={() => abrirArchivoContrato((contrato.archivo_machote_url || contrato.archivo_url)!)}
+              disabled={abriendoArchivoUrl === (contrato.archivo_machote_url || contrato.archivo_url)}
             >
-              📥 Ver y descargar machote
-            </a>
+              {abriendoArchivoUrl === (contrato.archivo_machote_url || contrato.archivo_url)
+                ? "Abriendo…"
+                : "📥 Ver y descargar machote"}
+            </button>
             {archivoFinalUrl === (contrato.archivo_machote_url || contrato.archivo_url) ? (
               <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Es la versión final</span>
             ) : (
@@ -763,9 +801,14 @@ export default function ContratoModal({
                   <p className="item-card-sub">{new Date(v.created_at).toLocaleString("es-MX")}</p>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <a className="ver-pdf-btn" href={v.archivo_url} target="_blank" download>
-                    📥 Ver
-                  </a>
+                  <button
+                    type="button"
+                    className="ver-pdf-btn"
+                    onClick={() => abrirArchivoContrato(v.archivo_url)}
+                    disabled={abriendoArchivoUrl === v.archivo_url}
+                  >
+                    {abriendoArchivoUrl === v.archivo_url ? "Abriendo…" : "📥 Ver"}
+                  </button>
                   {archivoFinalUrl === v.archivo_url ? (
                     <span style={{ fontSize: 12, color: "#0F6E56", fontWeight: 600 }}>★ Final</span>
                   ) : (

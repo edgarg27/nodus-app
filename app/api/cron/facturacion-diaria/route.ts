@@ -559,3 +559,14 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, fecha: hoyISO, resumen });
 }
+
+// Los servicios de cron (cron-job.org, Vercel, etc.) suelen llamar con GET.
+// Aquí SOLO se acepta con el secreto del cron — nunca con sesión — para que
+// abrir esta URL en el navegador no dispare una facturación.
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  return POST(req);
+}

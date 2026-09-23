@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { labelRol } from "@/lib/roles";
@@ -69,7 +70,16 @@ type Resumen = {
   totalClientes: number;
   facturasPendientes: number;
   facturasVencidas: number;
+  montoVencido: number;
   comprobantesRevisar: number;
+  solicitudesInvitados: number;
+  solicitudesClientes: number;
+  reservacionesPendientes: number;
+  ticketsAbiertos: number;
+  ticketsUrgentes: number;
+  oficinasTotal: number;
+  oficinasOcupadas: number;
+  contratosPorVencer: number;
 };
 
 // Mismos colores que ya usa /tickets para la urgencia.
@@ -101,6 +111,18 @@ export default function AdminPanel({
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [facturasCliente, setFacturasCliente] = useState<Factura[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [abriendoArchivoId, setAbriendoArchivoId] = useState<string | null>(null);
+
+  async function abrirArchivoContrato(id: string, archivoUrl: string) {
+    setAbriendoArchivoId(id);
+    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl);
+    setAbriendoArchivoId(null);
+    if (!url) {
+      alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
   const [vouchersCliente, setVouchersCliente] = useState<Voucher[]>([]);
   const [contratosCliente, setContratosCliente] = useState<ContratoResumen[]>([]);
   const [generandoVoucher, setGenerandoVoucher] = useState(false);
@@ -277,7 +299,7 @@ export default function AdminPanel({
       lista = lista.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "mantenimiento");
     }
     // Logros, quejas y sugerencias solo le llegan al superadmin, no al admin/gerente.
-    if (rol === "gerente") {
+    if (rol === "gerente" || rol === "admin") {
       lista = lista.filter((n) => n.tipo !== "nueva_queja" && n.tipo !== "nuevo_logro");
     }
     setNotificaciones(lista);
@@ -310,7 +332,10 @@ export default function AdminPanel({
     } else if (n.tipo === "proximo_mantenimiento") {
       router.push("/mantenimiento");
     } else if (n.tipo === "nuevo_gasto") {
-      router.push("/cobranza?tab=gastos");
+      // La pestaña de gastos en /cobranza solo renderiza contenido para roles
+      // con alcance global (esGlobal); admin (alcance de un solo centro) debe
+      // ir a /gastos, que sí muestra los gastos de su centro.
+      router.push(esGlobal ? "/cobranza?tab=gastos" : "/gastos");
     } else if (
       n.tipo === "pago_confirmado" ||
       n.tipo === "fecha_pago_hoy" ||
@@ -319,6 +344,17 @@ export default function AdminPanel({
       n.tipo === "cuenta_pausada"
     ) {
       router.push("/cobranza");
+    } else if (n.tipo === "nueva_solicitud_invitado") {
+      // Day Pass y demás solicitudes de invitados: ahí mismo se genera el pase.
+      router.push("/centro?tab=invitados");
+    } else if (n.tipo === "nueva_tarjeta_fidelidad") {
+      router.push("/fidelidad-admin");
+    } else if (n.tipo === "solicitud_cliente") {
+      router.push("/centro?tab=solicitudes");
+    } else if (n.tipo === "visita_cliente") {
+      router.push("/centro?tab=visitas");
+    } else if (n.tipo === "reservacion_cancelada_cliente") {
+      router.push("/centro?tab=reservaciones");
     } else if (n.tipo === "nueva_queja") {
       // Mismo tipo para quejas Y sugerencias (ver app/quejas-sugerencias/page.tsx)
       router.push("/atencion-cliente");
@@ -796,25 +832,78 @@ export default function AdminPanel({
 
           {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
             <>
-              <p className="panel-section-label">Resumen general</p>
+              <p className="panel-section-label">Por atender</p>
+              <div className="stats-row">
+                {(() => {
+                  const solicitudes = resumen.solicitudesInvitados + resumen.solicitudesClientes;
+                  return (
+                    <a
+                      className={`stat-card${solicitudes > 0 ? " stat-card-alerta" : ""}`}
+                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro?tab=solicitudes" : "/centro?tab=invitados"}
+                    >
+                      <p className="stat-val">{solicitudes}</p>
+                      <p className="stat-lbl">Solicitudes por atender</p>
+                      <p className="stat-delta">
+                        {resumen.solicitudesInvitados} de invitados · {resumen.solicitudesClientes} de clientes
+                      </p>
+                    </a>
+                  );
+                })()}
+                <a
+                  className={`stat-card${resumen.reservacionesPendientes > 0 ? " stat-card-alerta" : ""}`}
+                  href="/centro?tab=reservaciones"
+                >
+                  <p className="stat-val">{resumen.reservacionesPendientes}</p>
+                  <p className="stat-lbl">Reservaciones por confirmar</p>
+                  <p className="stat-delta">Salas pendientes →</p>
+                </a>
+                <a
+                  className={`stat-card${resumen.facturasVencidas > 0 ? " stat-card-alerta" : ""}`}
+                  href="/facturas-admin"
+                >
+                  <p className="stat-val">{resumen.facturasVencidas}</p>
+                  <p className="stat-lbl">Pagos vencidos</p>
+                  <p className="stat-delta" style={resumen.facturasVencidas > 0 ? { color: "#A32D2D" } : undefined}>
+                    ${resumen.montoVencido.toLocaleString("es-MX")} por cobrar · {resumen.facturasPendientes} pendientes
+                  </p>
+                </a>
+                <a className={`stat-card${resumen.ticketsAbiertos > 0 ? " stat-card-alerta" : ""}`} href="/tickets">
+                  <p className="stat-val">{resumen.ticketsAbiertos}</p>
+                  <p className="stat-lbl">Tickets abiertos</p>
+                  <p className="stat-delta" style={resumen.ticketsUrgentes > 0 ? { color: "#A32D2D", fontWeight: 700 } : undefined}>
+                    {resumen.ticketsUrgentes > 0 ? `🔴 ${resumen.ticketsUrgentes} urgente${resumen.ticketsUrgentes === 1 ? "" : "s"}` : "Sin urgentes"}
+                  </p>
+                </a>
+              </div>
+
+              <p className="panel-section-label" style={{ marginTop: 8 }}>
+                Resumen del centro
+              </p>
               <div className="stats-row">
                 <button className="stat-card" onClick={() => setTab("clientes")}>
                   <p className="stat-val">{resumen.totalClientes}</p>
                   <p className="stat-lbl">Clientes activos</p>
                   <p className="stat-delta">Ver clientes →</p>
                 </button>
-                <div className="stat-card">
-                  <p className="stat-val">{resumen.facturasPendientes}</p>
-                  <p className="stat-lbl">Facturas pendientes</p>
-                </div>
-                <div className="stat-card">
-                  <p className="stat-val">{resumen.facturasVencidas}</p>
-                  <p className="stat-lbl">Facturas vencidas</p>
-                </div>
-                <div className="stat-card">
+                <a className="stat-card" href="/reportes">
+                  <p className="stat-val">
+                    {resumen.oficinasOcupadas}
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "#888" }}> de {resumen.oficinasTotal}</span>
+                  </p>
+                  <p className="stat-lbl">Oficinas ocupadas</p>
+                  <p className="stat-delta">
+                    {resumen.oficinasTotal > 0 ? Math.round((resumen.oficinasOcupadas / resumen.oficinasTotal) * 100) : 0}% de ocupación
+                  </p>
+                </a>
+                <a className={`stat-card${resumen.contratosPorVencer > 0 ? " stat-card-alerta" : ""}`} href="/contratos">
+                  <p className="stat-val">{resumen.contratosPorVencer}</p>
+                  <p className="stat-lbl">Contratos por vencer</p>
+                  <p className="stat-delta">En los próximos 30 días</p>
+                </a>
+                <a className="stat-card" href="/pagos">
                   <p className="stat-val">{resumen.comprobantesRevisar}</p>
                   <p className="stat-lbl">Comprobantes por revisar</p>
-                </div>
+                </a>
               </div>
             </>
           )}
@@ -940,10 +1029,6 @@ export default function AdminPanel({
                 migracion_atencion_cliente_servicio.sql). */}
             {(rol === "admin" || rol === "superadmin" || rol === "atencion_cliente") && (
               <>
-                <a className="modulo-card" href="/decoraciones">
-                  <span className="modulo-icon">🎄</span>
-                  <span className="modulo-name">Decoraciones y festividades</span>
-                </a>
                 <a className="modulo-card" href="/documentacion-centro">
                   <span className="modulo-icon">📁</span>
                   <span className="modulo-name">Documentación del centro</span>
@@ -1035,6 +1120,13 @@ export default function AdminPanel({
               <a className="modulo-card" href="/experiencia-cliente">
                 <span className="modulo-icon">🎉</span>
                 <span className="modulo-name">Experiencia de Cliente</span>
+              </a>
+            )}
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+              <a className="modulo-card" href="/fidelidad-admin">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tarjeta de fidelidad</span>
               </a>
             )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
@@ -1459,9 +1551,14 @@ export default function AdminPanel({
                       </p>
                       <p className="factura-concepto">${Number(ct.renta_mensual).toLocaleString("es-MX")}/mes</p>
                       {ct.archivo_url && (
-                        <a className="ver-pdf-btn" href={ct.archivo_url} target="_blank" download>
-                          📥 Ver PDF
-                        </a>
+                        <button
+                          type="button"
+                          className="ver-pdf-btn"
+                          onClick={() => abrirArchivoContrato(ct.id, ct.archivo_url!)}
+                          disabled={abriendoArchivoId === ct.id}
+                        >
+                          {abriendoArchivoId === ct.id ? "Abriendo…" : "📥 Ver PDF"}
+                        </button>
                       )}
                       {puedeGestionarClientes && (
                         <a

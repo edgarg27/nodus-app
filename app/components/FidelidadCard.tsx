@@ -1,4 +1,9 @@
-import { LABEL_TIPO_ESPACIO_FIDELIDAD, TIPOS_ESPACIO_FIDELIDAD, type TipoEspacioFidelidad } from "@/lib/fidelidad";
+import {
+  LABEL_TIPO_ESPACIO_FIDELIDAD,
+  TIPOS_ESPACIO_FIDELIDAD,
+  formatFolioFidelidad,
+  type TipoEspacioFidelidad,
+} from "@/lib/fidelidad";
 
 // Tarjeta visual de cliente frecuente — mismo diseño en las 3 pantallas que
 // la usan (pedir tarjeta, consultar por folio, y panel de staff). Sin
@@ -9,9 +14,18 @@ type SelloVisual = { numero: number; tipo_espacio: TipoEspacioFidelidad; detalle
 export default function FidelidadCard({
   sellos = [],
   regalo = null,
+  nombre,
+  folio,
+  onCasillaClick,
+  casillaSeleccionada,
 }: {
   sellos?: SelloVisual[];
   regalo?: { tipo_espacio: TipoEspacioFidelidad; detalle: string | null } | null;
+  nombre?: string;
+  folio?: number;
+  // Solo en el panel de staff: las casillas 1 a 8 se vuelven botones.
+  onCasillaClick?: (numero: number) => void;
+  casillaSeleccionada?: number | null;
 }) {
   const iconoDe = (t: TipoEspacioFidelidad) => TIPOS_ESPACIO_FIDELIDAD.find((x) => x.id === t)?.icono || "";
 
@@ -31,6 +45,13 @@ export default function FidelidadCard({
           <p className="fidcard-subtitulo">Gracias por ser de nuestros clientes más leales</p>
         </div>
       </div>
+
+      {(nombre || folio) && (
+        <div className="fidcard-titular">
+          <p className="fidcard-titular-nombre">{nombre}</p>
+          {folio ? <p className="fidcard-titular-folio">{formatFolioFidelidad(folio)}</p> : null}
+        </div>
+      )}
 
       <div className="fidcard-grid">
         {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
@@ -52,9 +73,25 @@ export default function FidelidadCard({
             );
           }
           const sello = sellos.find((s) => s.numero === n);
+          const contenido = sello && <img src={iconoDe(sello.tipo_espacio)} alt="" className="fidcard-icon" />;
+          if (onCasillaClick) {
+            return (
+              <button
+                key={n}
+                type="button"
+                aria-label={sello ? `Casilla ${n}: sellada` : `Casilla ${n}: vacía`}
+                className={`fidcard-casilla fidcard-casilla-click${sello ? " fidcard-casilla-llena" : ""}${
+                  casillaSeleccionada === n ? " fidcard-casilla-sel" : ""
+                }`}
+                onClick={() => onCasillaClick(n)}
+              >
+                {contenido}
+              </button>
+            );
+          }
           return (
             <div key={n} className={`fidcard-casilla${sello ? " fidcard-casilla-llena" : ""}`}>
-              {sello && <img src={iconoDe(sello.tipo_espacio)} alt="" className="fidcard-icon" />}
+              {contenido}
             </div>
           );
         })}
@@ -70,7 +107,11 @@ export default function FidelidadCard({
               <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" stroke="none" />
             </svg>
           </span>
-          <span className="fidcard-social-icon fidcard-social-icon-f">f</span>
+          <span className="fidcard-social-icon fidcard-social-icon-f">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+            </svg>
+          </span>
           <p className="fidcard-social-label">Nodus Flex Center</p>
         </div>
       </div>

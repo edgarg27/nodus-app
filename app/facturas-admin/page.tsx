@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -601,9 +602,9 @@ export default function FacturasAdminPage() {
                           </div>
                         )}
                         {f.archivo_url && (
-                          <a className="ver-pdf-btn" href={f.archivo_url} target="_blank" download>
+                          <BotonArchivo url={f.archivo_url} bucket="facturas">
                             📥 Ver PDF
-                          </a>
+                          </BotonArchivo>
                         )}
                       </div>
                       <span className="factura-badge" style={{ background: badge.bg }}>

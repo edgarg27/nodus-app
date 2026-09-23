@@ -1,14 +1,16 @@
 -- =====================================================================
--- Flujo de firma por liga: fecha de envío a firma
+-- Seguimiento de la firma en Cincel: fecha de envío
 --
 -- Qué agrega:
---   Columna `enviado_a_firma_at` en `contratos` — se llena cuando la
---   admin manda el contrato por correo con la liga para firmar (ver
---   app/api/contratos/enviar-a-firma/route.ts). Las columnas para
---   registrar la firma en sí (`firmado`, `firmado_at`, `firmado_ip`,
---   `firma_url`) ya existían en la tabla sin usarse — ahora sí se usan:
---   se llenan cuando el cliente da clic en "Firmo y acepto" en la página
---   pública /firmar-contrato/[id] (ver app/api/contratos/firmar/route.ts).
+--   Columna `enviado_a_firma_at` en `contratos` — se llena cuando ventas
+--   marca "Enviado a Cincel" en el modal del contrato (Contratos ->
+--   Pendientes de aprobación). Con ella se sabe en qué paso va cada
+--   contrato: sin archivo -> "Listo para firma" -> "En Cincel" -> firmado
+--   (se sube el PDF firmado y se aprueba).
+--
+-- La firma legal se hace en Cincel, no en la app. Las columnas `firmado`,
+-- `firmado_at`, `firmado_ip` y `firma_url` ya existen (de la firma por liga
+-- que se retiró); no se usan para contratos nuevos y no se borran.
 --
 -- Corre esto UNA VEZ en el SQL Editor de Supabase.
 -- =====================================================================

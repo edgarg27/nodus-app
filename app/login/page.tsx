@@ -16,6 +16,7 @@ function LoginInner() {
   const [loading, setLoading] = useState(false);
   const [recordarme, setRecordarme] = useState(false);
   const [mostrarPassword, setMostrarPassword] = useState(false);
+  const [modo, setModo] = useState<"login" | "recuperar" | "enviado">("login");
 
   // Si la vez pasada dejó marcado "Recuérdame", recuperamos su usuario/correo
   // para no hacerlo escribirlo de nuevo. La contraseña en sí NO la guardamos
@@ -113,6 +114,107 @@ function LoginInner() {
     router.refresh();
   }
 
+  // "¿Olvidaste tu contraseña?": manda un enlace al correo de la cuenta para
+  // crear una nueva. La respuesta es la misma exista o no la cuenta.
+  async function handleRecuperar(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!identificador.trim()) {
+      setError("Escribe tu correo o número de usuario.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/recuperar-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identificador: identificador.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "No se pudo enviar el enlace. Intenta de nuevo.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("No se pudo conectar. Intenta de nuevo.");
+      setLoading(false);
+      return;
+    }
+    setLoading(false);
+    setModo("enviado");
+  }
+
+  if (modo !== "login") {
+    return (
+      <div className="login-wrap">
+        {modo === "recuperar" ? (
+          <form className="login-card" onSubmit={handleRecuperar}>
+            <h1>Recupera tu contraseña</h1>
+            <p className="subtitle">Te mandamos un enlace por correo para crear una nueva</p>
+
+            <label htmlFor="identificador-recuperar">Correo o número de usuario</label>
+            <div className="login-input-wrap">
+              <span className="login-input-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-5.5 8.28" />
+                </svg>
+              </span>
+              <input
+                id="identificador-recuperar"
+                type="text"
+                required
+                autoFocus
+                autoComplete="username"
+                placeholder="tu@correo.com o N-1356"
+                value={identificador}
+                onChange={(e) => setIdentificador(e.target.value)}
+              />
+            </div>
+
+            <p className="error">{error}</p>
+
+            <button type="submit" disabled={loading}>
+              {loading ? "Enviando..." : "Enviar enlace"}
+            </button>
+
+            <a
+              href="#"
+              className="login-forgot-link"
+              style={{ textAlign: "center", marginTop: 4 }}
+              onClick={(e) => {
+                e.preventDefault();
+                setError("");
+                setModo("login");
+              }}
+            >
+              ← Volver a iniciar sesión
+            </a>
+          </form>
+        ) : (
+          <div className="login-card" style={{ textAlign: "center" }}>
+            <p style={{ fontSize: 40, margin: 0 }}>📬</p>
+            <h1>Revisa tu correo</h1>
+            <p className="subtitle">
+              Si tu cuenta existe, te mandamos un enlace para crear una nueva contraseña. Búscalo también en spam o
+              correo no deseado. El enlace vence en 1 hora.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setModo("login");
+              }}
+            >
+              Volver a iniciar sesión
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
@@ -188,7 +290,11 @@ function LoginInner() {
           <a
             href="#"
             className="login-forgot-link"
-            onClick={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault();
+              setError("");
+              setModo("recuperar");
+            }}
           >
             ¿Olvidaste tu contraseña?
           </a>

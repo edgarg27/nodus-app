@@ -305,7 +305,7 @@ function TabCalendario({
                 background: dia ? (sinServicio ? "#FBE9E9" : "#F7F7F7") : "transparent",
                 padding: 4,
                 cursor: clicable ? "pointer" : "default",
-                border: diaAbierto === dia ? "2px solid #0d1b3e" : "1px solid transparent",
+                border: dia && diaAbierto === dia ? "2px solid #0d1b3e" : "1px solid transparent",
               }}
             >
               {dia && (

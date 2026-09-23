@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 
 type Factura = {
   id: string;
@@ -22,9 +23,9 @@ function ArchivosFactura({ f }: { f: Factura }) {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
       {f.archivo_url && (
-        <a className="ver-pdf-btn" href={f.archivo_url} target="_blank" rel="noopener noreferrer">
+        <BotonArchivo url={f.archivo_url} bucket="facturas">
           📄 Ver factura
-        </a>
+        </BotonArchivo>
       )}
       {f.archivo_url && (
         <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=pdf`}>
@@ -291,7 +292,7 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full" href={p.link_pago || `/pagar-simulado/${p.id}`}>
+                    <a className="pagar-btn-full" href={`/pagar-simulado/${p.id}`}>
                       💳 Ir a pagar
                     </a>
                   </div>

@@ -46,9 +46,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo generar el pago" }, { status: 500 });
   }
 
-  const origin = req.nextUrl.origin;
-  const linkPago = `${origin}/pagar-simulado/${pago.id}`;
-  await admin.from("pagos").update({ link_pago: linkPago }).eq("id", pago.id);
-
-  return NextResponse.json({ ok: true, pago: { ...pago, link_pago: linkPago } });
+  return NextResponse.json({ ok: true, pago });
 }

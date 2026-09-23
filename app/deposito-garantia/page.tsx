@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
@@ -45,6 +46,18 @@ export default function DepositoGarantiaPage() {
   const [depositos, setDepositos] = useState<Deposito[]>([]);
   const [soloPendientes, setSoloPendientes] = useState(true);
   const [procesando, setProcesando] = useState<string | null>(null);
+  const [abriendoComprobanteId, setAbriendoComprobanteId] = useState<string | null>(null);
+
+  async function abrirComprobante(id: string, comprobanteUrl: string) {
+    setAbriendoComprobanteId(id);
+    const { url, error: signErr } = await pedirLinkFirmado(comprobanteUrl);
+    setAbriendoComprobanteId(null);
+    if (!url) {
+      alert("No se pudo abrir el comprobante: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
   const [subiendoParaId, setSubiendoParaId] = useState<string | null>(null);
   const [archivosComprobante, setArchivosComprobante] = useState<File[]>([]);
   const [errorComprobante, setErrorComprobante] = useState("");
@@ -272,14 +285,15 @@ export default function DepositoGarantiaPage() {
                       </p>
                     ) : d.estado === "pagado" ? (
                       d.comprobante_url && (
-                        <a
+                        <button
+                          type="button"
                           className="ver-pdf-btn"
-                          href={d.comprobante_url}
-                          target="_blank"
+                          onClick={() => abrirComprobante(d.id, d.comprobante_url!)}
+                          disabled={abriendoComprobanteId === d.id}
                           style={{ marginTop: 8, display: "inline-block" }}
                         >
-                          👁️ Ver comprobante
-                        </a>
+                          {abriendoComprobanteId === d.id ? "Abriendo…" : "👁️ Ver comprobante"}
+                        </button>
                       )
                     ) : subiendoParaId === d.id ? (
                       <div style={{ marginTop: 8 }}>

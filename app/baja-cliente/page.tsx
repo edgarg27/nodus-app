@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { pedirLinkFirmado } from "@/lib/storage";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -49,6 +50,19 @@ export default function BajaClientePage() {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState(false);
+  const [abriendoContrato, setAbriendoContrato] = useState(false);
+
+  async function abrirContrato() {
+    if (!contrato?.archivo_url) return;
+    setAbriendoContrato(true);
+    const { url, error: signErr } = await pedirLinkFirmado(contrato.archivo_url);
+    setAbriendoContrato(false);
+    if (!url) {
+      alert("No se pudo abrir el contrato: " + (signErr || "intenta de nuevo"));
+      return;
+    }
+    window.open(url, "_blank");
+  }
 
   const confettiBaja = useMemo(() => {
     if (!exito) return [];
@@ -314,9 +328,9 @@ export default function BajaClientePage() {
                   {contrato.horas_sala_juntas ? ` · ${contrato.horas_sala_juntas}h sala de juntas` : ""}
                 </p>
                 {contrato.archivo_url ? (
-                  <a className="ver-pdf-btn" href={contrato.archivo_url} target="_blank" download>
-                    📥 Ver y descargar contrato
-                  </a>
+                  <button type="button" className="ver-pdf-btn" onClick={abrirContrato} disabled={abriendoContrato}>
+                    {abriendoContrato ? "Abriendo…" : "📥 Ver y descargar contrato"}
+                  </button>
                 ) : (
                   <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin contrato PDF adjunto</p>
                 )}

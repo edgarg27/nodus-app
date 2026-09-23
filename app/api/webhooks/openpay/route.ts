@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { consultarCargo } from "@/lib/openpay";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Openpay manda un POST aquí cuando cambia el estatus de un cargo. Nunca
 // confiamos en el contenido del webhook a ciegas — siempre se vuelve a
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (pago && pago.estado !== "pagado") {
-      await admin.from("pagos").update({ estado: "pagado" }).eq("id", pago.id);
+      await admin.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).eq("id", pago.id);
       await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
 
       const { data: factura } = await admin
