@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { labelRol } from "@/lib/roles";
@@ -115,7 +115,7 @@ export default function AdminPanel({
 
   async function abrirArchivoContrato(id: string, archivoUrl: string) {
     setAbriendoArchivoId(id);
-    const { url, error: signErr } = await getSignedFileUrl(supabase, "contratos", archivoUrl);
+    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl);
     setAbriendoArchivoId(null);
     if (!url) {
       alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));

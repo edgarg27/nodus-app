@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl, parseStorageUrl } from "@/lib/storage";
+import { pedirLinkFirmado, parseStorageUrl } from "@/lib/storage";
 
 // Imagen guardada en Supabase Storage que se muestra con un link firmado y
 // temporal en vez de la URL pública fija guardada en la base de datos. Sirve
@@ -48,7 +47,7 @@ export default function ImagenPrivada({
       return;
     }
     setFirmada(null);
-    getSignedFileUrl(createClient(), bucket, src, VIGENCIA_SEG).then(({ url }) => {
+    pedirLinkFirmado(src, { expiresIn: VIGENCIA_SEG }).then(({ url }) => {
       if (cancelado) return;
       if (!url) {
         setFallo(true);

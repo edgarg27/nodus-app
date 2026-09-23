@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 
 // Botón que abre (o descarga) un archivo guardado en Supabase Storage pidiendo
 // un link firmado y temporal en el momento del clic, en vez de reusar una URL
@@ -29,7 +28,7 @@ export default function BotonArchivo({
 
   async function abrir() {
     setAbriendo(true);
-    const { url: firmada, error } = await getSignedFileUrl(createClient(), bucket, url, 300, descargar);
+    const { url: firmada, error } = await pedirLinkFirmado(url, { descargar });
     setAbriendo(false);
     if (!firmada) {
       alert("No se pudo abrir el archivo: " + (error || "intenta de nuevo"));

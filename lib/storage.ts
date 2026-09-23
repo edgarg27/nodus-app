@@ -43,3 +43,25 @@ export async function getSignedFileUrl(
   }
   return { url: data.signedUrl, error: null };
 }
+
+// Versión para el NAVEGADOR: pide el link firmado al servidor
+// (/api/archivos/firmar), que comprueba que el usuario puede ver ese archivo
+// (staff: cualquiera; cliente: solo los ligados a sus registros) y firma con
+// permisos de servidor. Así funciona igual con buckets públicos o privados.
+export async function pedirLinkFirmado(
+  url: string,
+  opciones: { descargar?: boolean; expiresIn?: number } = {}
+): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const res = await fetch("/api/archivos/firmar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, descargar: opciones.descargar === true, expiresIn: opciones.expiresIn }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.url) return { url: null, error: data.error || "No se pudo abrir el archivo" };
+    return { url: data.url as string, error: null };
+  } catch {
+    return { url: null, error: "No se pudo conectar" };
+  }
+}

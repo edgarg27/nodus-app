@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 
 type Gasto = {
@@ -69,7 +69,7 @@ export default function GastosPage() {
 
   async function abrirComprobante(archivoUrl: string) {
     setAbriendoArchivoUrl(archivoUrl);
-    const { url, error: signErr } = await getSignedFileUrl(supabase, "comprobantes", archivoUrl);
+    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl);
     setAbriendoArchivoUrl(null);
     if (!url) {
       alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getSignedFileUrl } from "@/lib/storage";
+import { pedirLinkFirmado } from "@/lib/storage";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -55,7 +55,7 @@ export default function BajaClientePage() {
   async function abrirContrato() {
     if (!contrato?.archivo_url) return;
     setAbriendoContrato(true);
-    const { url, error: signErr } = await getSignedFileUrl(supabase, "contratos", contrato.archivo_url);
+    const { url, error: signErr } = await pedirLinkFirmado(contrato.archivo_url);
     setAbriendoContrato(false);
     if (!url) {
       alert("No se pudo abrir el contrato: " + (signErr || "intenta de nuevo"));
