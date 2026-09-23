@@ -5013,6 +5013,20 @@ body {
   padding: 0 1cqw;
 }
 
+.fidcard-casilla-click {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fidcard-casilla-click:hover {
+  box-shadow: 0 0 0 0.35cqw #f07e3a;
+}
+
+.fidcard-casilla-sel {
+  box-shadow: 0 0 0 0.5cqw #f07e3a;
+}
+
 .fidcard-casilla-regalo {
   color: #185fa5;
 }

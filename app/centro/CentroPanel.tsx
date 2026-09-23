@@ -393,7 +393,7 @@ export default function CentroPanel({
   const [errorBusquedaTarjeta, setErrorBusquedaTarjeta] = useState("");
   const [tarjetaEncontrada, setTarjetaEncontrada] = useState<TarjetaFidelidad | null>(null);
   const [sellosTarjetaEncontrada, setSellosTarjetaEncontrada] = useState<SelloFidelidadRow[]>([]);
-  const [mostrarFormSello, setMostrarFormSello] = useState(false);
+  const [casillaSel, setCasillaSel] = useState<number | null>(null);
   const [selloForm, setSelloForm] = useState<{ tipo_espacio: TipoEspacioFidelidad; detalle: string }>({
     tipo_espacio: "coworking",
     detalle: "",
@@ -1390,14 +1390,40 @@ export default function CentroPanel({
       setErrorBusquedaTarjeta("No se encontró ninguna tarjeta con ese folio");
       return;
     }
+    await cargarTarjeta(tarjeta);
+    setBuscandoTarjeta(false);
+  }
+
+  // Trae los sellos de una tarjeta y la deja abierta en pantalla.
+  async function cargarTarjeta(tarjeta: TarjetaFidelidad) {
     const { data: sellos } = await supabase
       .from("tarjetas_fidelidad_sellos")
       .select("*")
       .eq("tarjeta_id", tarjeta.id)
       .order("numero", { ascending: true });
-    setBuscandoTarjeta(false);
+    setErrorBusquedaTarjeta("");
+    setErrorSello("");
+    setCasillaSel(null);
     setTarjetaEncontrada(tarjeta);
     setSellosTarjetaEncontrada(sellos || []);
+  }
+
+  async function abrirTarjetaDeLista(tarjeta: TarjetaFidelidad) {
+    await cargarTarjeta(tarjeta);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Deja la tarjeta abierta al día: estado según cuántas casillas hay
+  // selladas (8 = completa, menos = activa). Una tarjeta ya canjeada no se toca.
+  async function sincronizarEstadoTarjeta(tarjeta: TarjetaFidelidad, sellos: SelloFidelidadRow[]) {
+    if (tarjeta.estado === "canjeada") return tarjeta;
+    const nuevoEstado = sellos.length >= 8 ? "completada" : "activa";
+    if (nuevoEstado === tarjeta.estado) return tarjeta;
+    await supabase.from("tarjetas_fidelidad").update({ estado: nuevoEstado }).eq("id", tarjeta.id);
+    const actualizada = { ...tarjeta, estado: nuevoEstado } as TarjetaFidelidad;
+    setTarjetaEncontrada(actualizada);
+    setTarjetasFidelidad((prev) => prev.map((t) => (t.id === actualizada.id ? actualizada : t)));
+    return actualizada;
   }
 
   // Registra el siguiente sello de una tarjeta (el staff dice qué se rentó).
@@ -1410,10 +1436,17 @@ export default function CentroPanel({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const siguienteNumero = sellosTarjetaEncontrada.length + 1;
+    // Casilla elegida en la tarjeta; si no eligió una, la primera vacía.
+    const numero =
+      casillaSel ?? Array.from({ length: 8 }, (_, i) => i + 1).find((n) => !sellosTarjetaEncontrada.some((s) => s.numero === n));
+    if (!numero || sellosTarjetaEncontrada.some((s) => s.numero === numero)) {
+      setGuardandoSello(false);
+      setErrorSello("Esa casilla ya tiene sello.");
+      return;
+    }
     const { error: insertError } = await supabase.from("tarjetas_fidelidad_sellos").insert({
       tarjeta_id: tarjetaEncontrada.id,
-      numero: siguienteNumero,
+      numero,
       tipo_espacio: selloForm.tipo_espacio,
       detalle: selloForm.detalle.trim() || null,
       capturado_por: user?.id,
@@ -1423,33 +1456,65 @@ export default function CentroPanel({
       setErrorSello("No se pudo registrar el sello. Intenta de nuevo.");
       return;
     }
-    const nuevosSellos = [
-      ...sellosTarjetaEncontrada,
-      {
-        id: "",
-        tarjeta_id: tarjetaEncontrada.id,
-        numero: siguienteNumero,
-        created_at: new Date().toISOString(),
-        tipo_espacio: selloForm.tipo_espacio,
-        detalle: selloForm.detalle.trim() || null,
-        capturado_por: user?.id || null,
-      },
-    ];
+    // Se vuelve a leer para tener el id real del sello (hace falta para quitarlo).
+    const { data: sellosActuales } = await supabase
+      .from("tarjetas_fidelidad_sellos")
+      .select("*")
+      .eq("tarjeta_id", tarjetaEncontrada.id)
+      .order("numero", { ascending: true });
+    const nuevosSellos: SelloFidelidadRow[] = sellosActuales || [];
     setSellosTarjetaEncontrada(nuevosSellos);
-    setMostrarFormSello(false);
+    setCasillaSel(null);
     setSelloForm({ tipo_espacio: "coworking", detalle: "" });
 
-    if (siguienteNumero === 8) {
-      await supabase.from("tarjetas_fidelidad").update({ estado: "completada" }).eq("id", tarjetaEncontrada.id);
-      const actualizada = { ...tarjetaEncontrada, estado: "completada" as const };
-      setTarjetaEncontrada(actualizada);
-      setTarjetasFidelidad((prev) => prev.map((t) => (t.id === actualizada.id ? actualizada : t)));
+    const estabaCompleta = tarjetaEncontrada.estado === "completada";
+    const actualizada = await sincronizarEstadoTarjeta(tarjetaEncontrada, nuevosSellos);
+    if (!estabaCompleta && actualizada.estado === "completada") {
       const regalo = calcularRegalo(nuevosSellos);
       if (regalo) setRegaloModal({ tipo_espacio: regalo.tipo_espacio, detalle: regalo.detalle });
-    } else {
-      setTarjetasFidelidad((prev) => prev.map((t) => (t.id === tarjetaEncontrada.id ? tarjetaEncontrada : t)));
     }
     setGuardandoSello(false);
+  }
+
+  // Quita un sello (por error de captura). Si la tarjeta estaba completa,
+  // vuelve a activa. Una tarjeta ya canjeada no se modifica.
+  async function quitarSello(sello: SelloFidelidadRow) {
+    if (!tarjetaEncontrada || tarjetaEncontrada.estado === "canjeada") return;
+    if (!confirm(`¿Quitar el sello ${sello.numero} de esta tarjeta?`)) return;
+    setErrorSello("");
+    const { data: borrados, error } = await supabase
+      .from("tarjetas_fidelidad_sellos")
+      .delete()
+      .eq("id", sello.id)
+      .select("id");
+    if (error || !borrados || borrados.length === 0) {
+      setErrorSello("No se pudo quitar el sello. Intenta de nuevo.");
+      return;
+    }
+    const restantes = sellosTarjetaEncontrada.filter((s) => s.id !== sello.id);
+    setSellosTarjetaEncontrada(restantes);
+    setCasillaSel(null);
+    await sincronizarEstadoTarjeta(tarjetaEncontrada, restantes);
+  }
+
+  // Borra la tarjeta completa (sus sellos se van con ella).
+  async function eliminarTarjeta(tarjeta: TarjetaFidelidad) {
+    if (
+      !confirm(
+        `¿Eliminar la tarjeta #${String(tarjeta.folio).padStart(6, "0")} de ${tarjeta.nombre}? Se borran también todos sus sellos y no se puede deshacer.`
+      )
+    )
+      return;
+    setErrorSello("");
+    const { data: borradas, error } = await supabase.from("tarjetas_fidelidad").delete().eq("id", tarjeta.id).select("id");
+    if (error || !borradas || borradas.length === 0) {
+      setErrorSello("No se pudo eliminar la tarjeta. Si el problema sigue, falta aplicar la migración de permisos de eliminación.");
+      return;
+    }
+    setTarjetasFidelidad((prev) => prev.filter((t) => t.id !== tarjeta.id));
+    setTarjetaEncontrada(null);
+    setSellosTarjetaEncontrada([]);
+    setCasillaSel(null);
   }
 
   // El staff marca que ya entregó el regalo de la casilla 9 — cierra el
@@ -3008,7 +3073,20 @@ export default function CentroPanel({
                       #{String(tarjetaEncontrada.folio).padStart(6, "0")} · {tarjetaEncontrada.nombre} ·{" "}
                       {tarjetaEncontrada.centro}
                     </p>
-                    <FidelidadCard sellos={sellosTarjetaEncontrada} regalo={calcularRegalo(sellosTarjetaEncontrada)} />
+                    <FidelidadCard
+                      sellos={sellosTarjetaEncontrada}
+                      regalo={calcularRegalo(sellosTarjetaEncontrada)}
+                      nombre={tarjetaEncontrada.nombre}
+                      folio={tarjetaEncontrada.folio}
+                      casillaSeleccionada={casillaSel}
+                      onCasillaClick={(n) => {
+                        setErrorSello("");
+                        setCasillaSel(casillaSel === n ? null : n);
+                      }}
+                    />
+                    <p className="fidelidad-card-nota" style={{ color: "#8b93a7", marginTop: 6 }}>
+                      Toca una casilla para ponerle o quitarle el sello.
+                    </p>
                     <p className="fidelidad-card-nota" style={{ color: "#8b93a7" }}>
                       {sellosTarjetaEncontrada.length}/8 sellos ·{" "}
                       {tarjetaEncontrada.estado === "activa"
@@ -3018,20 +3096,57 @@ export default function CentroPanel({
                           : "Regalo ya entregado"}
                     </p>
 
-                    {tarjetaEncontrada.estado === "activa" && !mostrarFormSello && (
+                    {tarjetaEncontrada.estado === "activa" && casillaSel === null && sellosTarjetaEncontrada.length < 8 && (
                       <button
                         className="reservar-btn"
                         style={{ marginTop: 12 }}
-                        onClick={() => setMostrarFormSello(true)}
+                        onClick={() =>
+                          setCasillaSel(
+                            Array.from({ length: 8 }, (_, i) => i + 1).find(
+                              (n) => !sellosTarjetaEncontrada.some((s) => s.numero === n)
+                            ) ?? null
+                          )
+                        }
                       >
                         + Agregar sello
                       </button>
                     )}
 
-                    {tarjetaEncontrada.estado === "activa" && mostrarFormSello && (
+                    {casillaSel !== null && sellosTarjetaEncontrada.find((s) => s.numero === casillaSel) && (
+                      <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: 12 }}>
+                        {(() => {
+                          const sello = sellosTarjetaEncontrada.find((s) => s.numero === casillaSel)!;
+                          return (
+                            <>
+                              <p className="sub-label" style={{ color: "#0d1b3e" }}>
+                                Sello {sello.numero} · {LABEL_TIPO_ESPACIO_FIDELIDAD[sello.tipo_espacio]}
+                                {sello.detalle ? ` (${sello.detalle})` : ""}
+                              </p>
+                              <p className="item-card-sub">{new Date(sello.created_at).toLocaleString("es-MX")}</p>
+                              {errorSello && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorSello}</p>}
+                              {tarjetaEncontrada.estado === "canjeada" ? (
+                                <p className="item-card-sub">El regalo ya se entregó: esta tarjeta ya no se modifica.</p>
+                              ) : (
+                                <button
+                                  className="tel-borrar-btn"
+                                  style={{ marginTop: 8, color: "#A32D2D", fontWeight: 600 }}
+                                  onClick={() => quitarSello(sello)}
+                                >
+                                  Quitar este sello
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {tarjetaEncontrada.estado !== "canjeada" &&
+                      casillaSel !== null &&
+                      !sellosTarjetaEncontrada.some((s) => s.numero === casillaSel) && (
                       <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: 12 }}>
                         <p className="sub-label" style={{ color: "#0d1b3e" }}>
-                          ¿Qué rentó en esta visita?
+                          Sello {casillaSel} · ¿Qué rentó en esta visita?
                         </p>
                         <select
                           value={selloForm.tipo_espacio}
@@ -3054,7 +3169,7 @@ export default function CentroPanel({
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                           <button
                             className="tel-borrar-btn"
-                            onClick={() => setMostrarFormSello(false)}
+                            onClick={() => setCasillaSel(null)}
                             disabled={guardandoSello}
                           >
                             Cancelar
@@ -3075,6 +3190,18 @@ export default function CentroPanel({
                         🎁 Marcar regalo como entregado
                       </button>
                     )}
+
+                    {casillaSel === null && errorSello && (
+                      <p style={{ color: "#A32D2D", fontSize: 13, marginTop: 8 }}>{errorSello}</p>
+                    )}
+
+                    <button
+                      className="tel-borrar-btn"
+                      style={{ marginTop: 16, color: "#A32D2D", fontWeight: 600 }}
+                      onClick={() => eliminarTarjeta(tarjetaEncontrada)}
+                    >
+                      🗑 Eliminar tarjeta
+                    </button>
                   </div>
                 )}
 
@@ -3085,7 +3212,20 @@ export default function CentroPanel({
                   <div className="empty-card">Sin tarjetas de fidelidad todavía</div>
                 ) : (
                   tarjetasFidelidad.map((t) => (
-                    <div className="item-card" key={t.id}>
+                    <div
+                      className="item-card"
+                      key={t.id}
+                      role="button"
+                      tabIndex={0}
+                      style={{
+                        cursor: "pointer",
+                        outline: tarjetaEncontrada?.id === t.id ? "2px solid #f07e3a" : undefined,
+                      }}
+                      onClick={() => abrirTarjetaDeLista(t)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") abrirTarjetaDeLista(t);
+                      }}
+                    >
                       <div className="item-card-info">
                         <p className="item-card-titulo">
                           #{String(t.folio).padStart(6, "0")} · {t.nombre}

@@ -16,11 +16,16 @@ export default function FidelidadCard({
   regalo = null,
   nombre,
   folio,
+  onCasillaClick,
+  casillaSeleccionada,
 }: {
   sellos?: SelloVisual[];
   regalo?: { tipo_espacio: TipoEspacioFidelidad; detalle: string | null } | null;
   nombre?: string;
   folio?: number;
+  // Solo en el panel de staff: las casillas 1 a 8 se vuelven botones.
+  onCasillaClick?: (numero: number) => void;
+  casillaSeleccionada?: number | null;
 }) {
   const iconoDe = (t: TipoEspacioFidelidad) => TIPOS_ESPACIO_FIDELIDAD.find((x) => x.id === t)?.icono || "";
 
@@ -68,9 +73,25 @@ export default function FidelidadCard({
             );
           }
           const sello = sellos.find((s) => s.numero === n);
+          const contenido = sello && <img src={iconoDe(sello.tipo_espacio)} alt="" className="fidcard-icon" />;
+          if (onCasillaClick) {
+            return (
+              <button
+                key={n}
+                type="button"
+                aria-label={sello ? `Casilla ${n}: sellada` : `Casilla ${n}: vacía`}
+                className={`fidcard-casilla fidcard-casilla-click${sello ? " fidcard-casilla-llena" : ""}${
+                  casillaSeleccionada === n ? " fidcard-casilla-sel" : ""
+                }`}
+                onClick={() => onCasillaClick(n)}
+              >
+                {contenido}
+              </button>
+            );
+          }
           return (
             <div key={n} className={`fidcard-casilla${sello ? " fidcard-casilla-llena" : ""}`}>
-              {sello && <img src={iconoDe(sello.tipo_espacio)} alt="" className="fidcard-icon" />}
+              {contenido}
             </div>
           );
         })}
