@@ -20,6 +20,10 @@ export const LABEL_TIPO_ESPACIO_FIDELIDAD: Record<TipoEspacioFidelidad, string> 
   working_desk: "Working desk",
 };
 
+export function formatFolioFidelidad(folio: number): string {
+  return "NODUS-FID-" + String(folio).padStart(6, "0");
+}
+
 export type SelloFidelidad = {
   numero: number;
   tipo_espacio: TipoEspacioFidelidad;

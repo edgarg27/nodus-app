@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -186,7 +187,9 @@ export default function AgendarInvitadoPage() {
       fecha_deseada: fechaDeseada || null,
       duracion_tipo: duracionEfectiva,
       fecha_fin_deseada: duracionEfectiva === "semana" ? sumarSeisDias(fechaDeseada) : null,
-      hora_inicio_deseada: duracionEfectiva === "hora" ? `${String(horaInicio).padStart(2, "0")}:00` : null,
+      // Day Pass: solo hora de llegada aproximada (el pase es de todo el día).
+      hora_inicio_deseada:
+        duracionEfectiva === "hora" || tipoInfo?.esDayPass ? `${String(horaInicio).padStart(2, "0")}:00` : null,
       hora_fin_deseada: duracionEfectiva === "hora" ? `${String(horaFin).padStart(2, "0")}:00` : null,
       notas: notas.trim() || null,
       estado: "pendiente",
@@ -205,7 +208,21 @@ export default function AgendarInvitadoPage() {
       await fetch("/api/notificar-solicitud-invitado", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tipo, centro: form.centro, nombre: form.nombre.trim() }),
+        body: JSON.stringify({
+          tipo,
+          centro: form.centro,
+          nombre: form.nombre.trim(),
+          telefono: form.telefono.trim(),
+          email: form.email.trim(),
+          empresa: form.empresa.trim() || undefined,
+          fecha: fechaDeseada || undefined,
+          fechaFin: duracionEfectiva === "semana" ? sumarSeisDias(fechaDeseada) : undefined,
+          duracion: duracionEfectiva,
+          horaInicio:
+            duracionEfectiva === "hora" || tipoInfo?.esDayPass ? `${String(horaInicio).padStart(2, "0")}:00` : undefined,
+          horaFin: duracionEfectiva === "hora" ? `${String(horaFin).padStart(2, "0")}:00` : undefined,
+          notas: notas.trim() || undefined,
+        }),
       });
     } catch {
       // no crítico
@@ -305,7 +322,7 @@ export default function AgendarInvitadoPage() {
               </span>
               <span className="invitado-menu-text">
                 <p className="invitado-menu-title">¿Eres cliente frecuente?</p>
-                <p className="invitado-menu-desc">Pide tu tarjeta de fidelidad</p>
+                <p className="invitado-menu-desc">Pide o consulta tu tarjeta de fidelidad</p>
               </span>
               <span className="invitado-menu-chevron">›</span>
             </a>
@@ -314,6 +331,9 @@ export default function AgendarInvitadoPage() {
 
         {paso === "datos" && (
           <form className="form-card" onSubmit={continuarDespuesDeDatos}>
+            <p className="sub-label" style={{ color: "#f07e3a", fontWeight: 700 }}>
+              Paso 1 de 2 · Tus datos (en el siguiente paso eliges fecha y horario)
+            </p>
             <p className="sub-label">Centro de tu interés</p>
             <select value={form.centro} onChange={(e) => setForm({ ...form, centro: e.target.value })}>
               {CENTROS.map((c) => (
@@ -365,6 +385,9 @@ export default function AgendarInvitadoPage() {
 
         {paso === "horario" && (
           <div className="form-card">
+            <p className="sub-label" style={{ color: "#f07e3a", fontWeight: 700 }}>
+              Paso 2 de 2 · Fecha y horario
+            </p>
             {!tipoInfo?.esDayPass && (
               <>
                 <p className="sub-label">¿Por cuánto tiempo?</p>
@@ -398,6 +421,19 @@ export default function AgendarInvitadoPage() {
               <p className="nota-info" style={{ marginTop: 4 }}>
                 📅 Del {formatFechaCorta(fechaDeseada)} al {formatFechaCorta(sumarSeisDias(fechaDeseada))}
               </p>
+            )}
+
+            {tipoInfo?.esDayPass && (
+              <>
+                <p className="sub-label">Hora de llegada aproximada</p>
+                <select value={horaInicio} onChange={(e) => setHoraInicio(Number(e.target.value))}>
+                  {HORAS.map((h) => (
+                    <option key={h} value={h}>
+                      {formatHora(h)}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
 
             {!tipoInfo?.esDayPass && duracionTipo === "hora" && (
@@ -470,6 +506,25 @@ export default function AgendarInvitadoPage() {
               Hacer otra solicitud
             </button>
           </div>
+        )}
+
+        {paso === "enviado" && (
+          <>
+            <div className="invitado-intro">
+              <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="invitado-intro-icon-img" />
+              <span>
+                ¿Tienes tarjeta de fidelidad? Escribe tu folio y consulta tu tarjeta digital y cuántos sellos llevas.
+              </span>
+            </div>
+            <ConsultaTarjetaFidelidad />
+            <a className="invitado-menu-item daypass" href="/tarjeta-fidelidad">
+              <span className="invitado-menu-text">
+                <p className="invitado-menu-title">¿Aún no tienes tarjeta?</p>
+                <p className="invitado-menu-desc">Pídela gratis y junta sellos en cada visita</p>
+              </span>
+              <span className="invitado-menu-chevron">›</span>
+            </a>
+          </>
         )}
       </div>
     </div>

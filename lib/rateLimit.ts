@@ -22,6 +22,11 @@ function sweep(now: number) {
   });
 }
 
+// IP del solicitante detrás del proxy (mismo criterio que usan las demás rutas).
+export function ipDeRequest(headers: Headers): string {
+  return headers.get("x-forwarded-for")?.split(",")[0]?.trim() || headers.get("x-real-ip") || "desconocida";
+}
+
 /**
  * Verifica si `key` puede hacer una solicitud más dentro de la ventana de
  * tiempo dada. Regresa `true` si se permite (y registra el intento), o

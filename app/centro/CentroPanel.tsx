@@ -2597,7 +2597,9 @@ export default function CentroPanel({
                                       {s.duracion_tipo === "semana" && s.fecha_fin_deseada
                                         ? `Semana deseada: ${s.fecha_deseada} al ${s.fecha_fin_deseada}`
                                         : s.duracion_tipo === "dia"
-                                          ? `Fecha deseada: ${s.fecha_deseada} · Todo el día`
+                                          ? `Fecha deseada: ${s.fecha_deseada} · Todo el día${
+                                              s.hora_inicio_deseada ? ` · llega ~${s.hora_inicio_deseada.slice(0, 5)}` : ""
+                                            }`
                                           : `Fecha deseada: ${s.fecha_deseada}${
                                               s.hora_inicio_deseada && s.hora_fin_deseada
                                                 ? ` · ${s.hora_inicio_deseada} - ${s.hora_fin_deseada}`
