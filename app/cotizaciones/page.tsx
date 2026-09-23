@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -269,9 +270,9 @@ export default function CotizacionesPage() {
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     {c.archivo_url && (
-                      <a className="ver-pdf-btn" href={c.archivo_url} target="_blank" download>
+                      <BotonArchivo url={c.archivo_url} bucket="cotizaciones" descargar>
                         📥 Descargar
-                      </a>
+                      </BotonArchivo>
                     )}
                     <button
                       className={

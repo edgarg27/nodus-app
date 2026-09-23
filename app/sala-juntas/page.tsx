@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import BotonArchivo from "@/app/components/BotonArchivo";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const SALA_DEFAULT: Record<string, string> = {
@@ -356,15 +357,13 @@ export default function SalaJuntasPage() {
                     )}
                   </div>
                   {r.archivo_url ? (
-                    <a
-                      className="ver-pdf-btn"
-                      href={r.archivo_url}
-                      target="_blank"
-                      download
+                    <BotonArchivo
+                      url={r.archivo_url}
+                      bucket="sala-juntas"
                       title="Se abre en una pestaña nueva; usa el ícono de imprimir de tu navegador ahí para imprimirlo"
                     >
                       📥 Ver / descargar / imprimir
-                    </a>
+                    </BotonArchivo>
                   ) : (
                     <span style={{ fontSize: 12, color: "#aaa" }}>Sin PDF</span>
                   )}
