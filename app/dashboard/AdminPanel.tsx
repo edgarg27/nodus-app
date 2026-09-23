@@ -335,6 +335,17 @@ export default function AdminPanel({
       n.tipo === "cuenta_pausada"
     ) {
       router.push("/cobranza");
+    } else if (n.tipo === "nueva_solicitud_invitado") {
+      // Day Pass y demás solicitudes de invitados: ahí mismo se genera el pase.
+      router.push("/centro?tab=invitados");
+    } else if (n.tipo === "nueva_tarjeta_fidelidad") {
+      router.push("/fidelidad-admin");
+    } else if (n.tipo === "solicitud_cliente") {
+      router.push("/centro?tab=solicitudes");
+    } else if (n.tipo === "visita_cliente") {
+      router.push("/centro?tab=visitas");
+    } else if (n.tipo === "reservacion_cancelada_cliente") {
+      router.push("/centro?tab=reservaciones");
     } else if (n.tipo === "nueva_queja") {
       // Mismo tipo para quejas Y sugerencias (ver app/quejas-sugerencias/page.tsx)
       router.push("/atencion-cliente");
