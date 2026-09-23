@@ -4003,6 +4003,86 @@ body {
   border-radius: 8px;
 }
 
+/* Pantalla del mapa más ancha que el resto de las pantallas (700px) para que
+   el plano se lea bien. */
+.rep-content.rep-content-ancho {
+  max-width: 1280px;
+}
+
+.mapa-imagen-wrap img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mapa-bandeja {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.mapa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #eee;
+  border-radius: 999px;
+  background: #fafafa;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.mapa-chip:hover {
+  border-color: #f07e3a;
+}
+
+.mapa-chip-sel {
+  border-color: #f07e3a;
+  background: #fff3e8;
+}
+
+.mapa-pin-etiqueta {
+  position: absolute;
+  left: 50%;
+  bottom: 115%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #0d1b3e;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mapa-fantasma {
+  position: fixed;
+  z-index: 60;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f07e3a;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .mapa-descargas {
   display: flex;
   gap: 8px;
