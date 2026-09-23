@@ -170,7 +170,7 @@ export default function AdminPanel({
     fetchNotificaciones();
     fetchMisReportes();
     fetchTicketsUrgentes();
-    if (rol === "diseno" || rol === "atencion_cliente") {
+    if (rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza") {
       fetchBannersPromocionales(supabase).then(setBannersPromo);
       fetchBannersLogros();
     }
@@ -741,7 +741,7 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -884,7 +884,7 @@ export default function AdminPanel({
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente") && (
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza") && (
             <div style={{ maxWidth: 700, margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
@@ -919,9 +919,9 @@ export default function AdminPanel({
             )}
             {/* Gastos y Proveedores de sistemas/operaciones/admin ya viven
                 dentro de "Panel de Centro" (con factura/comprobante
-                adjuntos) — este acceso directo es solo para cobranza, que
-                no tiene Panel de Centro. */}
-            {(rol === "cobranza" || rol === "superadmin" || rol === "gerente") && (
+                adjuntos). Cobranza ya no ve este acceso directo: sus gastos
+                los ve dentro de "Ingresos por Centro". */}
+            {(rol === "superadmin" || rol === "gerente") && (
               <a className="modulo-card" href="/cobranza?tab=gastos">
                 <span className="modulo-icon">💸</span>
                 <span className="modulo-name">Gastos</span>
@@ -1012,7 +1012,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Paquetería y Mensajería</span>
               </a>
             )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/pagos">
                 <span className="modulo-icon">💰</span>
                 <span className="modulo-name">Pagos</span>

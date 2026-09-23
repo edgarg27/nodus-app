@@ -71,6 +71,7 @@ export default function ProspectosPage() {
   });
 
   const [prospectoPerdiendo, setProspectoPerdiendo] = useState<Prospecto | null>(null);
+  const [confirmandoBorrarId, setConfirmandoBorrarId] = useState<string | null>(null);
   const [comentarioPerdido, setComentarioPerdido] = useState("");
   const [avisoExito, setAvisoExito] = useState(false);
   const [nombreRegistrado, setNombreRegistrado] = useState("");
@@ -197,7 +198,7 @@ export default function ProspectosPage() {
   }
 
   async function borrarProspecto(id: string) {
-    if (!confirm("¿Borrar este prospecto?")) return;
+    setConfirmandoBorrarId(null);
     await supabase.from("prospectos").delete().eq("id", id);
     cargarProspectos();
   }
@@ -416,7 +417,7 @@ export default function ProspectosPage() {
                               >
                                 👤 Nuevo cliente
                               </a>
-                              <button className="tel-borrar-btn" onClick={() => borrarProspecto(p.id)}>
+                              <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
                                 🗑
                               </button>
                             </div>
@@ -431,6 +432,25 @@ export default function ProspectosPage() {
           </>
         )}
       </div>
+
+      {confirmandoBorrarId && (
+        <div className="modal-overlay" onClick={() => setConfirmandoBorrarId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Borrar prospecto</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar este prospecto? Esta acción no se puede deshacer.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarProspecto(confirmandoBorrarId)}>
+                🗑 Borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {avisoExito && (
         <div className="modal-overlay" onClick={() => setAvisoExito(false)}>
