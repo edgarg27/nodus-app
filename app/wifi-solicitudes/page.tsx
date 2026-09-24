@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { AVISO_SOLO_COWORKING, clientesConCoworking } from "@/lib/coworking";
 
 type Solicitud = {
   id: string;
@@ -39,6 +40,9 @@ export default function WifiSolicitudesPage() {
   const [duracionPorId, setDuracionPorId] = useState<Record<string, number>>({});
   const [procesando, setProcesando] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Solo a clientes de Coworking se les genera voucher; las solicitudes de
+  // los demás (anteriores al cambio) solo se pueden rechazar.
+  const [clientesCoworking, setClientesCoworking] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTodo();
@@ -63,11 +67,16 @@ export default function WifiSolicitudesPage() {
     ]);
     setPendientes(pend || []);
     setHistorial(hist || []);
+    setClientesCoworking(await clientesConCoworking(supabase, Array.from(new Set((pend || []).map((p) => p.user_id)))));
     setLoading(false);
   }
 
   async function aprobar(s: Solicitud) {
     setError("");
+    if (!clientesCoworking.has(s.user_id)) {
+      setError(AVISO_SOLO_COWORKING);
+      return;
+    }
     setProcesando(s.id);
     const minutos = duracionPorId[s.id] || 43200;
     const centroCliente = s.centro || "Bosques";
@@ -227,7 +236,8 @@ export default function WifiSolicitudesPage() {
                     <button
                       className={"btn-enviar" + (procesando === s.id ? " sending" : "")}
                       style={{ width: "auto", padding: "8px 16px" }}
-                      disabled={procesando === s.id}
+                      disabled={procesando === s.id || !clientesCoworking.has(s.user_id)}
+                      title={clientesCoworking.has(s.user_id) ? undefined : AVISO_SOLO_COWORKING}
                       onClick={() => aprobar(s)}
                     >
                       <span className="btn-enviar-icon-wrapper">
@@ -255,6 +265,9 @@ export default function WifiSolicitudesPage() {
                     >
                       ❌ Rechazar
                     </button>
+                    {!clientesCoworking.has(s.user_id) && (
+                      <span style={{ fontSize: 12, color: "#888" }}>No es cliente de Coworking: solo se puede rechazar.</span>
+                    )}
                   </div>
                 </div>
               ))

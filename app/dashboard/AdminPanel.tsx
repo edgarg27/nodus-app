@@ -1324,7 +1324,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Mtto.</span>
               </a>
             )}
-            {rol !== "cobranza" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "cobranza" && rol !== "operaciones" && rol !== "diseno" && (
               <a className="modulo-card" href="/inventario">
                 <span className="modulo-icon">📦</span>
                 <span className="modulo-name">Inventario</span>

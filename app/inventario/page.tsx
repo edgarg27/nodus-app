@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
+// atencion_cliente es cuenta sin centro: ve todos, con selector.
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "atencion_cliente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 const ESTADOS: Record<string, { label: string; bg: string; color: string }> = {
@@ -14,8 +15,27 @@ const ESTADOS: Record<string, { label: string; bg: string; color: string }> = {
   baja: { label: "Dado de baja", bg: "#F0F0F0", color: "#666" },
 };
 
+// Cada área tiene su propio inventario (migracion_inventario_por_area.sql):
+// Sistemas, Servicio al Cliente y Operaciones ven solo el suyo;
+// admins/gerente solo el General; la superadmin ve todos para
+// corroborar. La RLS lo respalda.
+type Area = "sistemas" | "atencion_cliente" | "operaciones" | "general";
+type FiltroArea = Area | "todos";
+const AREAS: Record<Area, string> = {
+  sistemas: "Sistemas",
+  atencion_cliente: "Servicio al Cliente",
+  operaciones: "Operaciones",
+  general: "General",
+};
+
+function areaPropia(rol: string): Area {
+  return rol === "sistemas" || rol === "atencion_cliente" || rol === "operaciones" ? rol : "general";
+}
+
 type Item = {
   id: string;
+  area: Area;
+  registrado_por: string | null;
   dispositivo: string;
   marca_modelo: string | null;
   numero_serie: string | null;
@@ -33,8 +53,26 @@ export default function InventarioPage() {
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [busqueda, setBusqueda] = useState("");
+  const [filtroArea, setFiltroArea] = useState<FiltroArea>("todos");
+  const [nombrePorId, setNombrePorId] = useState<Record<string, string>>({});
+  const [borrandoId, setBorrandoId] = useState<string | null>(null);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
+  const esSuper = miRol === "superadmin";
+
+  // Superadmin: el filtro que eligió; los demás: siempre su propia área.
+  function areaAFiltrar(rol: string, filtro: FiltroArea): Area | null {
+    if (rol === "superadmin") return filtro === "todos" ? null : filtro;
+    return areaPropia(rol);
+  }
+
+  // Para la columna "Registró" (solo superadmin).
+  async function cargarNombres(lista: Item[]) {
+    const ids = Array.from(new Set(lista.map((i) => i.registrado_por).filter((x): x is string => !!x)));
+    if (ids.length === 0) return {} as Record<string, string>;
+    const { data } = await supabase.from("profiles").select("id, nombre").in("id", ids);
+    return Object.fromEntries((data || []).map((p) => [p.id, p.nombre || ""])) as Record<string, string>;
+  }
   const [exportandoTodo, setExportandoTodo] = useState(false);
 
   async function exportarTodosLosCentros() {
@@ -42,10 +80,17 @@ export default function InventarioPage() {
     try {
       const resultados = await Promise.all(
         centrosDisponibles.map(async (c) => {
-          const { data } = await supabase.from("inventario").select("*").eq("centro", c).order("dispositivo");
+          let q = supabase.from("inventario").select("*").eq("centro", c);
+          const area = areaAFiltrar(miRol, filtroArea);
+          if (area) q = q.eq("area", area);
+          const { data } = await q.order("dispositivo");
+          const nombres: Record<string, string> = esSuper ? await cargarNombres(data || []) : {};
           return [
             c,
             (data || []).map((i: Item) => ({
+              ...(esSuper
+                ? { Área: AREAS[i.area] || i.area, Registró: (i.registrado_por && nombres[i.registrado_por]) || "" }
+                : {}),
               Dispositivo: i.dispositivo,
               "Marca/Modelo": i.marca_modelo || "",
               "Número de serie": i.numero_serie || "",
@@ -72,6 +117,7 @@ export default function InventarioPage() {
     ubicacion: "",
     estado: "operativo",
     notas: "",
+    area: "general" as Area,
   });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -93,11 +139,11 @@ export default function InventarioPage() {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       const c = profile?.centro || CENTROS_SUGERIDOS[0];
       setCentro(c);
-      await fetchItems(c);
+      await fetchItems(c, rol);
     } else {
       const c = profile?.centro || null;
       setCentro(c);
-      if (c) await fetchItems(c);
+      if (c) await fetchItems(c, rol);
     }
     setLoading(false);
   }
@@ -109,13 +155,21 @@ export default function InventarioPage() {
     setLoading(false);
   }
 
-  async function fetchItems(c: string) {
-    const { data } = await supabase
-      .from("inventario")
-      .select("*")
-      .eq("centro", c)
-      .order("dispositivo");
+  async function cambiarFiltroArea(f: FiltroArea) {
+    setFiltroArea(f);
+    if (!centro) return;
+    setLoading(true);
+    await fetchItems(centro, miRol, f);
+    setLoading(false);
+  }
+
+  async function fetchItems(c: string, rol: string = miRol, filtro: FiltroArea = filtroArea) {
+    let q = supabase.from("inventario").select("*").eq("centro", c);
+    const area = areaAFiltrar(rol, filtro);
+    if (area) q = q.eq("area", area);
+    const { data } = await q.order("dispositivo");
     setItems(data || []);
+    if (rol === "superadmin") setNombrePorId(await cargarNombres(data || []));
   }
 
   const itemsFiltrados = items.filter((i) => {
@@ -144,6 +198,7 @@ export default function InventarioPage() {
 
     const { error: insertError } = await supabase.from("inventario").insert({
       centro,
+      area: esSuper ? form.area : areaPropia(miRol),
       dispositivo: form.dispositivo,
       marca_modelo: form.marca_modelo || null,
       numero_serie: form.numero_serie || null,
@@ -168,6 +223,7 @@ export default function InventarioPage() {
       ubicacion: "",
       estado: "operativo",
       notas: "",
+      area: form.area,
     });
     setMostrarForm(false);
     setGuardando(false);
@@ -180,7 +236,7 @@ export default function InventarioPage() {
   }
 
   async function borrarItem(id: string) {
-    if (!confirm("¿Borrar este artículo del inventario?")) return;
+    setBorrandoId(null);
     await supabase.from("inventario").delete().eq("id", id);
     if (centro) fetchItems(centro);
   }
@@ -192,16 +248,29 @@ export default function InventarioPage() {
           ← Regresar
         </a>
         <p className="rep-title">Inventario</p>
-        <p className="rep-sub">{centro || "Selecciona un centro"}</p>
-        {esGlobal && centrosDisponibles.length > 1 && (
+        <p className="rep-sub">
+          {centro || "Selecciona un centro"}
+          {miRol && !esSuper ? ` · Inventario ${AREAS[areaPropia(miRol)]}` : ""}
+        </p>
+        {((esGlobal && centrosDisponibles.length > 1) || esSuper) && (
           <div className="centro-selector">
-            <select value={centro || ""} onChange={(e) => cambiarCentro(e.target.value)}>
-              {centrosDisponibles.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            {esGlobal && centrosDisponibles.length > 1 && (
+              <select value={centro || ""} onChange={(e) => cambiarCentro(e.target.value)}>
+                {centrosDisponibles.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+            {esSuper && (
+              <select value={filtroArea} onChange={(e) => cambiarFiltroArea(e.target.value as FiltroArea)}>
+                <option value="todos">Todos los inventarios</option>
+                <option value="sistemas">Inventario Sistemas</option>
+                <option value="atencion_cliente">Inventario Servicio al Cliente</option>
+                <option value="general">Inventario General</option>
+              </select>
+            )}
           </div>
         )}
       </div>
@@ -235,6 +304,9 @@ export default function InventarioPage() {
                       : exportarExcel(
                           `inventario-${centro}`,
                           items.map((i) => ({
+                            ...(esSuper
+                              ? { Área: AREAS[i.area] || i.area, Registró: (i.registrado_por && nombrePorId[i.registrado_por]) || "" }
+                              : {}),
                             Dispositivo: i.dispositivo,
                             "Marca/Modelo": i.marca_modelo || "",
                             "Número de serie": i.numero_serie || "",
@@ -295,6 +367,13 @@ export default function InventarioPage() {
                       </option>
                     ))}
                   </select>
+                  {esSuper && (
+                    <select value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value as Area })}>
+                      <option value="general">Inventario General</option>
+                      <option value="sistemas">Inventario Sistemas</option>
+                      <option value="atencion_cliente">Inventario Servicio al Cliente</option>
+                    </select>
+                  )}
                 </div>
                 <input
                   type="text"
@@ -330,6 +409,8 @@ export default function InventarioPage() {
                       <th>Cant.</th>
                       <th>Ubicación</th>
                       <th>Estado</th>
+                      {esSuper && <th>Área</th>}
+                      {esSuper && <th>Registró</th>}
                       <th></th>
                     </tr>
                   </thead>
@@ -357,8 +438,10 @@ export default function InventarioPage() {
                               ))}
                             </select>
                           </td>
+                          {esSuper && <td>{AREAS[i.area] || i.area}</td>}
+                          {esSuper && <td>{(i.registrado_por && nombrePorId[i.registrado_por]) || "—"}</td>}
                           <td>
-                            <button className="tel-borrar-btn" onClick={() => borrarItem(i.id)}>
+                            <button className="tel-borrar-btn" onClick={() => setBorrandoId(i.id)}>
                               🗑
                             </button>
                           </td>
@@ -372,6 +455,25 @@ export default function InventarioPage() {
           </>
         )}
       </div>
+
+      {borrandoId && (
+        <div className="modal-overlay" onClick={() => setBorrandoId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Borrar artículo</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar este artículo del inventario?
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setBorrandoId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarItem(borrandoId)}>
+                🗑 Borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

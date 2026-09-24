@@ -3037,6 +3037,14 @@ a.stat-card {
   font-size: 13px;
 }
 
+/* La lista que se despliega la dibuja el navegador con fondo blanco y
+   heredaba la letra blanca del select (sobre el encabezado azul): los
+   centros no se veían. */
+.centro-selector select option {
+  background: #fff;
+  color: #1a1a1a;
+}
+
 .centro-tabs {
   display: flex;
   gap: 6px;

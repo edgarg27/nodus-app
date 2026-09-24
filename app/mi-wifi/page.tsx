@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { esClienteCoworking } from "@/lib/coworking";
 
 type Voucher = {
   id: string;
@@ -109,6 +110,13 @@ export default function MiWifiPage() {
     } = await supabase.auth.getUser();
     if (!user) {
       setLoading(false);
+      return;
+    }
+
+    // Por ahora WiFi solo es para Coworking: a los demás se les regresa a
+    // su dashboard (la tarjeta tampoco se les muestra).
+    if (!(await esClienteCoworking(supabase, user.id))) {
+      window.location.replace("/dashboard-cliente");
       return;
     }
 

@@ -13,7 +13,31 @@ export type ParametrosDisponibilidad = {
   horaFin?: number;
 };
 
-export type ResultadoDisponibilidad = { disponible: boolean; motivo?: string };
+// `ocupadoPor`: quién la tiene (nombre · empresa), para que el staff sepa
+// con quién choca sin ir a buscar el contrato.
+export type ResultadoDisponibilidad = { disponible: boolean; motivo?: string; ocupadoPor?: string };
+
+// "2026-12-31" → "31/12/2026", sin pasar por Date (evita el corrimiento
+// de un día por zona horaria).
+function fechaCorta(iso: string | null | undefined) {
+  if (!iso) return "";
+  const [a, m, d] = iso.slice(0, 10).split("-");
+  return d && m && a ? `${d}/${m}/${a}` : iso;
+}
+
+async function nombresPorUserId(supabase: SupabaseClient, userIds: (string | null)[]) {
+  const ids = Array.from(new Set(userIds.filter((x): x is string => !!x)));
+  if (ids.length === 0) return {} as Record<string, { nombre: string | null; empresa: string | null }>;
+  const { data } = await supabase.from("profiles").select("id, nombre, empresa").in("id", ids);
+  return Object.fromEntries((data || []).map((p) => [p.id, { nombre: p.nombre, empresa: p.empresa }])) as Record<
+    string,
+    { nombre: string | null; empresa: string | null }
+  >;
+}
+
+function unirNombre(nombre: string | null | undefined, empresa: string | null | undefined) {
+  return [nombre, empresa].filter((x) => x && x.trim()).join(" · ") || "un cliente";
+}
 
 // La disponibilidad nunca usa `oficinas.estado` para decidir — ese campo
 // es un flag sin fecha, no dice nada sobre si se libera antes del rango
@@ -32,14 +56,29 @@ export async function verificarDisponibilidadOficina(
   // se presta ni por hora).
   const { data: contratosChocando } = await supabase
     .from("contratos")
-    .select("id, fecha_inicio, fecha_vencimiento")
+    .select("id, fecha_inicio, fecha_vencimiento, user_id, cliente_nombre_historico, cliente_empresa_historico")
     .eq("oficina_id", oficinaId)
     .eq("estatus", "vigente")
     .lte("fecha_inicio", fechaFin)
     .gte("fecha_vencimiento", fechaInicio);
 
   if (contratosChocando && contratosChocando.length > 0) {
-    return { disponible: false, motivo: "Esta oficina ya tiene un contrato vigente que traslapa con ese rango de fechas." };
+    // Mismo criterio que Contratos: con cuenta → su perfil; sin cuenta
+    // (contrato manual) → el nombre/empresa histórico del contrato.
+    const perfiles = await nombresPorUserId(supabase, contratosChocando.map((c) => c.user_id));
+    const quienes = contratosChocando.map((c) => {
+      const p = c.user_id ? perfiles[c.user_id] : undefined;
+      return unirNombre(p?.nombre || c.cliente_nombre_historico, p?.empresa || c.cliente_empresa_historico);
+    });
+    const c0 = contratosChocando[0];
+    return {
+      disponible: false,
+      ocupadoPor: Array.from(new Set(quienes)).join(", "),
+      motivo:
+        contratosChocando.length === 1
+          ? `Contrato vigente del ${fechaCorta(c0.fecha_inicio)} al ${fechaCorta(c0.fecha_vencimiento)}, traslapa con ese rango de fechas.`
+          : "Tiene contratos vigentes que traslapan con ese rango de fechas.",
+    };
   }
 
   // Reservaciones (modalidad Hora/Día) — `fecha`/`fecha_fin` son columnas
@@ -48,7 +87,7 @@ export async function verificarDisponibilidadOficina(
   if (modalidad === "Hora" || modalidad === "Día") {
     const { data: reservacionesChocando } = await supabase
       .from("reservaciones")
-      .select("id, fecha, fecha_fin, hora_inicio, hora_fin")
+      .select("id, fecha, fecha_fin, hora_inicio, hora_fin, user_id")
       .eq("oficina_id", oficinaId)
       .in("estado", ["pendiente", "confirmada"])
       .lte("fecha", fechaFin)
@@ -63,7 +102,16 @@ export async function verificarDisponibilidadOficina(
     });
 
     if (traslape.length > 0) {
-      return { disponible: false, motivo: "Esta oficina ya tiene una reservación que traslapa con esa fecha/hora." };
+      const perfiles = await nombresPorUserId(supabase, traslape.map((r) => r.user_id));
+      const quienes = traslape.map((r) => {
+        const p = r.user_id ? perfiles[r.user_id] : undefined;
+        return unirNombre(p?.nombre, p?.empresa);
+      });
+      return {
+        disponible: false,
+        ocupadoPor: Array.from(new Set(quienes)).join(", "),
+        motivo: "Tiene una reservación que traslapa con esa fecha/hora.",
+      };
     }
   }
 
