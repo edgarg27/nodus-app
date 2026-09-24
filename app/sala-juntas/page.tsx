@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
+import CentroPanel from "@/app/centro/CentroPanel";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const SALA_DEFAULT: Record<string, string> = {
@@ -142,9 +143,12 @@ function useFirma() {
 
 export default function SalaJuntasPage() {
   const supabase = createClient();
-  const [tab, setTab] = useState<"nuevo" | "registros">("nuevo");
+  // Reservaciones va primero: es lo que se ve al entrar a Sala de Juntas.
+  const [tab, setTab] = useState<"reservaciones" | "nuevo" | "registros">("reservaciones");
   const [centro, setCentro] = useState<string | null>(null);
   const [miRol, setMiRol] = useState("");
+  const [miNombre, setMiNombre] = useState("");
+  const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [registros, setRegistros] = useState<Registro[]>([]);
 
@@ -179,10 +183,17 @@ export default function SalaJuntasPage() {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("rol, centro, nombre").eq("id", user.id).single();
     setMiRol(profile?.rol || "");
+    setMiNombre(profile?.nombre || user.email || "");
     const c = profile?.centro || null;
     setCentro(c);
+    // Lista de centros que necesita el panel de Reservaciones.
+    const { data: ofis } = await supabase.from("oficinas").select("centro");
+    const centros = new Set<string>();
+    (ofis || []).forEach((o) => o.centro && centros.add(o.centro));
+    if (c) centros.add(c);
+    setCentrosDisponibles(Array.from(centros).sort());
     if (c) {
       setTipoSala(SALA_DEFAULT[c] || "");
       await fetchRegistros(c, profile?.rol || "");
@@ -314,6 +325,12 @@ export default function SalaJuntasPage() {
 
       <div className="centro-tabs">
         <button
+          className={"centro-tab" + (tab === "reservaciones" ? " active" : "")}
+          onClick={() => setTab("reservaciones")}
+        >
+          📋 Reservaciones
+        </button>
+        <button
           className={"centro-tab" + (tab === "nuevo" ? " active" : "")}
           onClick={() => setTab("nuevo")}
         >
@@ -327,7 +344,18 @@ export default function SalaJuntasPage() {
         </button>
       </div>
 
-      <div className="rep-content">
+      {!loading && tab === "reservaciones" && (
+        <CentroPanel
+          nombre={miNombre}
+          rol={miRol}
+          centroPerfil={centro}
+          centrosDisponibles={centrosDisponibles}
+          vista="reservaciones"
+          embebido
+        />
+      )}
+
+      <div className="rep-content" style={!loading && tab === "reservaciones" ? { display: "none" } : undefined}>
         {loading ? (
           <div className="nodus-inline-loading">
             <div className="nodus-spinner nodus-spinner-sm">

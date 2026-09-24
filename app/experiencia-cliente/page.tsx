@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { empresasDistintas } from "@/lib/empresa";
 import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 
+// Quién puede agregar/quitar días sin servicio (mismo criterio que la política
+// RLS de dias_centro, ver migracion_dias_centro_permisos.sql).
+const ROLES_EDITAN_DIAS = ["admin", "superadmin", "gerente"];
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -120,7 +123,7 @@ export default function ExperienciaClientePage() {
         <a className="rep-back" href="/dashboard">
           ← Regresar
         </a>
-        <p className="rep-title">Experiencia de Cliente</p>
+        <p className="rep-title">Calendario de Eventos</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (
           <div className="centro-selector">
@@ -179,6 +182,7 @@ export default function ExperienciaClientePage() {
                 diasCentro={diasCentro}
                 centro={centro}
                 miId={miId}
+                puedeEditarDias={ROLES_EDITAN_DIAS.includes(miRol)}
                 onCambio={() => fetchTodo(centro)}
               />
             )}
@@ -493,12 +497,14 @@ function TabEventos({
   diasCentro,
   centro,
   miId,
+  puedeEditarDias,
   onCambio,
 }: {
   eventos: Evento[];
   diasCentro: DiaCentro[];
   centro: string;
   miId: string;
+  puedeEditarDias: boolean;
   onCambio: () => void;
 }) {
   const supabase = createClient();
@@ -665,20 +671,23 @@ function TabEventos({
         <p className="panel-section-label" style={{ margin: 0 }}>
           🚫 Días sin servicio ({sinServicio.length})
         </p>
-        <button
-          className="tel-borrar-btn"
-          style={{ color: "#0d1b3e", fontWeight: 600 }}
-          onClick={() => setMostrarFormCierre((v) => !v)}
-        >
-          {mostrarFormCierre ? "Cancelar" : "+ Agregar día de cierre"}
-        </button>
+        {puedeEditarDias && (
+          <button
+            className="tel-borrar-btn"
+            style={{ color: "#0d1b3e", fontWeight: 600 }}
+            onClick={() => setMostrarFormCierre((v) => !v)}
+          >
+            {mostrarFormCierre ? "Cancelar" : "+ Agregar día de cierre"}
+          </button>
+        )}
       </div>
       <p style={{ fontSize: 12, color: "#aaa", margin: "4px 0 8px" }}>
-        Los festivos oficiales cierran por defecto. Aquí agregas otros días en que {centro} no abre, o marcas un festivo en que
-        sí abre. Los clientes de {centro} lo ven en su calendario.
+        {puedeEditarDias
+          ? `Los festivos oficiales cierran por defecto. Aquí agregas otros días en que ${centro} no abre, o marcas un festivo en que sí abre. Los clientes de ${centro} lo ven en su calendario.`
+          : `Días en que ${centro} no abre; los clientes lo ven en su calendario. Solo admin, superadmin y gerente los modifican.`}
       </p>
 
-      {mostrarFormCierre && (
+      {puedeEditarDias && mostrarFormCierre && (
         <form className="form-card" onSubmit={agregarCierre}>
           <div className="tel-form-grid">
             <div>
@@ -716,7 +725,7 @@ function TabEventos({
                     {fechaLargaMx(fecha)} · {esCierreExtra ? "Cierre agregado" : "Festivo oficial"}
                   </p>
                 </div>
-                {esCierreExtra ? (
+                {!puedeEditarDias ? null : esCierreExtra ? (
                   <button className="tel-borrar-btn" style={{ color: "#A32D2D" }} onClick={() => quitarAjuste(fecha)}>
                     Quitar
                   </button>
@@ -743,9 +752,11 @@ function TabEventos({
                   <p className="contrato-cliente-nombre">{oficiales[a.fecha] || "Día festivo"}</p>
                   <p className="contrato-detalle">{fechaLargaMx(a.fecha)}</p>
                 </div>
-                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => quitarAjuste(a.fecha)}>
-                  Volver a cerrar
-                </button>
+                {puedeEditarDias && (
+                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => quitarAjuste(a.fecha)}>
+                    Volver a cerrar
+                  </button>
+                )}
               </div>
             </div>
           ))}

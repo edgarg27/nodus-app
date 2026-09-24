@@ -24,14 +24,6 @@ export default function CotizacionesPage() {
   const [centro, setCentro] = useState<string | null>(null);
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
 
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [nombre, setNombre] = useState("");
-  const [notas, setNotas] = useState("");
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [guardando, setGuardando] = useState(false);
-  const [enviado, setEnviado] = useState(false);
-  const [error, setError] = useState("");
-
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
   const [aceptadoOkId, setAceptadoOkId] = useState<string | null>(null);
   const [confirmandoAceptarId, setConfirmandoAceptarId] = useState<string | null>(null);
@@ -60,51 +52,6 @@ export default function CotizacionesPage() {
     if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
     const { data } = await query;
     setCotizaciones(data || []);
-  }
-
-  async function guardarCotizacion(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (!centro || !nombre.trim()) {
-      setError("Ponle un nombre a la cotización");
-      return;
-    }
-    setGuardando(true);
-
-    let archivoUrl: string | null = null;
-    if (archivo) {
-      const fileName = `${centro}-${Date.now()}.${archivo.name.split(".").pop() || "pdf"}`;
-      const { error: upErr } = await supabase.storage
-        .from("cotizaciones")
-        .upload(fileName, archivo, { contentType: archivo.type, upsert: true });
-      if (upErr) {
-        setError("No se pudo subir el archivo: " + upErr.message);
-        setGuardando(false);
-        return;
-      }
-      archivoUrl = supabase.storage.from("cotizaciones").getPublicUrl(fileName).data.publicUrl;
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    await supabase.from("cotizaciones").insert({
-      centro,
-      nombre,
-      notas: notas || null,
-      archivo_url: archivoUrl,
-      registrado_por: user?.id,
-    });
-
-    setNombre("");
-    setNotas("");
-    setArchivo(null);
-    setMostrarForm(false);
-    setGuardando(false);
-    setEnviado(true);
-    setTimeout(() => setEnviado(false), 1800);
-    fetchCotizaciones(centro, "");
   }
 
   async function borrarCotizacion(id: string) {
@@ -183,13 +130,13 @@ export default function CotizacionesPage() {
               <p className="panel-section-label" style={{ margin: 0 }}>
                 Cotizaciones ({cotizacionesFiltradas.length})
               </p>
-              <button
+              <a
+                href="/registrar-plan"
                 className="tel-borrar-btn"
-                style={{ color: "#0d1b3e", fontWeight: 600 }}
-                onClick={() => setMostrarForm((v) => !v)}
+                style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
               >
-                {mostrarForm ? "Cancelar" : "+ Subir cotización"}
-              </button>
+                + Crear Cotización
+              </a>
             </div>
 
             <input
@@ -198,61 +145,6 @@ export default function CotizacionesPage() {
               onChange={(e) => setBusqueda(e.target.value)}
               style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", width: "100%" }}
             />
-
-            {mostrarForm && (
-              <form className="form-card" onSubmit={guardarCotizacion}>
-                <input
-                  type="text"
-                  placeholder="Nombre de la cotización (ej. Cableado piso 8)"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                />
-                <input
-                  type="text"
-                  placeholder="Notas (opcional)"
-                  value={notas}
-                  onChange={(e) => setNotas(e.target.value)}
-                />
-                <p className="sub-label">Archivo (PDF, imagen, Excel, etc.)</p>
-                <input type="file" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
-                {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
-                <button
-                  className={"btn-enviar" + (guardando ? " sending" : "") + (enviado ? " sent" : "")}
-                  type="submit"
-                  disabled={guardando}
-                >
-                  <span className="btn-enviar-icon-wrapper">
-                    <svg
-                      className="btn-enviar-icon"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path fill="none" d="M0 0h24v24H0z"></path>
-                      <path
-                        fill="currentColor"
-                        d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"
-                      ></path>
-                    </svg>
-                  </span>
-                  <span className="btn-enviar-check-wrapper">
-                    <svg
-                      className="btn-enviar-check"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    <span>¡Listo!</span>
-                  </span>
-                  <span className="btn-enviar-text">Guardar cotización</span>
-                </button>
-              </form>
-            )}
 
             {cotizacionesFiltradas.length === 0 ? (
               <div className="empty-card">

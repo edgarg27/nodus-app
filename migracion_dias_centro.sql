@@ -43,12 +43,12 @@ create policy "dias_centro_staff_write" on public.dias_centro
   using (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.rol in ('admin', 'superadmin', 'gerente', 'cobranza')
+      where p.id = auth.uid() and p.rol in ('admin', 'superadmin', 'gerente')
     )
   )
   with check (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.rol in ('admin', 'superadmin', 'gerente', 'cobranza')
+      where p.id = auth.uid() and p.rol in ('admin', 'superadmin', 'gerente')
     )
   );

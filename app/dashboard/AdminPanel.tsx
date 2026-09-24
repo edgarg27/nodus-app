@@ -320,13 +320,13 @@ export default function AdminPanel({
     if (!n.leida) marcarNotifLeida(n.id);
     setMenuNotifAbierto(false);
     if (n.tipo === "nueva_reservacion") {
-      router.push("/centro?tab=reservaciones");
+      router.push("/sala-juntas");
     } else if (n.tipo === "nuevo_tour") {
       router.push("/tours");
     } else if (n.tipo === "baja_extension" || n.tipo === "nuevo_did") {
       router.push("/telefonia");
     } else if (n.tipo === "nuevo_voucher") {
-      router.push("/centro?tab=vouchers");
+      router.push("/centro/vouchers");
     } else if (n.tipo === "ticket_en_proceso" || n.tipo === "ticket_resuelto" || n.tipo === "nuevo_ticket") {
       router.push(n.mensaje?.includes("📶") ? "/wifi-solicitudes" : "/tickets");
     } else if (n.tipo === "proximo_mantenimiento") {
@@ -346,15 +346,15 @@ export default function AdminPanel({
       router.push("/cobranza");
     } else if (n.tipo === "nueva_solicitud_invitado") {
       // Day Pass y demás solicitudes de invitados: ahí mismo se genera el pase.
-      router.push("/centro?tab=invitados");
+      router.push("/centro/invitados");
     } else if (n.tipo === "nueva_tarjeta_fidelidad") {
       router.push("/fidelidad-admin");
     } else if (n.tipo === "solicitud_cliente") {
-      router.push("/centro?tab=solicitudes");
+      router.push("/centro/solicitudes");
     } else if (n.tipo === "visita_cliente") {
-      router.push("/centro?tab=visitas");
+      router.push("/centro/visitas");
     } else if (n.tipo === "reservacion_cancelada_cliente") {
-      router.push("/centro?tab=reservaciones");
+      router.push("/sala-juntas");
     } else if (n.tipo === "nueva_queja") {
       // Mismo tipo para quejas Y sugerencias (ver app/quejas-sugerencias/page.tsx)
       router.push("/atencion-cliente");
@@ -839,7 +839,7 @@ export default function AdminPanel({
                   return (
                     <a
                       className={`stat-card${solicitudes > 0 ? " stat-card-alerta" : ""}`}
-                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro?tab=solicitudes" : "/centro?tab=invitados"}
+                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro/solicitudes" : "/centro/invitados"}
                     >
                       <p className="stat-val">{solicitudes}</p>
                       <p className="stat-lbl">Solicitudes por atender</p>
@@ -851,7 +851,7 @@ export default function AdminPanel({
                 })()}
                 <a
                   className={`stat-card${resumen.reservacionesPendientes > 0 ? " stat-card-alerta" : ""}`}
-                  href="/centro?tab=reservaciones"
+                  href="/sala-juntas"
                 >
                   <p className="stat-val">{resumen.reservacionesPendientes}</p>
                   <p className="stat-lbl">Reservaciones por confirmar</p>
@@ -994,12 +994,6 @@ export default function AdminPanel({
               className={"modulos-grid" + (rol === "sistemas" || rol === "atencion_cliente" ? " modulos-grid-compacta" : "")}
               style={{ marginTop: 8 }}
             >
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/centro?tab=reservaciones">
-                <span className="modulo-icon">📋</span>
-                <span className="modulo-name">Reservaciones</span>
-              </a>
-            )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/cobranza">
                 <span className="modulo-icon">💰</span>
@@ -1119,7 +1113,7 @@ export default function AdminPanel({
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno" && (
               <a className="modulo-card" href="/experiencia-cliente">
                 <span className="modulo-icon">🎉</span>
-                <span className="modulo-name">Experiencia de Cliente</span>
+                <span className="modulo-name">Calendario de Eventos</span>
               </a>
             )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
@@ -1161,10 +1155,41 @@ export default function AdminPanel({
                 <span className="modulo-name">Usuarios</span>
               </a>
             )}
-            {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/centro">
-                <span className="modulo-icon">🏢</span>
-                <span className="modulo-name">Panel de Centro</span>
+            {/* Lo que antes eran pestañas del Panel de Centro: cada uno tiene
+                ahora su propia pantalla (/centro/<módulo>), con el mismo acceso
+                que tenía la pestaña. */}
+            {(rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente") && (
+              <a className="modulo-card" href="/centro/resumen">
+                <span className="modulo-icon">📊</span>
+                <span className="modulo-name">Resumen</span>
+              </a>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente") && (
+              <>
+                <a className="modulo-card" href="/centro/invitados">
+                  <span className="modulo-icon">🙋</span>
+                  <span className="modulo-name">Invitados</span>
+                </a>
+                <a className="modulo-card" href="/centro/solicitudes">
+                  <span className="modulo-icon">📨</span>
+                  <span className="modulo-name">Solicitudes</span>
+                </a>
+                <a className="modulo-card" href="/centro/visitas">
+                  <span className="modulo-icon">🚪</span>
+                  <span className="modulo-name">Visitas</span>
+                </a>
+              </>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas") && (
+              <a className="modulo-card" href="/centro/vouchers">
+                <span className="modulo-icon">🎟️</span>
+                <span className="modulo-name">Vouchers</span>
+              </a>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones") && (
+              <a className="modulo-card" href="/centro/proveedores">
+                <span className="modulo-icon">🧾</span>
+                <span className="modulo-name">Proveedores</span>
               </a>
             )}
             {rol !== "cobranza" && rol !== "diseno" && (
