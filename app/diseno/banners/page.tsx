@@ -17,6 +17,10 @@ type Banner = {
 // (los mismos que también se ven en la vista previa del Panel de Diseño).
 // Administrados aquí por Diseño (o superadmin/gerente) — ver
 // migracion_banners_promocionales.sql para la tabla y sus políticas.
+// Máximo de banners en total (activos e inactivos) para que el carrusel
+// no se haga eterno.
+const MAX_BANNERS = 6;
+
 export default function BannersPage() {
   const supabase = createClient();
   const [miRol, setMiRol] = useState("");
@@ -74,6 +78,10 @@ export default function BannersPage() {
     setError("");
     if (!nuevaImagen[0]) {
       setError("Sube una imagen para el banner nuevo");
+      return;
+    }
+    if (banners.length >= MAX_BANNERS) {
+      setError(`Ya tienes ${MAX_BANNERS} banners, el máximo. Borra uno para agregar otro.`);
       return;
     }
     setAgregando(true);
@@ -267,8 +275,13 @@ export default function BannersPage() {
             )}
 
             <p className="panel-section-label" style={{ marginTop: 12 }}>
-              Agregar banner
+              Agregar banner ({banners.length} de {MAX_BANNERS})
             </p>
+            {banners.length >= MAX_BANNERS ? (
+              <div className="empty-card">
+                Ya tienes {MAX_BANNERS} banners, el máximo. Para agregar otro, borra uno o reemplaza su imagen.
+              </div>
+            ) : (
             <div className="form-card">
               <p className="sub-label">Imagen</p>
               <FileDropzone files={nuevaImagen} onChange={setNuevaImagen} maxFiles={1} accept="image/*" />
@@ -283,6 +296,7 @@ export default function BannersPage() {
                 <span className="btn-enviar-text">{agregando ? "Agregando..." : "Agregar banner"}</span>
               </button>
             </div>
+            )}
           </>
         )}
       </div>
