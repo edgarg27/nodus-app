@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { esClienteCoworking } from "@/lib/coworking";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 
 type Profile = {
@@ -107,6 +108,10 @@ export default function ClientePanel({
   // el carrusel crece solo conforme se van publicando.
   const [bannersPromo, setBannersPromo] = useState<BannerDestacado[]>([]);
   const [bannersLogros, setBannersLogros] = useState<BannerDestacado[]>([]);
+  // WiFi (vouchers) ya solo es para clientes de Coworking; a los de
+  // oficina se les oculta la tarjeta (el código de /mi-wifi se conserva
+  // por si se vuelve a usar).
+  const [tieneCoworking, setTieneCoworking] = useState(false);
 
   useEffect(() => {
     fetchBannersPromocionales(supabase).then(setBannersPromo);
@@ -142,6 +147,8 @@ export default function ClientePanel({
         .eq("cliente_id", user.id)
         .eq("estado", "pendiente");
       setEncuestasPendientes(count || 0);
+
+      esClienteCoworking(supabase, user.id).then(setTieneCoworking);
 
       const { data: contratosData } = await supabase
         .from("contratos")
@@ -543,11 +550,13 @@ export default function ClientePanel({
 
         <p className="panel-section-label">Mi espacio</p>
         <div className="quick-grid">
-          <a className="quick-card" href="/mi-wifi">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/wifi.png" alt="" className="quick-icon icon-img-28" />
-            <span className="quick-name">WiFi</span>
-          </a>
+          {tieneCoworking && (
+            <a className="quick-card" href="/mi-wifi">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/wifi.png" alt="" className="quick-icon icon-img-28" />
+              <span className="quick-name">WiFi</span>
+            </a>
+          )}
           <a className="quick-card" href="/estado-cuenta">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/estado-cuenta.png" alt="" className="quick-icon icon-img-28" />

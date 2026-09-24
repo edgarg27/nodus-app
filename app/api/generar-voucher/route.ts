@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { centroTieneUnifi, generarVoucherReal } from "@/lib/unifi";
+import { AVISO_SOLO_COWORKING, esClienteCoworking } from "@/lib/coworking";
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -35,6 +36,12 @@ export async function POST(req: NextRequest) {
 
   if (!cliente) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  }
+
+  // Solo clientes con Coworking vigente (las oficinas usan su propia red).
+  // Para alguien más está el voucher manual (/api/voucher-manual).
+  if (!(await esClienteCoworking(supabase, cliente.id))) {
+    return NextResponse.json({ error: AVISO_SOLO_COWORKING }, { status: 400 });
   }
 
   if (!cliente.centro || !centroTieneUnifi(cliente.centro)) {

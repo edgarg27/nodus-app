@@ -255,7 +255,16 @@ export default function ModalDisponibilidad({
         {verificado && resultado && (
           <div className={`disp-resultado ${resultado.disponible ? "ok" : "no"}`}>
             <span className="disp-resultado-icono">{resultado.disponible ? "✓" : "✗"}</span>
-            <span>{resultado.disponible ? "Disponible en esas fechas" : `Ocupada — ${resultado.motivo}`}</span>
+            <span>
+              {resultado.disponible ? (
+                "Disponible en esas fechas"
+              ) : (
+                <>
+                  Ocupada{resultado.ocupadoPor ? " por " : ""}
+                  {resultado.ocupadoPor && <strong>{resultado.ocupadoPor}</strong>} — {resultado.motivo}
+                </>
+              )}
+            </span>
           </div>
         )}
 

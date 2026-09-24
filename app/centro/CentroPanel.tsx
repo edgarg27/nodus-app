@@ -8,9 +8,20 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
+import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
-type VoucherCentro = { id: string; codigo: string; folio: string; user_id: string; created_at: string; expira_en: string | null };
+// user_id null + "para" = voucher manual (visita, proveedor…), ver
+// /api/voucher-manual y migracion_vouchers_manuales.sql.
+type VoucherCentro = {
+  id: string;
+  codigo: string;
+  folio: string;
+  user_id: string | null;
+  para?: string | null;
+  created_at: string;
+  expira_en: string | null;
+};
 type Oficina = { numero: string; tipo: string; estado: string };
 type Extension = { id: string; extension: string; did: string | null; tipo: string; departamento: string | null; asignado_a: string | null; activo: boolean };
 type Internet = { proveedor_principal: string | null; velocidad_principal: string | null; proveedor_respaldo: string | null; velocidad_respaldo: string | null; notas: string | null };
@@ -362,6 +373,15 @@ export default function CentroPanel({
   const [menuNotifAbierto, setMenuNotifAbierto] = useState(false);
   const [vouchers, setVouchers] = useState<VoucherCentro[]>([]);
   const [generandoVoucherPara, setGenerandoVoucherPara] = useState<string | null>(null);
+  // Contratos vigentes de los clientes: quién es de Coworking (a ellos se
+  // les genera voucher normal) y qué espacio dice su contrato (para
+  // agrupar). null = todavía cargando. Ver lib/coworking.ts.
+  const [espaciosClientes, setEspaciosClientes] = useState<EspaciosClientes | null>(null);
+  // Voucher manual "por si acaso", para quien sea (sin cliente).
+  const [paraVoucherManual, setParaVoucherManual] = useState("");
+  const [centroVoucherManual, setCentroVoucherManual] = useState("Bosques");
+  const [generandoManual, setGenerandoManual] = useState(false);
+  const [codigoManualGenerado, setCodigoManualGenerado] = useState("");
   const [duracionVoucher, setDuracionVoucher] = useState(43200);
   const [errorVoucher, setErrorVoucher] = useState("");
   const [errorProveedor, setErrorProveedor] = useState("");
@@ -380,6 +400,12 @@ export default function CentroPanel({
   useEffect(() => {
     if (centro) fetchTodo(centro);
   }, [centro]);
+
+  useEffect(() => {
+    if (tab !== "vouchers") return;
+    espaciosDeClientes(supabase).then(setEspaciosClientes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   useEffect(() => {
     if (rol === "sistemas") fetchGastosSistemas();
@@ -406,7 +432,7 @@ export default function CentroPanel({
             .eq("centro", c),
           supabase
             .from("vouchers")
-            .select("id, codigo, folio, user_id, created_at, expira_en")
+            .select("*")
             .eq("centro", c)
             .order("created_at", { ascending: false }),
         ]);
@@ -516,7 +542,7 @@ export default function CentroPanel({
         .limit(20),
       supabase
         .from("vouchers")
-        .select("id, codigo, folio, user_id, created_at, expira_en")
+        .select("*")
         .eq("centro", c)
         .order("created_at", { ascending: false }),
       supabase
@@ -1475,9 +1501,45 @@ export default function CentroPanel({
     });
   }
 
-  async function generarVoucherParaCliente(cliente: Cliente) {
-    setGenerandoVoucherPara(cliente.id);
+  async function generarVoucherManual() {
     setErrorVoucher("");
+    setCodigoManualGenerado("");
+    const para = paraVoucherManual.trim();
+    if (!para) {
+      setErrorVoucher("Escribe para quién es el voucher manual");
+      return;
+    }
+    const centroManual = esGlobal ? centroVoucherManual : centro;
+    if (!centroManual) return;
+    setGenerandoManual(true);
+    try {
+      const res = await fetch("/api/voucher-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ para, minutos: duracionVoucher, centro: centroManual }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorVoucher(data.error || "No se pudo generar el voucher");
+      } else {
+        agregarVoucherAEstado(centroManual, data.voucher);
+        setCodigoManualGenerado(data.voucher.codigo);
+        setParaVoucherManual("");
+        await supabase.from("notificaciones").insert({
+          centro: centroManual,
+          tipo: "nuevo_voucher",
+          mensaje: `🎟️ Voucher manual para ${para} (${centroManual})`,
+        });
+      }
+    } catch {
+      setErrorVoucher("No se pudo conectar con UniFi. Intenta de nuevo.");
+    }
+    setGenerandoManual(false);
+  }
+
+  async function generarVoucherParaCliente(cliente: Cliente) {
+    setErrorVoucher("");
+    setGenerandoVoucherPara(cliente.id);
     // Usamos el centro real del cliente (importante en la vista global, donde
     // se listan clientes de varios centros a la vez) y no el del selector.
     const centroCliente = cliente.centro || centro;
@@ -1575,20 +1637,59 @@ export default function CentroPanel({
   function renderOficinasConVouchers(clientesLista: Cliente[], vouchersLista: VoucherCentro[]) {
     const porOficina: Record<string, Cliente[]> = {};
     clientesLista.forEach((c) => {
-      const key = c.numero_oficina || "Sin oficina asignada";
+      // Primero lo que dice su contrato vigente; si no, el dato del perfil.
+      const delContrato = espaciosClientes?.espacios.get(c.id);
+      const key = delContrato?.length
+        ? delContrato.join(", ")
+        : c.numero_oficina
+          ? `Oficina ${c.numero_oficina}`
+          : "Sin espacio asignado";
       if (!porOficina[key]) porOficina[key] = [];
       porOficina[key].push(c);
     });
-    const oficinasOrdenadas = Object.keys(porOficina).sort();
+    const oficinasOrdenadas = Object.keys(porOficina).sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    const manuales = vouchersLista.filter((v) => !v.user_id);
+
+    const listaManuales =
+      manuales.length > 0 ? (
+        <div key="__manuales">
+          <p className="panel-section-label" style={{ marginTop: 12 }}>
+            🎫 Vouchers manuales
+          </p>
+          {manuales.map((v) => {
+            const vencido = v.expira_en && new Date(v.expira_en) < new Date();
+            return (
+              <div className="item-card" key={v.id} style={{ marginBottom: 8, alignItems: "center" }}>
+                <div className="item-card-info" style={{ flex: 1 }}>
+                  <p className="item-card-titulo">{v.para || "Voucher manual"}</p>
+                  <p className="item-card-extra" style={{ color: vencido ? "#A32D2D" : "#0F6E56", margin: 0 }}>
+                    {vencido ? "⚠️ Venció: " : "✓ Vigente: "}
+                    <span style={{ fontFamily: "monospace" }}>{v.codigo}</span>
+                    {v.expira_en && ` · ${new Date(v.expira_en).toLocaleDateString("es-MX")}`}
+                  </p>
+                </div>
+                <button className="tel-borrar-btn" style={{ fontSize: 11 }} onClick={() => borrarVoucherCentro(v.id)}>
+                  🗑 Borrar
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null;
 
     if (oficinasOrdenadas.length === 0) {
-      return <div className="empty-card">Sin clientes registrados en este centro</div>;
+      return (
+        <>
+          {listaManuales}
+          <div className="empty-card">Sin clientes registrados en este centro</div>
+        </>
+      );
     }
 
-    return oficinasOrdenadas.map((oficina) => (
+    return [listaManuales, ...oficinasOrdenadas.map((oficina) => (
       <div key={oficina}>
         <p className="panel-section-label" style={{ marginTop: 12 }}>
-          🏢 Oficina {oficina}
+          🏢 {oficina}
         </p>
         {porOficina[oficina].map((c) => {
           const vouchersDeCliente = vouchersLista.filter((v) => v.user_id === c.id);
@@ -1641,20 +1742,24 @@ export default function CentroPanel({
                 )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                <button
-                  className="tel-borrar-btn"
-                  style={{ color: "#0d1b3e", fontWeight: 700 }}
-                  onClick={() => generarVoucherParaCliente(c)}
-                  disabled={generandoVoucherPara === c.id}
-                >
-                  {generandoVoucherPara === c.id ? "..." : "🎫 Generar"}
-                </button>
+                {espaciosClientes === null ? null : espaciosClientes.coworking.has(c.id) ? (
+                  <button
+                    className="tel-borrar-btn"
+                    style={{ color: "#0d1b3e", fontWeight: 700 }}
+                    onClick={() => generarVoucherParaCliente(c)}
+                    disabled={generandoVoucherPara === c.id}
+                  >
+                    {generandoVoucherPara === c.id ? "..." : "🎫 Generar"}
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#888" }}>No es de Coworking</span>
+                )}
               </div>
             </div>
           );
         })}
       </div>
-    ));
+    ))];
   }
 
   const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -2658,6 +2763,46 @@ export default function CentroPanel({
                 {errorVoucher && (
                   <p style={{ color: "#A32D2D", fontSize: 12 }}>{errorVoucher}</p>
                 )}
+
+                <div className="form-card" style={{ marginTop: 4 }}>
+                  <p className="sub-label" style={{ fontWeight: 600, color: "#0d1b3e" }}>
+                    🎫 Voucher manual (para quien sea)
+                  </p>
+                  <p style={{ fontSize: 12, color: "#888", margin: "2px 0 8px" }}>
+                    Para una visita, un proveedor o alguien de paso. Usa la duración de arriba.
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      type="text"
+                      placeholder="¿Para quién? (ej. Visita de Juan Pérez)"
+                      value={paraVoucherManual}
+                      onChange={(e) => setParaVoucherManual(e.target.value)}
+                      style={{ flex: 1, minWidth: 200 }}
+                    />
+                    {esGlobal && (
+                      <select value={centroVoucherManual} onChange={(e) => setCentroVoucherManual(e.target.value)}>
+                        {centrosDisponibles.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      className="btn-aceptar"
+                      style={{ width: "auto" }}
+                      disabled={generandoManual || !paraVoucherManual.trim()}
+                      onClick={generarVoucherManual}
+                    >
+                      {generandoManual ? "Generando..." : "Generar voucher"}
+                    </button>
+                  </div>
+                  {codigoManualGenerado && (
+                    <p style={{ marginTop: 8, fontSize: 14, color: "#0F6E56" }}>
+                      ✓ Código generado: <strong style={{ fontFamily: "monospace", fontSize: 16 }}>{codigoManualGenerado}</strong>
+                    </p>
+                  )}
+                </div>
 
                 {esGlobal ? (
                   cargandoVouchersGlobal ? (

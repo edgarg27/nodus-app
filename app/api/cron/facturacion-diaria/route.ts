@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoSPEI } from "@/lib/openpay";
 import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
+import { clientesConCoworking } from "@/lib/coworking";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
 import { enviarAvisoPago } from "@/lib/correosPagos";
@@ -104,13 +105,15 @@ async function procesarMensual(
     userId: string;
     contrato: { id: string; renta_mensual: number | null; fecha_inicio: string | null; fecha_vencimiento: string | null };
     cliente: { nombre: string | null; email: string | null; centro: string | null };
+    // Solo Coworking recibe voucher de WiFi (ver lib/coworking.ts).
+    esCoworking: boolean;
     hoy: Date;
     hoyISO: string;
     inicioMes: string;
     finMes: string;
   }
 ) {
-  const { userId, contrato, cliente, hoy, hoyISO, inicioMes, finMes } = ctx;
+  const { userId, contrato, cliente, esCoworking, hoy, hoyISO, inicioMes, finMes } = ctx;
   const renta = Number(contrato.renta_mensual) || 0;
   if (renta <= 0) return;
 
@@ -153,7 +156,7 @@ async function procesarMensual(
           : "Cargo SPEI generado automático (renta mensual, mes a mes)",
     });
 
-    if (facturaId && cliente.centro && centroTieneUnifi(cliente.centro)) {
+    if (facturaId && esCoworking && cliente.centro && centroTieneUnifi(cliente.centro)) {
       try {
         const { codigo, unifiId } = await generarVoucherReal(cliente.centro, {
           notaBase: `Nodus - ${cliente.nombre} (renovación mensual)`,
@@ -340,6 +343,9 @@ export async function POST(req: NextRequest) {
     if (!contratoPorCliente.has(c.user_id)) contratoPorCliente.set(c.user_id, c);
   }
 
+  // El voucher mensual de WiFi ya solo es para clientes de Coworking.
+  const conCoworking = await clientesConCoworking(admin, Array.from(contratoPorCliente.keys()));
+
   for (const [userId, contrato] of contratoPorCliente) {
     const diaPago = contrato.dia_pago as number;
 
@@ -362,6 +368,7 @@ export async function POST(req: NextRequest) {
           userId,
           contrato,
           cliente,
+          esCoworking: conCoworking.has(userId),
           hoy,
           hoyISO,
           inicioMes,
@@ -459,8 +466,9 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Voucher nuevo del mes (solo en centros con UniFi real configurado)
-          if (cliente.centro && centroTieneUnifi(cliente.centro)) {
+          // Voucher nuevo del mes (solo Coworking y solo en centros con
+          // UniFi real configurado)
+          if (conCoworking.has(userId) && cliente.centro && centroTieneUnifi(cliente.centro)) {
             try {
               const { codigo, unifiId } = await generarVoucherReal(cliente.centro, {
                 notaBase: `Nodus - ${cliente.nombre} (renovación mensual)`,
