@@ -592,7 +592,7 @@ export default function ClientePanel({
             <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
               📅
             </span>
-            <span className="quick-name">Eventos</span>
+            <span className="quick-name">Calendario de Eventos</span>
           </a>
         </div>
 

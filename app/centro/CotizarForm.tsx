@@ -446,9 +446,14 @@ export default function CotizarForm({
   }, [clienteId]);
 
   // ---------- Tipo de espacio / Oficina o Paquete ----------
+  // Working Desk no se ofrece en Bosques (ahí no existen; solo hay una
+  // oficina de ese tipo registrada como placeholder, sin contratos) — en los
+  // demás centros sigue apareciendo igual.
   const tiposEspacioDisponibles = useMemo(() => {
-    return Array.from(new Set(oficinas.map((o) => o.tipo).filter(Boolean))).sort();
-  }, [oficinas]);
+    return Array.from(new Set(oficinas.map((o) => o.tipo).filter(Boolean)))
+      .filter((t) => !(centro === "Bosques" && t.trim().toLowerCase() === "working desk"))
+      .sort();
+  }, [oficinas, centro]);
 
   const [tipoEspacio, setTipoEspacio] = useState("");
 
@@ -463,6 +468,28 @@ export default function CotizarForm({
         return a.numero.localeCompare(b.numero, "es", { numeric: true });
       });
   }, [oficinas, tipoEspacio, ocupacionPorOficina]);
+
+  // Coworking: los espacios se llaman A, B… Z, AA… AZ y se eligen en dos
+  // pasos — primero la letra, y si esa letra tiene varios espacios (la "A"
+  // agrupa A, AA, AB… AZ) se despliega su tabla para escoger cuál. Las
+  // letras que tienen un solo espacio se eligen directo.
+  const esCoworkingSel = tipoEspacio.trim().toLowerCase() === "coworking";
+  const [grupoEspacioAbierto, setGrupoEspacioAbierto] = useState<string | null>(null);
+  const [paqueteListaAbierta, setPaqueteListaAbierta] = useState(false);
+  const gruposEspacios = useMemo(() => {
+    const mapa = new Map<string, Oficina[]>();
+    for (const o of oficinasDelTipo) {
+      const letra = (o.numero || "").trim().charAt(0).toUpperCase();
+      if (!mapa.has(letra)) mapa.set(letra, []);
+      mapa.get(letra)!.push(o);
+    }
+    return Array.from(mapa.entries())
+      .sort(([a], [b]) => a.localeCompare(b, "es"))
+      .map(([letra, lista]) => [
+        letra,
+        [...lista].sort((a, b) => a.numero.length - b.numero.length || a.numero.localeCompare(b.numero, "es")),
+      ] as [string, Oficina[]]);
+  }, [oficinasDelTipo]);
 
   const paquetesDelTipo = useMemo(() => {
     return paquetes.filter((p) => p.tipo_espacio === tipoEspacio);
@@ -2641,14 +2668,16 @@ export default function CotizarForm({
         oficinasDelTipo.length > 0 &&
         !(esRenovacion && contratoARenovarId && modoRenovacion === "renovar") && (
         <div>
-          <p className="panel-section-label">Oficina</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
-            {oficinasDelTipo
-              .filter((o) => !(modoRenovacion === "agregar" && o.id === oficina?.id))
-              .map((o) => {
+          <p className="panel-section-label">{esCoworkingSel ? "Espacio" : "Oficina"}</p>
+          {(() => {
+            const idSel = modoRenovacion === "agregar" ? oficinaNuevaId : oficinaId;
+            const visibles = oficinasDelTipo.filter((o) => !(modoRenovacion === "agregar" && o.id === oficina?.id));
+            const gridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 } as const;
+
+            const tarjeta = (o: Oficina) => {
               const ocupacion = ocupacionPorOficina[o.id];
               const bloqueada = !!ocupacion || o.estado === "mantenimiento";
-              const seleccionada = modoRenovacion === "agregar" ? oficinaNuevaId === o.id : oficinaId === o.id;
+              const seleccionada = idSel === o.id;
               return (
                 <button
                   key={o.id}
@@ -2664,7 +2693,7 @@ export default function CotizarForm({
                   }}
                 >
                   <p className="contrato-cliente-nombre" style={{ margin: 0 }}>
-                    Oficina {o.numero}
+                    {esCoworkingSel ? "Espacio" : "Oficina"} {o.numero}
                   </p>
                   {ocupacion ? (
                     <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 0" }}>
@@ -2682,8 +2711,87 @@ export default function CotizarForm({
                   )}
                 </button>
               );
-            })}
-          </div>
+            };
+
+            if (!esCoworkingSel) return <div style={gridStyle}>{visibles.map((o) => tarjeta(o))}</div>;
+
+            // Coworking: primero las letras; la que agrupa varios espacios
+            // (la "A": A, AA, AB… AZ) despliega su tabla al elegirla.
+            const idsVisibles = new Set(visibles.map((o) => o.id));
+            const grupos = gruposEspacios
+              .map(([letra, lista]) => [letra, lista.filter((o) => idsVisibles.has(o.id))] as [string, Oficina[]])
+              .filter(([, lista]) => lista.length > 0);
+            const letraSel = visibles.find((o) => o.id === idSel)?.numero.trim().charAt(0).toUpperCase() || null;
+            const abierto = grupoEspacioAbierto ?? letraSel;
+
+            return (
+              <>
+                <div style={gridStyle}>
+                  {grupos.map(([letra, lista]) => {
+                    if (lista.length === 1) return tarjeta(lista[0]);
+                    const libres = lista.filter((o) => !ocupacionPorOficina[o.id] && o.estado !== "mantenimiento").length;
+                    const activo = abierto === letra;
+                    return (
+                      <div
+                        key={`grupo-${letra}`}
+                        className="contrato-card-admin"
+                        style={{ textAlign: "left", border: activo ? "2px solid #0d1b3e" : undefined }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setGrupoEspacioAbierto(activo ? "" : letra)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            width: "100%",
+                            textAlign: "left",
+                            cursor: "pointer",
+                            font: "inherit",
+                            color: "inherit",
+                          }}
+                        >
+                          <p className="contrato-cliente-nombre" style={{ margin: 0 }}>
+                            Espacio {letra}
+                          </p>
+                          <p style={{ fontSize: 12, color: libres > 0 ? "#0F6E56" : "#A32D2D", margin: "4px 0 0" }}>
+                            {libres} de {lista.length} disponibles
+                          </p>
+                          <span style={{ fontSize: 11, color: "#0d1b3e", fontWeight: 600 }}>
+                            {activo ? "▲ Ocultar" : "▼ Ver espacios"}
+                          </span>
+                        </button>
+                        {activo && (
+                          <div className="lista-espacios">
+                            {lista.map((o) => {
+                              const ocupacion = ocupacionPorOficina[o.id];
+                              const bloqueada = !!ocupacion || o.estado === "mantenimiento";
+                              return (
+                                <button
+                                  key={o.id}
+                                  type="button"
+                                  disabled={bloqueada}
+                                  className={"lista-espacios-item" + (idSel === o.id ? " activo" : "")}
+                                  onClick={() => (modoRenovacion === "agregar" ? setOficinaNuevaId(o.id) : seleccionarOficina(o.id))}
+                                >
+                                  {idSel === o.id ? "✓ " : ""}Espacio {o.numero}
+                                  {ocupacion
+                                    ? ` · Ocupado por ${ocupacion.clienteNombre} (hasta ${ocupacion.fechaVencimiento})`
+                                    : o.estado === "mantenimiento"
+                                    ? " · En mantenimiento"
+                                    : ""}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -2691,22 +2799,42 @@ export default function CotizarForm({
       {tipoEspacio && paquetesDelTipo.length > 0 && (
         <div>
           <p className="panel-section-label">Paquete</p>
-          <select
-            value={paqueteId}
-            onChange={(e) => seleccionarPaquete(e.target.value)}
+          {/* Campo cerrado que al tocarlo despliega la lista (mismo diseño que
+              la de espacios de Coworking, sin renglón "Selecciona un
+              paquete"). Al elegir uno se cierra; tocar el elegido otra vez
+              lo quita (antes eso se hacía volviendo al renglón vacío). */}
+          <button
+            type="button"
+            className={"lista-espacios-disparador" + (paqueteListaAbierta ? " abierto" : "")}
             disabled={paqueteBloqueado}
-            style={{ width: "100%" }}
+            onClick={() => setPaqueteListaAbierta((v) => !v)}
           >
-            <option value="">Selecciona un paquete</option>
-            {paquetesDelTipo.map((p) => {
-              const yaRegistrado = paquetesYaRegistrados.has(p.id);
-              return (
-                <option key={p.id} value={p.id} disabled={yaRegistrado}>
-                  {p.nombre} {p.descripcion ? `· ${p.descripcion}` : ""} {yaRegistrado ? "· Ya registrado" : ""}
-                </option>
-              );
-            })}
-          </select>
+            <span>{paquete ? `✓ ${paquete.nombre}` : "Ver paquetes"}</span>
+            {!paqueteBloqueado && <span style={{ fontSize: 11 }}>{paqueteListaAbierta ? "▲" : "▼"}</span>}
+          </button>
+          {paqueteListaAbierta && !paqueteBloqueado && (
+            <div className="lista-espacios">
+              {paquetesDelTipo.map((p) => {
+                const yaRegistrado = paquetesYaRegistrados.has(p.id);
+                const elegido = paqueteId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={yaRegistrado}
+                    className={"lista-espacios-item" + (elegido ? " activo" : "")}
+                    onClick={() => {
+                      seleccionarPaquete(elegido ? "" : p.id);
+                      setPaqueteListaAbierta(false);
+                    }}
+                  >
+                    {elegido ? "✓ " : ""}
+                    {p.nombre} {p.descripcion ? `· ${p.descripcion}` : ""} {yaRegistrado ? "· Ya registrado" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {paqueteBloqueado && (
             <p style={{ fontSize: 11, color: "#a3701f", margin: "4px 0 0" }}>
               🔒 Este paquete se asignó automáticamente por la oficina elegida y no se puede cambiar.

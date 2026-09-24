@@ -6,7 +6,7 @@ import { diasSinServicio, proximosDiasSinServicio, type DiaCentro } from "@/lib/
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-// Los eventos los captura el staff en Experiencia del cliente → Eventos
+// Los eventos los captura el staff en Calendario de Eventos → Eventos
 // (tabla eventos_centro: fecha, hora y lugar son opcionales salvo la fecha).
 type Evento = {
   id: string;
@@ -161,7 +161,7 @@ export default function CalendarioEventosPage() {
         <a className="rep-back" href="/dashboard-cliente">
           ← Regresar
         </a>
-        <p className="rep-title">Calendario de eventos</p>
+        <p className="rep-title">Calendario de Eventos</p>
         <p className="rep-sub">{centro || "Tu centro"}</p>
       </div>
 

@@ -185,8 +185,16 @@ export default function MapaConPines({
     setModalAbierto(true);
   }
 
-  const oficinasConPin = oficinas.filter((o) => o.mapa_x != null && o.mapa_y != null);
-  const oficinasSinPin = oficinas.filter((o) => o.mapa_x == null || o.mapa_y == null);
+  // Los espacios de Coworking (A, AA, AB… ~350 en Bosques) no se ubican uno
+  // por uno en el plano: si no tienen pin no se listan aquí ni en "Colocar
+  // pines" (llenarían la pantalla). La ventana de disponibilidad sí sigue
+  // recibiendo todas las oficinas, y cualquiera que ya tenga pin se sigue
+  // mostrando normal.
+  const oficinasVisibles = oficinas.filter(
+    (o) => !(o.tipo?.trim().toLowerCase() === "coworking" && (o.mapa_x == null || o.mapa_y == null))
+  );
+  const oficinasConPin = oficinasVisibles.filter((o) => o.mapa_x != null && o.mapa_y != null);
+  const oficinasSinPin = oficinasVisibles.filter((o) => o.mapa_x == null || o.mapa_y == null);
 
   // Bandeja de oficinas sin pin: un centro puede tener cientos (Bosques tiene
   // 351 puestos de coworking), así que se filtra y se limita lo que se dibuja.
@@ -334,9 +342,9 @@ export default function MapaConPines({
         <span>⚪ Mantenimiento / otro estado</span>
       </div>
 
-      {oficinas.length > 0 && (
+      {oficinasVisibles.length > 0 && (
         <div className="oficinas-grid">
-          {oficinas.map((o) => (
+          {oficinasVisibles.map((o) => (
             <button
               key={o.id}
               type="button"

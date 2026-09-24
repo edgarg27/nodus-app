@@ -305,6 +305,71 @@ body {
   gap: 10px;
 }
 
+/* Dashboard admin: resumen de pendientes ↔ banners, con una flechita
+   a un lado de los recuadros para cambiar de uno a otro. */
+.resumen-deslizable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Ventana que recorta y pista que se desliza de lado (translateX). Todos
+   los paneles miden lo mismo (el más alto, los recuadros), así la página
+   no brinca al cambiar. */
+.resumen-ventana {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.resumen-pista {
+  display: flex;
+  align-items: stretch;
+  will-change: transform;
+}
+
+.resumen-panel {
+  flex: 0 0 100%;
+  min-width: 0;
+  padding: 1px;
+  box-sizing: border-box;
+}
+
+.resumen-deslizable-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.resumen-panel-banners {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.resumen-flecha {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #e3e3e3;
+  background: #fff;
+  color: #0d1b3e;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 0 3px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.resumen-flecha:hover {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
 .stat-card {
   background: #fff;
   border-radius: 12px;
@@ -1442,6 +1507,115 @@ a.stat-card {
 .modulos-grid-compacta {
   max-width: 620px;
   margin: 0 auto;
+}
+
+/* Sistemas: 5 módulos por renglón en pantallas anchas; en angostas se
+   acomoda solo como .modulos-grid. */
+.modulos-grid-5 {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+@media (min-width: 860px) {
+  .modulos-grid-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Lista de espacios de Coworking dentro de la tarjeta de cada letra
+   (Cotizar): se desliza solo por dentro (overscroll-behavior evita que la
+   página se mueva cuando el cursor está encima) y la barrita delgada solo
+   se ve al pasar el cursor, sin flechas de subir/bajar. */
+.lista-espacios {
+  margin-top: 8px;
+  max-height: 168px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.lista-espacios:hover {
+  scrollbar-color: #b9bfcc transparent;
+}
+
+.lista-espacios::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lista-espacios::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.lista-espacios:hover::-webkit-scrollbar-thumb {
+  background: #b9bfcc;
+}
+
+.lista-espacios-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.lista-espacios-item:hover:not(:disabled) {
+  background: #f3f5fa;
+}
+
+.lista-espacios-item.activo {
+  background: #e6ebf7;
+  font-weight: 700;
+  color: #0d1b3e;
+}
+
+.lista-espacios-item:disabled {
+  color: #9a9a9a;
+  cursor: not-allowed;
+}
+
+/* Campo cerrado que despliega la lista de arriba (Paquete en Cotizar). */
+.lista-espacios-disparador {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  color: #1a1a1a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lista-espacios-disparador:hover:not(:disabled),
+.lista-espacios-disparador.abierto {
+  border-color: #0d1b3e;
+}
+
+.lista-espacios-disparador:disabled {
+  cursor: default;
+  color: #0d1b3e;
+  font-weight: 600;
+}
+
+/* Elegido pero bloqueado (ej. paquete asignado por la oficina): se queda
+   resaltado y legible, no gris. */
+.lista-espacios-item.activo:disabled {
+  color: #0d1b3e;
+  cursor: default;
 }
 
 .modulo-card {

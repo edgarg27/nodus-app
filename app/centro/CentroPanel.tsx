@@ -190,15 +190,16 @@ function calFormatHora(h: number) {
 // pestaña de gastos. El contenido y la lógica del tab "gastos" siguen
 // intactos más abajo por si se necesitan de nuevo, solo ya no aparece
 // mezclado en esta barra de Reservaciones/Panel de Centro.
+// Resumen, Reservaciones, Telefonía e Internet ya no son pestañas de aquí:
+// Reservaciones es la primera pestaña de Sala de Juntas (/sala-juntas), Telefonía
+// (con el Internet de cada centro) vive en /telefonia, y la ocupación está
+// en el dashboard y en Reportes. El contenido de "reservaciones" se sigue
+// dibujando aquí solo para el botón "📅 Agendar" de Invitados.
 const TABS_TODAS = [
-  { id: "resumen", label: "📊 Resumen" },
-  { id: "reservaciones", label: "📅 Reservaciones" },
   { id: "invitados", label: "🙋 Invitados" },
   { id: "solicitudes", label: "📨 Solicitudes" },
   { id: "visitas", label: "🚪 Visitas" },
   { id: "vouchers", label: "🎟️ Vouchers" },
-  { id: "telefonia", label: "☎️ Telefonía" },
-  { id: "internet", label: "🌐 Internet" },
   { id: "proveedores", label: "🧾 Proveedores" },
 ];
 
@@ -214,16 +215,40 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
 // CotizarForm.tsx para "Medio de contacto" al cotizar.
 const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Otro"];
 
+// Cada módulo que antes era pestaña del Panel de Centro ahora es su propia
+// pantalla (/centro/<vista>) con su encabezado azul; comparten este mismo
+// componente para no duplicar toda la lógica.
+export type VistaCentro = "resumen" | "reservaciones" | "invitados" | "solicitudes" | "visitas" | "vouchers" | "proveedores";
+
+const TITULO_POR_TAB: Record<string, string> = {
+  resumen: "Resumen",
+  reservaciones: "Reservaciones",
+  invitados: "Invitados",
+  solicitudes: "Solicitudes",
+  visitas: "Visitas",
+  vouchers: "Vouchers",
+  proveedores: "Proveedores",
+  prospectos: "Prospectos",
+};
+
 export default function CentroPanel({
   nombre,
   rol,
   centroPerfil,
   centrosDisponibles,
+  vista,
+  embebido = false,
 }: {
   nombre: string;
   rol: string;
   centroPerfil: string | null;
   centrosDisponibles: string[];
+  // Pantalla propia de un módulo (ver VistaCentro): mismo contenido que tenía
+  // la pestaña, con su propio encabezado y sin la barra de pestañas.
+  vista?: VistaCentro;
+  // Se dibuja dentro de otra pantalla (hoy: pestaña Reservaciones de Sala de
+  // Juntas): sin el encabezado azul ni el contenedor "panel" propios.
+  embebido?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -247,10 +272,10 @@ export default function CentroPanel({
   const TABS_POR_ROL =
     rol === "sistemas"
       ? TABS_TODAS.filter(
-          (t) => t.id !== "reservaciones" && t.id !== "prospectos" && t.id !== "telefonia" && t.id !== "invitados" && t.id !== "solicitudes" && t.id !== "visitas"
+          (t) => t.id !== "invitados" && t.id !== "solicitudes" && t.id !== "visitas"
         )
       : rol === "operaciones"
-      ? TABS_TODAS.filter((t) => t.id === "resumen" || t.id === "proveedores" || t.id === "gastos")
+      ? TABS_TODAS.filter((t) => t.id === "proveedores")
       : TABS_TODAS;
   const TABS = TABS_POR_ROL;
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -259,14 +284,15 @@ export default function CentroPanel({
     centroPerfil || (esGlobal ? centrosDisponibles[0] || "" : "")
   );
   const TABS_RESTRINGIDAS_OPERACIONES = ["reservaciones", "prospectos", "telefonia", "vouchers", "internet"];
-  const tabInicial = searchParams.get("tab") || "resumen";
-  const [tab, setTab] = useState(
-    rol === "sistemas" && (tabInicial === "reservaciones" || tabInicial === "prospectos" || tabInicial === "telefonia" || tabInicial === "invitados")
-      ? "resumen"
-      : rol === "operaciones" && TABS_RESTRINGIDAS_OPERACIONES.includes(tabInicial)
-      ? "resumen"
-      : tabInicial
-  );
+  const [tab, setTab] = useState<string>(vista || "proveedores");
+
+  // Ir a un módulo: si ya estamos en su pantalla solo cambia el contenido;
+  // si no, se navega a la pantalla de ese módulo.
+  function irAVista(v: VistaCentro) {
+    if (vista === v) setTab(v);
+    else if (v === "reservaciones") router.push("/sala-juntas");
+    else router.push(`/centro/${v}`);
+  }
   const [loading, setLoading] = useState(true);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -1010,7 +1036,7 @@ export default function CentroPanel({
       registrado_por: user?.id,
     });
     await supabase.from("solicitudes_invitados").update({ estado: "agendada", atendido_por: user?.id }).eq("id", s.id);
-    setTab("prospectos");
+    router.push("/prospectos");
     fetchTodo(centro);
   }
 
@@ -1720,13 +1746,30 @@ export default function CentroPanel({
   }
 
   return (
-    <div className="panel">
+    <div className={embebido ? undefined : "panel"}>
+      {!embebido && (
       <div className="panel-header">
         <div>
-          <a className="rep-back" href="/dashboard">
-            ← Regresar
-          </a>
-          <p className="panel-header-title">Panel de Centro</p>
+          {/* Si el contenido cambió dentro de la misma pantalla (ej. "Agendar"
+              en Invitados abre el calendario de reservaciones), Regresar
+              vuelve primero a lo que se estaba viendo. */}
+          {vista && tab !== vista ? (
+            <a
+              className="rep-back"
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setTab(vista);
+              }}
+            >
+              ← Regresar
+            </a>
+          ) : (
+            <a className="rep-back" href="/dashboard">
+              ← Regresar
+            </a>
+          )}
+          <p className="panel-header-title">{TITULO_POR_TAB[tab] || "Panel de Centro"}</p>
           <p className="panel-header-sub">{esGlobal ? "Todos tus centros" : centro || "Sin centro asignado"}</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -1755,8 +1798,8 @@ export default function CentroPanel({
                         onClick={() => {
                           if (!n.leida) marcarNotifLeida(n.id);
                           if (n.tipo === "nueva_reservacion") {
-                            setTab("reservaciones");
                             setMenuNotifAbierto(false);
+                            irAVista("reservaciones");
                           } else if (
                             n.tipo === "nuevo_ticket" ||
                             n.tipo === "ticket_en_proceso" ||
@@ -1764,7 +1807,7 @@ export default function CentroPanel({
                           ) {
                             router.push("/tickets");
                           } else if (n.tipo === "nuevo_voucher") {
-                            setTab("vouchers");
+                            irAVista("vouchers");
                             setMenuNotifAbierto(false);
                           } else if (n.tipo === "nuevo_did" || n.tipo === "baja_extension") {
                             router.push("/telefonia");
@@ -1829,6 +1872,7 @@ export default function CentroPanel({
           </div>
         </div>
       </div>
+      )}
 
       {!centro && !esGlobal ? (
         <div className="rep-content">
@@ -1845,17 +1889,7 @@ export default function CentroPanel({
         </div>
       ) : (
         <>
-          <div className="centro-tabs">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                className={"centro-tab" + (tab === t.id ? " active" : "")}
-                onClick={() => setTab(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+
 
           <div className="panel-content">
             {loading ? (
@@ -2666,280 +2700,6 @@ export default function CentroPanel({
                       </p>
                     )}
                     {renderOficinasConVouchers(clientes, vouchers)}
-                  </>
-                )}
-              </>
-            )}
-
-            {/* ---------------- TELEFONÍA ---------------- */}
-            {tab === "telefonia" && (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <p className="panel-section-label" style={{ margin: 0 }}>
-                    Extensiones de {centro}
-                  </p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      className="btn-exportar"
-                      onClick={() =>
-                        exportarExcel(
-                          `extensiones-${centro}`,
-                          extensiones.map((e) => ({
-                            Extension: e.extension,
-                            DID: e.did || "",
-                            Tipo: e.tipo,
-                            Departamento: e.departamento || "",
-                            "Asignado a": e.asignado_a || "",
-                            Activo: e.activo ? "Sí" : "No",
-                          }))
-                        )
-                      }
-                    >
-                      📥 Excel
-                    </button>
-                    {puedeEditarTelefonia && (
-                      <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href="/telefonia">
-                        + Agregar extensión
-                      </a>
-                    )}
-                  </div>
-                </div>
-                {extensiones.length === 0 ? (
-                  <div className="empty-card">
-                    Sin extensiones registradas
-                    {!puedeEditarTelefonia && " todavía."}
-                  </div>
-                ) : (
-                  <table className="tel-tabla" style={{ background: "#fff", borderRadius: 12 }}>
-                    <thead>
-                      <tr>
-                        <th>Ext.</th>
-                        <th>DID</th>
-                        <th>Tipo</th>
-                        <th>Departamento</th>
-                        <th>Asignado a</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {extensiones.map((ext) => (
-                        <tr key={ext.id} className={ext.activo ? "" : "tel-inactivo"}>
-                          <td>
-                            <span className="tel-ext-badge">{ext.extension}</span>
-                          </td>
-                          <td>{ext.did || "—"}</td>
-                          <td>{ext.tipo === "did" ? "DID" : "Interna"}</td>
-                          <td>{ext.departamento || "—"}</td>
-                          <td>{ext.asignado_a || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </>
-            )}
-
-            {/* ---------------- INTERNET ---------------- */}
-            {tab === "internet" && (
-              <>
-                {esGlobal ? (
-                  cargandoDatosGlobales ? (
-                    <div className="nodus-inline-loading">
-            <div className="nodus-spinner nodus-spinner-sm">
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-            </div>
-            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Cargando internet de todos los centros...</p>
-          </div>
-                  ) : (
-                    centrosDisponibles.map((c) => {
-                      const net = datosGlobales[c]?.internet || null;
-                      const editando = editandoInternetCentro === c;
-                      return (
-                        <div key={c} className="rep-ocupacion-card" style={{ marginBottom: 12 }}>
-                          {editando ? (
-                            <>
-                              <div className="tel-form-grid">
-                                <input
-                                  placeholder="Proveedor principal (ej. Alestra)"
-                                  value={formInternet.proveedor_principal || ""}
-                                  onChange={(e) =>
-                                    setFormInternet({ ...formInternet, proveedor_principal: e.target.value })
-                                  }
-                                />
-                                <input
-                                  placeholder="Velocidad principal (ej. 500 Mb)"
-                                  value={formInternet.velocidad_principal || ""}
-                                  onChange={(e) =>
-                                    setFormInternet({ ...formInternet, velocidad_principal: e.target.value })
-                                  }
-                                />
-                                <input
-                                  placeholder="Proveedor de respaldo (ej. Telmex)"
-                                  value={formInternet.proveedor_respaldo || ""}
-                                  onChange={(e) =>
-                                    setFormInternet({ ...formInternet, proveedor_respaldo: e.target.value })
-                                  }
-                                />
-                                <input
-                                  placeholder="Velocidad de respaldo (ej. 100 Mb)"
-                                  value={formInternet.velocidad_respaldo || ""}
-                                  onChange={(e) =>
-                                    setFormInternet({ ...formInternet, velocidad_respaldo: e.target.value })
-                                  }
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                placeholder="Notas"
-                                value={formInternet.notas || ""}
-                                onChange={(e) => setFormInternet({ ...formInternet, notas: e.target.value })}
-                                style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginTop: 8, width: "100%" }}
-                              />
-                              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                                <button className="btn-enviar" onClick={() => guardarInternetGlobal(c)}>
-                                  Guardar
-                                </button>
-                                <button
-                                  className="tel-borrar-btn"
-                                  style={{ color: "#888" }}
-                                  onClick={() => setEditandoInternetCentro(null)}
-                                >
-                                  Cancelar
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="rep-ocupacion-header">
-                                <span className="rep-ocupacion-centro">🌐 {c}</span>
-                                {puedeEditarInternet && (
-                                  <button
-                                    className="tel-borrar-btn"
-                                    style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                    onClick={() => {
-                                      setFormInternet(
-                                        net || {
-                                          proveedor_principal: "",
-                                          velocidad_principal: "",
-                                          proveedor_respaldo: "",
-                                          velocidad_respaldo: "",
-                                          notas: "",
-                                        }
-                                      );
-                                      setEditandoInternetCentro(c);
-                                    }}
-                                  >
-                                    {net ? "Editar" : "+ Agregar"}
-                                  </button>
-                                )}
-                              </div>
-                              {net ? (
-                                <div className="rep-ocupacion-detalle" style={{ flexWrap: "wrap", gap: 10 }}>
-                                  <span>
-                                    🟢 Principal: <b>{net.proveedor_principal || "—"}</b>{" "}
-                                    {net.velocidad_principal ? `(${net.velocidad_principal})` : ""}
-                                  </span>
-                                  <span>
-                                    🟠 Respaldo: <b>{net.proveedor_respaldo || "—"}</b>{" "}
-                                    {net.velocidad_respaldo ? `(${net.velocidad_respaldo})` : ""}
-                                  </span>
-                                  {net.notas && <span>📝 {net.notas}</span>}
-                                </div>
-                              ) : (
-                                <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Sin información capturada</p>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    })
-                  )
-                ) : (
-                  <>
-                    <p className="panel-section-label">Internet de {centro}</p>
-                    <div className="rep-ocupacion-card">
-                      {editandoInternet ? (
-                        <>
-                          <div className="tel-form-grid">
-                            <input
-                              placeholder="Proveedor principal (ej. Alestra)"
-                              value={formInternet.proveedor_principal || ""}
-                              onChange={(e) =>
-                                setFormInternet({ ...formInternet, proveedor_principal: e.target.value })
-                              }
-                            />
-                            <input
-                              placeholder="Velocidad principal (ej. 500 Mb)"
-                              value={formInternet.velocidad_principal || ""}
-                              onChange={(e) =>
-                                setFormInternet({ ...formInternet, velocidad_principal: e.target.value })
-                              }
-                            />
-                            <input
-                              placeholder="Proveedor de respaldo (ej. Telmex)"
-                              value={formInternet.proveedor_respaldo || ""}
-                              onChange={(e) =>
-                                setFormInternet({ ...formInternet, proveedor_respaldo: e.target.value })
-                              }
-                            />
-                            <input
-                              placeholder="Velocidad de respaldo (ej. 100 Mb)"
-                              value={formInternet.velocidad_respaldo || ""}
-                              onChange={(e) =>
-                                setFormInternet({ ...formInternet, velocidad_respaldo: e.target.value })
-                              }
-                            />
-                          </div>
-                          <input
-                            type="text"
-                            placeholder="Notas"
-                            value={formInternet.notas || ""}
-                            onChange={(e) => setFormInternet({ ...formInternet, notas: e.target.value })}
-                            style={{ border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", fontSize: 13, marginTop: 8, width: "100%" }}
-                          />
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <button className="btn-enviar" onClick={guardarInternet}>
-                              Guardar
-                            </button>
-                            <button className="tel-borrar-btn" style={{ color: "#888" }} onClick={() => setEditandoInternet(false)}>
-                              Cancelar
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="rep-ocupacion-header">
-                            <span className="rep-ocupacion-centro">🌐 {centro}</span>
-                            {puedeEditarInternet && (
-                              <button
-                                className="tel-borrar-btn"
-                                style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                onClick={() => setEditandoInternet(true)}
-                              >
-                                {internet ? "Editar" : "+ Agregar"}
-                              </button>
-                            )}
-                          </div>
-                          {internet ? (
-                            <div className="rep-ocupacion-detalle" style={{ flexWrap: "wrap", gap: 10 }}>
-                              <span>
-                                🟢 Principal: <b>{internet.proveedor_principal || "—"}</b>{" "}
-                                {internet.velocidad_principal ? `(${internet.velocidad_principal})` : ""}
-                              </span>
-                              <span>
-                                🟠 Respaldo: <b>{internet.proveedor_respaldo || "—"}</b>{" "}
-                                {internet.velocidad_respaldo ? `(${internet.velocidad_respaldo})` : ""}
-                              </span>
-                              {internet.notas && <span>📝 {internet.notas}</span>}
-                            </div>
-                          ) : (
-                            <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Sin información capturada</p>
-                          )}
-                        </>
-                      )}
-                    </div>
                   </>
                 )}
               </>

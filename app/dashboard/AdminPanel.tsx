@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
@@ -106,6 +106,73 @@ export default function AdminPanel({
   const supabase = createClient();
 
   const [tab, setTab] = useState<"admin" | "clientes">("admin");
+  // Admin/superadmin/gerente: el resumen ("Por atender" + "Resumen del
+  // centro") sigue siendo lo principal; con la flecha de a un lado se
+  // cambia a los banners (los mismos que ve el cliente) y se regresa.
+  // Es un carrusel que da la vuelta: [banners, pendientes, banners,
+  // pendientes] arrancando en la posición 1; al llegar a una copia de la
+  // orilla (0 o 3) se brinca sin animación a la original (2 o 1), así
+  // ambas flechas siempre deslizan hacia su lado.
+  const [posResumen, setPosResumen] = useState(1);
+  const [animandoResumen, setAnimandoResumen] = useState(false);
+  const moviendoResumen = useRef(false);
+
+  function moverResumen(dir: -1 | 1) {
+    if (moviendoResumen.current) return;
+    moviendoResumen.current = true;
+    setAnimandoResumen(true);
+    setPosResumen((p) => p + dir);
+  }
+
+  // Deslizador con flechitas a los lados: lo principal del panel (el
+  // resumen de admin, los últimos tickets de Sistemas) ↔ los banners.
+  // Es una función que devuelve JSX, no un componente, para que no se
+  // re-monte en cada render (ver la nota de "Fila" en el resumen).
+  function deslizadorConBanners(panelPrincipal: React.ReactNode) {
+    const panelBanners = (
+      <div className="resumen-panel-banners">
+        <p className="panel-section-label">Banners</p>
+        <div style={{ maxWidth: 700, width: "100%", margin: "8px auto 0" }}>
+          <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
+        </div>
+      </div>
+    );
+    return (
+      <div className="resumen-deslizable">
+        <button type="button" className="resumen-flecha" onClick={() => moverResumen(-1)} aria-label="Anterior" title="Anterior">
+          ‹
+        </button>
+        <div className="resumen-ventana">
+          <div
+            className="resumen-pista"
+            style={{
+              transform: `translateX(-${posResumen * 100}%)`,
+              transition: animandoResumen ? "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)" : "none",
+            }}
+            onTransitionEnd={finMovimientoResumen}
+          >
+            {[panelBanners, panelPrincipal, panelBanners, panelPrincipal].map((panel, i) => (
+              <div className="resumen-panel" key={i} aria-hidden={i !== posResumen}>
+                {panel}
+              </div>
+            ))}
+          </div>
+        </div>
+        <button type="button" className="resumen-flecha" onClick={() => moverResumen(1)} aria-label="Siguiente" title="Siguiente">
+          ›
+        </button>
+      </div>
+    );
+  }
+
+  function finMovimientoResumen(e: React.TransitionEvent<HTMLDivElement>) {
+    // Las transiciones de adentro (puntitos del carrusel, etc.) también
+    // burbujean hasta aquí: solo cuenta la de la pista.
+    if (e.target !== e.currentTarget) return;
+    setAnimandoResumen(false);
+    setPosResumen((p) => (p === 0 ? 2 : p === 3 ? 1 : p));
+    moviendoResumen.current = false;
+  }
   const [busqueda, setBusqueda] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>(clientesIniciales);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
@@ -192,10 +259,8 @@ export default function AdminPanel({
     fetchNotificaciones();
     fetchMisReportes();
     fetchTicketsUrgentes();
-    if (rol === "diseno" || rol === "atencion_cliente") {
-      fetchBannersPromocionales(supabase).then(setBannersPromo);
-      fetchBannersLogros();
-    }
+    fetchBannersPromocionales(supabase).then(setBannersPromo);
+    fetchBannersLogros();
     if (rol === "sistemas") fetchUltimosTicketsSistemas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -320,13 +385,13 @@ export default function AdminPanel({
     if (!n.leida) marcarNotifLeida(n.id);
     setMenuNotifAbierto(false);
     if (n.tipo === "nueva_reservacion") {
-      router.push("/centro?tab=reservaciones");
+      router.push("/sala-juntas");
     } else if (n.tipo === "nuevo_tour") {
       router.push("/tours");
     } else if (n.tipo === "baja_extension" || n.tipo === "nuevo_did") {
       router.push("/telefonia");
     } else if (n.tipo === "nuevo_voucher") {
-      router.push("/centro?tab=vouchers");
+      router.push("/centro/vouchers");
     } else if (n.tipo === "ticket_en_proceso" || n.tipo === "ticket_resuelto" || n.tipo === "nuevo_ticket") {
       router.push(n.mensaje?.includes("📶") ? "/wifi-solicitudes" : "/tickets");
     } else if (n.tipo === "proximo_mantenimiento") {
@@ -346,15 +411,15 @@ export default function AdminPanel({
       router.push("/cobranza");
     } else if (n.tipo === "nueva_solicitud_invitado") {
       // Day Pass y demás solicitudes de invitados: ahí mismo se genera el pase.
-      router.push("/centro?tab=invitados");
+      router.push("/centro/invitados");
     } else if (n.tipo === "nueva_tarjeta_fidelidad") {
       router.push("/fidelidad-admin");
     } else if (n.tipo === "solicitud_cliente") {
-      router.push("/centro?tab=solicitudes");
+      router.push("/centro/solicitudes");
     } else if (n.tipo === "visita_cliente") {
-      router.push("/centro?tab=visitas");
+      router.push("/centro/visitas");
     } else if (n.tipo === "reservacion_cancelada_cliente") {
-      router.push("/centro?tab=reservaciones");
+      router.push("/sala-juntas");
     } else if (n.tipo === "nueva_queja") {
       // Mismo tipo para quejas Y sugerencias (ver app/quejas-sugerencias/page.tsx)
       router.push("/atencion-cliente");
@@ -777,7 +842,7 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -831,7 +896,8 @@ export default function AdminPanel({
           )}
 
           {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-            <>
+            deslizadorConBanners(
+                <div className="resumen-deslizable-contenido">
               <p className="panel-section-label">Por atender</p>
               <div className="stats-row">
                 {(() => {
@@ -839,7 +905,7 @@ export default function AdminPanel({
                   return (
                     <a
                       className={`stat-card${solicitudes > 0 ? " stat-card-alerta" : ""}`}
-                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro?tab=solicitudes" : "/centro?tab=invitados"}
+                      href={resumen.solicitudesInvitados === 0 && resumen.solicitudesClientes > 0 ? "/centro/solicitudes" : "/centro/invitados"}
                     >
                       <p className="stat-val">{solicitudes}</p>
                       <p className="stat-lbl">Solicitudes por atender</p>
@@ -851,7 +917,7 @@ export default function AdminPanel({
                 })()}
                 <a
                   className={`stat-card${resumen.reservacionesPendientes > 0 ? " stat-card-alerta" : ""}`}
-                  href="/centro?tab=reservaciones"
+                  href="/sala-juntas"
                 >
                   <p className="stat-val">{resumen.reservacionesPendientes}</p>
                   <p className="stat-lbl">Reservaciones por confirmar</p>
@@ -905,11 +971,15 @@ export default function AdminPanel({
                   <p className="stat-lbl">Comprobantes por revisar</p>
                 </a>
               </div>
-            </>
+                </div>
+            )
           )}
 
           {rol === "sistemas" && (
-            <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
+            // Mismo ancho que la cuadrícula de 5 módulos de abajo.
+            <div style={{ maxWidth: 800, margin: "0 auto", width: "100%" }}>
+              {deslizadorConBanners(
+                <div>
               <p className="panel-section-label">Últimos tickets</p>
               {ultimosTicketsSistemas.length === 0 ? (
                 <div className="empty-card" style={{ marginTop: 8 }}>
@@ -970,11 +1040,13 @@ export default function AdminPanel({
                   ))}
                 </div>
               )}
+                </div>
+              )}
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente") && (
-            <div style={{ maxWidth: 700, margin: "0 auto" }}>
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones") && (
+            <div style={{ maxWidth: 700, width: "100%", margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
                 <div style={{ textAlign: "right", marginTop: 6 }}>
@@ -986,20 +1058,24 @@ export default function AdminPanel({
             </div>
           )}
 
-          <div style={rol === "sistemas" || rol === "atencion_cliente" ? { maxWidth: 620, margin: "0 auto", width: "100%" } : undefined}>
+          <div
+            style={
+              rol === "sistemas"
+                ? { maxWidth: 800, margin: "0 auto", width: "100%" }
+                : rol === "atencion_cliente"
+                  ? { maxWidth: 620, margin: "0 auto", width: "100%" }
+                  : undefined
+            }
+          >
             <p className="panel-section-label" style={{ marginTop: 8 }}>
               Módulos
             </p>
             <div
-              className={"modulos-grid" + (rol === "sistemas" || rol === "atencion_cliente" ? " modulos-grid-compacta" : "")}
+              className={
+                "modulos-grid" + (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" ? " modulos-grid-compacta" : "")
+              }
               style={{ marginTop: 8 }}
             >
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/centro?tab=reservaciones">
-                <span className="modulo-icon">📋</span>
-                <span className="modulo-name">Reservaciones</span>
-              </a>
-            )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/cobranza">
                 <span className="modulo-icon">💰</span>
@@ -1008,9 +1084,9 @@ export default function AdminPanel({
             )}
             {/* Gastos y Proveedores de sistemas/operaciones/admin ya viven
                 dentro de "Panel de Centro" (con factura/comprobante
-                adjuntos) — este acceso directo es solo para cobranza, que
-                no tiene Panel de Centro. */}
-            {(rol === "cobranza" || rol === "superadmin" || rol === "gerente") && (
+                adjuntos). Cobranza ya no ve este acceso directo: sus gastos
+                los ve dentro de "Ingresos por Centro". */}
+            {(rol === "superadmin" || rol === "gerente") && (
               <a className="modulo-card" href="/cobranza?tab=gastos">
                 <span className="modulo-icon">💸</span>
                 <span className="modulo-name">Gastos</span>
@@ -1097,7 +1173,7 @@ export default function AdminPanel({
                 <span className="modulo-name">Paquetería y Mensajería</span>
               </a>
             )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/pagos">
                 <span className="modulo-icon">💰</span>
                 <span className="modulo-name">Pagos</span>
@@ -1119,7 +1195,7 @@ export default function AdminPanel({
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno" && (
               <a className="modulo-card" href="/experiencia-cliente">
                 <span className="modulo-icon">🎉</span>
-                <span className="modulo-name">Experiencia de Cliente</span>
+                <span className="modulo-name">Calendario de Eventos</span>
               </a>
             )}
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
@@ -1161,10 +1237,41 @@ export default function AdminPanel({
                 <span className="modulo-name">Usuarios</span>
               </a>
             )}
-            {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/centro">
-                <span className="modulo-icon">🏢</span>
-                <span className="modulo-name">Panel de Centro</span>
+            {/* Lo que antes eran pestañas del Panel de Centro: cada uno tiene
+                ahora su propia pantalla (/centro/<módulo>), con el mismo acceso
+                que tenía la pestaña. */}
+            {(rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente") && (
+              <a className="modulo-card" href="/centro/resumen">
+                <span className="modulo-icon">📊</span>
+                <span className="modulo-name">Resumen</span>
+              </a>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente") && (
+              <>
+                <a className="modulo-card" href="/centro/invitados">
+                  <span className="modulo-icon">🙋</span>
+                  <span className="modulo-name">Invitados</span>
+                </a>
+                <a className="modulo-card" href="/centro/solicitudes">
+                  <span className="modulo-icon">📨</span>
+                  <span className="modulo-name">Solicitudes</span>
+                </a>
+                <a className="modulo-card" href="/centro/visitas">
+                  <span className="modulo-icon">🚪</span>
+                  <span className="modulo-name">Visitas</span>
+                </a>
+              </>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas") && (
+              <a className="modulo-card" href="/centro/vouchers">
+                <span className="modulo-icon">🎟️</span>
+                <span className="modulo-name">Vouchers</span>
+              </a>
+            )}
+            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones") && (
+              <a className="modulo-card" href="/centro/proveedores">
+                <span className="modulo-icon">🧾</span>
+                <span className="modulo-name">Proveedores</span>
               </a>
             )}
             {rol !== "cobranza" && rol !== "diseno" && (
