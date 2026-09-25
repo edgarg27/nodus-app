@@ -744,7 +744,7 @@ export default function PaquetesPage() {
                     />
                   </div>
                   <div>
-                    <p className="sub-label">Horas bolsa incluidas</p>
+                    <p className="sub-label">Horas Cowork incluidas</p>
                     <input
                       type="number"
                       min={0}
@@ -917,7 +917,7 @@ export default function PaquetesPage() {
                         <p className="contrato-detalle">
                           {!!p.incluye_horas_sala_juntas && `${p.incluye_horas_sala_juntas}h sala de juntas incluidas`}
                           {!!p.incluye_horas_sala_juntas && !!p.horas_bolsa && " · "}
-                          {!!p.horas_bolsa && `${p.horas_bolsa}h bolsa incluidas`}
+                          {!!p.horas_bolsa && `${p.horas_bolsa}h Cowork incluidas`}
                         </p>
                       )}
                       <p className="contrato-detalle" style={{ color: p.bloquea_reasignacion ? "#a3701f" : "#0f6e56" }}>

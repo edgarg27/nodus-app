@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  HORAS_ANTICIPACION_CANCELACION,
+  cancelaATiempo,
+  esEspacioCowork,
+  fmtHoras,
+  horasPlaneadas,
+} from "@/lib/horasCowork";
 
 type Reservacion = {
   id: string;
@@ -9,9 +16,26 @@ type Reservacion = {
   fecha: string;
   hora: string;
   hora_inicio: string | null;
+  hora_fin?: string | null;
   centro: string;
   estado: string;
+  asistencia?: string | null;
+  horas_cobradas?: number | null;
 };
+
+// Etiqueta del estado. Para Horas Cowork se aclara qué pasó con las horas.
+function badgeDe(r: Reservacion) {
+  if (esEspacioCowork(r.espacio)) {
+    if (r.asistencia === "llego") {
+      return { bg: "#E1F5EE", label: `✓ Llegaste · ${fmtHoras(Number(r.horas_cobradas ?? horasPlaneadas(r)))} h consumidas` };
+    }
+    if (r.asistencia === "no_llego") return { bg: "#FCEBEB", label: "✗ No asististe · horas cobradas" };
+    if (r.estado === "cancelada" && r.horas_cobradas != null) {
+      return { bg: "#FCEBEB", label: `✗ Cancelada · ${fmtHoras(Number(r.horas_cobradas))} h cobradas` };
+    }
+  }
+  return ESTADO_BADGE[r.estado] || ESTADO_BADGE.pendiente;
+}
 
 // Regla: ya no se puede cancelar en línea si faltan menos de 30 minutos
 // para que empiece la reservación (o si ya empezó).
@@ -167,9 +191,9 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
                 </div>
                 <span
                   className="estado-badge"
-                  style={{ background: (ESTADO_BADGE[r.estado] || ESTADO_BADGE.pendiente).bg }}
+                  style={{ background: badgeDe(r).bg }}
                 >
-                  {(ESTADO_BADGE[r.estado] || ESTADO_BADGE.pendiente).label}
+                  {badgeDe(r).label}
                 </span>
               </div>
 
@@ -206,6 +230,21 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
             <p className="modal-email">
               {cancelando.espacio} · {cancelando.fecha} · {cancelando.hora}
             </p>
+            {esEspacioCowork(cancelando.espacio) &&
+              (cancelaATiempo(cancelando.fecha, cancelando.hora_inicio) ? (
+                <div className="nota-info" style={{ marginTop: 8 }}>
+                  ✅ Cancelas con más de {HORAS_ANTICIPACION_CANCELACION} horas de anticipación: tus horas Cowork se te
+                  devuelven.
+                </div>
+              ) : (
+                <div
+                  className="nota-info"
+                  style={{ marginTop: 8, background: "rgba(255, 199, 102, 0.2)", color: "#a3701f" }}
+                >
+                  ⚠️ Faltan menos de {HORAS_ANTICIPACION_CANCELACION} horas para tu reservación: si cancelas ahora, sus{" "}
+                  {fmtHoras(horasPlaneadas(cancelando))} hora(s) se cobran de tu paquete y no se devuelven.
+                </div>
+              ))}
             <p className="sub-label" style={{ marginTop: 8 }}>
               ¿Por qué cancelas? (el equipo del centro lo verá)
             </p>
