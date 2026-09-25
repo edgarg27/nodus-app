@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { esEspacioCowork, fmtHoras, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { esClienteCoworking } from "@/lib/coworking";
+import { esPublicoGeneral } from "@/lib/datosFiscales";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 
 type Profile = {
@@ -368,6 +369,16 @@ export default function ClientePanel({
       <div className="cli-content">
         <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
 
+        {(!profile?.rfc || esPublicoGeneral(profile.rfc)) && (
+          <a className="ticket-en-proceso-banner" href="/datos-fiscales" style={{ display: "flex", textDecoration: "none" }}>
+            <span style={{ fontSize: 20 }}>🧾</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>Completa tus datos fiscales</p>
+              <p style={{ margin: 0, fontSize: 12, opacity: 0.8 }}>Así tus facturas salen a tu nombre y puedes deducirlas</p>
+            </div>
+          </a>
+        )}
+
         {encuestasPendientes > 0 && (
           <a className="ticket-en-proceso-banner" href="/mis-encuestas" style={{ display: "flex", textDecoration: "none" }}>
             <span style={{ fontSize: 20 }}>📝</span>
@@ -575,6 +586,10 @@ export default function ClientePanel({
           <a className="quick-card" href="/mis-tarjetas">
             <span className="quick-icon" style={{ fontSize: 26 }}>💳</span>
             <span className="quick-name">Mis tarjetas</span>
+          </a>
+          <a className="quick-card" href="/datos-fiscales">
+            <span className="quick-icon" style={{ fontSize: 26 }}>🧾</span>
+            <span className="quick-name">Datos fiscales</span>
           </a>
           <a className="quick-card" href="/facturas">
             {/* eslint-disable-next-line @next/next/no-img-element */}
