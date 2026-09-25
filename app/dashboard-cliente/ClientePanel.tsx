@@ -572,6 +572,10 @@ export default function ClientePanel({
             <img src="/icons/estado-cuenta.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Estado de Cuenta</span>
           </a>
+          <a className="quick-card" href="/mis-tarjetas">
+            <span className="quick-icon" style={{ fontSize: 26 }}>💳</span>
+            <span className="quick-name">Mis tarjetas</span>
+          </a>
           <a className="quick-card" href="/facturas">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/factura.png" alt="" className="quick-icon icon-img-28" />
