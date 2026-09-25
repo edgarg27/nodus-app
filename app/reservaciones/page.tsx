@@ -869,6 +869,14 @@ function ReservacionesInner() {
 
             {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
+            <p style={{ fontSize: 12, color: "#888", margin: "8px 0" }}>
+              Al solicitar aceptas la{" "}
+              <a href="/politica-cancelacion" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>
+                política de cancelación y reembolsos
+              </a>
+              .
+            </p>
+
             <button
               className="reservar-btn"
               onClick={abrirModalCoffee}

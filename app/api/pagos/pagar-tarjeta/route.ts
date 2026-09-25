@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoTarjeta } from "@/lib/openpay";
 import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
 import { checkRateLimit, ipDeRequest } from "@/lib/rateLimit";
+import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 
 // Cobro con tarjeta de un pago del propio cliente (una factura o un pago suelto
 // como la renta o el depósito de un contrato). El navegador manda solo el token
@@ -20,7 +21,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo." }, { status: 429 });
   }
 
-  const { pagoId, facturaId, tokenId, deviceSessionId } = await req.json();
+  const { pagoId, facturaId, tokenId, deviceSessionId, politicaVersion } = await req.json();
+  if (politicaVersion !== POLITICA_CANCELACION_VERSION) {
+    return NextResponse.json({ error: "Para pagar, acepta la política de cancelación y reembolsos" }, { status: 400 });
+  }
   if (!tokenId || !deviceSessionId || (!pagoId && !facturaId)) {
     return NextResponse.json({ error: "Faltan datos del pago" }, { status: 400 });
   }
@@ -99,6 +103,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "El cargo se generó pero no se pudo registrar. Avisa al centro." }, { status: 500 });
       }
     }
+
+    // Queda registrado qué política aceptó (necesita migracion_politica_cancelacion.sql;
+    // si esa migración aún no se corrió, el pago sigue su curso sin el registro).
+    await admin
+      .from("pagos")
+      .update({ politica_version: politicaVersion, politica_aceptada_at: new Date().toISOString() })
+      .eq("openpay_charge_id", cargo.id);
 
     if (cargo.status === "completed") {
       const r = await confirmarPagoPorCargo(admin, cargo.id);

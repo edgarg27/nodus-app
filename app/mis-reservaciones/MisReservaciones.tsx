@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { MINUTOS_LIMITE_CANCELACION } from "@/lib/politicaCancelacion";
 import {
   HORAS_ANTICIPACION_CANCELACION,
   cancelaATiempo,
@@ -39,8 +40,7 @@ function badgeDe(r: Reservacion) {
 }
 
 // Regla: ya no se puede cancelar en línea si faltan menos de 30 minutos
-// para que empiece la reservación (o si ya empezó).
-const MINUTOS_LIMITE_CANCELACION = 30;
+// para que empiece la reservación (o si ya empezó). El valor vive en lib/politicaCancelacion.ts.
 
 function puedeCancelarEnLinea(r: Reservacion) {
   if (!r.hora_inicio) return true; // sin dato de hora, no bloqueamos por seguridad

@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import AceptoPolitica from "@/app/components/AceptoPolitica";
+import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 const OPENPAY_JS = "https://resources.openpay.mx/lib/openpay-js/1.2.38/openpay.v1.min.js";
@@ -54,6 +56,7 @@ function PagarTarjetaInner() {
   const [mes, setMes] = useState("");
   const [anio, setAnio] = useState("");
   const [cvv, setCvv] = useState("");
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const deviceRef = useRef("");
 
   const confetti = useMemo(() => {
@@ -135,6 +138,7 @@ function PagarTarjetaInner() {
     setError("");
     const OP = window.OpenPay;
     if (!OP) return;
+    if (!aceptaPolitica) return setError("Para pagar, acepta la política de cancelación y reembolsos");
     const num = numero.replace(/\s+/g, "");
     if (!titular.trim()) return setError("Escribe el nombre como aparece en la tarjeta");
     if (!OP.card.validateCardNumber(num)) return setError("El número de la tarjeta no es válido");
@@ -157,6 +161,7 @@ function PagarTarjetaInner() {
               facturaId: facturaId || undefined,
               tokenId: respuesta.data.id,
               deviceSessionId: deviceRef.current,
+              politicaVersion: POLITICA_CANCELACION_VERSION,
             }),
           });
           const data = await res.json();
@@ -320,11 +325,12 @@ function PagarTarjetaInner() {
                 <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
                   🔒 Pago seguro con Openpay. Nodus no guarda ni ve el número de tu tarjeta. Tu banco puede pedirte una verificación.
                 </p>
+                <AceptoPolitica acepto={aceptaPolitica} onChange={setAceptaPolitica} deshabilitado={procesando} />
                 {sandbox && (
                   <p style={{ fontSize: 12, color: "#a3701f", margin: 0 }}>Modo de pruebas: no se cobra dinero real.</p>
                 )}
                 {error && <p style={{ color: "#A32D2D", fontSize: 13, margin: 0 }}>{error}</p>}
-                <button className="reservar-btn" type="submit" disabled={!listo || procesando}>
+                <button className="reservar-btn" type="submit" disabled={!listo || procesando || !aceptaPolitica}>
                   {procesando ? "Procesando…" : `Pagar $${detalle.monto.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}
                 </button>
               </form>
