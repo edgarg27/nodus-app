@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { generarContratoDocx, normalizarTipoEspacioContrato } from "@/lib/contratoDocx";
 import { rentaMensualConIva } from "@/lib/formaPago";
-import { normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
+import { normalizarDatosFiscales, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
@@ -134,13 +134,13 @@ export async function POST(req: NextRequest) {
   // contrato.
   if (fiscal) {
     const tipoP = venta.tipo_persona === "moral" ? "moral" : "fisica";
-    const datos = {
+    const datos = normalizarDatosFiscales({
       rfc: normalizarRfc(fiscal.rfc),
       nombre_fiscal: String(fiscal.nombre_fiscal || "").trim(),
       regimen_fiscal: String(fiscal.regimen_fiscal || ""),
       cp_fiscal: String(fiscal.cp_fiscal || "").trim(),
       uso_cfdi: String(fiscal.uso_cfdi || ""),
-    };
+    });
     const msg = validarDatosFiscales(datos, tipoP);
     if (msg) return NextResponse.json({ error: msg }, { status: 400 });
     const cambiosVenta: Record<string, string | null> = { ...datos };

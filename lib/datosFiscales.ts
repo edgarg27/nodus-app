@@ -33,6 +33,27 @@ export const USOS_CFDI: { clave: string; nombre: string }[] = [
 
 export const USO_CFDI_DEFAULT = "G03";
 
+// Cuando el cliente no da datos fiscales, la factura se hace a "público en general":
+// RFC genérico del SAT, ese nombre exacto, régimen 616 y uso S01. En el CFDI 4.0 el código
+// postal es el del lugar de expedición (el del centro). Ojo: esa factura no es deducible
+// para el cliente.
+export const RFC_PUBLICO_GENERAL = "XAXX010101000";
+export const DATOS_PUBLICO_GENERAL = {
+  rfc: RFC_PUBLICO_GENERAL,
+  nombre_fiscal: "PUBLICO EN GENERAL",
+  regimen_fiscal: "616",
+  uso_cfdi: "S01",
+};
+
+export function esPublicoGeneral(rfc: string) {
+  return normalizarRfc(rfc) === RFC_PUBLICO_GENERAL;
+}
+
+// Si el RFC es el de público en general, el nombre, régimen y uso van fijos.
+export function normalizarDatosFiscales(d: DatosFiscales): DatosFiscales {
+  return esPublicoGeneral(d.rfc) ? { ...d, ...DATOS_PUBLICO_GENERAL } : d;
+}
+
 // RFC de persona física (13) o moral (12), más los genéricos del SAT.
 const RFC_FISICA = /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/;
 const RFC_MORAL = /^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/;
@@ -46,6 +67,9 @@ export function normalizarRfc(rfc: string) {
 export function validarDatosFiscales(d: DatosFiscales, tipo: TipoPersonaFiscal): string {
   const rfc = normalizarRfc(d.rfc);
   if (!rfc) return "Falta el RFC";
+  if (rfc === RFC_PUBLICO_GENERAL && tipo === "moral") {
+    return "Una persona moral necesita su RFC: público en general solo aplica a personas físicas";
+  }
   if (!RFC_GENERICOS.includes(rfc) && !(tipo === "moral" ? RFC_MORAL : RFC_FISICA).test(rfc)) {
     return tipo === "moral"
       ? "El RFC de una persona moral tiene 12 caracteres (ej. ABC010101AB1)"
