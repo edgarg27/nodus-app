@@ -8,6 +8,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
+import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
@@ -60,7 +61,7 @@ type Prospecto = {
   // confirmarProspectoPerdido más abajo).
   comentario_perdido?: string | null;
 };
-type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; paquete_label?: string | null };
+type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
 type Notificacion = { id: string; tipo: string; categoria: string | null; mensaje: string; leida: boolean; created_at: string; reservacion_id: string | null };
 type TipoSolicitudInvitado =
   | "sala_juntas"
@@ -316,6 +317,11 @@ export default function CentroPanel({
   const [formGastoCentro, setFormGastoCentro] = useState("");
   const [prospectos, setProspectos] = useState<Prospecto[]>([]);
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([]);
+  // Horas Cowork: saldo del contrato de cada reservación de Coworking, y la
+  // reservación cuya llegada se está registrando (recepción puede ajustar las horas).
+  const [saldosCowork, setSaldosCowork] = useState<Record<string, SaldoHoras>>({});
+  const [llegadaEditando, setLlegadaEditando] = useState<{ id: string; horas: string } | null>(null);
+  const [guardandoLlegada, setGuardandoLlegada] = useState(false);
   // Motivo que el CLIENTE escribió al cancelar su propia reservación (ver
   // app/mis-reservaciones/page.tsx → confirmarCancelacion) — se guarda como
   // una notificación tipo "reservacion_cancelada_cliente" y se mapea aquí
@@ -523,7 +529,7 @@ export default function CentroPanel({
       supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
       supabase
         .from("reservaciones")
-        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id")
+        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
         .eq("centro", c)
         .order("fecha", { ascending: false }),
       supabase
@@ -620,6 +626,30 @@ export default function CentroPanel({
         paquete_label: r.cotizacion_id ? labelPorCotizacion[r.cotizacion_id] || null : null,
       }))
     );
+
+    // Saldo de Horas Cowork de cada contrato con reservaciones de Coworking.
+    const contratosCowork = Array.from(
+      new Set((reservas || []).filter((r) => esEspacioCowork(r.espacio) && r.contrato_id).map((r) => r.contrato_id as string))
+    );
+    const saldos: Record<string, SaldoHoras> = {};
+    if (contratosCowork.length > 0) {
+      const [{ data: conts }, { data: resCont }] = await Promise.all([
+        supabase.from("contratos").select("id, horas_bolsa, fecha_inicio, fecha_vencimiento").in("id", contratosCowork),
+        supabase
+          .from("reservaciones")
+          .select("contrato_id, espacio, fecha, hora_inicio, hora_fin, estado, horas_cobradas, asistencia")
+          .in("contrato_id", contratosCowork)
+          .in("estado", ["pendiente", "confirmada", "cancelada"]),
+      ]);
+      (conts || []).forEach((ct) => {
+        const v = ventanaHoras(ct);
+        const delContrato = (resCont || []).filter(
+          (r) => r.contrato_id === ct.id && esEspacioCowork(r.espacio) && r.fecha >= v.desde && r.fecha <= v.hasta
+        );
+        saldos[ct.id] = saldoHoras(Number(ct.horas_bolsa || 0), delContrato);
+      });
+    }
+    setSaldosCowork(saldos);
 
     const canceladasIds = (reservas || []).filter((r) => r.estado === "cancelada").map((r) => r.id);
     const rechazadasIds = (reservas || []).filter((r) => r.estado === "rechazada").map((r) => r.id);
@@ -1373,6 +1403,39 @@ export default function CentroPanel({
 
   const [rechazando, setRechazando] = useState<Reservacion | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState("");
+
+  // Recepción registra que el cliente llegó a usar sus Horas Cowork: las horas
+  // agendadas (o las que ajuste recepción) pasan de apartadas a consumidas.
+  async function registrarLlegada(reserva: Reservacion, horas: number) {
+    if (!(horas >= 0) || guardandoLlegada) return;
+    setGuardandoLlegada(true);
+    const { error } = await supabase
+      .from("reservaciones")
+      .update({ asistencia: "llego", horas_cobradas: horas, llegada_at: new Date().toISOString() })
+      .eq("id", reserva.id);
+    setGuardandoLlegada(false);
+    if (error) {
+      alert("No se pudo registrar la llegada: " + error.message);
+      return;
+    }
+    setLlegadaEditando(null);
+    fetchTodo(centro);
+  }
+
+  // El cliente no llegó ni avisó: sus horas quedan cobradas.
+  async function marcarNoAsistio(reserva: Reservacion) {
+    const horas = horasPlaneadas(reserva);
+    if (!confirm(`¿Marcar que ${reserva.cliente_nombre || "el cliente"} no asistió? Sus ${fmtHoras(horas)} hora(s) quedan cobradas.`)) return;
+    const { error } = await supabase
+      .from("reservaciones")
+      .update({ asistencia: "no_llego", horas_cobradas: horas })
+      .eq("id", reserva.id);
+    if (error) {
+      alert("No se pudo registrar: " + error.message);
+      return;
+    }
+    fetchTodo(centro);
+  }
 
   async function responderReserva(reserva: Reservacion, aceptar: boolean) {
     if (!aceptar) {
@@ -2339,6 +2402,85 @@ export default function CentroPanel({
                   </div>
                 )}
 
+                {(() => {
+                  const hoyStr = calFormatFechaISO(new Date());
+                  const hace7 = calFormatFechaISO(new Date(Date.now() - 7 * 86400000));
+                  const porRegistrar = reservaciones
+                    .filter(
+                      (r) =>
+                        r.estado === "confirmada" &&
+                        esEspacioCowork(r.espacio) &&
+                        !r.asistencia &&
+                        r.fecha <= hoyStr &&
+                        r.fecha >= hace7
+                    )
+                    .sort((a, b) => (a.fecha === b.fecha ? (a.hora_inicio || "").localeCompare(b.hora_inicio || "") : a.fecha < b.fecha ? 1 : -1));
+                  if (porRegistrar.length === 0) return null;
+                  return (
+                    <>
+                      <p className="sec-label-red">🎟️ Horas Cowork: registrar llegada ({porRegistrar.length})</p>
+                      {porRegistrar.map((r) => {
+                        const saldo = r.contrato_id ? saldosCowork[r.contrato_id] : undefined;
+                        const editando = llegadaEditando?.id === r.id;
+                        return (
+                          <div className="reserva-admin-card" key={r.id}>
+                            <div className="reserva-admin-top">
+                              <div>
+                                <p className="reserva-admin-cliente">{r.cliente_nombre}</p>
+                                <p className="reserva-admin-detalle">
+                                  {r.espacio} · {r.fecha === hoyStr ? "Hoy" : r.fecha} · {r.hora}
+                                </p>
+                                {saldo && (
+                                  <p className="reserva-admin-detalle">
+                                    Le quedan {fmtHoras(saldo.disponibles)} de {fmtHoras(saldo.totales)} horas Cowork
+                                    (consumidas {fmtHoras(saldo.consumidas)} · apartadas {fmtHoras(saldo.apartadas)})
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {editando ? (
+                              <div className="reserva-admin-acciones" style={{ alignItems: "center" }}>
+                                <span style={{ fontSize: 13 }}>Horas a descontar:</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={12}
+                                  step={0.5}
+                                  value={llegadaEditando?.horas ?? ""}
+                                  onChange={(e) => setLlegadaEditando({ id: r.id, horas: e.target.value })}
+                                  style={{ width: 70 }}
+                                />
+                                <button
+                                  className="btn-aceptar"
+                                  disabled={guardandoLlegada}
+                                  onClick={() => registrarLlegada(r, Number(llegadaEditando?.horas))}
+                                >
+                                  {guardandoLlegada ? "Guardando..." : "✓ Confirmar"}
+                                </button>
+                                <button className="btn-rechazar" onClick={() => setLlegadaEditando(null)}>
+                                  Regresar
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="reserva-admin-acciones">
+                                <button
+                                  className="btn-aceptar"
+                                  onClick={() => setLlegadaEditando({ id: r.id, horas: String(horasPlaneadas(r)) })}
+                                >
+                                  ✓ Registrar llegada
+                                </button>
+                                <button className="btn-rechazar" onClick={() => marcarNoAsistio(r)}>
+                                  ✗ No asistió
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
+
                 {reservasPendientes.length > 0 && (
                   <>
                     <p className="sec-label-red">⏳ Pendientes de confirmar ({reservasPendientes.length})</p>
@@ -2401,6 +2543,8 @@ export default function CentroPanel({
                           Fecha: r.fecha,
                           Horario: r.hora,
                           Estado: r.estado,
+                          Asistencia: r.asistencia === "llego" ? "Llegó" : r.asistencia === "no_llego" ? "No asistió" : "",
+                          "Horas cobradas": r.horas_cobradas ?? "",
                         }))
                       )
                     }
@@ -2421,6 +2565,15 @@ export default function CentroPanel({
                             {r.espacio} · {r.fecha} · {r.hora}
                           </p>
                           {r.paquete_label && <p className="item-card-sub">{r.paquete_label}</p>}
+                          {esEspacioCowork(r.espacio) && r.asistencia === "llego" && (
+                            <p className="item-card-sub">✓ Llegó · {fmtHoras(Number(r.horas_cobradas ?? horasPlaneadas(r)))} h consumidas</p>
+                          )}
+                          {esEspacioCowork(r.espacio) && r.asistencia === "no_llego" && (
+                            <p className="item-card-sub">✗ No asistió · {fmtHoras(Number(r.horas_cobradas ?? horasPlaneadas(r)))} h cobradas</p>
+                          )}
+                          {r.estado === "cancelada" && r.horas_cobradas != null && (
+                            <p className="item-card-sub">⏱ Canceló con poca anticipación · {fmtHoras(Number(r.horas_cobradas))} h cobradas</p>
+                          )}
                           {r.estado === "cancelada" && motivosCancelacion[r.id] && (
                             <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 0" }}>
                               ❌ Motivo del cliente: {motivosCancelacion[r.id]}

@@ -4,6 +4,14 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import MisReservaciones from "../mis-reservaciones/MisReservaciones";
+import {
+  HORAS_ANTICIPACION_CANCELACION,
+  fmtHoras,
+  saldoHoras,
+  ventanaHoras,
+  type SaldoHoras,
+  type VentanaHoras,
+} from "@/lib/horasCowork";
 
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const HORAS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8am a 8pm
@@ -119,6 +127,9 @@ function ReservacionesInner() {
   const [horasSalaRestantes, setHorasSalaRestantes] = useState(0);
   const [horasBolsaTotales, setHorasBolsaTotales] = useState(0);
   const [horasBolsaRestantes, setHorasBolsaRestantes] = useState(0);
+  // Horas Cowork: desglose (consumidas / apartadas) y ventana de vigencia.
+  const [saldoBolsa, setSaldoBolsa] = useState<SaldoHoras | null>(null);
+  const [ventanaBolsa, setVentanaBolsa] = useState<VentanaHoras | null>(null);
   const [oficinasBolsaDelCentro, setOficinasBolsaDelCentro] = useState<{ id: string; icono: string }[]>([]);
   const [precioHoraExtra, setPrecioHoraExtra] = useState(150);
   const [miCentro, setMiCentro] = useState<string | null>(null);
@@ -285,7 +296,7 @@ function ReservacionesInner() {
     // el más reciente vigente como respaldo.
     const { data: contratosVigentes } = await supabase
       .from("contratos")
-      .select("id, horas_sala_juntas, horas_bolsa")
+      .select("id, horas_sala_juntas, horas_bolsa, fecha_inicio, fecha_vencimiento")
       .eq("user_id", user.id)
       .eq("estatus", "vigente")
       .order("created_at", { ascending: false });
@@ -302,34 +313,48 @@ function ReservacionesInner() {
     setHorasSalaTotales(salaTotales);
     setHorasBolsaTotales(bolsaTotales);
 
-    // Las horas se cuentan solo dentro del mes calendario actual — al
-    // empezar un mes nuevo, se renuevan automáticamente. Scopeado al
-    // contrato elegido (un cliente puede tener más de uno vigente).
-    const hoy = new Date();
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split("T")[0];
-    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split("T")[0];
+    // Sala de Juntas: las horas se cuentan solo dentro del mes calendario
+    // actual — al empezar un mes nuevo, se renuevan automáticamente.
+    // Horas Cowork: si el contrato es de término fijo (paquete de 30 horas)
+    // el banco es único y vale toda su vigencia; si no, también es mensual
+    // (ver lib/horasCowork.ts). Scopeado al contrato elegido (un cliente
+    // puede tener más de uno vigente).
+    const ventMes = ventanaHoras({});
+    const ventBolsa = ventanaHoras(contratoValido || {});
+    setVentanaBolsa(ventBolsa);
 
     let salaUsadas = 0;
-    let bolsaUsadas = 0;
+    let reservasBolsa: {
+      hora_inicio: string | null;
+      hora_fin: string | null;
+      estado: string;
+      horas_cobradas: number | null;
+      asistencia: string | null;
+    }[] = [];
     if (idContrato) {
       const { data: usadas } = await supabase
         .from("reservaciones")
-        .select("hora_inicio, hora_fin, espacio")
+        .select("hora_inicio, hora_fin, espacio, fecha, estado, horas_cobradas, asistencia")
         .eq("user_id", user.id)
         .eq("contrato_id", idContrato)
-        .in("estado", ["pendiente", "confirmada"])
-        .gte("fecha", inicioMes)
-        .lte("fecha", finMes);
+        .in("estado", ["pendiente", "confirmada", "cancelada"])
+        .gte("fecha", ventMes.desde < ventBolsa.desde ? ventMes.desde : ventBolsa.desde)
+        .lte("fecha", ventMes.hasta > ventBolsa.hasta ? ventMes.hasta : ventBolsa.hasta);
 
       (usadas || []).forEach((r) => {
         if (!r.espacio || !r.hora_inicio || !r.hora_fin) return;
-        const horas = parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
-        if (esSalaDeJuntas(r.espacio)) salaUsadas += horas;
-        else bolsaUsadas += horas;
+        if (esSalaDeJuntas(r.espacio)) {
+          if (r.estado === "cancelada" || r.fecha < ventMes.desde || r.fecha > ventMes.hasta) return;
+          salaUsadas += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
+        } else if (r.fecha >= ventBolsa.desde && r.fecha <= ventBolsa.hasta) {
+          reservasBolsa.push(r);
+        }
       });
     }
+    const saldo = saldoHoras(bolsaTotales, reservasBolsa);
+    setSaldoBolsa(saldo);
     setHorasSalaRestantes(salaTotales - salaUsadas);
-    setHorasBolsaRestantes(bolsaTotales - bolsaUsadas);
+    setHorasBolsaRestantes(saldo.disponibles);
 
     if (c) {
       const { data: precio } = await supabase
@@ -383,7 +408,10 @@ function ReservacionesInner() {
   // horario" — esos horarios quedan bloqueados por completo, no
   // seleccionables (regla #17 de DOCUMENTACION_COTIZAR.md).
   function bloqueadoPorHorario(fechaISO: string, hora: number) {
-    return esBolsaActual && esFueraDeHorario(fechaISO, hora);
+    if (!esBolsaActual) return false;
+    // Un paquete de vigencia fija solo se puede usar dentro de sus fechas.
+    if (ventanaBolsa?.porVigencia && (fechaISO < ventanaBolsa.desde || fechaISO > ventanaBolsa.hasta)) return true;
+    return esFueraDeHorario(fechaISO, hora);
   }
 
   function rangoLibre(fechaISO: string, ini: number, fin: number) {
@@ -635,7 +663,7 @@ function ReservacionesInner() {
               className={"cal-espacio-tab" + (categoria === "bolsa" ? " active" : "")}
               onClick={() => cambiarCategoria("bolsa")}
             >
-              🎟️ Horas Bolsa
+              🎟️ Horas Cowork
             </button>
           </div>
         )}
@@ -644,7 +672,7 @@ function ReservacionesInner() {
           <div className="empty-card">
             {categoria === "sala"
               ? "Tu contrato no incluye horas de Sala de Juntas en este centro."
-              : "Tu contrato no incluye Horas Bolsa (Coworking / Sala de Capacitación) en este centro."}
+              : "Tu contrato no incluye Horas Cowork (Coworking / Sala de Capacitación) en este centro."}
           </div>
         ) : (
           <>
@@ -652,7 +680,7 @@ function ReservacionesInner() {
               <div className="horas-banco-card">
                 <div>
                   <p className="horas-banco-num">{Math.max(horasDisponiblesReales, 0)}</p>
-                  <p className="horas-banco-lbl">{categoria === "sala" ? "horas de sala de juntas" : "horas bolsa"}</p>
+                  <p className="horas-banco-lbl">{categoria === "sala" ? "horas de sala de juntas" : "horas Cowork"}</p>
                 </div>
                 <div className="horas-banco-bar-wrap">
                   <div className="horas-banco-bar">
@@ -671,8 +699,21 @@ function ReservacionesInner() {
                     />
                   </div>
                   <p className="horas-banco-detalle">
-                    {horasDisponiblesReales} de {categoria === "sala" ? horasSalaTotales : horasBolsaTotales} horas disponibles
+                    {fmtHoras(horasDisponiblesReales)} de {categoria === "sala" ? horasSalaTotales : horasBolsaTotales} horas disponibles
                   </p>
+                  {categoria === "bolsa" && saldoBolsa && (
+                    <>
+                      <p className="horas-banco-detalle">
+                        Consumidas: {fmtHoras(saldoBolsa.consumidas)} · Apartadas: {fmtHoras(saldoBolsa.apartadas)}
+                      </p>
+                      {ventanaBolsa?.porVigencia && (
+                        <p className="horas-banco-detalle">
+                          Puedes usarlas del {ventanaBolsa.desde} al {ventanaBolsa.hasta}. Las horas que no uses en ese
+                          periodo se pierden.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -751,7 +792,7 @@ function ReservacionesInner() {
                               : pasado
                               ? "Ya pasó"
                               : bloqueado
-                              ? "Fuera de horario — no disponible para Horas Bolsa"
+                              ? "No disponible para Horas Cowork (fuera de horario o de la vigencia de tu paquete)"
                               : fueraHorario
                               ? "Fuera de horario normal — se cobra extra, sujeto a cotización de recepción"
                               : `${formatHora(h)}`
@@ -774,7 +815,7 @@ function ReservacionesInner() {
               </span>
               {esBolsaActual ? (
                 <span className="cal-leyenda-item">
-                  <span className="cal-leyenda-dot" style={{ background: "#d8d8d8" }} /> Fuera de horario (no disponible)
+                  <span className="cal-leyenda-dot" style={{ background: "#d8d8d8" }} /> No disponible (fuera de horario o vigencia)
                 </span>
               ) : (
                 <span className="cal-leyenda-item">
@@ -824,9 +865,17 @@ function ReservacionesInner() {
                     )}
                   </div>
                 ) : (
-                  <div className="nota-info">
-                    Te quedarán {horasDisponiblesReales - duracionSeleccion} hora(s) bolsa del mes después de esta reserva
-                  </div>
+                  <>
+                    <div className="nota-info">
+                      Te quedarán {fmtHoras(horasDisponiblesReales - duracionSeleccion)} hora(s) Cowork
+                      {ventanaBolsa?.porVigencia ? " de tu paquete" : " del mes"} después de esta reserva
+                    </div>
+                    <div className="nota-info">
+                      📍 Al llegar al centro, preséntate en recepción: ahí se registra tu llegada y se descuentan tus
+                      horas. Si necesitas cancelar, hazlo con al menos {HORAS_ANTICIPACION_CANCELACION} horas de
+                      anticipación para que se te devuelvan; si no, esas horas se cobran.
+                    </div>
+                  </>
                 )}
                 {seleccionFueraHorario && (
                   <div className="nota-info" style={{ background: "rgba(255, 199, 102, 0.2)", color: "#a3701f" }}>

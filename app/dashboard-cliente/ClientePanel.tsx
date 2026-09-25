@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { esEspacioCowork, fmtHoras, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { esClienteCoworking } from "@/lib/coworking";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 
@@ -45,7 +46,7 @@ type MiExtension = {
 
 type TicketResumen = { id: string; folio: string; asunto: string; descripcion?: string | null };
 
-// Sala de Juntas vs Horas Bolsa (Coworking / Sala de Capacitación) — mismo
+// Sala de Juntas vs Horas Cowork, antes "Horas Bolsa" (Coworking / Sala de Capacitación) — mismo
 // criterio que app/reservaciones/page.tsx: startsWith en vez de igualdad
 // exacta para clasificar también oficinas numeradas tipo "Coworking 1".
 function esSalaDeJuntas(espacio: string) {
@@ -59,6 +60,7 @@ type ContratoCliente = {
   paquete_id: string | null;
   oficina_id: string | null;
   fecha_inicio: string;
+  fecha_vencimiento?: string | null;
   dia_pago: number | null;
   label: string;
 };
@@ -102,6 +104,7 @@ export default function ClientePanel({
   const [horasSalaTotales, setHorasSalaTotales] = useState(0);
   const [horasSalaRestantes, setHorasSalaRestantes] = useState(0);
   const [horasBolsaTotales, setHorasBolsaTotales] = useState(0);
+  const [saldoBolsa, setSaldoBolsa] = useState<SaldoHoras | null>(null);
 
   // Banners promocionales que administra Diseño desde /diseno/banners, más
   // los banners de "Logros" que las empresas comparten y Diseño trabaja —
@@ -152,7 +155,7 @@ export default function ClientePanel({
 
       const { data: contratosData } = await supabase
         .from("contratos")
-        .select("id, horas_sala_juntas, horas_bolsa, paquete_id, oficina_id, fecha_inicio, dia_pago")
+        .select("id, horas_sala_juntas, horas_bolsa, paquete_id, oficina_id, fecha_inicio, fecha_vencimiento, dia_pago")
         .eq("user_id", user.id)
         .eq("estatus", "vigente")
         .order("created_at", { ascending: false });
@@ -215,31 +218,38 @@ export default function ClientePanel({
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Las horas se cuentan solo dentro del mes calendario actual — se
-      // renuevan solas al empezar un mes nuevo. Scopeado al contrato_id
-      // elegido, porque un mismo cliente puede tener más de un contrato
-      // vigente, cada uno con su propio banco de horas.
-      const hoy = new Date();
-      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split("T")[0];
-      const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split("T")[0];
+      // Sala de Juntas: las horas se cuentan solo dentro del mes calendario
+      // actual — se renuevan solas al empezar un mes nuevo. Horas Cowork: un
+      // paquete de vigencia fija (30 horas) tiene un banco único durante todo
+      // su contrato; cualquier otro también es mensual (ver lib/horasCowork.ts).
+      // Scopeado al contrato_id elegido, porque un mismo cliente puede tener
+      // más de un contrato vigente, cada uno con su propio banco de horas.
+      const ventMes = ventanaHoras({});
+      const ventBolsa = ventanaHoras(contrato);
 
       const { data: usadas } = await supabase
         .from("reservaciones")
-        .select("hora_inicio, hora_fin, espacio")
+        .select("hora_inicio, hora_fin, espacio, fecha, estado, horas_cobradas, asistencia")
         .eq("user_id", user.id)
         .eq("contrato_id", contratoId)
-        .in("estado", ["pendiente", "confirmada"])
-        .gte("fecha", inicioMes)
-        .lte("fecha", finMes);
+        .in("estado", ["pendiente", "confirmada", "cancelada"])
+        .gte("fecha", ventMes.desde < ventBolsa.desde ? ventMes.desde : ventBolsa.desde)
+        .lte("fecha", ventMes.hasta > ventBolsa.hasta ? ventMes.hasta : ventBolsa.hasta);
 
       let salaUsadas = 0;
+      const reservasBolsa: NonNullable<typeof usadas> = [];
       (usadas || []).forEach((r) => {
         if (!r.espacio || !r.hora_inicio || !r.hora_fin) return;
-        if (!esSalaDeJuntas(r.espacio)) return;
-        salaUsadas += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
+        if (esSalaDeJuntas(r.espacio)) {
+          if (r.estado === "cancelada" || r.fecha < ventMes.desde || r.fecha > ventMes.hasta) return;
+          salaUsadas += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
+        } else if (esEspacioCowork(r.espacio) && r.fecha >= ventBolsa.desde && r.fecha <= ventBolsa.hasta) {
+          reservasBolsa.push(r);
+        }
       });
 
       setHorasSalaRestantes(salaTotales - salaUsadas);
+      setSaldoBolsa(saldoHoras(bolsaTotales, reservasBolsa));
     })();
   }, [contratoId, contratos]);
 
@@ -620,6 +630,22 @@ export default function ClientePanel({
                   <div className="servicio-info">
                     <p className="servicio-nombre">Sala de Juntas</p>
                     <p className="servicio-desc">Reserva para hoy o cualquier día</p>
+                  </div>
+                  <span className="servicio-arrow">›</span>
+                </a>
+              )}
+              {horasBolsaTotales > 0 && (
+                <a className="servicio-card" href={`/reservaciones?categoria=bolsa${qs}`}>
+                  <div className="servicio-icono">
+                    <span style={{ fontSize: 22, lineHeight: "24px" }}>🎟️</span>
+                  </div>
+                  <div className="servicio-info">
+                    <p className="servicio-nombre">Horas Cowork</p>
+                    <p className="servicio-desc">
+                      {saldoBolsa
+                        ? `Te quedan ${fmtHoras(saldoBolsa.disponibles)} de ${fmtHoras(saldoBolsa.totales)} horas · agenda tu día`
+                        : "Agenda tu día en Coworking"}
+                    </p>
                   </div>
                   <span className="servicio-arrow">›</span>
                 </a>

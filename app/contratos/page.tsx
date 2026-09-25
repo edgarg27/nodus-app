@@ -1010,7 +1010,7 @@ export default function ContratosPage() {
                         <p className="contrato-detalle">
                           ${c.renta_mensual.toLocaleString("es-MX")}/mes
                           {c.horas_sala_juntas ? ` · ${c.horas_sala_juntas}h sala de juntas` : ""}
-                          {c.horas_bolsa ? ` · ${c.horas_bolsa}h bolsa` : ""}
+                          {c.horas_bolsa ? ` · ${c.horas_bolsa}h Cowork` : ""}
                           {c.dia_pago ? ` · paga el día ${c.dia_pago}` : ""}
                         </p>
                         {c.plan_nombre && <p className="contrato-detalle">{c.plan_nombre}</p>}
