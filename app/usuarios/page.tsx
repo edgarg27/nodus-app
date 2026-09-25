@@ -20,7 +20,7 @@ const ROLES_STAFF = [
   { id: "cobranza", label: "Cobranza" },
   { id: "atencion_cliente", label: "Atención al Cliente" },
   { id: "diseno", label: "Diseño" },
-  { id: "ventas", label: "Ventas" },
+  { id: "ventas", label: "Asesora de Ventas" },
 ];
 
 const ROL_ICONO: Record<string, string> = {
@@ -32,7 +32,7 @@ const ROL_ICONO: Record<string, string> = {
   cobranza: "💰",
   atencion_cliente: "🎧",
   diseno: "🎨",
-  ventas: "💼",
+  ventas: "🤝",
 };
 
 export default function UsuariosPage() {

@@ -11,7 +11,7 @@ export const ROL_LABEL: Record<string, string> = {
   cobranza: "Cobranza",
   atencion_cliente: "Atención al Cliente",
   diseno: "Diseño",
-  ventas: "Ventas",
+  ventas: "Asesora de Ventas",
 };
 
 export function labelRol(rol: string): string {
