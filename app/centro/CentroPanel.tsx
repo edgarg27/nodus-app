@@ -8,6 +8,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
@@ -337,7 +338,7 @@ export default function CentroPanel({
   const [calEspacio, setCalEspacio] = useState("");
   const [calInicioSemana, setCalInicioSemana] = useState(calLunesDeLaSemana(new Date()));
   const [calReservas, setCalReservas] = useState<
-    { id: string; espacio: string; fecha: string; hora_inicio: string; hora_fin: string; estado: string; user_id: string; cliente_nombre: string | null }[]
+    { id: string; espacio: string; fecha: string; hora_inicio: string; hora_fin: string; estado: string; user_id: string; cliente_nombre: string | null; para_nombre?: string | null }[]
   >([]);
   const [calSeleccion, setCalSeleccion] = useState<{ fecha: string; horaInicio: number; horaFin: number } | null>(null);
   const [calGuardando, setCalGuardando] = useState(false);
@@ -497,6 +498,16 @@ export default function CentroPanel({
 
   async function fetchTodo(c: string) {
     setLoading(true);
+    // Una solicitud de reservación que sigue pendiente cuando ya pasó su fecha
+    // se cancela sola, para que no estorbe en "Pendientes de confirmar".
+    const hoyVencidas = hoyMexicoISO();
+    await supabase
+      .from("reservaciones")
+      .update({ estado: "cancelada" })
+      .eq("centro", c)
+      .eq("estado", "pendiente")
+      .lt("fecha", hoyVencidas)
+      .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`);
     const [
       { data: clis },
       { data: ofis },
@@ -633,10 +644,26 @@ export default function CentroPanel({
       });
     }
 
+    // Reservaciones que el admin agendó a partir de una solicitud de invitado: se
+    // muestra el nombre de quien la pidió, no el de quien la capturó.
+    const { data: solsAgendadas } = await supabase
+      .from("solicitudes_invitados")
+      .select("reservacion_id, nombre")
+      .eq("centro", c)
+      .not("reservacion_id", "is", null);
+    const invitadoPorReserva: Record<string, string> = {};
+    (solsAgendadas || []).forEach((sol) => {
+      if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
+    });
+
     setReservaciones(
       (reservas || []).map((r) => ({
         ...r,
-        cliente_nombre: (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
+        cliente_nombre:
+          (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) ||
+          invitadoPorReserva[r.id] ||
+          nombrePorId[r.user_id] ||
+          "Cliente",
         paquete_label: r.cotizacion_id ? labelPorCotizacion[r.cotizacion_id] || null : null,
       }))
     );
@@ -944,9 +971,8 @@ export default function CentroPanel({
       nombrePorId = Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre]));
     }
 
-    // Una sala reservada al aceptar su cotización se guarda a nombre de quien la
-    // aceptó (o del cliente, si ya tiene cuenta): en el calendario se muestra el
-    // nombre de quien la pidió, que viene en la cotización.
+    // Una reservación agendada por el admin a nombre de otra persona (cotización de
+    // sala aceptada o solicitud de invitado) muestra debajo el nombre de esa persona.
     const cotIds = Array.from(new Set(reservas.map((r) => r.cotizacion_id).filter(Boolean)));
     const nombrePorCot: Record<string, string> = {};
     if (cotIds.length > 0) {
@@ -959,11 +985,22 @@ export default function CentroPanel({
       });
     }
 
+    const { data: solsAgendadas } = await supabase
+      .from("solicitudes_invitados")
+      .select("reservacion_id, nombre")
+      .eq("centro", centro)
+      .not("reservacion_id", "is", null);
+    const invitadoPorReserva: Record<string, string> = {};
+    (solsAgendadas || []).forEach((sol) => {
+      if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
+    });
+
     setCalReservas(
-      reservas.map((r) => ({
-        ...r,
-        cliente_nombre: (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
-      }))
+      reservas.map((r) => {
+        const quien = nombrePorId[r.user_id] || "Cliente";
+        const para = (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || invitadoPorReserva[r.id] || null;
+        return { ...r, cliente_nombre: quien, para_nombre: para && para !== quien ? para : null };
+      })
     );
     setCalCargando(false);
   }
@@ -2373,7 +2410,7 @@ export default function CentroPanel({
                                     }
                                     title={
                                       reservaAqui
-                                        ? reservaAqui.cliente_nombre || "Ocupado"
+                                        ? [reservaAqui.cliente_nombre, reservaAqui.para_nombre].filter(Boolean).join(" · para ") || "Ocupado"
                                         : ocupado
                                         ? "Ocupado"
                                         : pasado
@@ -2394,6 +2431,21 @@ export default function CentroPanel({
                                         }}
                                       >
                                         {reservaAqui.cliente_nombre}
+                                      </span>
+                                    )}
+                                    {reservaAqui?.para_nombre && (
+                                      <span
+                                        style={{
+                                          fontSize: 9,
+                                          display: "block",
+                                          overflow: "hidden",
+                                          whiteSpace: "nowrap",
+                                          textOverflow: "ellipsis",
+                                          padding: "0 2px",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {reservaAqui.para_nombre}
                                       </span>
                                     )}
                                   </div>
