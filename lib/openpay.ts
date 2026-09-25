@@ -189,6 +189,8 @@ export async function cobrarTarjetaGuardada(opts: {
   monto: number;
   descripcion: string;
   ordenId: string; // único por intento
+  // Huella antifraude: Openpay la pide también en cobros sin el cliente presente.
+  deviceSessionId: string;
 }): Promise<CargoTarjeta> {
   const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/customers/${opts.customerId}/charges`, {
     method: "POST",
@@ -200,6 +202,7 @@ export async function cobrarTarjetaGuardada(opts: {
       currency: "MXN",
       description: opts.descripcion.slice(0, 250),
       order_id: opts.ordenId.slice(0, 100),
+      device_session_id: opts.deviceSessionId,
     }),
   });
   return openpayJson(res, "No se pudo cobrar la tarjeta guardada");

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { cobrarTarjetaGuardada } from "@/lib/openpay";
 import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
@@ -50,6 +51,7 @@ export async function intentarCobroAutomatico(
       monto: Number(datos.monto),
       descripcion: `${datos.concepto} (cobro automático)`,
       ordenId: `${datos.facturaId}-auto-${Date.now().toString(36)}`,
+      deviceSessionId: randomUUID().replace(/-/g, ""),
     });
 
     // Se registra el pago con su cargo para que el flujo normal lo confirme.
@@ -70,7 +72,11 @@ export async function intentarCobroAutomatico(
     await admin.from("tarjetas_guardadas").update({ fallos_consecutivos: 0 }).eq("id", tarjeta.id);
     return { intento: true, pagado: true };
   } catch (err: any) {
-    const motivo = err?.message || "El banco rechazó el cobro";
+    // El detalle técnico de Openpay (en inglés) queda en el registro del servidor; al
+    // cliente se le dice algo claro.
+    const detalleTecnico = err?.message || "sin detalle";
+    console.error(`[cobroAutomatico] factura ${datos.facturaId}: ${detalleTecnico}`);
+    const motivo = "el banco no aprobó el cobro o la tarjeta ya no está disponible";
     const fallos = (tarjeta.fallos_consecutivos || 0) + 1;
     const apagar = fallos >= FALLOS_PARA_APAGAR_COBRO_AUTOMATICO;
     await admin
@@ -94,6 +100,6 @@ export async function intentarCobroAutomatico(
       monto: datos.monto,
       desactivado: apagar,
     });
-    return { intento: true, pagado: false, error: motivo };
+    return { intento: true, pagado: false, error: detalleTecnico };
   }
 }
