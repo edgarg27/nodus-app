@@ -14,7 +14,7 @@ import { construirHtmlComunicado } from "@/lib/comunicado";
 // Requiere RESEND_API_KEY en .env.local (y el dominio nodusbc.mx verificado
 // en Resend, que ya lo está porque los otros correos salen de ahí).
 
-const ROLES_CORREOS = ["admin", "superadmin", "gerente"];
+const ROLES_CORREOS = ["admin", "superadmin", "gerente", "ventas"];
 const ROLES_GLOBALES = ["superadmin", "gerente"];
 const FROM_RESPALDO = process.env.EMAIL_FROM || "Nodus Flex Center <notificaciones@nodusbc.mx>";
 const MAX_DESTINATARIOS = 500;
