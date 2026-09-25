@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { rutaPermitida } from "@/lib/permisosRutas";
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: { headers: req.headers } });
@@ -62,6 +63,7 @@ export async function middleware(req: NextRequest) {
   const isPreciosSalaJuntas = path.startsWith("/precios-sala-juntas");
   const isDepositoGarantia = path.startsWith("/deposito-garantia");
   const isFidelidadAdmin = path.startsWith("/fidelidad-admin");
+  const isWifiSolicitudes = path.startsWith("/wifi-solicitudes");
   // El QR del Day Pass manda aquí — es la pantalla donde el staff acepta
   // la llegada del invitado. Requiere sesión, a diferencia del resto de
   // /day-pass/[id] que es público (el link que se le manda al invitado).
@@ -88,7 +90,7 @@ export async function middleware(req: NextRequest) {
     // "Cargando..." sin fin en vez de que lo mandara a /login.
     "/paqueteria",
   ].some((p) => path === p || path.startsWith(p + "/"));
-  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin;
+  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes;
 
   if (!session && isProtected) {
     // A diferencia de las demás secciones (que se abren desde dentro de la
@@ -136,12 +138,16 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     // panel admin, reportes y telefonía son solo para staff (no clientes)
-    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin) && role === "cliente") {
+    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes) && role === "cliente") {
       return NextResponse.redirect(new URL("/dashboard-cliente", req.url));
     }
     // el dashboard de cliente es solo para clientes
     if (isDashboardCliente && role !== "cliente") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    // cada rol de personal solo abre las pantallas que le corresponden (lib/permisosRutas.ts)
+    if (role && role !== "cliente" && !rutaPermitida(role, path)) {
+      return NextResponse.redirect(new URL("/dashboard?sin_permiso=1", req.url));
     }
   }
 
@@ -162,6 +168,7 @@ export const config = {
     "/precios-sala-juntas/:path*",
     "/deposito-garantia/:path*",
     "/fidelidad-admin/:path*",
+    "/wifi-solicitudes/:path*",
     "/contratos/:path*",
     "/correos/:path*",
     "/alta-cliente/:path*",
