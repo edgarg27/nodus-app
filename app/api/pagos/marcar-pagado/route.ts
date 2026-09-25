@@ -4,11 +4,10 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
-// Requiere sesión de staff — a diferencia de /api/pagos/simular (público,
-// solo para pagos sin factura_id), este endpoint puede marcar pagado
-// CUALQUIER pago, con o sin factura_id. Lo usa /pagos (botón "✓ Marcar
-// como pagado"), tanto para comprobantes en_revision del flujo real como
-// para pagos sueltos de Cotizar que el staff prefiera cerrar a mano.
+// Requiere sesión de staff. Puede marcar pagado CUALQUIER pago, con o sin
+// factura_id. Lo usa /pagos (botón "✓ Marcar como pagado"), tanto para
+// comprobantes en_revision como para pagos sueltos de Cotizar que el staff
+// prefiera cerrar a mano.
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
