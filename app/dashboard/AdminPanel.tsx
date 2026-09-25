@@ -356,8 +356,11 @@ export default function AdminPanel({
   const TIPOS_NOTIF_COBRANZA = ["pago_confirmado", "fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "cuenta_pausada", "nuevo_gasto"];
   const TIPOS_NOTIF_ATENCION = ["nueva_queja"];
   const TIPOS_NOTIF_DISENO = ["nuevo_logro"];
-  // Ventas: solo lo de sus módulos (Sala de Juntas) y prospectos de tours.
-  const TIPOS_NOTIF_VENTAS = ["nueva_reservacion", "reservacion_cancelada_cliente", "nuevo_tour"];
+  // Ventas: solo lo suyo. Los avisos de reservaciones de clientes son de la
+  // administradora; a Ventas le llegan los tours, los contratos que le mandan a
+  // firma y la respuesta a SUS reservaciones (esas van por user_id, ver abajo).
+  const TIPOS_NOTIF_VENTAS = ["nuevo_tour", "contrato_a_firma"];
+  const TIPOS_NOTIF_VENTAS_PROPIAS = ["reservacion_confirmada", "reservacion_rechazada"];
 
   const TIPOS_TICKET = ["nuevo_ticket", "ticket_en_proceso", "ticket_resuelto"];
 
@@ -371,10 +374,34 @@ export default function AdminPanel({
     else if (rol === "diseno") query = query.in("tipo", TIPOS_NOTIF_DISENO);
     else if (rol === "ventas") query = query.in("tipo", TIPOS_NOTIF_VENTAS);
     const { data } = await query;
+    let propias: any[] = [];
+    if (rol === "ventas") {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: respuestas } = await supabase
+          .from("notificaciones")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("tipo", TIPOS_NOTIF_VENTAS_PROPIAS)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        propias = respuestas || [];
+      }
+    }
     // Filtro extra: un "nuevo_ticket"/"ticket_en_proceso"/"ticket_resuelto" solo
     // le corresponde a sistemas si es de categoría "sistemas", y a operaciones
     // si es de categoría "mantenimiento" — el tipo solo no basta para separarlos.
-    let lista = data || [];
+    let lista = [...(data || []), ...propias]
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+      .slice(0, 20);
+    // "Contrato a firma" es solo de Ventas. Las respuestas a una reservación ("Tu
+    // reservación … fue confirmada") son para quien la pidió, no para el resto del
+    // personal, que las veía mezcladas con sus avisos.
+    if (rol !== "ventas") {
+      lista = lista.filter((n) => !["contrato_a_firma", "reservacion_confirmada", "reservacion_rechazada"].includes(n.tipo));
+    }
     if (rol === "sistemas") {
       lista = lista.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "sistemas");
     } else if (rol === "operaciones") {
@@ -405,6 +432,10 @@ export default function AdminPanel({
       router.push("/sala-juntas");
     } else if (n.tipo === "nuevo_tour") {
       router.push("/tours");
+    } else if (n.tipo === "contrato_a_firma") {
+      router.push("/contratos");
+    } else if (n.tipo === "reservacion_confirmada" || n.tipo === "reservacion_rechazada") {
+      router.push("/sala-juntas");
     } else if (n.tipo === "baja_extension" || n.tipo === "nuevo_did") {
       router.push("/telefonia");
     } else if (n.tipo === "nuevo_voucher") {
