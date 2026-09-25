@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCorreo } from "@/lib/email";
 import { ubicacionCentro } from "@/lib/centros";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Recordatorio por correo un día antes del tour — mismo patrón de auth que
 // app/api/cron/facturacion-diaria/route.ts (secreto del cron, o sesión de
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-    if (!miProfile || miProfile.rol === "cliente") {
+    if (!rolPuede(miProfile?.rol, "recordatorioTours")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
   }

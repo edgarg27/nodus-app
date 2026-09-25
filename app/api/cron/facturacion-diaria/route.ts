@@ -8,6 +8,7 @@ import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
 import { enviarAvisoPago } from "@/lib/correosPagos";
 import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
+import { rolPuede } from "@/lib/permisosApi";
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -348,7 +349,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-    if (!miProfile || miProfile.rol === "cliente") {
+    if (!rolPuede(miProfile?.rol, "cobroDiarioManual")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
   }

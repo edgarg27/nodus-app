@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Requiere sesión de staff. Puede marcar pagado CUALQUIER pago, con o sin
 // factura_id. Lo usa /pagos (botón "✓ Marcar como pagado"), tanto para
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "pagosMarcarPagado")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

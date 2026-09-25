@@ -5,6 +5,7 @@ import { generarContratoDocx, normalizarTipoEspacioContrato } from "@/lib/contra
 import { rentaMensualConIva } from "@/lib/formaPago";
 import { normalizarDatosFiscales, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
 // datos de la venta ya capturados en CotizarForm.tsx (cotizaciones_comerciales)
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "cotizacionAceptar")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

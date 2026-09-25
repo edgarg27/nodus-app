@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarEmpresa } from "@/lib/empresa";
+import { rolPuede } from "@/lib/permisosApi";
 
 async function generarNumeroUsuarioUnico(admin: ReturnType<typeof createAdminClient>) {
   for (let intento = 0; intento < 15; intento++) {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     .eq("id", session.user.id)
     .single();
 
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "crearCliente")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

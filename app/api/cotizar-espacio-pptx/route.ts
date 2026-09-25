@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { centroTienePlantillaCotizacionEspacio, generarPptxCotizacionEspacio } from "@/lib/cotizacionEspacioPptx";
 import { convertirPptxAPdf } from "@/lib/cotizacionSalaPptx";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Mismo flujo que /api/cotizar-sala-pptx, pero para Coworking y Oficina
 // Privada (Working Desk se agrega en cuanto llegue su plantilla). Se llama
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "cotizarPptx")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
