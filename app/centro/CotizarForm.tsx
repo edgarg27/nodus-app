@@ -1695,10 +1695,6 @@ export default function CotizarForm({
       setError("Falta la razón social de la empresa");
       return;
     }
-    if (!rfc.trim()) {
-      setError("Falta el RFC del cliente");
-      return;
-    }
     // Coffee Break es exclusivo de Sala de Juntas — no aplica en este flujo
     // de Coworking/Oficina Privada, así que no se valida aquí.
     setError("");
@@ -2903,12 +2899,6 @@ export default function CotizarForm({
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value)}
                 />
-              </div>
-            )}
-            {!esSalaJuntas && (
-              <div>
-                <p className="sub-label">RFC</p>
-                <input placeholder="RFC del cliente" value={rfc} onChange={(e) => setRfc(e.target.value.toUpperCase())} />
               </div>
             )}
             <div>

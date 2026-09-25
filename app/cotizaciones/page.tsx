@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
+import ModalDatosFiscales from "./ModalDatosFiscales";
+import type { DatosFiscales } from "@/lib/datosFiscales";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -28,6 +30,7 @@ export default function CotizacionesPage() {
   const [aceptadoOkId, setAceptadoOkId] = useState<string | null>(null);
   const [confirmandoAceptarId, setConfirmandoAceptarId] = useState<string | null>(null);
   const [confirmandoBorrarId, setConfirmandoBorrarId] = useState<string | null>(null);
+  const [errorFiscal, setErrorFiscal] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
@@ -69,20 +72,25 @@ export default function CotizacionesPage() {
     return c.nombre.toLowerCase().includes(q) || (c.notas || "").toLowerCase().includes(q);
   });
 
-  async function aceptarCotizacion(id: string) {
-    setConfirmandoAceptarId(null);
+  // `fiscal`: datos fiscales del cliente que se piden al aceptar (Coworking, Oficina,
+  // Working Desk). Las salas no los llevan.
+  async function aceptarCotizacion(id: string, fiscal?: DatosFiscales) {
+    if (!fiscal) setConfirmandoAceptarId(null);
+    setErrorFiscal("");
     setAceptandoId(id);
     try {
       const res = await fetch("/api/cotizacion-aceptar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, fiscal }),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || "No se pudo aceptar la cotización");
+        if (fiscal) setErrorFiscal(data.error || "No se pudo aceptar la cotización");
+        else alert(data.error || "No se pudo aceptar la cotización");
         return;
       }
+      setConfirmandoAceptarId(null);
       setAceptadoOkId(id);
       // Se deja ver un momento la palomita de "¡Listo!" antes de saltar a
       // Contratos, donde el contrato recién creado ya abre solo (ver
@@ -218,7 +226,22 @@ export default function CotizacionesPage() {
         )}
       </div>
 
-      {confirmandoAceptarId && (
+      {confirmandoAceptarId &&
+        !cotizaciones.find((c) => c.id === confirmandoAceptarId)?.nombre.includes("Sala de Juntas") &&
+        cotizaciones.find((c) => c.id === confirmandoAceptarId)?.cotizacion_comercial_id && (
+          <ModalDatosFiscales
+            cotizacionComercialId={cotizaciones.find((c) => c.id === confirmandoAceptarId)!.cotizacion_comercial_id as string}
+            aceptando={aceptandoId === confirmandoAceptarId}
+            error={errorFiscal}
+            onCancelar={() => {
+              setConfirmandoAceptarId(null);
+              setErrorFiscal("");
+            }}
+            onAceptar={(fiscal) => aceptarCotizacion(confirmandoAceptarId, fiscal)}
+          />
+        )}
+
+      {confirmandoAceptarId && cotizaciones.find((c) => c.id === confirmandoAceptarId)?.nombre.includes("Sala de Juntas") && (
         <div className="modal-overlay" onClick={() => setConfirmandoAceptarId(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <p className="modal-nombre">Aceptar cotización</p>
