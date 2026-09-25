@@ -28,6 +28,9 @@ function cargarScript(src: string) {
 }
 
 type Detalle = { titulo: string; monto: number; pagado: boolean };
+type TarjetaGuardada = { id: string; marca: string | null; ultimos4: string | null; vence_mes: string | null; vence_anio: string | null };
+
+const etiquetaMarca = (m: string | null) => (m ? m.charAt(0).toUpperCase() + m.slice(1) : "Tarjeta");
 
 // Pago con tarjeta con Openpay. La tarjeta se convierte en un token en el
 // navegador (Openpay.js) y solo ese token llega a Nodus: nunca guardamos ni
@@ -57,6 +60,10 @@ function PagarTarjetaInner() {
   const [anio, setAnio] = useState("");
   const [cvv, setCvv] = useState("");
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
+  // Tarjetas que el cliente ya guardó (Mis tarjetas): puede pagar con una sin capturarla de nuevo.
+  const [tarjetas, setTarjetas] = useState<TarjetaGuardada[]>([]);
+  const [tarjetaSel, setTarjetaSel] = useState("");
+  const [usarOtra, setUsarOtra] = useState(false);
   const deviceRef = useRef("");
 
   const confetti = useMemo(() => {
@@ -84,6 +91,19 @@ function PagarTarjetaInner() {
       const { data } = await supabase.from("facturas").select("folio, concepto, monto, estado").eq("id", facturaId).maybeSingle();
       if (data) setDetalle({ titulo: `${data.folio} · ${data.concepto}`, monto: Number(data.monto), pagado: data.estado === "pagada" });
     }
+    // Solo las tarjetas de quien paga (el personal puede leer todas por soporte).
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: guardadas } = await supabase
+      .from("tarjetas_guardadas")
+      .select("id, marca, ultimos4, vence_mes, vence_anio")
+      .eq("user_id", user?.id || "")
+      .eq("activa", true)
+      .order("created_at", { ascending: false });
+    const lista = (guardadas as TarjetaGuardada[]) || [];
+    setTarjetas(lista);
+    if (lista.length > 0) setTarjetaSel(lista[0].id);
     setCargando(false);
   }
 
@@ -110,7 +130,8 @@ function PagarTarjetaInner() {
   }, [retorno, cargando, detalle?.pagado]);
 
   // Carga Openpay.js y su huella antifraude cuando el formulario ya está en pantalla.
-  const formVisible = configurado && !!detalle && !detalle.pagado && !retorno;
+  const usandoGuardada = tarjetas.length > 0 && !usarOtra;
+  const formVisible = configurado && !!detalle && !detalle.pagado && !retorno && !usandoGuardada;
   useEffect(() => {
     if (!formVisible) return;
     let cancelado = false;
@@ -132,6 +153,33 @@ function PagarTarjetaInner() {
       cancelado = true;
     };
   }, [formVisible, merchantId, publicKey, sandbox]);
+
+  // Pago con una tarjeta guardada: el cobro lo hace el servidor con la tarjeta de Openpay.
+  async function pagarGuardada() {
+    setError("");
+    if (!aceptaPolitica) return setError("Para pagar, acepta la política de cancelación y reembolsos");
+    if (!tarjetaSel) return setError("Elige una tarjeta");
+    setProcesando(true);
+    try {
+      const res = await fetch("/api/pagos/pagar-tarjeta-guardada", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pagoId: pagoId || undefined,
+          facturaId: facturaId || undefined,
+          tarjetaId: tarjetaSel,
+          politicaVersion: POLITICA_CANCELACION_VERSION,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || "No se pudo procesar el pago");
+      else if (data.estado === "pagado") setDetalle((d) => (d ? { ...d, pagado: true } : d));
+      else setError("Tu pago está en proceso. Revisa tu estado de cuenta en unos minutos.");
+    } catch {
+      setError("No se pudo conectar. Intenta de nuevo.");
+    }
+    setProcesando(false);
+  }
 
   function pagar(e: React.FormEvent) {
     e.preventDefault();
@@ -265,6 +313,51 @@ function PagarTarjetaInner() {
 
             {retorno ? (
               <p style={{ fontSize: 14, color: "#555" }}>{verificando ? "Confirmando tu pago con el banco…" : ""}</p>
+            ) : usandoGuardada ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                <p className="sub-label">Paga con una de tus tarjetas</p>
+                {tarjetas.map((t) => (
+                  <label
+                    key={t.id}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center",
+                      border: `1px solid ${tarjetaSel === t.id ? "#f07e3a" : "#eee"}`,
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input type="radio" name="tarjeta" checked={tarjetaSel === t.id} onChange={() => setTarjetaSel(t.id)} />
+                    <span style={{ fontSize: 15 }}>
+                      💳 {etiquetaMarca(t.marca)} ···· {t.ultimos4 || "****"}
+                    </span>
+                    {t.vence_mes && t.vence_anio && (
+                      <span style={{ fontSize: 12, color: "#888", marginLeft: "auto" }}>
+                        vence {t.vence_mes}/{String(t.vence_anio).slice(-2)}
+                      </span>
+                    )}
+                  </label>
+                ))}
+                <AceptoPolitica acepto={aceptaPolitica} onChange={setAceptaPolitica} deshabilitado={procesando} />
+                {error && <p style={{ color: "#A32D2D", fontSize: 13, margin: 0 }}>{error}</p>}
+                <button className="reservar-btn" type="button" onClick={pagarGuardada} disabled={procesando || !tarjetaSel || !aceptaPolitica}>
+                  {procesando ? "Procesando…" : `Pagar $${detalle.monto.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`}
+                </button>
+                <button
+                  type="button"
+                  className="tel-borrar-btn"
+                  style={{ color: "#0d1b3e", fontWeight: 600 }}
+                  disabled={procesando}
+                  onClick={() => {
+                    setError("");
+                    setUsarOtra(true);
+                  }}
+                >
+                  Usar otra tarjeta
+                </button>
+              </div>
             ) : !configurado ? (
               <div className="nota-info">
                 El pago con tarjeta todavía no está disponible. Puedes pagar por transferencia SPEI desde tu estado de cuenta.
@@ -325,6 +418,20 @@ function PagarTarjetaInner() {
                 <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
                   🔒 Pago seguro con Openpay. Nodus no guarda ni ve el número de tu tarjeta. Tu banco puede pedirte una verificación.
                 </p>
+                {tarjetas.length > 0 && (
+                  <button
+                    type="button"
+                    className="tel-borrar-btn"
+                    style={{ color: "#0d1b3e", fontWeight: 600, alignSelf: "flex-start" }}
+                    disabled={procesando}
+                    onClick={() => {
+                      setError("");
+                      setUsarOtra(false);
+                    }}
+                  >
+                    ← Usar una tarjeta guardada
+                  </button>
+                )}
                 <AceptoPolitica acepto={aceptaPolitica} onChange={setAceptaPolitica} deshabilitado={procesando} />
                 {sandbox && (
                   <p style={{ fontSize: 12, color: "#a3701f", margin: 0 }}>Modo de pruebas: no se cobra dinero real.</p>
