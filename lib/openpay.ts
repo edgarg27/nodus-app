@@ -126,3 +126,81 @@ export async function crearCargoTarjeta(opts: {
   }
   return data;
 }
+
+// ---------- Clientes y tarjetas guardadas (cobro automático) ----------
+
+export type TarjetaOpenpay = {
+  id: string;
+  brand?: string;
+  card_number?: string; // enmascarado: solo se usan los últimos 4
+  holder_name?: string;
+  expiration_month?: string;
+  expiration_year?: string;
+  bank_name?: string;
+};
+
+async function openpayJson(res: Response, mensajeError: string) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.description || mensajeError);
+  }
+  return data;
+}
+
+/** Crea el cliente en Openpay (las tarjetas guardadas cuelgan de un cliente). */
+export async function crearClienteOpenpay(opts: { nombre: string; email: string; externalId: string }): Promise<{ id: string }> {
+  const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/customers`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({ name: opts.nombre, email: opts.email, external_id: opts.externalId, requires_account: false }),
+  });
+  return openpayJson(res, "No se pudo crear el cliente en Openpay");
+}
+
+/**
+ * Guarda la tarjeta que se tokenizó en el navegador en el cliente de Openpay.
+ * Regresa solo datos enmascarados: el número completo nunca lo tenemos.
+ */
+export async function agregarTarjetaACliente(customerId: string, tokenId: string, deviceSessionId: string): Promise<TarjetaOpenpay> {
+  const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/customers/${customerId}/cards`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({ token_id: tokenId, device_session_id: deviceSessionId }),
+  });
+  return openpayJson(res, "No se pudo guardar la tarjeta en Openpay");
+}
+
+export async function eliminarTarjetaDeCliente(customerId: string, cardId: string): Promise<void> {
+  const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/customers/${customerId}/cards/${cardId}`, {
+    method: "DELETE",
+    headers: { Authorization: authHeader() },
+  });
+  // 404 = ya no existía en Openpay: para nosotros es lo mismo.
+  if (!res.ok && res.status !== 404) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.description || "No se pudo eliminar la tarjeta en Openpay");
+  }
+}
+
+/** Cobra una tarjeta ya guardada (cobro automático: sin que el cliente esté presente). */
+export async function cobrarTarjetaGuardada(opts: {
+  customerId: string;
+  cardId: string;
+  monto: number;
+  descripcion: string;
+  ordenId: string; // único por intento
+}): Promise<CargoTarjeta> {
+  const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/customers/${opts.customerId}/charges`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      method: "card",
+      source_id: opts.cardId,
+      amount: opts.monto,
+      currency: "MXN",
+      description: opts.descripcion.slice(0, 250),
+      order_id: opts.ordenId.slice(0, 100),
+    }),
+  });
+  return openpayJson(res, "No se pudo cobrar la tarjeta guardada");
+}

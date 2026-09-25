@@ -179,6 +179,10 @@ export default function EstadoCuentaPage() {
           </div>
         </div>
 
+        <a className="pagar-btn-full" href="/mis-tarjetas" style={{ marginBottom: 10, display: "block", textAlign: "center" }}>
+          💳 Mis tarjetas y cobro automático
+        </a>
+
         {loading ? (
           <div className="nodus-inline-loading">
             <div className="nodus-spinner nodus-spinner-sm">

@@ -7,6 +7,7 @@ import { clientesConCoworking } from "@/lib/coworking";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
 import { enviarAvisoPago } from "@/lib/correosPagos";
+import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -18,6 +19,9 @@ type Resumen = {
   speiGenerados: number;
   vouchersGenerados: number;
   suspendidos: number;
+  // Cobro automático con tarjeta guardada (ver lib/cobroAutomatico.ts)
+  cobrosAutomaticos: number;
+  cobrosAutomaticosFallidos: number;
   errores: string[];
 };
 
@@ -44,6 +48,9 @@ async function crearFacturaConSpei(
     hoyISO: string;
     fechaVencimiento: string;
     notaSpei: string;
+    // Si el cliente autorizó el cobro automático, primero se intenta cobrar su
+    // tarjeta; solo si falla (o no hay) se genera la CLABE SPEI de respaldo.
+    autopago?: boolean;
   }
 ): Promise<string | undefined> {
   const { data: nuevaFactura } = await admin
@@ -63,6 +70,21 @@ async function crearFacturaConSpei(
   const facturaId = nuevaFactura?.id as string | undefined;
   if (!facturaId) return undefined;
   resumen.facturasGeneradas++;
+
+  if (datos.autopago) {
+    const r = await intentarCobroAutomatico(admin, {
+      userId: datos.userId,
+      facturaId,
+      monto: datos.monto,
+      concepto: datos.concepto,
+      cliente: datos.cliente,
+    });
+    if (r.pagado) {
+      resumen.cobrosAutomaticos++;
+      return facturaId;
+    }
+    if (r.intento) resumen.cobrosAutomaticosFallidos++;
+  }
 
   try {
     const cargo = await crearCargoSPEI({
@@ -154,6 +176,7 @@ async function procesarMensual(
         montoMes !== renta
           ? "Cargo SPEI generado automático (renta mensual + adicionales, mes a mes)"
           : "Cargo SPEI generado automático (renta mensual, mes a mes)",
+      autopago: true,
     });
 
     if (facturaId && esCoworking && cliente.centro && centroTieneUnifi(cliente.centro)) {
@@ -177,7 +200,10 @@ async function procesarMensual(
       }
     }
 
-    if (facturaId && !(await yaExisteNotifEsteMs(admin, userId, "pago_hoy"))) {
+    const { data: estadoFactura } = facturaId
+      ? await admin.from("facturas").select("estado").eq("id", facturaId).maybeSingle()
+      : { data: null };
+    if (facturaId && estadoFactura?.estado !== "pagada" && !(await yaExisteNotifEsteMs(admin, userId, "pago_hoy"))) {
       await admin.from("notificaciones").insert({
         centro: cliente.centro,
         user_id: userId,
@@ -189,6 +215,22 @@ async function procesarMensual(
   }
 
   if (!facturaRenta || facturaRenta.estado === "pagada") return;
+
+  // ---------- Reintento del cobro automático (días 3 y 7) ----------
+  if (diaHoy === 3 || diaHoy === 7) {
+    const r = await intentarCobroAutomatico(admin, {
+      userId,
+      facturaId: facturaRenta.id,
+      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+      concepto: conceptoRenta,
+      cliente,
+    });
+    if (r.pagado) {
+      resumen.cobrosAutomaticos++;
+      return;
+    }
+    if (r.intento) resumen.cobrosAutomaticosFallidos++;
+  }
 
   // ---------- Recordatorio dos días antes del límite ----------
   if (diaHoy === DIA_LIMITE_PAGO_MENSUAL - 2 && !(await yaExisteNotifEsteMs(admin, userId, "recordatorio_pago"))) {
@@ -323,6 +365,8 @@ export async function POST(req: NextRequest) {
     speiGenerados: 0,
     vouchersGenerados: 0,
     suspendidos: 0,
+    cobrosAutomaticos: 0,
+    cobrosAutomaticosFallidos: 0,
     errores: [] as string[],
   };
 
@@ -438,8 +482,23 @@ export async function POST(req: NextRequest) {
           facturaId = nuevaFactura?.id;
           resumen.facturasGeneradas++;
 
-          // SPEI automático para esa factura
+          // Cobro automático con tarjeta, si el cliente lo autorizó (si falla, sigue el SPEI)
+          let pagadaConTarjeta = false;
           if (facturaId) {
+            const r = await intentarCobroAutomatico(admin, {
+              userId,
+              facturaId,
+              monto: Number(montoMes),
+              concepto: `Renta mensual - ${nombreMes}`,
+              cliente,
+            });
+            pagadaConTarjeta = r.pagado;
+            if (r.pagado) resumen.cobrosAutomaticos++;
+            else if (r.intento) resumen.cobrosAutomaticosFallidos++;
+          }
+
+          // SPEI automático para esa factura
+          if (facturaId && !pagadaConTarjeta) {
             try {
               const cargo = await crearCargoSPEI({
                 monto: Number(montoMes),

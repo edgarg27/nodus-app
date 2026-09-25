@@ -123,3 +123,30 @@ export async function enviarGraciasPorPago(admin: Admin, pagoId: string) {
     console.error(`[correosPagos] gracias por pago ${pagoId}:`, e?.message);
   }
 }
+
+// Aviso cuando el cobro automático con tarjeta no se pudo realizar. No trae datos
+// de la tarjeta más que los últimos 4 dígitos.
+export async function enviarCobroAutomaticoFallido(datos: {
+  to: string | null | undefined;
+  nombre: string | null | undefined;
+  ultimos4: string | null | undefined;
+  motivo: string;
+  monto: number;
+  desactivado: boolean;
+}) {
+  if (!datos.to) return;
+  const parrafos = [
+    `Hola ${datos.nombre || "cliente"},`,
+    `No pudimos cobrar <strong>${moneda(datos.monto)}</strong> a tu tarjeta terminación <strong>${datos.ultimos4 || "****"}</strong>. Motivo: ${datos.motivo}.`,
+    "Puedes pagar por transferencia SPEI o con otra tarjeta desde tu estado de cuenta, a más tardar el día 10 para evitar el recargo.",
+  ];
+  if (datos.desactivado) {
+    parrafos.push("Después de varios intentos fallidos desactivamos el cobro automático. Puedes volver a activarlo desde Mis tarjetas.");
+  }
+  const r = await enviarCorreo({
+    to: datos.to,
+    subject: "No pudimos cobrar tu tarjeta — Nodus Flex Center",
+    html: plantilla("No pudimos cobrar tu tarjeta", parrafos),
+  });
+  if (!r.ok) console.error(`[correosPagos] cobro automático fallido a ${datos.to}: ${r.error}`);
+}
