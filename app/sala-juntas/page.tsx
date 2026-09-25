@@ -166,6 +166,9 @@ export default function SalaJuntasPage() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState(false);
+  // Reservación a la que pertenece la carta que se está llenando (viene del aviso
+  // "Entrega de sala" en Reservaciones).
+  const [reservacionCarta, setReservacionCarta] = useState<{ id: string; para: string; espacio: string; fecha: string; hora: string } | null>(null);
 
   const firma1 = useFirma();
   const firma2 = useFirma();
@@ -211,7 +214,34 @@ export default function SalaJuntasPage() {
     setRegistros(data || []);
   }
 
+  // "Firmar carta responsiva" desde Reservaciones: abre la carta ya con los datos de
+  // la reservación (quién la pidió, sala, fecha y hora).
+  async function abrirCartaDeReservacion(reservacionId: string) {
+    const { data: r } = await supabase
+      .from("reservaciones")
+      .select("id, espacio, fecha, hora_inicio, para_nombre, user_id")
+      .eq("id", reservacionId)
+      .single();
+    if (!r) return;
+    let para = r.para_nombre || "";
+    if (!para && r.user_id) {
+      const { data: perfil } = await supabase.from("profiles").select("nombre").eq("id", r.user_id).maybeSingle();
+      para = perfil?.nombre || "";
+    }
+    const horaInicio = (r.hora_inicio || "").slice(0, 5);
+    setReservacionCarta({ id: r.id, para, espacio: r.espacio, fecha: r.fecha, hora: horaInicio });
+    setNombre(para);
+    setTipoSala(r.espacio);
+    setFecha(r.fecha);
+    if (horaInicio) setHora(horaInicio);
+    setEncargadoNombre((actual) => actual || miNombre);
+    setError("");
+    setExito(false);
+    setTab("nuevo");
+  }
+
   function limpiarFormulario() {
+    setReservacionCarta(null);
     setNombre("");
     setCurp("");
     setEncargadoNombre("");
@@ -291,6 +321,7 @@ export default function SalaJuntasPage() {
         archivo_url: archivoUrl,
         encargado_nombre: encargadoNombre,
         registrado_por: user?.id,
+        ...(reservacionCarta ? { reservacion_id: reservacionCarta.id } : {}),
       });
 
       if (insertError) {
@@ -352,6 +383,7 @@ export default function SalaJuntasPage() {
           centrosDisponibles={centrosDisponibles}
           vista="reservaciones"
           embebido
+          onFirmarResponsiva={abrirCartaDeReservacion}
         />
       )}
 
@@ -408,6 +440,14 @@ export default function SalaJuntasPage() {
                 <p className="cli-al-corriente-sub">
                   Se descargó el PDF y quedó guardada en "Registros".
                 </p>
+              </div>
+            )}
+
+            {reservacionCarta && (
+              <div className="nota-info" style={{ marginBottom: 10 }}>
+                📌 Carta de la reservación de <b>{reservacionCarta.para || "el cliente"}</b> · {reservacionCarta.espacio} ·{" "}
+                {reservacionCarta.fecha} {reservacionCarta.hora}. Revisa con quien recibe que la sala esté en orden y anota
+                en Notas lo que falte antes de firmar.
               </div>
             )}
 

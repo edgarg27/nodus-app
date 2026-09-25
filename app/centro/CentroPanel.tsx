@@ -252,6 +252,7 @@ export default function CentroPanel({
   centrosDisponibles,
   vista,
   embebido = false,
+  onFirmarResponsiva,
 }: {
   nombre: string;
   rol: string;
@@ -263,6 +264,8 @@ export default function CentroPanel({
   // Se dibuja dentro de otra pantalla (hoy: pestaña Reservaciones de Sala de
   // Juntas): sin el encabezado azul ni el contenedor "panel" propios.
   embebido?: boolean;
+  // Abre la carta responsiva de una reservación de sala (lo implementa Sala de Juntas).
+  onFirmarResponsiva?: (reservacionId: string) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -345,6 +348,8 @@ export default function CentroPanel({
   const [calError, setCalError] = useState("");
   // A quién se le aparta el espacio: "c:<id de cliente>" o "p:<id de prospecto>".
   const [calPara, setCalPara] = useState("");
+  // Reservaciones que ya tienen su carta responsiva firmada.
+  const [cartasPorReserva, setCartasPorReserva] = useState<Record<string, boolean>>({});
   const [calCargando, setCalCargando] = useState(false);
   const [solicitudesInvitados, setSolicitudesInvitados] = useState<SolicitudInvitado[]>([]);
   const [dayPasses, setDayPasses] = useState<DayPass[]>([]);
@@ -657,6 +662,17 @@ export default function CentroPanel({
     (solsAgendadas || []).forEach((sol) => {
       if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
     });
+
+    const { data: cartasHechas } = await supabase
+      .from("registros_sala_juntas")
+      .select("reservacion_id")
+      .eq("centro", c)
+      .not("reservacion_id", "is", null);
+    const conCarta: Record<string, boolean> = {};
+    (cartasHechas || []).forEach((x) => {
+      if (x.reservacion_id) conCarta[x.reservacion_id] = true;
+    });
+    setCartasPorReserva(conCarta);
 
     setReservaciones(
       (reservas || []).map((r) => ({
@@ -2572,6 +2588,55 @@ export default function CentroPanel({
                     </button>
                   </div>
                 )}
+
+                {onFirmarResponsiva && (() => {
+                  // Entrega de sala: al llegar la hora hay que hacer firmar la carta responsiva
+                  // (la sala se entrega en orden y se anota lo que falte).
+                  const ahora = new Date();
+                  const hoyCarta = calFormatFechaISO(ahora);
+                  const hace3 = calFormatFechaISO(new Date(Date.now() - 3 * 86400000));
+                  const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+                  const minInicio = (h: string) => parseInt(h.split(":")[0]) * 60 + (parseInt(h.split(":")[1]) || 0);
+                  const porFirmar = reservaciones
+                    .filter(
+                      (r) =>
+                        r.estado === "confirmada" &&
+                        !esEspacioCowork(r.espacio) &&
+                        !cartasPorReserva[r.id] &&
+                        !!r.hora_inicio &&
+                        ((r.fecha < hoyCarta && r.fecha >= hace3) ||
+                          (r.fecha === hoyCarta && minInicio(r.hora_inicio as string) - 15 <= minAhora))
+                    )
+                    .sort((a, b) => (a.fecha === b.fecha ? (a.hora_inicio || "").localeCompare(b.hora_inicio || "") : a.fecha < b.fecha ? 1 : -1));
+                  if (porFirmar.length === 0) return null;
+                  return (
+                    <>
+                      <p className="sec-label-red">📝 Entrega de sala: falta la carta responsiva ({porFirmar.length})</p>
+                      {porFirmar.map((r) => (
+                        <div className="reserva-admin-card" key={r.id}>
+                          <div className="reserva-admin-top">
+                            <div>
+                              <p className="reserva-admin-cliente">{r.cliente_nombre}</p>
+                              <p className="reserva-admin-detalle">
+                                {r.espacio} · {r.fecha === hoyCarta ? "Hoy" : r.fecha} · {r.hora}
+                              </p>
+                              <p className="reserva-admin-detalle" style={{ color: r.fecha === hoyCarta ? "#a3701f" : "#A32D2D" }}>
+                                {r.fecha === hoyCarta
+                                  ? "⏰ Ya es la hora: que firme la carta al recibir la sala en orden."
+                                  : "⚠️ Se entregó la sala y no hay carta firmada."}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="reserva-admin-acciones">
+                            <button className="btn-aceptar" onClick={() => onFirmarResponsiva(r.id)}>
+                              📝 Firmar carta responsiva
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
 
                 {(() => {
                   const hoyStr = calFormatFechaISO(new Date());
