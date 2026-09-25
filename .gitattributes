@@ -1,0 +1,5 @@
+# Los scripts que corren en Linux deben terminar las líneas con LF, aunque se editen en Windows.
+*.sh text eol=lf
+Dockerfile text eol=lf
+deploy/Caddyfile text eol=lf
+docker-compose.yml text eol=lf

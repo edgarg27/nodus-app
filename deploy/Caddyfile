@@ -1,0 +1,22 @@
+# Caddy saca el certificado HTTPS solo (Let's Encrypt). Requisito: que el dominio ya
+# apunte (registro DNS tipo A) a la IP del servidor y que los puertos 80 y 443 estén abiertos.
+{$DOMINIO} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Caddy reemplaza el encabezado X-Forwarded-For con la IP real de quien visita: es la
+	# que usa el límite de intentos de la app.
+	reverse_proxy app:8080
+}
+
+# www.tu-dominio.mx -> tu-dominio.mx
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}
