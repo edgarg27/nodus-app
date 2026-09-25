@@ -232,8 +232,13 @@ export default function ProspectosPage() {
           <>
             <p className="panel-section-label">Registrar prospecto</p>
             <form className="form-card" onSubmit={agregarProspecto}>
-              <p className="sub-label">Registrado por</p>
-              <input value={miNombre} disabled style={{ background: "#f2f2f2", color: "#555" }} />
+              <div className="registrado-por">
+                <span className="registrado-por-lbl">Registrado por</span>
+                <span className="registrado-por-chip">
+                  <span className="registrado-por-avatar">{(miNombre.trim()[0] || "?").toUpperCase()}</span>
+                  {miNombre || "—"}
+                </span>
+              </div>
               <div className="tel-form-grid">
                 <input
                   placeholder="Nombre"
