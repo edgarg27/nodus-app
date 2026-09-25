@@ -1,5 +1,6 @@
 "use client";
 
+import AvisoContratoVentas from "./AvisoContratoVentas";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -266,7 +267,7 @@ export default function AdminPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Ventas: contratos que la administradora mandó a firma y todavía no sube a Cincel.
+  // Ventas: contratos que la administradora le mandó a firma y aún no tienen la versión firmada.
   const [contratosPorSubir, setContratosPorSubir] = useState(0);
   async function fetchContratosPorSubir() {
     const { count } = await supabase
@@ -274,7 +275,6 @@ export default function AdminPanel({
       .select("*", { count: "exact", head: true })
       .eq("estatus", "pre_aprobado")
       .not("enviado_a_ventas_at", "is", null)
-      .is("enviado_a_firma_at", null)
       .is("archivo_firmado_url", null);
     setContratosPorSubir(count || 0);
   }
@@ -758,6 +758,7 @@ export default function AdminPanel({
 
   return (
     <div className="panel">
+      {rol === "ventas" && <AvisoContratoVentas />}
       <div className="panel-header">
         <div>
           <p className="panel-header-title">
@@ -1121,7 +1122,7 @@ export default function AdminPanel({
                 <a className="modulo-card" href="/contratos">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por subir)` : ""}</span>
+                  <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por firmar)` : ""}</span>
                 </a>
               </>
             ) : (

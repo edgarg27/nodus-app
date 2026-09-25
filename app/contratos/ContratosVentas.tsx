@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
-import { MENSAJE_VENTAS_DEFAULT } from "@/lib/contratoPasos";
+import FileDropzone from "@/app/soporte/FileDropzone";
 
 type ContratoVentas = {
   id: string;
@@ -17,24 +17,27 @@ type ContratoVentas = {
   archivo_machote_url: string | null;
   enviado_a_ventas_at: string | null;
   enviado_a_firma_at: string | null;
-  mensaje_ventas: string | null;
   archivo_firmado_url: string | null;
   archivo_firmado_at: string | null;
 };
 
+type UltimaVersion = { archivo_url: string; nombre_archivo: string | null; created_at: string };
+
+const COLUMNAS =
+  "id, centro, user_id, cliente_nombre_historico, cliente_email_historico, cliente_empresa_historico, renta_mensual, archivo_url, archivo_machote_url, enviado_a_ventas_at, enviado_a_firma_at, archivo_firmado_url, archivo_firmado_at";
+
 const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-// Lo que ve el rol Ventas al entrar a Contratos: los contratos que la
-// administradora ya mandó a firma (paso 3 del flujo por pasos, ver
-// PasosContrato.tsx). Ventas baja la última versión, la sube a Cincel y deja un
-// mensaje para la administradora; cuando llega el contrato firmado, aquí
-// también aparece.
+// Lo que ve el rol Ventas al entrar a Contratos: la última versión que subió la
+// administradora de cada contrato que le mandó a firma. La firma en sí la hace
+// ella por su cuenta en Cincel; cuando tiene la versión firmada por ambas
+// partes, la sube aquí (o llega al correo de la administradora y la sube ella).
 export default function ContratosVentas() {
   const supabase = createClient();
   const [contratos, setContratos] = useState<ContratoVentas[]>([]);
   const [nombres, setNombres] = useState<Record<string, string>>({});
-  const [ultimaVersion, setUltimaVersion] = useState<Record<string, string>>({});
-  const [mensajes, setMensajes] = useState<Record<string, string>>({});
+  const [ultimaVersion, setUltimaVersion] = useState<Record<string, UltimaVersion>>({});
+  const [archivos, setArchivos] = useState<Record<string, File[]>>({});
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [abriendo, setAbriendo] = useState<string | null>(null);
@@ -46,19 +49,17 @@ export default function ContratosVentas() {
   }, []);
 
   async function cargar() {
-    const columnas =
-      "id, centro, user_id, cliente_nombre_historico, cliente_email_historico, cliente_empresa_historico, renta_mensual, archivo_url, archivo_machote_url, enviado_a_ventas_at, enviado_a_firma_at, mensaje_ventas, archivo_firmado_url, archivo_firmado_at";
     const [{ data: porFirmar }, { data: firmados }] = await Promise.all([
       supabase
         .from("contratos")
-        .select(columnas)
+        .select(COLUMNAS)
         .eq("estatus", "pre_aprobado")
-        .not("enviado_a_ventas_at", "is", null)
+        .or("enviado_a_ventas_at.not.is.null,enviado_a_firma_at.not.is.null")
         .is("archivo_firmado_url", null)
         .order("enviado_a_ventas_at", { ascending: false }),
       supabase
         .from("contratos")
-        .select(columnas)
+        .select(COLUMNAS)
         .not("archivo_firmado_url", "is", null)
         .order("archivo_firmado_at", { ascending: false })
         .limit(15),
@@ -77,15 +78,15 @@ export default function ContratosVentas() {
     if (lista.length > 0) {
       const { data: versiones } = await supabase
         .from("contrato_versiones")
-        .select("contrato_id, archivo_url, created_at")
+        .select("contrato_id, archivo_url, nombre_archivo, created_at")
         .in(
           "contrato_id",
           lista.map((c) => c.id)
         )
         .order("created_at", { ascending: false });
-      const mapa: Record<string, string> = {};
+      const mapa: Record<string, UltimaVersion> = {};
       (versiones || []).forEach((v) => {
-        if (!mapa[v.contrato_id]) mapa[v.contrato_id] = v.archivo_url;
+        if (!mapa[v.contrato_id]) mapa[v.contrato_id] = v;
       });
       setUltimaVersion(mapa);
     }
@@ -104,39 +105,38 @@ export default function ContratosVentas() {
     window.open(firmado, "_blank");
   }
 
-  async function marcarEnCincel(c: ContratoVentas) {
+  // La versión firmada también pasa a archivo_url: es la que ven el cliente,
+  // Ventas y la administradora.
+  async function subirFirmado(c: ContratoVentas) {
+    const file = archivos[c.id]?.[0];
+    if (!file) return;
     setOcupado(c.id);
     setError("");
-    const mensaje = (mensajes[c.id] ?? MENSAJE_VENTAS_DEFAULT).trim() || MENSAJE_VENTAS_DEFAULT;
+    const ext = file.name.split(".").pop() || "pdf";
+    const nombre = `${c.user_id || c.id}-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("contratos")
+      .upload(nombre, file, { contentType: file.type || undefined, upsert: true });
+    if (upErr) {
+      setError("No se pudo subir el archivo: " + upErr.message);
+      setOcupado(null);
+      return;
+    }
+    const url = supabase.storage.from("contratos").getPublicUrl(nombre).data.publicUrl;
     const { error: updErr } = await supabase
       .from("contratos")
-      .update({ enviado_a_firma_at: new Date().toISOString(), mensaje_ventas: mensaje })
+      .update({ archivo_firmado_url: url, archivo_firmado_at: new Date().toISOString(), archivo_url: url })
       .eq("id", c.id);
     setOcupado(null);
     if (updErr) {
-      setError("No se pudo guardar: " + updErr.message);
+      setError("No se pudo guardar la versión firmada: " + updErr.message);
       return;
     }
+    setArchivos((prev) => ({ ...prev, [c.id]: [] }));
     cargar();
   }
 
-  async function deshacer(c: ContratoVentas) {
-    setOcupado(c.id);
-    setError("");
-    const { error: updErr } = await supabase
-      .from("contratos")
-      .update({ enviado_a_firma_at: null, mensaje_ventas: null })
-      .eq("id", c.id);
-    setOcupado(null);
-    if (updErr) {
-      setError("No se pudo deshacer: " + updErr.message);
-      return;
-    }
-    cargar();
-  }
-
-  const porSubir = contratos.filter((c) => !c.archivo_firmado_url && !c.enviado_a_firma_at);
-  const enCincel = contratos.filter((c) => !c.archivo_firmado_url && c.enviado_a_firma_at);
+  const porFirmar = contratos.filter((c) => !c.archivo_firmado_url);
   const firmados = contratos.filter((c) => !!c.archivo_firmado_url);
 
   const nombreDe = (c: ContratoVentas) =>
@@ -161,88 +161,79 @@ export default function ContratosVentas() {
 
   return (
     <>
-        {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
+      {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
-        <p className="panel-section-label">✍ Contratos por subir a Cincel ({porSubir.length})</p>
-        {cargando ? (
-          <div className="empty-card">Cargando…</div>
-        ) : porSubir.length === 0 ? (
-          <div className="empty-card">No hay contratos esperando: cuando la administradora suba uno a firma, aparece aquí.</div>
-        ) : (
-          porSubir.map((c) => {
-            const archivo = ultimaVersion[c.id] || c.archivo_machote_url || c.archivo_url;
-            return tarjeta(
-              c,
-              <>
-                <p className="contrato-detalle">Enviado por la administradora el {fecha(c.enviado_a_ventas_at!)}</p>
-                {archivo && (
-                  <button type="button" className="ver-pdf-btn" onClick={() => abrir(archivo)} disabled={abriendo === archivo}>
-                    {abriendo === archivo ? "Abriendo…" : "📥 Descargar la última versión"}
-                  </button>
-                )}
-                <p className="sub-label" style={{ marginTop: 10 }}>
-                  Mensaje para la administradora
-                </p>
-                <textarea
-                  value={mensajes[c.id] ?? MENSAJE_VENTAS_DEFAULT}
-                  onChange={(e) => setMensajes((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                  rows={3}
-                  style={{ width: "100%", border: "1px solid #eee", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}
-                />
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button className="btn-aceptar" onClick={() => marcarEnCincel(c)} disabled={ocupado === c.id}>
-                    {ocupado === c.id ? "Guardando…" : "📨 Ya lo subí a Cincel"}
+      <p className="panel-section-label">✍ Contratos por firmar ({porFirmar.length})</p>
+      {cargando ? (
+        <div className="empty-card">Cargando…</div>
+      ) : porFirmar.length === 0 ? (
+        <div className="empty-card">No hay contratos por firmar: cuando la administradora suba uno a firma, aparece aquí.</div>
+      ) : (
+        porFirmar.map((c) => {
+          const v = ultimaVersion[c.id];
+          const archivo = v?.archivo_url || c.archivo_machote_url || c.archivo_url;
+          const enviado = c.enviado_a_ventas_at || c.enviado_a_firma_at;
+          return tarjeta(
+            c,
+            <>
+              <p className="contrato-detalle">
+                Última versión que subió la administradora{v ? ` · ${fecha(v.created_at)}` : ""}
+                {enviado ? ` · enviada a firma el ${fecha(enviado)}` : ""}
+              </p>
+              {archivo && (
+                <button
+                  type="button"
+                  className="ver-pdf-btn"
+                  style={{ maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word", textAlign: "left" }}
+                  onClick={() => abrir(archivo)}
+                  disabled={abriendo === archivo}
+                >
+                  {abriendo === archivo ? "Abriendo…" : `📥 ${v?.nombre_archivo || "Ver la última versión"}`}
+                </button>
+              )}
+              <p className="sub-label" style={{ marginTop: 10 }}>
+                Cuando tengas la versión firmada por ambas partes, súbela aquí
+              </p>
+              <FileDropzone
+                files={archivos[c.id] || []}
+                onChange={(f) => setArchivos((prev) => ({ ...prev, [c.id]: f }))}
+                maxFiles={1}
+                accept="application/pdf,.pdf"
+                etiquetaTipos="PDF"
+              />
+              {(archivos[c.id] || []).length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn-aceptar" onClick={() => subirFirmado(c)} disabled={ocupado === c.id}>
+                    {ocupado === c.id ? "Subiendo…" : "⬆ Subir versión firmada"}
                   </button>
                 </div>
+              )}
+            </>
+          );
+        })
+      )}
+
+      {firmados.length > 0 && (
+        <>
+          <p className="panel-section-label">✅ Contratos firmados ({firmados.length})</p>
+          {firmados.map((c) =>
+            tarjeta(
+              c,
+              <>
+                {c.archivo_firmado_at && <p className="contrato-detalle">Firmado y cargado el {fecha(c.archivo_firmado_at)}</p>}
+                <button
+                  type="button"
+                  className="ver-pdf-btn"
+                  onClick={() => abrir(c.archivo_firmado_url!)}
+                  disabled={abriendo === c.archivo_firmado_url}
+                >
+                  {abriendo === c.archivo_firmado_url ? "Abriendo…" : "📥 Ver contrato firmado"}
+                </button>
               </>
-            );
-          })
-        )}
-
-        {enCincel.length > 0 && (
-          <>
-            <p className="panel-section-label">📨 En Cincel · esperando firmas ({enCincel.length})</p>
-            {enCincel.map((c) =>
-              tarjeta(
-                c,
-                <>
-                  <p className="contrato-detalle">Subido a Cincel el {fecha(c.enviado_a_firma_at!)}</p>
-                  {c.mensaje_ventas && <p className="paso-mensaje">💬 {c.mensaje_ventas}</p>}
-                  <p className="contrato-detalle">
-                    Cuando llegue al correo de la administradora el contrato firmado, lo sube ella y aparece abajo.
-                  </p>
-                  <div style={{ marginTop: 6 }}>
-                    <button className="tel-borrar-btn" onClick={() => deshacer(c)} disabled={ocupado === c.id}>
-                      ↩ Deshacer (no lo había subido)
-                    </button>
-                  </div>
-                </>
-              )
-            )}
-          </>
-        )}
-
-        {firmados.length > 0 && (
-          <>
-            <p className="panel-section-label">✅ Contratos firmados ({firmados.length})</p>
-            {firmados.map((c) =>
-              tarjeta(
-                c,
-                <>
-                  {c.archivo_firmado_at && <p className="contrato-detalle">Firmado y cargado el {fecha(c.archivo_firmado_at)}</p>}
-                  <button
-                    type="button"
-                    className="ver-pdf-btn"
-                    onClick={() => abrir(c.archivo_firmado_url!)}
-                    disabled={abriendo === c.archivo_firmado_url}
-                  >
-                    {abriendo === c.archivo_firmado_url ? "Abriendo…" : "📥 Ver contrato firmado"}
-                  </button>
-                </>
-              )
-            )}
-          </>
-        )}
+            )
+          )}
+        </>
+      )}
     </>
   );
 }

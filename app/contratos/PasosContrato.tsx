@@ -28,8 +28,6 @@ export default function PasosContrato({
   const supabase = createClient();
   const [datos, setDatos] = useState({
     enviado_a_ventas_at: contrato.enviado_a_ventas_at ?? null,
-    enviado_a_firma_at: contrato.enviado_a_firma_at ?? null,
-    mensaje_ventas: contrato.mensaje_ventas ?? null,
     archivo_firmado_url: contrato.archivo_firmado_url ?? null,
   });
   const [versiones, setVersiones] = useState<Version[]>([]);
@@ -117,7 +115,7 @@ export default function PasosContrato({
     try {
       const ahora = new Date().toISOString();
       await actualizarContrato({ enviado_a_ventas_at: ahora, enviado_a_firma_at: null, mensaje_ventas: null });
-      setDatos((d) => ({ ...d, enviado_a_ventas_at: ahora, enviado_a_firma_at: null, mensaje_ventas: null }));
+      setDatos((d) => ({ ...d, enviado_a_ventas_at: ahora }));
       setConfirmandoFirma(false);
       onCambio();
     } catch (e: any) {
@@ -165,9 +163,8 @@ export default function PasosContrato({
 
   const hayVersion = versiones.length > 0;
   // Contratos que ya estaban "en Cincel" antes de este flujo no tienen fecha de envío a ventas.
-  const enviadoVentas = !!datos.enviado_a_ventas_at || !!datos.enviado_a_firma_at;
-  const fechaEnvioVentas = datos.enviado_a_ventas_at || datos.enviado_a_firma_at;
-  const enCincel = !!datos.enviado_a_firma_at;
+  const enviadoVentas = !!datos.enviado_a_ventas_at || !!contrato.enviado_a_firma_at;
+  const fechaEnvioVentas = datos.enviado_a_ventas_at || contrato.enviado_a_firma_at;
   const firmado = !!datos.archivo_firmado_url;
   const clase = (hecho: boolean, actual: boolean) => "paso" + (hecho ? " paso-hecho" : actual ? " paso-actual" : "");
 
@@ -240,7 +237,7 @@ export default function PasosContrato({
               <p className="paso-desc">
                 Enviado a Ventas el {fecha(fechaEnvioVentas!)}. Le aparece la última versión que subiste.
               </p>
-              {!enCincel && (
+              {!firmado && (
                 <button type="button" className="tel-borrar-btn" onClick={deshacerEnvio} disabled={ocupado === "deshacer"}>
                   ↩ Deshacer (quiero subir otra versión)
                 </button>
@@ -272,31 +269,29 @@ export default function PasosContrato({
       </div>
 
       {/* 4 */}
-      <div className={clase(enCincel, enviadoVentas && !enCincel)}>
-        <span className="paso-num">{enCincel ? "✓" : "4"}</span>
+      <div className={clase(firmado, enviadoVentas && !firmado)}>
+        <span className="paso-num">{firmado ? "✓" : "4"}</span>
         <div className="paso-cuerpo">
-          <p className="paso-nombre">Ventas lo sube a Cincel</p>
-          {enCincel ? (
-            <>
-              <p className="paso-desc">Ventas lo subió a Cincel el {fecha(datos.enviado_a_firma_at!)}.</p>
-              {datos.mensaje_ventas && <p className="paso-mensaje">💬 {datos.mensaje_ventas}</p>}
-            </>
-          ) : enviadoVentas ? (
-            <p className="paso-desc">⏳ Ventas todavía no lo sube a Cincel. Aquí verás su mensaje cuando lo haga.</p>
+          <p className="paso-nombre">Ventas hace la firma en Cincel</p>
+          {enviadoVentas ? (
+            <p className="paso-desc">
+              💼 Ventas ya tiene la última versión que subiste y se encarga de la firma en Cincel. No tienes que hacer nada
+              en este paso.
+            </p>
           ) : (
-            <p className="paso-desc">Lo hace Ventas desde su panel, después del paso 3.</p>
+            <p className="paso-desc">Se activa cuando subas a firma (paso 3): a Ventas le aparece la última versión.</p>
           )}
         </div>
       </div>
 
       {/* 5 */}
-      <div className={clase(firmado, enCincel && !firmado)}>
+      <div className={clase(firmado, enviadoVentas && !firmado)}>
         <span className="paso-num">{firmado ? "✓" : "5"}</span>
         <div className="paso-cuerpo">
           <p className="paso-nombre">Sube la versión firmada</p>
           <p className="paso-desc">
-            Cuando llegue a tu correo el contrato firmado por ambas partes, súbelo aquí. Esa es la versión que verán el
-            cliente, Ventas y tú.
+            El contrato firmado por ambas partes llega a tu correo, o Ventas lo sube cuando lo tiene. Si ya lo tienes,
+            súbelo aquí; si Ventas ya lo subió, lo ves abajo. Es la versión que verán el cliente, Ventas y tú.
           </p>
           {firmado && (
             <div className="paso-archivo">
@@ -326,9 +321,6 @@ export default function PasosContrato({
                 <button type="button" className="btn-aceptar" onClick={subirFirmado} disabled={ocupado === "firmado"} style={{ marginTop: 6 }}>
                   {ocupado === "firmado" ? "Subiendo…" : firmado ? "⬆ Reemplazar versión firmada" : "⬆ Subir versión firmada"}
                 </button>
-              )}
-              {!enCincel && !firmado && (
-                <p className="paso-aviso">Ventas todavía no marca que lo subió a Cincel; puedes subirlo igual si ya tienes el firmado.</p>
               )}
             </>
           )}
