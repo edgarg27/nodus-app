@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { generarContratoDocx, normalizarTipoEspacioContrato } from "@/lib/contratoDocx";
 import { rentaMensualConIva } from "@/lib/formaPago";
+import { normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id } = await req.json();
+  const { id, fiscal } = await req.json();
   if (!id) {
     return NextResponse.json({ error: "Falta el id de la cotización" }, { status: 400 });
   }
@@ -127,6 +128,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "La sala se reservó pero no se pudo marcar la cotización como aceptada." }, { status: 500 });
     }
     return NextResponse.json({ ok: true, contrato: null, reservada: true });
+  }
+  // Datos fiscales que se piden al aceptar (ya no se piden al cotizar): se validan,
+  // se guardan en la venta y en la cuenta del cliente si ya la tiene, y siguen al
+  // contrato.
+  if (fiscal) {
+    const tipoP = venta.tipo_persona === "moral" ? "moral" : "fisica";
+    const datos = {
+      rfc: normalizarRfc(fiscal.rfc),
+      nombre_fiscal: String(fiscal.nombre_fiscal || "").trim(),
+      regimen_fiscal: String(fiscal.regimen_fiscal || ""),
+      cp_fiscal: String(fiscal.cp_fiscal || "").trim(),
+      uso_cfdi: String(fiscal.uso_cfdi || ""),
+    };
+    const msg = validarDatosFiscales(datos, tipoP);
+    if (msg) return NextResponse.json({ error: msg }, { status: 400 });
+    const cambiosVenta: Record<string, string | null> = { ...datos };
+    if (tipoP === "moral") cambiosVenta.razon_social = datos.nombre_fiscal;
+    const { error: fiscalError } = await admin.from("cotizaciones_comerciales").update(cambiosVenta).eq("id", venta.id);
+    if (fiscalError) {
+      return NextResponse.json({ error: "No se pudieron guardar los datos fiscales: " + fiscalError.message }, { status: 500 });
+    }
+    Object.assign(venta, cambiosVenta);
+    if (venta.cliente_id) await admin.from("profiles").update(datos).eq("id", venta.cliente_id);
   }
   if (!venta.rfc || !String(venta.rfc).trim()) {
     return NextResponse.json({ error: "Falta el RFC del cliente — captúralo al cotizar en CotizarForm." }, { status: 400 });
@@ -245,6 +269,10 @@ export async function POST(req: NextRequest) {
       paquete_id: venta.paquete_id ?? null,
       oficina_id: venta.oficina_id ?? null,
       rfc: rfcLimpio,
+      nombre_fiscal: venta.nombre_fiscal ?? null,
+      regimen_fiscal: venta.regimen_fiscal ?? null,
+      cp_fiscal: venta.cp_fiscal ?? null,
+      uso_cfdi: venta.uso_cfdi ?? null,
     };
 
     const { data: contratoCreado, error: insertError } = contratoExistente

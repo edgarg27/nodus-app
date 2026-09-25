@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { nombre, email, empresa, rfc, telefono, centro: centroBody, diaPago } = body;
+  const { nombre, email, empresa, rfc, telefono, centro: centroBody, diaPago, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi } = body;
 
   const centro = miProfile.rol === "sistemas" || miProfile.rol === "superadmin" || miProfile.rol === "gerente" ? centroBody : miProfile.centro;
 
@@ -86,6 +86,10 @@ export async function POST(req: NextRequest) {
     ciudad: CIUDAD_POR_CENTRO[centro] || null,
     empresa: empresa ? normalizarEmpresa(empresa) : null,
     rfc: rfc || null,
+    // Datos fiscales capturados al aceptar la cotización (si los hay).
+    ...(regimen_fiscal || cp_fiscal || nombre_fiscal
+      ? { nombre_fiscal: nombre_fiscal || null, regimen_fiscal: regimen_fiscal || null, cp_fiscal: cp_fiscal || null, uso_cfdi: uso_cfdi || null }
+      : {}),
     numero_usuario: numeroUsuario,
     telefono: telefono || null,
     dia_pago: diaPago ? Number(diaPago) : null,

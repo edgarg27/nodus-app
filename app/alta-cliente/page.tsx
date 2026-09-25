@@ -38,6 +38,10 @@ type ContratoPendiente = {
   cotizacion_id: string | null;
   oficina_id: string | null;
   rfc: string | null;
+  nombre_fiscal?: string | null;
+  regimen_fiscal?: string | null;
+  cp_fiscal?: string | null;
+  uso_cfdi?: string | null;
   nombreContesta: string | null;
   telefono: string | null;
   correo: string | null;
@@ -165,7 +169,7 @@ function AltaClienteInner() {
     const { data: conts } = await supabase
       .from("contratos")
       .select(
-        "id, fecha_inicio, fecha_vencimiento, renta_mensual, forma_pago, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc, cliente_empresa_historico"
+        "id, fecha_inicio, fecha_vencimiento, renta_mensual, forma_pago, horas_sala_juntas, deposito_garantia, estatus, cotizacion_id, oficina_id, rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi, cliente_empresa_historico"
       )
       .is("user_id", null)
       .eq("centro", c)
@@ -224,6 +228,12 @@ function AltaClienteInner() {
 
   function seleccionarContrato(c: ContratoPendiente) {
     setContratoSeleccionadoId(c.id);
+    // Datos fiscales que se capturaron al aceptar la cotización: pasan a la cuenta nueva.
+    setFiscalContrato(
+      c.regimen_fiscal || c.cp_fiscal || c.nombre_fiscal
+        ? { nombre_fiscal: c.nombre_fiscal || "", regimen_fiscal: c.regimen_fiscal || "", cp_fiscal: c.cp_fiscal || "", uso_cfdi: c.uso_cfdi || "" }
+        : null
+    );
     setBusquedaContrato(c.nombreContesta || c.tipoEspacio || "Contrato");
     setMostrarListaContratos(false);
     if (c.nombreContesta || c.telefono || c.correo || c.rfc || c.razonSocial || c.empresaHistorica) {
@@ -239,6 +249,7 @@ function AltaClienteInner() {
   }
 
   function limpiarContrato() {
+    setFiscalContrato(null);
     setContratoSeleccionadoId("");
     setBusquedaContrato("");
     setMostrarListaContratos(false);
@@ -328,6 +339,12 @@ function AltaClienteInner() {
     telefono: telefonoDesdeUrl,
     diaPago: diaPagoDesdeUrl,
   });
+  const [fiscalContrato, setFiscalContrato] = useState<{
+    nombre_fiscal: string;
+    regimen_fiscal: string;
+    cp_fiscal: string;
+    uso_cfdi: string;
+  } | null>(null);
   const [guardandoCliente, setGuardandoCliente] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [errorCliente, setErrorCliente] = useState("");
@@ -373,6 +390,7 @@ function AltaClienteInner() {
           email: formCliente.email,
           empresa: formCliente.empresa,
           rfc: formCliente.rfc,
+          ...(fiscalContrato || {}),
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
           centro,
