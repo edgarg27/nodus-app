@@ -117,6 +117,12 @@ export default function PasosContrato({
       await actualizarContrato({ enviado_a_ventas_at: ahora, enviado_a_firma_at: null, mensaje_ventas: null });
       setDatos((d) => ({ ...d, enviado_a_ventas_at: ahora }));
       setConfirmandoFirma(false);
+      // Aviso para Ventas (solo lo ve ese rol, ver AdminPanel → fetchNotificaciones).
+      await supabase.from("notificaciones").insert({
+        centro: contrato.centro,
+        tipo: "contrato_a_firma",
+        mensaje: `La administradora subió a firma el contrato de ${contrato.cliente_nombre || contrato.cliente_nombre_historico || "un cliente"}: es la última versión que subió.`,
+      });
       onCambio();
     } catch (e: any) {
       setError("No se pudo subir a firma: " + (e?.message || "intenta de nuevo"));
