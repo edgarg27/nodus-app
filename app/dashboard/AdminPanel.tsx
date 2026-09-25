@@ -262,8 +262,22 @@ export default function AdminPanel({
     fetchBannersPromocionales(supabase).then(setBannersPromo);
     fetchBannersLogros();
     if (rol === "sistemas") fetchUltimosTicketsSistemas();
+    if (rol === "ventas") fetchContratosPorSubir();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ventas: contratos que la administradora mandó a firma y todavía no sube a Cincel.
+  const [contratosPorSubir, setContratosPorSubir] = useState(0);
+  async function fetchContratosPorSubir() {
+    const { count } = await supabase
+      .from("contratos")
+      .select("*", { count: "exact", head: true })
+      .eq("estatus", "pre_aprobado")
+      .not("enviado_a_ventas_at", "is", null)
+      .is("enviado_a_firma_at", null)
+      .is("archivo_firmado_url", null);
+    setContratosPorSubir(count || 0);
+  }
 
   async function fetchUltimosTicketsSistemas() {
     const { data } = await supabase
@@ -1107,7 +1121,7 @@ export default function AdminPanel({
                 <a className="modulo-card" href="/contratos">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Contratos</span>
+                  <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por subir)` : ""}</span>
                 </a>
               </>
             ) : (

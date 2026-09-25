@@ -9,6 +9,7 @@ import { conIva } from "@/lib/adicionales";
 import { etiquetaFormaPago } from "@/lib/formaPago";
 import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
+import ContratosVentas from "./ContratosVentas";
 
 // Lead de la pestaña Prospectos de Centro — todavía sin cuenta (profiles.id).
 // "+ Nuevo contrato" liga uno de estos, nunca un cliente ya existente: la
@@ -607,7 +608,10 @@ export default function ContratosPage() {
       </div>
 
       <div className="rep-content">
-        {!centro ? (
+        {miRol === "ventas" ? (
+          // Ventas no administra contratos: ve los que le mandan a firma.
+          <ContratosVentas />
+        ) : !centro ? (
           <div className="empty-card">Tu cuenta no tiene un centro asignado</div>
         ) : loading ? (
           <div className="nodus-inline-loading">
