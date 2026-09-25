@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AdminPanel from "./AdminPanel";
+import PanelVentas from "./PanelVentas";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 
@@ -28,6 +29,11 @@ export default async function DashboardPage() {
   // candado — no puede confiar en que siempre lleguen por esa puerta.
   if (!profile?.rol) redirect("/login");
   if (profile.rol === "cliente") redirect("/dashboard-cliente");
+
+  // Ventas solo ve los contratos que la administradora manda a firma (ver PanelVentas).
+  if (profile.rol === "ventas") {
+    return <PanelVentas nombre={profile.nombre || session.user.email || "Ventas"} rol={profile.rol} centro={profile.centro || null} />;
+  }
 
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;
