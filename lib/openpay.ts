@@ -75,3 +75,54 @@ export async function consultarCargo(chargeId: string): Promise<CargoSPEI> {
   }
   return data;
 }
+
+export type CargoTarjeta = {
+  id: string;
+  status: string; // "completed" | "charge_pending" | "in_progress" | "failed"…
+  amount: number;
+  error_message?: string;
+  // Con 3D Secure el banco pide una verificación: Openpay regresa la liga a la
+  // que hay que mandar al cliente.
+  payment_method?: { type: string; url?: string };
+};
+
+/**
+ * Cobra una tarjeta con el token que generó Openpay.js en el navegador. Nodus
+ * nunca recibe el número de la tarjeta, solo `tokenId` y `deviceSessionId`
+ * (huella antifraude). Con 3D Secure activo, si el banco pide verificar al
+ * cliente el cargo queda "charge_pending" y regresa la liga de verificación en
+ * `payment_method.url`; al terminar, el cliente vuelve a `redirectUrl`.
+ */
+export async function crearCargoTarjeta(opts: {
+  tokenId: string;
+  deviceSessionId: string;
+  monto: number;
+  descripcion: string;
+  ordenId: string; // único por intento: Openpay rechaza order_id repetidos
+  nombre: string;
+  email: string;
+  redirectUrl: string;
+}): Promise<CargoTarjeta> {
+  const res = await fetch(`${OPENPAY_URL}/${MERCHANT_ID}/charges`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      method: "card",
+      source_id: opts.tokenId,
+      amount: opts.monto,
+      currency: "MXN",
+      description: opts.descripcion.slice(0, 250),
+      order_id: opts.ordenId.slice(0, 100),
+      device_session_id: opts.deviceSessionId,
+      customer: { name: opts.nombre, email: opts.email },
+      use_3d_secure: true,
+      redirect_url: opts.redirectUrl,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.description || "No se pudo procesar el cargo con tarjeta");
+  }
+  return data;
+}

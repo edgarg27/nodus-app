@@ -4,8 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 // Público, sin sesión — el link de /encuesta/{token} se manda por correo
 // a cuentas reales del portal Y a contactos sin cuenta (tabla `clientes`),
 // así que responder nunca puede depender de tener sesión. El `token` es
-// lo único que protege un envío (mismo criterio que /pagar-simulado/[id]
-// con su UUID de pago) — por eso siempre se usa createAdminClient() aquí,
+// lo único que protege un envío — por eso siempre se usa createAdminClient() aquí,
 // nunca una consulta directa del navegador con la anon key.
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const admin = createAdminClient();

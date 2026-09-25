@@ -4,10 +4,9 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 
 // Genera un registro de cobro suelto (sin factura ni cargo SPEI) para el
 // módulo Cotizar: renta/depósito/adicionales al aprobar un contrato, o el
-// pago inicial de una reserva. No hay dinero real de por medio — el
-// cliente confirma manualmente desde /pagar-simulado/{id} (botón "Simular
-// pago" → POST /api/pagos/simular), igual que documenta
-// DOCUMENTACION_FACTURAS.md sección 1.1.
+// pago inicial de una reserva. El cliente lo paga con tarjeta desde
+// /pagar-tarjeta?pagoId={id} (Openpay), o el staff lo marca pagado a mano en
+// /pagos (POST /api/pagos/marcar-pagado). Ya no existe el botón "Simular pago".
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {

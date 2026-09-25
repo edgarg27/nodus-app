@@ -212,6 +212,9 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
+                    <a className="pagar-btn-full vencida" href={`/pagar-tarjeta?facturaId=${f.id}`} style={{ marginBottom: 6 }}>
+                      💳 Pagar con tarjeta
+                    </a>
                     <a
                       className="pagar-btn-full vencida"
                       href={`/pagar-spei?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}`}
@@ -253,6 +256,9 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
+                    <a className="pagar-btn-full" href={`/pagar-tarjeta?facturaId=${f.id}`} style={{ marginBottom: 6 }}>
+                      💳 Pagar con tarjeta
+                    </a>
                     <a
                       className="pagar-btn-full"
                       href={`/pagar-spei?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}`}
@@ -292,7 +298,7 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full" href={`/pagar-simulado/${p.id}`}>
+                    <a className="pagar-btn-full" href={`/pagar-tarjeta?pagoId=${p.id}`}>
                       💳 Ir a pagar
                     </a>
                   </div>
