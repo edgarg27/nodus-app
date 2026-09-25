@@ -395,7 +395,7 @@ export default function ProspectosPage() {
                               </select>
                               <a
                                 className="tel-borrar-btn"
-                                style={{ color: "#0d1b3e", fontWeight: 600 }}
+                                style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
                                 href={`/registrar-plan?centro=${encodeURIComponent(p.centro || centro || "")}&prospectoId=${encodeURIComponent(
                                   p.id
                                 )}&prospectoNombre=${encodeURIComponent(
@@ -407,19 +407,6 @@ export default function ProspectosPage() {
                                 )}`}
                               >
                                 🧾 Cotizar
-                              </a>
-                              <a
-                                className="tel-borrar-btn"
-                                style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                href={`/alta-cliente?nombre=${encodeURIComponent(p.nombre)}&email=${encodeURIComponent(
-                                  p.email || ""
-                                )}&telefono=${encodeURIComponent(p.telefono || "")}&empresa=${encodeURIComponent(
-                                  p.empresa || ""
-                                )}&rfc=${encodeURIComponent(p.rfc || "")}&diaPago=${encodeURIComponent(
-                                  p.dia_pago != null ? String(p.dia_pago) : ""
-                                )}&prospectoId=${encodeURIComponent(p.id)}`}
-                              >
-                                👤 Nuevo cliente
                               </a>
                               <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
                                 🗑
