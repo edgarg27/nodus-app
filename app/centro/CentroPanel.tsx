@@ -8,6 +8,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
@@ -62,7 +63,7 @@ type Prospecto = {
   // confirmarProspectoPerdido más abajo).
   comentario_perdido?: string | null;
 };
-type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
+type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; para_nombre?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
 type Notificacion = { id: string; tipo: string; categoria: string | null; mensaje: string; leida: boolean; created_at: string; reservacion_id: string | null };
 type TipoSolicitudInvitado =
   | "sala_juntas"
@@ -251,6 +252,7 @@ export default function CentroPanel({
   centrosDisponibles,
   vista,
   embebido = false,
+  onFirmarResponsiva,
 }: {
   nombre: string;
   rol: string;
@@ -262,6 +264,8 @@ export default function CentroPanel({
   // Se dibuja dentro de otra pantalla (hoy: pestaña Reservaciones de Sala de
   // Juntas): sin el encabezado azul ni el contenedor "panel" propios.
   embebido?: boolean;
+  // Abre la carta responsiva de una reservación de sala (lo implementa Sala de Juntas).
+  onFirmarResponsiva?: (reservacionId: string) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -337,11 +341,17 @@ export default function CentroPanel({
   const [calEspacio, setCalEspacio] = useState("");
   const [calInicioSemana, setCalInicioSemana] = useState(calLunesDeLaSemana(new Date()));
   const [calReservas, setCalReservas] = useState<
-    { id: string; espacio: string; fecha: string; hora_inicio: string; hora_fin: string; estado: string; user_id: string; cliente_nombre: string | null }[]
+    { id: string; espacio: string; fecha: string; hora_inicio: string; hora_fin: string; estado: string; user_id: string; cliente_nombre: string | null; para_nombre?: string | null }[]
   >([]);
   const [calSeleccion, setCalSeleccion] = useState<{ fecha: string; horaInicio: number; horaFin: number } | null>(null);
   const [calGuardando, setCalGuardando] = useState(false);
   const [calError, setCalError] = useState("");
+  // A quién se le aparta el espacio: "c:<id de cliente>" o "p:<id de prospecto>".
+  const [calPara, setCalPara] = useState("");
+  // Ventana que pregunta a quién se le aparta el horario al pulsar "Reservar".
+  const [calPreguntaPara, setCalPreguntaPara] = useState(false);
+  // Reservaciones que ya tienen su carta responsiva firmada.
+  const [cartasPorReserva, setCartasPorReserva] = useState<Record<string, boolean>>({});
   const [calCargando, setCalCargando] = useState(false);
   const [solicitudesInvitados, setSolicitudesInvitados] = useState<SolicitudInvitado[]>([]);
   const [dayPasses, setDayPasses] = useState<DayPass[]>([]);
@@ -497,6 +507,16 @@ export default function CentroPanel({
 
   async function fetchTodo(c: string) {
     setLoading(true);
+    // Una solicitud de reservación que sigue pendiente cuando ya pasó su fecha
+    // se cancela sola, para que no estorbe en "Pendientes de confirmar".
+    const hoyVencidas = hoyMexicoISO();
+    await supabase
+      .from("reservaciones")
+      .update({ estado: "cancelada" })
+      .eq("centro", c)
+      .eq("estado", "pendiente")
+      .lt("fecha", hoyVencidas)
+      .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`);
     const [
       { data: clis },
       { data: ofis },
@@ -530,7 +550,7 @@ export default function CentroPanel({
       supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
       supabase
         .from("reservaciones")
-        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
+        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
         .eq("centro", c)
         .order("fecha", { ascending: false }),
       supabase
@@ -633,10 +653,38 @@ export default function CentroPanel({
       });
     }
 
+    // Reservaciones que el admin agendó a partir de una solicitud de invitado: se
+    // muestra el nombre de quien la pidió, no el de quien la capturó.
+    const { data: solsAgendadas } = await supabase
+      .from("solicitudes_invitados")
+      .select("reservacion_id, nombre")
+      .eq("centro", c)
+      .not("reservacion_id", "is", null);
+    const invitadoPorReserva: Record<string, string> = {};
+    (solsAgendadas || []).forEach((sol) => {
+      if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
+    });
+
+    const { data: cartasHechas } = await supabase
+      .from("registros_sala_juntas")
+      .select("reservacion_id")
+      .eq("centro", c)
+      .not("reservacion_id", "is", null);
+    const conCarta: Record<string, boolean> = {};
+    (cartasHechas || []).forEach((x) => {
+      if (x.reservacion_id) conCarta[x.reservacion_id] = true;
+    });
+    setCartasPorReserva(conCarta);
+
     setReservaciones(
       (reservas || []).map((r) => ({
         ...r,
-        cliente_nombre: (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
+        cliente_nombre:
+          r.para_nombre ||
+          (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) ||
+          invitadoPorReserva[r.id] ||
+          nombrePorId[r.user_id] ||
+          "Cliente",
         paquete_label: r.cotizacion_id ? labelPorCotizacion[r.cotizacion_id] || null : null,
       }))
     );
@@ -929,7 +977,7 @@ export default function CentroPanel({
     const hasta = calFormatFechaISO(new Date(calInicioSemana.getTime() + 6 * 86400000));
     const { data } = await supabase
       .from("reservaciones")
-      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id, cotizacion_id")
+      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id, cotizacion_id, para_nombre")
       .eq("centro", centro)
       .eq("espacio", calEspacio)
       .gte("fecha", desde)
@@ -944,9 +992,8 @@ export default function CentroPanel({
       nombrePorId = Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre]));
     }
 
-    // Una sala reservada al aceptar su cotización se guarda a nombre de quien la
-    // aceptó (o del cliente, si ya tiene cuenta): en el calendario se muestra el
-    // nombre de quien la pidió, que viene en la cotización.
+    // Una reservación agendada por el admin a nombre de otra persona (cotización de
+    // sala aceptada o solicitud de invitado) muestra debajo el nombre de esa persona.
     const cotIds = Array.from(new Set(reservas.map((r) => r.cotizacion_id).filter(Boolean)));
     const nombrePorCot: Record<string, string> = {};
     if (cotIds.length > 0) {
@@ -959,11 +1006,22 @@ export default function CentroPanel({
       });
     }
 
+    const { data: solsAgendadas } = await supabase
+      .from("solicitudes_invitados")
+      .select("reservacion_id, nombre")
+      .eq("centro", centro)
+      .not("reservacion_id", "is", null);
+    const invitadoPorReserva: Record<string, string> = {};
+    (solsAgendadas || []).forEach((sol) => {
+      if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
+    });
+
     setCalReservas(
-      reservas.map((r) => ({
-        ...r,
-        cliente_nombre: (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
-      }))
+      reservas.map((r) => {
+        const quien = nombrePorId[r.user_id] || "Cliente";
+        const para = r.para_nombre || (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || invitadoPorReserva[r.id] || null;
+        return { ...r, cliente_nombre: quien, para_nombre: para && para !== quien ? para : null };
+      })
     );
     setCalCargando(false);
   }
@@ -1019,6 +1077,27 @@ export default function CentroPanel({
   async function confirmarReservaAdmin() {
     if (!calSeleccion || !centro) return;
     setCalError("");
+    // A quién se le aparta: una solicitud de invitado ya trae su nombre; si no, hay
+    // que elegir un cliente o, si todavía no es cliente, un prospecto.
+    let paraNombre: string | null = null;
+    let paraClienteId: string | null = null;
+    let prospectoId: string | null = null;
+    if (solicitudEnAgendamiento) {
+      paraNombre = solicitudEnAgendamiento.nombre;
+    } else {
+      if (!calPara) {
+        setCalError("Elige a qué cliente le apartas este horario o, si todavía no es cliente, selecciona un prospecto.");
+        return;
+      }
+      const [tipoPara, idPara] = calPara.split(":");
+      if (tipoPara === "c") {
+        paraNombre = clientes.find((cl) => cl.id === idPara)?.nombre || null;
+        paraClienteId = idPara;
+      } else {
+        paraNombre = prospectos.find((pr) => pr.id === idPara)?.nombre || null;
+        prospectoId = idPara;
+      }
+    }
     setCalGuardando(true);
     const {
       data: { user },
@@ -1043,6 +1122,9 @@ export default function CentroPanel({
         horas_incluidas: 0,
         horas_extra: 0,
         costo_extra: 0,
+        para_nombre: paraNombre,
+        para_cliente_id: paraClienteId,
+        prospecto_id: prospectoId,
       })
       .select()
       .single();
@@ -1065,7 +1147,7 @@ export default function CentroPanel({
       await supabase.from("notificaciones").insert({
         centro,
         tipo: "nueva_reservacion",
-        mensaje: `${perfilVentas?.nombre || "Ventas"} (Ventas) solicitó ${calEspacio} el ${calSeleccion.fecha} (${horarioTexto}) — falta confirmar la disponibilidad.`,
+        mensaje: `${perfilVentas?.nombre || "Ventas"} (Ventas) solicitó ${calEspacio}${paraNombre ? ` para ${paraNombre}` : ""} el ${calSeleccion.fecha} (${horarioTexto}) — falta confirmar la disponibilidad.`,
         reservacion_id: nuevaReserva.id,
       });
     }
@@ -1081,6 +1163,8 @@ export default function CentroPanel({
       setSolicitudEnAgendamiento(null);
     }
     setCalSeleccion(null);
+    setCalPara("");
+    setCalPreguntaPara(false);
     setCalGuardando(false);
     fetchCalReservas();
     fetchTodo(centro);
@@ -2373,7 +2457,7 @@ export default function CentroPanel({
                                     }
                                     title={
                                       reservaAqui
-                                        ? reservaAqui.cliente_nombre || "Ocupado"
+                                        ? [reservaAqui.cliente_nombre, reservaAqui.para_nombre].filter(Boolean).join(" · para ") || "Ocupado"
                                         : ocupado
                                         ? "Ocupado"
                                         : pasado
@@ -2394,6 +2478,21 @@ export default function CentroPanel({
                                         }}
                                       >
                                         {reservaAqui.cliente_nombre}
+                                      </span>
+                                    )}
+                                    {reservaAqui?.para_nombre && (
+                                      <span
+                                        style={{
+                                          fontSize: 9,
+                                          display: "block",
+                                          overflow: "hidden",
+                                          whiteSpace: "nowrap",
+                                          textOverflow: "ellipsis",
+                                          padding: "0 2px",
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {reservaAqui.para_nombre}
                                       </span>
                                     )}
                                   </div>
@@ -2437,6 +2536,12 @@ export default function CentroPanel({
                             {calFormatHora(calSeleccion.horaInicio)} - {calFormatHora(calSeleccion.horaFin)}
                           </span>
                         </div>
+                        {solicitudEnAgendamiento && (
+                          <div className="resumen-reserva-row">
+                            <span className="resumen-reserva-label">Para</span>
+                            <span className="resumen-reserva-val">{solicitudEnAgendamiento.nombre}</span>
+                          </div>
+                        )}
                         <div className="nota-info">
                           {rol === "ventas"
                             ? "⏳ Queda pendiente: la administradora confirma la disponibilidad antes de que se aparte."
@@ -2445,17 +2550,129 @@ export default function CentroPanel({
                       </div>
                     )}
 
-                    {calError && <p style={{ color: "#A32D2D", fontSize: 13 }}>{calError}</p>}
+                    {calError && !calPreguntaPara && <p style={{ color: "#A32D2D", fontSize: 13 }}>{calError}</p>}
 
                     <button
                       className="reservar-btn"
-                      onClick={confirmarReservaAdmin}
+                      onClick={() => {
+                        // Una solicitud de invitado ya trae a quién; en los demás casos se pregunta.
+                        if (solicitudEnAgendamiento) {
+                          confirmarReservaAdmin();
+                        } else {
+                          setCalError("");
+                          setCalPreguntaPara(true);
+                        }
+                      }}
                       disabled={!calSeleccion || calGuardando}
                     >
                       {calGuardando ? "Guardando..." : rol === "ventas" ? "Solicitar este horario" : "Reservar este horario"}
                     </button>
+
+                    {calPreguntaPara && calSeleccion && (
+                      <div className="modal-overlay" onClick={() => !calGuardando && setCalPreguntaPara(false)}>
+                        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                          <p className="modal-nombre">¿A quién le apartas este horario?</p>
+                          <p className="modal-email">
+                            {calEspacio} · {calSeleccion.fecha} · {calFormatHora(calSeleccion.horaInicio)} -{" "}
+                            {calFormatHora(calSeleccion.horaFin)}
+                          </p>
+                          <p className="sub-label" style={{ marginTop: 10 }}>
+                            Cliente o, si todavía no es cliente, prospecto
+                          </p>
+                          <select
+                            autoFocus
+                            value={calPara}
+                            onChange={(e) => setCalPara(e.target.value)}
+                            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #eee", fontSize: 14 }}
+                          >
+                            <option value="">Selecciona un cliente o prospecto…</option>
+                            <optgroup label="Clientes">
+                              {[...clientes]
+                                .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                .map((cl) => (
+                                  <option key={cl.id} value={`c:${cl.id}`}>
+                                    {cl.nombre}
+                                    {cl.empresa ? ` · ${cl.empresa}` : ""}
+                                  </option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Prospectos (si todavía no es cliente)">
+                              {prospectos
+                                .filter((pr) => pr.estado !== "convertido")
+                                .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                .map((pr) => (
+                                  <option key={pr.id} value={`p:${pr.id}`}>
+                                    {pr.nombre}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          </select>
+                          <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>
+                            Su nombre aparece en el calendario debajo del tuyo.
+                          </p>
+                          {calError && <p style={{ color: "#A32D2D", fontSize: 13, margin: "8px 0 0" }}>{calError}</p>}
+                          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                            <button className="tel-borrar-btn" onClick={() => setCalPreguntaPara(false)} disabled={calGuardando}>
+                              Cancelar
+                            </button>
+                            <button className="btn-aceptar" onClick={confirmarReservaAdmin} disabled={calGuardando}>
+                              {calGuardando ? "Guardando..." : rol === "ventas" ? "Solicitar horario" : "Reservar horario"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
+                {onFirmarResponsiva && (() => {
+                  // Entrega de sala: al llegar la hora hay que hacer firmar la carta responsiva
+                  // (la sala se entrega en orden y se anota lo que falte).
+                  const ahora = new Date();
+                  const hoyCarta = calFormatFechaISO(ahora);
+                  const hace3 = calFormatFechaISO(new Date(Date.now() - 3 * 86400000));
+                  const minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+                  const minInicio = (h: string) => parseInt(h.split(":")[0]) * 60 + (parseInt(h.split(":")[1]) || 0);
+                  const porFirmar = reservaciones
+                    .filter(
+                      (r) =>
+                        r.estado === "confirmada" &&
+                        !esEspacioCowork(r.espacio) &&
+                        !cartasPorReserva[r.id] &&
+                        !!r.hora_inicio &&
+                        ((r.fecha < hoyCarta && r.fecha >= hace3) ||
+                          (r.fecha === hoyCarta && minInicio(r.hora_inicio as string) - 15 <= minAhora))
+                    )
+                    .sort((a, b) => (a.fecha === b.fecha ? (a.hora_inicio || "").localeCompare(b.hora_inicio || "") : a.fecha < b.fecha ? 1 : -1));
+                  if (porFirmar.length === 0) return null;
+                  return (
+                    <>
+                      <p className="sec-label-red">📝 Entrega de sala: falta la carta responsiva ({porFirmar.length})</p>
+                      {porFirmar.map((r) => (
+                        <div className="reserva-admin-card" key={r.id}>
+                          <div className="reserva-admin-top">
+                            <div>
+                              <p className="reserva-admin-cliente">{r.cliente_nombre}</p>
+                              <p className="reserva-admin-detalle">
+                                {r.espacio} · {r.fecha === hoyCarta ? "Hoy" : r.fecha} · {r.hora}
+                              </p>
+                              <p className="reserva-admin-detalle" style={{ color: r.fecha === hoyCarta ? "#a3701f" : "#A32D2D" }}>
+                                {r.fecha === hoyCarta
+                                  ? "⏰ Ya es la hora: que firme la carta al recibir la sala en orden."
+                                  : "⚠️ Se entregó la sala y no hay carta firmada."}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="reserva-admin-acciones">
+                            <button className="btn-aceptar" onClick={() => onFirmarResponsiva(r.id)}>
+                              📝 Firmar carta responsiva
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
 
                 {(() => {
                   const hoyStr = calFormatFechaISO(new Date());

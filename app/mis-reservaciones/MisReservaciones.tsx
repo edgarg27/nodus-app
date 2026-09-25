@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 import {
   HORAS_ANTICIPACION_CANCELACION,
   cancelaATiempo,
@@ -80,6 +81,16 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
+
+    // Una solicitud que sigue pendiente cuando ya pasó su fecha se cancela sola.
+    const hoyVencidas = hoyMexicoISO();
+    await supabase
+      .from("reservaciones")
+      .update({ estado: "cancelada" })
+      .eq("user_id", user.id)
+      .eq("estado", "pendiente")
+      .lt("fecha", hoyVencidas)
+      .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`);
 
     const { data } = await supabase
       .from("reservaciones")
