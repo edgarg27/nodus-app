@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCorreo } from "@/lib/email";
 import { ubicacionCentro } from "@/lib/centros";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Correo de confirmación inmediata al agendar un tour (app/tours/page.tsx →
 // agregarTour()) — no bloquea el guardado del tour si falla.
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "toursConfirmar")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

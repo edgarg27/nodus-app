@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { centroTienePlantillaCotizacionSala, generarPptxCotizacionSala, convertirPptxAPdf } from "@/lib/cotizacionSalaPptx";
+import { rolPuede } from "@/lib/permisosApi";
 
 // RECONSTRUCCIÓN (2026-09-07): este archivo tenía por error el flujo de
 // Coworking/Oficina Privada — se movió a app/api/cotizar-espacio-pptx/route.ts
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "cotizarPptx")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

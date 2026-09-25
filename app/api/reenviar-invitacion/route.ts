@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Botón "📧 Reenviar invitación" en el detalle de cliente de AdminPanel.tsx
 // — por si el link/token del correo original (ver /api/crear-cliente) ya
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "reenviarInvitacion")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

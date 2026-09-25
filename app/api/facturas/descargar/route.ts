@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { parseStorageUrl } from "@/lib/storage";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Descarga real (con nombre de archivo) del PDF o XML de una factura. El
 // cliente solo puede bajar las suyas; el staff cualquiera. Se sirve a través
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   if (factura.user_id !== session.user.id) {
     const { data: perfil } = await admin.from("profiles").select("rol").eq("id", session.user.id).maybeSingle();
-    if (!perfil || perfil.rol === "cliente") {
+    if (!rolPuede(perfil?.rol, "facturaDescargar")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
   }

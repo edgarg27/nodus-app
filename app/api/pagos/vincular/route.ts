@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { rolPuede } from "@/lib/permisosApi";
 
 // Asocia uno o más pagos existentes (sin factura) a una factura — lo usa
 // facturas-admin para vincular un pago suelto (ej. de comprobante o SPEI
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: miProfile } = await supabase.from("profiles").select("rol, centro").eq("id", session.user.id).single();
-  if (!miProfile || miProfile.rol === "cliente") {
+  if (!rolPuede(miProfile?.rol, "pagosVincular")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
