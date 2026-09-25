@@ -267,6 +267,15 @@ export default function AdminPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // El middleware manda aquí (?sin_permiso=1) a quien intenta abrir una pantalla que no es de su rol.
+  const [sinPermiso, setSinPermiso] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("sin_permiso")) {
+      setSinPermiso(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   // Ventas: contratos que la administradora le mandó a firma y aún no tienen la versión firmada.
   const [contratosPorSubir, setContratosPorSubir] = useState(0);
   async function fetchContratosPorSubir() {
@@ -892,6 +901,15 @@ export default function AdminPanel({
           </div>
         </div>
       </div>
+
+      {sinPermiso && (
+        <div className="nota-info" style={{ margin: "10px 16px 0", display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <span>🔒 Esa pantalla no está disponible para tu rol.</span>
+          <button className="tel-borrar-btn" onClick={() => setSinPermiso(false)}>
+            ✕
+          </button>
+        </div>
+      )}
 
       {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && rol !== "ventas" && (
         <div className="panel-tabs">
