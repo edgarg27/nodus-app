@@ -1,0 +1,58 @@
+# Nodus en producción: la app, Caddy (HTTPS automático) y el cobro diario.
+# Guía completa: DESPLIEGUE.md. Todas las variables salen del archivo `.env`
+# (cópialo de .env.production.example y llénalo); nunca lo subas a git.
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_OPENPAY_MERCHANT_ID: ${NEXT_PUBLIC_OPENPAY_MERCHANT_ID}
+        NEXT_PUBLIC_OPENPAY_PUBLIC_KEY: ${NEXT_PUBLIC_OPENPAY_PUBLIC_KEY}
+        NEXT_PUBLIC_OPENPAY_SANDBOX: ${NEXT_PUBLIC_OPENPAY_SANDBOX:-false}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+    image: nodus-app:latest
+    env_file: .env
+    environment:
+      TZ: America/Mexico_City
+    restart: unless-stopped
+    expose:
+      - "8080"
+
+  # Proxy inverso: recibe el tráfico de internet, saca y renueva solo el certificado
+  # HTTPS y se lo pasa a la app. Es lo único que se abre al exterior.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Tareas programadas (cobro diario y recordatorios de tours): llama a la app cada día.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      TZ: America/Mexico_City
+      CRON_SECRET: ${CRON_SECRET}
+    volumes:
+      - ./deploy/cron/iniciar-cron.sh:/iniciar-cron.sh:ro
+      - ./deploy/cron/llamar.sh:/llamar.sh:ro
+    entrypoint: ["/bin/sh", "/iniciar-cron.sh"]
+
+volumes:
+  caddy_data:
+  caddy_config:

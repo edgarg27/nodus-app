@@ -14,6 +14,7 @@ type Item = {
   fotos_urls: string[] | null;
   estado: string;
   respuesta: string | null;
+  atendido_por_nombre?: string | null;
   created_at: string;
 };
 

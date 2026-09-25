@@ -3,3 +3,6 @@ node_modules/
 .env.local
 next-env.d.ts
 scripts/cron-facturacion.log
+.env
+.env.production
+.version-anterior

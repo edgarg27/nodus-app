@@ -1,0 +1,23 @@
+# Lo que NO debe entrar a la imagen (secretos, dependencias locales y archivos que la app no usa)
+.git
+.gitignore
+node_modules
+.next
+.env
+.env.*
+!.env.production.example
+*.log
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Documentación, scripts de base de datos y carpetas sueltas: no las usa la app
+*.md
+*.sql
+images
+"Claude outputs"
+"New folder"
+.claude
+scripts
+deploy
+docker-compose.yml
+Dockerfile
