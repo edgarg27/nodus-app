@@ -348,6 +348,8 @@ export default function CentroPanel({
   const [calError, setCalError] = useState("");
   // A quién se le aparta el espacio: "c:<id de cliente>" o "p:<id de prospecto>".
   const [calPara, setCalPara] = useState("");
+  // Ventana que pregunta a quién se le aparta el horario al pulsar "Reservar".
+  const [calPreguntaPara, setCalPreguntaPara] = useState(false);
   // Reservaciones que ya tienen su carta responsiva firmada.
   const [cartasPorReserva, setCartasPorReserva] = useState<Record<string, boolean>>({});
   const [calCargando, setCalCargando] = useState(false);
@@ -1162,6 +1164,7 @@ export default function CentroPanel({
     }
     setCalSeleccion(null);
     setCalPara("");
+    setCalPreguntaPara(false);
     setCalGuardando(false);
     fetchCalReservas();
     fetchTodo(centro);
@@ -2533,42 +2536,12 @@ export default function CentroPanel({
                             {calFormatHora(calSeleccion.horaInicio)} - {calFormatHora(calSeleccion.horaFin)}
                           </span>
                         </div>
-                        <div style={{ margin: "10px 0" }}>
-                          <p className="resumen-reserva-label" style={{ margin: "0 0 4px" }}>
-                            ¿A quién le apartas este horario?
-                          </p>
-                          {solicitudEnAgendamiento ? (
+                        {solicitudEnAgendamiento && (
+                          <div className="resumen-reserva-row">
+                            <span className="resumen-reserva-label">Para</span>
                             <span className="resumen-reserva-val">{solicitudEnAgendamiento.nombre}</span>
-                          ) : (
-                            <select
-                              value={calPara}
-                              onChange={(e) => setCalPara(e.target.value)}
-                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", fontSize: 13, background: "#fff", color: "#1a1a1a" }}
-                            >
-                              <option value="">Selecciona un cliente o prospecto…</option>
-                              <optgroup label="Clientes">
-                                {[...clientes]
-                                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
-                                  .map((cl) => (
-                                    <option key={cl.id} value={`c:${cl.id}`}>
-                                      {cl.nombre}
-                                      {cl.empresa ? ` · ${cl.empresa}` : ""}
-                                    </option>
-                                  ))}
-                              </optgroup>
-                              <optgroup label="Prospectos (si todavía no es cliente)">
-                                {prospectos
-                                  .filter((pr) => pr.estado !== "convertido")
-                                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
-                                  .map((pr) => (
-                                    <option key={pr.id} value={`p:${pr.id}`}>
-                                      {pr.nombre}
-                                    </option>
-                                  ))}
-                              </optgroup>
-                            </select>
-                          )}
-                        </div>
+                          </div>
+                        )}
                         <div className="nota-info">
                           {rol === "ventas"
                             ? "⏳ Queda pendiente: la administradora confirma la disponibilidad antes de que se aparte."
@@ -2577,15 +2550,78 @@ export default function CentroPanel({
                       </div>
                     )}
 
-                    {calError && <p style={{ color: "#A32D2D", fontSize: 13 }}>{calError}</p>}
+                    {calError && !calPreguntaPara && <p style={{ color: "#A32D2D", fontSize: 13 }}>{calError}</p>}
 
                     <button
                       className="reservar-btn"
-                      onClick={confirmarReservaAdmin}
+                      onClick={() => {
+                        // Una solicitud de invitado ya trae a quién; en los demás casos se pregunta.
+                        if (solicitudEnAgendamiento) {
+                          confirmarReservaAdmin();
+                        } else {
+                          setCalError("");
+                          setCalPreguntaPara(true);
+                        }
+                      }}
                       disabled={!calSeleccion || calGuardando}
                     >
                       {calGuardando ? "Guardando..." : rol === "ventas" ? "Solicitar este horario" : "Reservar este horario"}
                     </button>
+
+                    {calPreguntaPara && calSeleccion && (
+                      <div className="modal-overlay" onClick={() => !calGuardando && setCalPreguntaPara(false)}>
+                        <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                          <p className="modal-nombre">¿A quién le apartas este horario?</p>
+                          <p className="modal-email">
+                            {calEspacio} · {calSeleccion.fecha} · {calFormatHora(calSeleccion.horaInicio)} -{" "}
+                            {calFormatHora(calSeleccion.horaFin)}
+                          </p>
+                          <p className="sub-label" style={{ marginTop: 10 }}>
+                            Cliente o, si todavía no es cliente, prospecto
+                          </p>
+                          <select
+                            autoFocus
+                            value={calPara}
+                            onChange={(e) => setCalPara(e.target.value)}
+                            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #eee", fontSize: 14 }}
+                          >
+                            <option value="">Selecciona un cliente o prospecto…</option>
+                            <optgroup label="Clientes">
+                              {[...clientes]
+                                .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                .map((cl) => (
+                                  <option key={cl.id} value={`c:${cl.id}`}>
+                                    {cl.nombre}
+                                    {cl.empresa ? ` · ${cl.empresa}` : ""}
+                                  </option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Prospectos (si todavía no es cliente)">
+                              {prospectos
+                                .filter((pr) => pr.estado !== "convertido")
+                                .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                .map((pr) => (
+                                  <option key={pr.id} value={`p:${pr.id}`}>
+                                    {pr.nombre}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          </select>
+                          <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>
+                            Su nombre aparece en el calendario debajo del tuyo.
+                          </p>
+                          {calError && <p style={{ color: "#A32D2D", fontSize: 13, margin: "8px 0 0" }}>{calError}</p>}
+                          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                            <button className="tel-borrar-btn" onClick={() => setCalPreguntaPara(false)} disabled={calGuardando}>
+                              Cancelar
+                            </button>
+                            <button className="btn-aceptar" onClick={confirmarReservaAdmin} disabled={calGuardando}>
+                              {calGuardando ? "Guardando..." : rol === "ventas" ? "Solicitar horario" : "Reservar horario"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
