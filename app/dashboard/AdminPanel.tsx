@@ -342,6 +342,8 @@ export default function AdminPanel({
   const TIPOS_NOTIF_COBRANZA = ["pago_confirmado", "fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "cuenta_pausada", "nuevo_gasto"];
   const TIPOS_NOTIF_ATENCION = ["nueva_queja"];
   const TIPOS_NOTIF_DISENO = ["nuevo_logro"];
+  // Ventas: solo lo de sus módulos (Sala de Juntas) y prospectos de tours.
+  const TIPOS_NOTIF_VENTAS = ["nueva_reservacion", "reservacion_cancelada_cliente", "nuevo_tour"];
 
   const TIPOS_TICKET = ["nuevo_ticket", "ticket_en_proceso", "ticket_resuelto"];
 
@@ -353,6 +355,7 @@ export default function AdminPanel({
     else if (rol === "cobranza") query = query.in("tipo", TIPOS_NOTIF_COBRANZA);
     else if (rol === "atencion_cliente") query = query.in("tipo", TIPOS_NOTIF_ATENCION);
     else if (rol === "diseno") query = query.in("tipo", TIPOS_NOTIF_DISENO);
+    else if (rol === "ventas") query = query.in("tipo", TIPOS_NOTIF_VENTAS);
     const { data } = await query;
     // Filtro extra: un "nuevo_ticket"/"ticket_en_proceso"/"ticket_resuelto" solo
     // le corresponde a sistemas si es de categoría "sistemas", y a operaciones
@@ -754,6 +757,8 @@ export default function AdminPanel({
               ? "Panel de Atención al Cliente"
               : rol === "diseno"
               ? "Panel de Diseño"
+              : rol === "ventas"
+              ? "Panel de Ventas"
               : "Panel Admin"}
           </p>
           <p className="panel-header-sub">
@@ -842,7 +847,7 @@ export default function AdminPanel({
         </div>
       </div>
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && rol !== "ventas" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -876,7 +881,7 @@ export default function AdminPanel({
               </div>
             ))}
 
-          {ticketsUrgentes.length > 0 && (
+          {ticketsUrgentes.length > 0 && rol !== "ventas" && (
             <a href="/tickets" className="alerta-urgente alerta-urgente-link">
               <span className="alerta-urgente-dot" />
               <span className="alerta-urgente-body">
@@ -895,7 +900,7 @@ export default function AdminPanel({
             </a>
           )}
 
-          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && (
             deslizadorConBanners(
                 <div className="resumen-deslizable-contenido">
               <p className="panel-section-label">Por atender</p>
@@ -1045,7 +1050,7 @@ export default function AdminPanel({
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones") && (
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas") && (
             <div style={{ maxWidth: 700, width: "100%", margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
@@ -1062,7 +1067,7 @@ export default function AdminPanel({
             style={
               rol === "sistemas"
                 ? { maxWidth: 800, margin: "0 auto", width: "100%" }
-                : rol === "atencion_cliente"
+                : rol === "atencion_cliente" || rol === "ventas"
                   ? { maxWidth: 620, margin: "0 auto", width: "100%" }
                   : undefined
             }
@@ -1072,10 +1077,41 @@ export default function AdminPanel({
             </p>
             <div
               className={
-                "modulos-grid" + (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" ? " modulos-grid-compacta" : "")
+                "modulos-grid" +
+                (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" || rol === "ventas" ? " modulos-grid-compacta" : "")
               }
               style={{ marginTop: 8 }}
             >
+            {rol === "ventas" ? (
+              // Asesora de Ventas: SOLO estos módulos. Va aparte a propósito:
+              // las condiciones de abajo son "a quién no se le muestra" y un
+              // rol nuevo recibiría todo lo de la admin.
+              <>
+                <a className="modulo-card" href="/sala-juntas">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Sala de Juntas</span>
+                </a>
+                <a className="modulo-card" href="/mapa-oficinas">
+                  <span className="modulo-icon">🗺️</span>
+                  <span className="modulo-name">Mapa oficinas</span>
+                </a>
+                <a className="modulo-card" href="/experiencia-cliente">
+                  <span className="modulo-icon">🎉</span>
+                  <span className="modulo-name">Calendario de Eventos</span>
+                </a>
+                <a className="modulo-card" href="/correos">
+                  <span className="modulo-icon">📧</span>
+                  <span className="modulo-name">Correos</span>
+                </a>
+                <a className="modulo-card" href="/contratos">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Contratos</span>
+                </a>
+              </>
+            ) : (
+            <>
             {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
               <a className="modulo-card" href="/cobranza">
                 <span className="modulo-icon">💰</span>
@@ -1335,6 +1371,8 @@ export default function AdminPanel({
                 <span className="modulo-icon">💻</span>
                 <span className="modulo-name">Equipos</span>
               </a>
+            )}
+            </>
             )}
             </div>
           </div>
