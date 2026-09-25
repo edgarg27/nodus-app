@@ -7,6 +7,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import { conIva, sinIva } from "@/lib/adicionales";
+import PasosContrato from "./PasosContrato";
 
 type VersionContrato = {
   id: string;
@@ -98,8 +99,8 @@ export default function ContratoModal({
   const [error, setError] = useState("");
   const [estatus, setEstatus] = useState(contrato.estatus || "");
   const [archivoFinalUrl, setArchivoFinalUrl] = useState(contrato.archivo_url);
-  const [confirmacionFirma, setConfirmacionFirma] = useState(false);
-  const [marcandoCincel, setMarcandoCincel] = useState(false);
+  // Versión firmada (paso 5 del flujo por pasos): es la que habilita aprobar.
+  const [firmadoUrl, setFirmadoUrl] = useState<string | null>(contrato.archivo_firmado_url ?? null);
   const [exitoAprobacionVisible, setExitoAprobacionVisible] = useState(false);
   const [confirmandoRechazo, setConfirmandoRechazo] = useState(false);
 
@@ -433,26 +434,11 @@ export default function ContratoModal({
     onGuardado();
   }
 
-  // La firma legal se hace en Cincel: ventas descarga el contrato final, lo
-  // sube a Cincel y aquí solo se deja constancia de que ya se mandó (o se
-  // deshace si fue un error). Reusa la columna enviado_a_firma_at.
-  async function marcarEnviadoACincel(enviado: boolean) {
-    setMarcandoCincel(true);
-    setError("");
-    const { error: updateError } = await supabase
-      .from("contratos")
-      .update({ enviado_a_firma_at: enviado ? new Date().toISOString() : null })
-      .eq("id", contrato.id);
-    setMarcandoCincel(false);
-    if (updateError) {
-      setError("No se pudo actualizar el estado de la firma: " + updateError.message);
-      return;
-    }
-    onGuardado();
-  }
+  // Contratos anteriores al flujo por pasos que ya venían firmados se pueden aprobar tal cual.
+  const puedeAprobar = !!firmadoUrl || (contrato.firmado && !!archivoFinalUrl);
 
   async function aprobar() {
-    if (!archivoFinalUrl || !(confirmacionFirma || contrato.firmado)) return;
+    if (!puedeAprobar) return;
     setProcesandoAprobacion(true);
     await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", contrato.id);
 
@@ -625,74 +611,16 @@ export default function ContratoModal({
         )}
 
         {estatus === "pre_aprobado" && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            {!contrato.firmado && (
-              <div className="nota-info" style={{ width: "100%", margin: 0, lineHeight: 1.5 }}>
-                <strong>Firma en Cincel</strong>
-                {!archivoFinalUrl ? (
-                  <p style={{ margin: "4px 0 0" }}>1. Sube el contrato final (PDF) y dale "Guardar cambios".</p>
-                ) : !contrato.enviado_a_firma_at ? (
-                  <>
-                    <p style={{ margin: "4px 0 6px" }}>
-                      ✍ <strong>Listo para firma.</strong> Descárgalo, súbelo a Cincel y luego marca aquí que ya se mandó.
-                    </p>
-                    <button
-                      className="tel-borrar-btn"
-                      style={{ color: "#0d1b3e", fontWeight: 700 }}
-                      onClick={() => marcarEnviadoACincel(true)}
-                      disabled={marcandoCincel}
-                    >
-                      {marcandoCincel ? "Guardando…" : "📨 Marcar como enviado a Cincel"}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p style={{ margin: "4px 0 6px" }}>
-                      📨 <strong>En Cincel</strong> desde el {new Date(contrato.enviado_a_firma_at).toLocaleDateString("es-MX")}.
-                      Cuando el cliente firme, descarga el PDF firmado, súbelo aquí como versión final y confirma abajo.
-                    </p>
-                    <button
-                      className="tel-borrar-btn"
-                      style={{ color: "#888" }}
-                      onClick={() => marcarEnviadoACincel(false)}
-                      disabled={marcandoCincel}
-                    >
-                      Deshacer (no se ha mandado)
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            {contrato.firmado ? (
-              <p style={{ fontSize: 12, color: "#0F6E56", width: "100%", margin: 0 }}>
-                ✓ Firmado{contrato.firmado_at ? ` el ${new Date(contrato.firmado_at).toLocaleDateString("es-MX")}` : ""}.
-              </p>
-            ) : (
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, width: "100%", color: "#333" }}>
-                <input
-                  type="checkbox"
-                  checked={confirmacionFirma}
-                  onChange={(e) => setConfirmacionFirma(e.target.checked)}
-                />
-                Confirmo que el documento cargado es la versión firmada en Cincel
-              </label>
-            )}
-            <button
-              className="btn-aceptar"
-              onClick={aprobar}
-              disabled={procesandoAprobacion || !archivoFinalUrl || !(confirmacionFirma || contrato.firmado)}
-            >
-              ✓ Aprobar contrato
-            </button>
-            <button className="btn-rechazar" onClick={() => setConfirmandoRechazo(true)} disabled={procesandoAprobacion}>
-              ✗ Rechazar contrato
-            </button>
-            {!archivoFinalUrl && (
-              <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
-                ⚠️ Sube el contrato firmado antes de aprobar — si acabas de seleccionar el PDF, dale "Guardar cambios" primero.
-              </p>
-            )}
-          </div>
+          <PasosContrato contrato={contrato} onCambio={onRefrescar} onFirmadoCambio={setFirmadoUrl}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn-aceptar" onClick={aprobar} disabled={procesandoAprobacion || !puedeAprobar}>
+                ✓ Aprobar contrato
+              </button>
+              <button className="btn-rechazar" onClick={() => setConfirmandoRechazo(true)} disabled={procesandoAprobacion}>
+                ✗ Rechazar contrato
+              </button>
+            </div>
+          </PasosContrato>
         )}
 
         <p className="modal-seccion">✎ Datos del contrato</p>
@@ -751,6 +679,8 @@ export default function ContratoModal({
           </div>
         </div>
 
+        {estatus !== "pre_aprobado" && (
+        <>
         <p className="modal-seccion">📎 Contrato PDF (Machote pre-generado)</p>
         {contrato.archivo_machote_url || contrato.archivo_url ? (
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -835,6 +765,8 @@ export default function ContratoModal({
           <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
             Dale "Guardar cambios" para subirlo — no se reemplaza el machote, queda como una versión más para elegir.
           </p>
+        )}
+        </>
         )}
 
         {/* ---------------- Adicionales ---------------- */}

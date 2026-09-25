@@ -232,8 +232,13 @@ export default function ProspectosPage() {
           <>
             <p className="panel-section-label">Registrar prospecto</p>
             <form className="form-card" onSubmit={agregarProspecto}>
-              <p className="sub-label">Registrado por</p>
-              <input value={miNombre} disabled style={{ background: "#f2f2f2", color: "#555" }} />
+              <div className="registrado-por">
+                <span className="registrado-por-lbl">Registrado por</span>
+                <span className="registrado-por-chip">
+                  <span className="registrado-por-avatar">{(miNombre.trim()[0] || "?").toUpperCase()}</span>
+                  {miNombre || "—"}
+                </span>
+              </div>
               <div className="tel-form-grid">
                 <input
                   placeholder="Nombre"
@@ -395,7 +400,7 @@ export default function ProspectosPage() {
                               </select>
                               <a
                                 className="tel-borrar-btn"
-                                style={{ color: "#0d1b3e", fontWeight: 600 }}
+                                style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
                                 href={`/registrar-plan?centro=${encodeURIComponent(p.centro || centro || "")}&prospectoId=${encodeURIComponent(
                                   p.id
                                 )}&prospectoNombre=${encodeURIComponent(
@@ -407,19 +412,6 @@ export default function ProspectosPage() {
                                 )}`}
                               >
                                 🧾 Cotizar
-                              </a>
-                              <a
-                                className="tel-borrar-btn"
-                                style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                href={`/alta-cliente?nombre=${encodeURIComponent(p.nombre)}&email=${encodeURIComponent(
-                                  p.email || ""
-                                )}&telefono=${encodeURIComponent(p.telefono || "")}&empresa=${encodeURIComponent(
-                                  p.empresa || ""
-                                )}&rfc=${encodeURIComponent(p.rfc || "")}&diaPago=${encodeURIComponent(
-                                  p.dia_pago != null ? String(p.dia_pago) : ""
-                                )}&prospectoId=${encodeURIComponent(p.id)}`}
-                              >
-                                👤 Nuevo cliente
                               </a>
                               <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
                                 🗑

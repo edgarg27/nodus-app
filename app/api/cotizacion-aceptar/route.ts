@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { generarContratoDocx, normalizarTipoEspacioContrato } from "@/lib/contratoDocx";
 import { rentaMensualConIva } from "@/lib/formaPago";
+import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
 // datos de la venta ya capturados en CotizarForm.tsx (cotizaciones_comerciales)
@@ -56,6 +57,76 @@ export async function POST(req: NextRequest) {
   const tipoEspacio = normalizarTipoEspacioContrato(venta.tipo_espacio || "");
   if (!tipoEspacio) {
     return NextResponse.json({ error: `Tipo de espacio "${venta.tipo_espacio}" no reconocido para generar el contrato.` }, { status: 400 });
+  }
+  // Sala de Juntas es una reserva: no lleva contrato ni RFC (el formulario ni
+  // siquiera lo pide). Aceptar la cotización aparta el horario en el calendario
+  // y la marca como aceptada.
+  if (tipoEspacio === "Sala de Juntas") {
+    const horario = parseHorarioSala(venta.tipo_espacio);
+    const fecha = venta.fecha_inicio ? String(venta.fecha_inicio).slice(0, 10) : "";
+    if (!horario || !fecha) {
+      return NextResponse.json(
+        { error: "No se pudo leer la fecha y el horario de esta cotización para reservar la sala." },
+        { status: 400 }
+      );
+    }
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+    if (fecha < hoy) {
+      return NextResponse.json({ error: "La fecha de esta cotización ya pasó: no se puede reservar la sala." }, { status: 400 });
+    }
+
+    const hhmm = (h: number) => `${String(h % 24).padStart(2, "0")}:00`;
+    const hora12 = (h: number) => {
+      const n = h % 24;
+      if (n === 0) return "12:00 AM";
+      if (n < 12) return `${n}:00 AM`;
+      if (n === 12) return "12:00 PM";
+      return `${n - 12}:00 PM`;
+    };
+    const horasDelRango = Array.from({ length: horario.horaFin - horario.horaInicio }, (_, i) => horario.horaInicio + i);
+
+    // A nombre del cliente si ya tiene cuenta; si no, de quien acepta (igual que
+    // cuando el admin reserva directo desde el calendario). En el calendario se
+    // muestra el nombre de la cotización (cotizacion_id).
+    let reservada = false;
+    for (const espacio of salasDelCentro(venta.centro)) {
+      const { error: resError } = await admin.from("reservaciones").insert({
+        user_id: venta.cliente_id ?? session.user.id,
+        espacio,
+        fecha,
+        hora: `${hora12(horario.horaInicio)} - ${hora12(horario.horaFin)}`,
+        hora_inicio: hhmm(horario.horaInicio),
+        hora_fin: hhmm(horario.horaFin),
+        centro: venta.centro,
+        estado: "confirmada",
+        fuera_horario: horasDelRango.some((h) => esFueraDeHorario(fecha, h)),
+        horas_incluidas: 0,
+        horas_extra: 0,
+        costo_extra: 0,
+        cotizacion_id: venta.id,
+      });
+      if (!resError) {
+        reservada = true;
+        break;
+      }
+      // 23P01 = ese horario ya está ocupado en esa sala (ver
+      // migracion_no_traslape_reservaciones.sql): se prueba con la siguiente.
+      if (resError.code !== "23P01") {
+        return NextResponse.json({ error: "No se pudo reservar la sala: " + resError.message }, { status: 500 });
+      }
+    }
+    if (!reservada) {
+      return NextResponse.json(
+        { error: "Ese horario ya está ocupado en el calendario. Libera el horario o cotiza otra fecha antes de aceptar." },
+        { status: 409 }
+      );
+    }
+
+    const { error: salaError } = await admin.from("cotizaciones").update({ estatus: "aceptada" }).eq("id", id);
+    if (salaError) {
+      return NextResponse.json({ error: "La sala se reservó pero no se pudo marcar la cotización como aceptada." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, contrato: null, reservada: true });
   }
   if (!venta.rfc || !String(venta.rfc).trim()) {
     return NextResponse.json({ error: "Falta el RFC del cliente — captúralo al cotizar en CotizarForm." }, { status: 400 });
