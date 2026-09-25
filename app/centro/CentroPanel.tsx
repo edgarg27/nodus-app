@@ -591,6 +591,15 @@ export default function CentroPanel({
     (clis || []).forEach((cl) => {
       nombrePorId[cl.id] = cl.nombre;
     });
+    // Reservaciones hechas por personal (ej. Ventas desde el calendario) no son de un
+    // cliente: su nombre se busca aparte para que se vea quién la pidió.
+    const sinNombre = Array.from(new Set((reservas || []).map((r) => r.user_id).filter((id) => id && !nombrePorId[id])));
+    if (sinNombre.length > 0) {
+      const { data: personal } = await supabase.from("profiles").select("id, nombre").in("id", sinNombre);
+      (personal || []).forEach((pf) => {
+        if (pf.nombre) nombrePorId[pf.id] = pf.nombre;
+      });
+    }
 
     // Reservaciones creadas desde Cotizar traen cotizacion_id — se resuelve
     // el label 📦 {paquete} · {modalidad} vía join manual a
@@ -1025,7 +1034,9 @@ export default function CentroPanel({
         hora_inicio: `${String(calSeleccion.horaInicio).padStart(2, "0")}:00`,
         hora_fin: `${String(calSeleccion.horaFin).padStart(2, "0")}:00`,
         centro,
-        estado: "confirmada",
+        // Ventas también está sujeta a disponibilidad: su reservación queda
+        // pendiente hasta que la administradora la confirme.
+        estado: rol === "ventas" ? "pendiente" : "confirmada",
         fuera_horario: Array.from({ length: calSeleccion.horaFin - calSeleccion.horaInicio }, (_, i) => calSeleccion.horaInicio + i).some((h) =>
           esFueraDeHorario(calSeleccion.fecha, h)
         ),
@@ -1046,6 +1057,19 @@ export default function CentroPanel({
       setCalGuardando(false);
       return;
     }
+    // Ventas: se avisa a la administradora para que revise la disponibilidad.
+    if (rol === "ventas") {
+      const { data: perfilVentas } = user
+        ? await supabase.from("profiles").select("nombre").eq("id", user.id).maybeSingle()
+        : { data: null };
+      await supabase.from("notificaciones").insert({
+        centro,
+        tipo: "nueva_reservacion",
+        mensaje: `${perfilVentas?.nombre || "Ventas"} (Ventas) solicitó ${calEspacio} el ${calSeleccion.fecha} (${horarioTexto}) — falta confirmar la disponibilidad.`,
+        reservacion_id: nuevaReserva.id,
+      });
+    }
+
     // Si esta reservación vino de una solicitud de invitado (pestaña
     // "Invitados"), la marcamos como atendida y la enlazamos a la
     // reservación real que se acaba de crear.
@@ -2413,7 +2437,11 @@ export default function CentroPanel({
                             {calFormatHora(calSeleccion.horaInicio)} - {calFormatHora(calSeleccion.horaFin)}
                           </span>
                         </div>
-                        <div className="nota-info">✓ Se guarda directo como confirmada — no necesita aprobación.</div>
+                        <div className="nota-info">
+                          {rol === "ventas"
+                            ? "⏳ Queda pendiente: la administradora confirma la disponibilidad antes de que se aparte."
+                            : "✓ Se guarda directo como confirmada — no necesita aprobación."}
+                        </div>
                       </div>
                     )}
 
@@ -2424,7 +2452,7 @@ export default function CentroPanel({
                       onClick={confirmarReservaAdmin}
                       disabled={!calSeleccion || calGuardando}
                     >
-                      {calGuardando ? "Guardando..." : "Reservar este horario"}
+                      {calGuardando ? "Guardando..." : rol === "ventas" ? "Solicitar este horario" : "Reservar este horario"}
                     </button>
                   </div>
                 )}
@@ -2542,14 +2570,20 @@ export default function CentroPanel({
                             )}
                           </div>
                         </div>
-                        <div className="reserva-admin-acciones">
-                          <button className="btn-aceptar" onClick={() => responderReserva(r, true)}>
-                            ✓ Aceptar
-                          </button>
-                          <button className="btn-rechazar" onClick={() => responderReserva(r, false)}>
-                            ✗ Rechazar
-                          </button>
-                        </div>
+                        {rol === "ventas" ? (
+                          <p style={{ fontSize: 12, color: "#a3701f", margin: "6px 0 0" }}>
+                            ⏳ Espera a que la administradora confirme la disponibilidad.
+                          </p>
+                        ) : (
+                          <div className="reserva-admin-acciones">
+                            <button className="btn-aceptar" onClick={() => responderReserva(r, true)}>
+                              ✓ Aceptar
+                            </button>
+                            <button className="btn-rechazar" onClick={() => responderReserva(r, false)}>
+                              ✗ Rechazar
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </>
