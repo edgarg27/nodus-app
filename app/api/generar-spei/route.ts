@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearCargoSPEI } from "@/lib/openpay";
+import { createAdminClient } from "@/lib/supabaseAdmin";
+import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
+
+// Deja registrado qué política aceptó el cliente (necesita migracion_politica_cancelacion.sql;
+// si aún no se corrió, no pasa nada: solo no queda el registro).
+async function registrarPolitica(pagoId: string) {
+  try {
+    await createAdminClient()
+      .from("pagos")
+      .update({ politica_version: POLITICA_CANCELACION_VERSION, politica_aceptada_at: new Date().toISOString() })
+      .eq("id", pagoId);
+  } catch {
+    // el registro es secundario: nunca debe impedir el pago
+  }
+}
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
@@ -12,9 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const { facturaId } = await req.json();
+  const { facturaId, politicaVersion } = await req.json();
   if (!facturaId) {
     return NextResponse.json({ error: "Falta facturaId" }, { status: 400 });
+  }
+  if (politicaVersion !== POLITICA_CANCELACION_VERSION) {
+    return NextResponse.json({ error: "Para pagar, acepta la política de cancelación y reembolsos" }, { status: 400 });
   }
 
   // La factura tiene que ser del propio cliente que está pidiendo el cargo
@@ -45,6 +63,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (pagoExistente?.clabe && pagoExistente.fecha_limite && new Date(pagoExistente.fecha_limite) > new Date()) {
+    await registrarPolitica(pagoExistente.id);
     return NextResponse.json({ ok: true, pago: pagoExistente });
   }
 
@@ -84,6 +103,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El cargo se generó pero no se pudo guardar" }, { status: 500 });
     }
 
+    await registrarPolitica(pago.id);
     return NextResponse.json({ ok: true, pago });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Error generando el cargo SPEI" }, { status: 500 });

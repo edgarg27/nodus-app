@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import AceptoPolitica from "@/app/components/AceptoPolitica";
+import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -23,7 +25,10 @@ function PagarSpeiInner() {
   const facturaId = params.get("facturaId") || "";
   const folio = params.get("folio") || "";
 
-  const [loading, setLoading] = useState(true);
+  // La ficha de pago se genera hasta que el cliente acepta la política de cancelación.
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
+  const [confirmada, setConfirmada] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [pago, setPago] = useState<Pago | null>(null);
   const [error, setError] = useState("");
   const [verificando, setVerificando] = useState(false);
@@ -41,11 +46,6 @@ function PagarSpeiInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pago?.estado]);
 
-  useEffect(() => {
-    generar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function generar() {
     setLoading(true);
     setError("");
@@ -53,7 +53,7 @@ function PagarSpeiInner() {
       const res = await fetch("/api/generar-spei", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facturaId }),
+        body: JSON.stringify({ facturaId, politicaVersion: POLITICA_CANCELACION_VERSION }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -145,7 +145,21 @@ function PagarSpeiInner() {
       </div>
 
       <div className="sub-content">
-        {loading ? (
+        {!confirmada ? (
+          <>
+            <AceptoPolitica acepto={aceptaPolitica} onChange={setAceptaPolitica} />
+            <button
+              className="reservar-btn"
+              disabled={!aceptaPolitica}
+              onClick={() => {
+                setConfirmada(true);
+                generar();
+              }}
+            >
+              Continuar y generar ficha de pago
+            </button>
+          </>
+        ) : loading ? (
           <p style={{ color: "#888", fontSize: 13 }}>Generando tu ficha de pago...</p>
         ) : error && !pago ? (
           <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>
