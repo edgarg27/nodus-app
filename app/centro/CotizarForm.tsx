@@ -2957,10 +2957,13 @@ export default function CotizarForm({
                 />
               </div>
             )}
-            <div>
-              <p className="sub-label">Número de personas</p>
-              <input type="number" min={0} value={numeroPersonas} onChange={(e) => setNumeroPersonas(e.target.value)} />
-            </div>
+            {/* En Sala de Juntas la capacidad ya se elige arriba con el tamaño de sala. */}
+            {!esSalaJuntas && (
+              <div>
+                <p className="sub-label">Número de personas</p>
+                <input type="number" min={0} value={numeroPersonas} onChange={(e) => setNumeroPersonas(e.target.value)} />
+              </div>
+            )}
             <input
               placeholder={tipoPersona === "moral" ? "Nombre del representante legal" : "Nombre de quién solicita la cotización"}
               value={nombreContesta}

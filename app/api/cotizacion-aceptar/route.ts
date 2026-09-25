@@ -57,6 +57,15 @@ export async function POST(req: NextRequest) {
   if (!tipoEspacio) {
     return NextResponse.json({ error: `Tipo de espacio "${venta.tipo_espacio}" no reconocido para generar el contrato.` }, { status: 400 });
   }
+  // Sala de Juntas es una reserva: no lleva contrato ni RFC (el formulario ni
+  // siquiera lo pide), así que aceptarla solo marca la cotización como aceptada.
+  if (tipoEspacio === "Sala de Juntas") {
+    const { error: salaError } = await admin.from("cotizaciones").update({ estatus: "aceptada" }).eq("id", id);
+    if (salaError) {
+      return NextResponse.json({ error: "No se pudo marcar la cotización como aceptada." }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, contrato: null });
+  }
   if (!venta.rfc || !String(venta.rfc).trim()) {
     return NextResponse.json({ error: "Falta el RFC del cliente — captúralo al cotizar en CotizarForm." }, { status: 400 });
   }

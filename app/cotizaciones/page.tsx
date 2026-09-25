@@ -223,7 +223,9 @@ export default function CotizacionesPage() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <p className="modal-nombre">Aceptar cotización</p>
             <p className="sub-label" style={{ marginTop: 8 }}>
-              ¿Aceptar esta cotización y generar el contrato como pre-aprobado?
+              {cotizaciones.find((c) => c.id === confirmandoAceptarId)?.nombre.includes("Sala de Juntas")
+                ? "¿Marcar esta cotización de Sala de Juntas como aceptada? Las salas son reservas: no generan contrato."
+                : "¿Aceptar esta cotización y generar el contrato como pre-aprobado?"}
             </p>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button className="tel-borrar-btn" onClick={() => setConfirmandoAceptarId(null)}>
