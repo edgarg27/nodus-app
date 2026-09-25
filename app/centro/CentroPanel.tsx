@@ -3866,7 +3866,7 @@ export default function CentroPanel({
                                   </select>
                                   <a
                                     className="tel-borrar-btn"
-                                    style={{ color: "#0d1b3e", fontWeight: 600 }}
+                                    style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
                                     href={`/registrar-plan?centro=${encodeURIComponent(centro)}&prospectoNombre=${encodeURIComponent(
                                       p.nombre
                                     )}&prospectoTelefono=${encodeURIComponent(p.telefono || "")}&prospectoEmail=${encodeURIComponent(
@@ -3874,19 +3874,6 @@ export default function CentroPanel({
                                     )}&prospectoInteres=${encodeURIComponent(p.interes || "")}`}
                                   >
                                     🧾 Cotizar
-                                  </a>
-                                  <a
-                                    className="tel-borrar-btn"
-                                    style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                    href={`/alta-cliente?nombre=${encodeURIComponent(p.nombre)}&email=${encodeURIComponent(
-                                      p.email || ""
-                                    )}&telefono=${encodeURIComponent(p.telefono || "")}&empresa=${encodeURIComponent(
-                                      p.empresa || ""
-                                    )}&rfc=${encodeURIComponent(p.rfc || "")}&diaPago=${encodeURIComponent(
-                                      p.dia_pago != null ? String(p.dia_pago) : ""
-                                    )}&prospectoId=${encodeURIComponent(p.id)}`}
-                                  >
-                                    👤 Nuevo cliente
                                   </a>
                                   <button className="tel-borrar-btn" onClick={() => borrarProspecto(p.id)}>
                                     🗑
