@@ -7,6 +7,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { conIva } from "@/lib/adicionales";
 import { etiquetaFormaPago } from "@/lib/formaPago";
+import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
 
 // Lead de la pestaña Prospectos de Centro — todavía sin cuenta (profiles.id).
@@ -62,6 +63,11 @@ export type Contrato = {
   firmado: boolean;
   firmado_at: string | null;
   enviado_a_firma_at: string | null;
+  // Flujo por pasos (migracion_contratos_por_pasos.sql)
+  enviado_a_ventas_at?: string | null;
+  mensaje_ventas?: string | null;
+  archivo_firmado_url?: string | null;
+  archivo_firmado_at?: string | null;
   plan_nombre?: string | null;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
@@ -245,7 +251,6 @@ export default function ContratosPage() {
   // Casilla "Confirmo que el documento cargado es la versión firmada" por
   // tarjeta de contrato pendiente — el botón "✓ Aprobar" no se habilita
   // solo con el archivo cargado, también hace falta esta confirmación.
-  const [confirmacionFirma, setConfirmacionFirma] = useState<Record<string, boolean>>({});
 
   // Búsqueda por nombre, empresa, teléfono, correo o folio (id del
   // contrato) — aplica tanto a "Pendientes de aprobación" como a "Todos".
@@ -269,7 +274,7 @@ export default function ContratosPage() {
   // el camino más directo que usa el staff desde la lista de pendientes
   // (regla de negocio #3 de DOCUMENTACION_COTIZAR.md).
   async function aprobarContrato(c: Contrato) {
-    if (!c.archivo_url || !confirmacionFirma[c.id]) return;
+    if (!c.archivo_firmado_url) return;
     setProcesandoAprobacion(c.id);
     await supabase.from("contratos").update({ estatus: "vigente", firmado: true }).eq("id", c.id);
 
@@ -658,23 +663,15 @@ export default function ContratosPage() {
                       </div>
                       <span className="factura-badge" style={{ background: ESTATUS_LABEL.pre_aprobado.bg }}>
                         <span className="factura-badge-text" style={{ color: ESTATUS_LABEL.pre_aprobado.color }}>
-                          {!c.archivo_url ? "📄 Falta el contrato" : c.enviado_a_firma_at ? "📨 En Cincel" : "✍ Listo para firma"}
+                          {ETAPA_LABEL[etapaContrato(c)]}
                         </span>
                       </span>
                     </div>
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginTop: 8, color: "#333" }}>
-                      <input
-                        type="checkbox"
-                        checked={!!confirmacionFirma[c.id]}
-                        onChange={(e) => setConfirmacionFirma((prev) => ({ ...prev, [c.id]: e.target.checked }))}
-                      />
-                      Confirmo que el documento cargado es la versión firmada en Cincel
-                    </label>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                       <button
                         className="btn-aceptar"
                         onClick={() => aprobarContrato(c)}
-                        disabled={procesandoAprobacion === c.id || !c.archivo_url || !confirmacionFirma[c.id]}
+                        disabled={procesandoAprobacion === c.id || !c.archivo_firmado_url}
                       >
                         ✓ Aprobar
                       </button>
@@ -685,14 +682,9 @@ export default function ContratosPage() {
                       >
                         ✗ Rechazar
                       </button>
-                      {!c.archivo_url && (
+                      {!c.archivo_firmado_url && (
                         <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
-                          ⚠️ Sube el contrato firmado antes de aprobar
-                        </p>
-                      )}
-                      {c.archivo_url && !confirmacionFirma[c.id] && (
-                        <p style={{ fontSize: 12, color: "#a3701f", width: "100%", margin: "6px 0 0" }}>
-                          ⚠️ Marca la casilla de confirmación antes de aprobar
+                          ⚠️ Para aprobar falta la versión firmada: abre "Editar" y sigue los pasos.
                         </p>
                       )}
                       <button

@@ -6021,3 +6021,109 @@ a.stat-card {
     opacity: 0;
   }
 }
+
+/* ---------- Contratos por pasos (app/contratos/PasosContrato.tsx) ---------- */
+.pasos-contrato {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f7f8fb;
+  border: 1px solid #eceff5;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.pasos-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.paso {
+  display: flex;
+  gap: 10px;
+  opacity: 0.55;
+}
+
+.paso-actual,
+.paso-hecho {
+  opacity: 1;
+}
+
+.paso-num {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #d3d8e2;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.paso-actual .paso-num {
+  background: #f07e3a;
+}
+
+.paso-hecho .paso-num {
+  background: #0f6e56;
+}
+
+.paso-cuerpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paso-cuerpo > button {
+  align-self: flex-start;
+}
+
+.paso-nombre {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.paso-desc {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.paso-aviso {
+  font-size: 12px;
+  color: #a3701f;
+  margin: 0;
+}
+
+.paso-mensaje {
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #e6eaf2;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: 0;
+  color: #333;
+  line-height: 1.45;
+}
+
+.paso-archivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #333;
+}
