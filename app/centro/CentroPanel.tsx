@@ -63,7 +63,7 @@ type Prospecto = {
   // confirmarProspectoPerdido más abajo).
   comentario_perdido?: string | null;
 };
-type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
+type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; para_nombre?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
 type Notificacion = { id: string; tipo: string; categoria: string | null; mensaje: string; leida: boolean; created_at: string; reservacion_id: string | null };
 type TipoSolicitudInvitado =
   | "sala_juntas"
@@ -343,6 +343,8 @@ export default function CentroPanel({
   const [calSeleccion, setCalSeleccion] = useState<{ fecha: string; horaInicio: number; horaFin: number } | null>(null);
   const [calGuardando, setCalGuardando] = useState(false);
   const [calError, setCalError] = useState("");
+  // A quién se le aparta el espacio: "c:<id de cliente>" o "p:<id de prospecto>".
+  const [calPara, setCalPara] = useState("");
   const [calCargando, setCalCargando] = useState(false);
   const [solicitudesInvitados, setSolicitudesInvitados] = useState<SolicitudInvitado[]>([]);
   const [dayPasses, setDayPasses] = useState<DayPass[]>([]);
@@ -541,7 +543,7 @@ export default function CentroPanel({
       supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
       supabase
         .from("reservaciones")
-        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
+        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
         .eq("centro", c)
         .order("fecha", { ascending: false }),
       supabase
@@ -660,6 +662,7 @@ export default function CentroPanel({
       (reservas || []).map((r) => ({
         ...r,
         cliente_nombre:
+          r.para_nombre ||
           (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) ||
           invitadoPorReserva[r.id] ||
           nombrePorId[r.user_id] ||
@@ -956,7 +959,7 @@ export default function CentroPanel({
     const hasta = calFormatFechaISO(new Date(calInicioSemana.getTime() + 6 * 86400000));
     const { data } = await supabase
       .from("reservaciones")
-      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id, cotizacion_id")
+      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id, cotizacion_id, para_nombre")
       .eq("centro", centro)
       .eq("espacio", calEspacio)
       .gte("fecha", desde)
@@ -998,7 +1001,7 @@ export default function CentroPanel({
     setCalReservas(
       reservas.map((r) => {
         const quien = nombrePorId[r.user_id] || "Cliente";
-        const para = (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || invitadoPorReserva[r.id] || null;
+        const para = r.para_nombre || (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || invitadoPorReserva[r.id] || null;
         return { ...r, cliente_nombre: quien, para_nombre: para && para !== quien ? para : null };
       })
     );
@@ -1056,6 +1059,27 @@ export default function CentroPanel({
   async function confirmarReservaAdmin() {
     if (!calSeleccion || !centro) return;
     setCalError("");
+    // A quién se le aparta: una solicitud de invitado ya trae su nombre; si no, hay
+    // que elegir un cliente o, si todavía no es cliente, un prospecto.
+    let paraNombre: string | null = null;
+    let paraClienteId: string | null = null;
+    let prospectoId: string | null = null;
+    if (solicitudEnAgendamiento) {
+      paraNombre = solicitudEnAgendamiento.nombre;
+    } else {
+      if (!calPara) {
+        setCalError("Elige a qué cliente le apartas este horario o, si todavía no es cliente, selecciona un prospecto.");
+        return;
+      }
+      const [tipoPara, idPara] = calPara.split(":");
+      if (tipoPara === "c") {
+        paraNombre = clientes.find((cl) => cl.id === idPara)?.nombre || null;
+        paraClienteId = idPara;
+      } else {
+        paraNombre = prospectos.find((pr) => pr.id === idPara)?.nombre || null;
+        prospectoId = idPara;
+      }
+    }
     setCalGuardando(true);
     const {
       data: { user },
@@ -1080,6 +1104,9 @@ export default function CentroPanel({
         horas_incluidas: 0,
         horas_extra: 0,
         costo_extra: 0,
+        para_nombre: paraNombre,
+        para_cliente_id: paraClienteId,
+        prospecto_id: prospectoId,
       })
       .select()
       .single();
@@ -1102,7 +1129,7 @@ export default function CentroPanel({
       await supabase.from("notificaciones").insert({
         centro,
         tipo: "nueva_reservacion",
-        mensaje: `${perfilVentas?.nombre || "Ventas"} (Ventas) solicitó ${calEspacio} el ${calSeleccion.fecha} (${horarioTexto}) — falta confirmar la disponibilidad.`,
+        mensaje: `${perfilVentas?.nombre || "Ventas"} (Ventas) solicitó ${calEspacio}${paraNombre ? ` para ${paraNombre}` : ""} el ${calSeleccion.fecha} (${horarioTexto}) — falta confirmar la disponibilidad.`,
         reservacion_id: nuevaReserva.id,
       });
     }
@@ -1118,6 +1145,7 @@ export default function CentroPanel({
       setSolicitudEnAgendamiento(null);
     }
     setCalSeleccion(null);
+    setCalPara("");
     setCalGuardando(false);
     fetchCalReservas();
     fetchTodo(centro);
@@ -2488,6 +2516,42 @@ export default function CentroPanel({
                           <span className="resumen-reserva-val">
                             {calFormatHora(calSeleccion.horaInicio)} - {calFormatHora(calSeleccion.horaFin)}
                           </span>
+                        </div>
+                        <div style={{ margin: "10px 0" }}>
+                          <p className="resumen-reserva-label" style={{ margin: "0 0 4px" }}>
+                            ¿A quién le apartas este horario?
+                          </p>
+                          {solicitudEnAgendamiento ? (
+                            <span className="resumen-reserva-val">{solicitudEnAgendamiento.nombre}</span>
+                          ) : (
+                            <select
+                              value={calPara}
+                              onChange={(e) => setCalPara(e.target.value)}
+                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "none", fontSize: 13, background: "#fff", color: "#1a1a1a" }}
+                            >
+                              <option value="">Selecciona un cliente o prospecto…</option>
+                              <optgroup label="Clientes">
+                                {[...clientes]
+                                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                  .map((cl) => (
+                                    <option key={cl.id} value={`c:${cl.id}`}>
+                                      {cl.nombre}
+                                      {cl.empresa ? ` · ${cl.empresa}` : ""}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                              <optgroup label="Prospectos (si todavía no es cliente)">
+                                {prospectos
+                                  .filter((pr) => pr.estado !== "convertido")
+                                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
+                                  .map((pr) => (
+                                    <option key={pr.id} value={`p:${pr.id}`}>
+                                      {pr.nombre}
+                                    </option>
+                                  ))}
+                              </optgroup>
+                            </select>
+                          )}
                         </div>
                         <div className="nota-info">
                           {rol === "ventas"
