@@ -224,7 +224,7 @@ export default function CotizacionesPage() {
             <p className="modal-nombre">Aceptar cotización</p>
             <p className="sub-label" style={{ marginTop: 8 }}>
               {cotizaciones.find((c) => c.id === confirmandoAceptarId)?.nombre.includes("Sala de Juntas")
-                ? "¿Marcar esta cotización de Sala de Juntas como aceptada? Las salas son reservas: no generan contrato."
+                ? "¿Aceptar esta cotización de Sala de Juntas? Se reserva el horario en el calendario; las salas no generan contrato."
                 : "¿Aceptar esta cotización y generar el contrato como pre-aprobado?"}
             </p>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>

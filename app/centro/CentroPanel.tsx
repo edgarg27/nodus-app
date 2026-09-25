@@ -8,6 +8,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
+import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 
@@ -155,7 +156,7 @@ const LABEL_TIPO_DAYPASS: Record<"coworking" | "oficina_privada" | "working_desk
 
 // ---------- Calendario de reservaciones (vista admin) ----------
 const CAL_DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const CAL_HORAS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8am a 8pm
+const CAL_HORAS = HORAS_CALENDARIO; // de 7am a 11pm; lo fuera de horario se marca aparte
 const CAL_ESPACIOS_DEFAULT = [
   { id: "Sala de Juntas A", icono: "🤝" },
   { id: "Sala de Juntas B", icono: "🤝" },
@@ -598,10 +599,11 @@ export default function CentroPanel({
       new Set((reservas || []).map((r) => r.cotizacion_id).filter((id): id is string => !!id))
     );
     const labelPorCotizacion: Record<string, string> = {};
+    const nombreSalaPorCotizacion: Record<string, string> = {};
     if (cotizacionIds.length > 0) {
       const { data: cots } = await supabase
         .from("cotizaciones_comerciales")
-        .select("id, paquete_id, modalidad_paquete")
+        .select("id, paquete_id, modalidad_paquete, tipo_espacio, nombre_contesta_telefono")
         .in("id", cotizacionIds);
       const paqueteIds = Array.from(new Set((cots || []).map((ct) => ct.paquete_id).filter((id): id is string => !!id)));
       const { data: paqs } =
@@ -613,6 +615,9 @@ export default function CentroPanel({
         nombrePaquetePorId[p.id] = p.nombre;
       });
       (cots || []).forEach((ct) => {
+        if (ct.nombre_contesta_telefono && (ct.tipo_espacio || "").startsWith("Sala de Juntas")) {
+          nombreSalaPorCotizacion[ct.id] = ct.nombre_contesta_telefono;
+        }
         if (!ct.paquete_id) return;
         const partes = [`📦 ${nombrePaquetePorId[ct.paquete_id] || "Paquete"}`, ct.modalidad_paquete || null].filter(Boolean);
         labelPorCotizacion[ct.id] = partes.join(" · ");
@@ -622,7 +627,7 @@ export default function CentroPanel({
     setReservaciones(
       (reservas || []).map((r) => ({
         ...r,
-        cliente_nombre: nombrePorId[r.user_id] || "Cliente",
+        cliente_nombre: (r.cotizacion_id && nombreSalaPorCotizacion[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
         paquete_label: r.cotizacion_id ? labelPorCotizacion[r.cotizacion_id] || null : null,
       }))
     );
@@ -915,7 +920,7 @@ export default function CentroPanel({
     const hasta = calFormatFechaISO(new Date(calInicioSemana.getTime() + 6 * 86400000));
     const { data } = await supabase
       .from("reservaciones")
-      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id")
+      .select("id, espacio, fecha, hora_inicio, hora_fin, estado, user_id, cotizacion_id")
       .eq("centro", centro)
       .eq("espacio", calEspacio)
       .gte("fecha", desde)
@@ -930,7 +935,27 @@ export default function CentroPanel({
       nombrePorId = Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre]));
     }
 
-    setCalReservas(reservas.map((r) => ({ ...r, cliente_nombre: nombrePorId[r.user_id] || "Cliente" })));
+    // Una sala reservada al aceptar su cotización se guarda a nombre de quien la
+    // aceptó (o del cliente, si ya tiene cuenta): en el calendario se muestra el
+    // nombre de quien la pidió, que viene en la cotización.
+    const cotIds = Array.from(new Set(reservas.map((r) => r.cotizacion_id).filter(Boolean)));
+    const nombrePorCot: Record<string, string> = {};
+    if (cotIds.length > 0) {
+      const { data: cots } = await supabase
+        .from("cotizaciones_comerciales")
+        .select("id, tipo_espacio, nombre_contesta_telefono")
+        .in("id", cotIds);
+      (cots || []).forEach((ct) => {
+        if (ct.nombre_contesta_telefono && (ct.tipo_espacio || "").startsWith("Sala de Juntas")) nombrePorCot[ct.id] = ct.nombre_contesta_telefono;
+      });
+    }
+
+    setCalReservas(
+      reservas.map((r) => ({
+        ...r,
+        cliente_nombre: (r.cotizacion_id && nombrePorCot[r.cotizacion_id]) || nombrePorId[r.user_id] || "Cliente",
+      }))
+    );
     setCalCargando(false);
   }
 
@@ -1001,7 +1026,9 @@ export default function CentroPanel({
         hora_fin: `${String(calSeleccion.horaFin).padStart(2, "0")}:00`,
         centro,
         estado: "confirmada",
-        fuera_horario: false,
+        fuera_horario: Array.from({ length: calSeleccion.horaFin - calSeleccion.horaInicio }, (_, i) => calSeleccion.horaInicio + i).some((h) =>
+          esFueraDeHorario(calSeleccion.fecha, h)
+        ),
         horas_incluidas: 0,
         horas_extra: 0,
         costo_extra: 0,
@@ -2318,7 +2345,7 @@ export default function CentroPanel({
                                     key={`cal-${fechaISO}-${h}`}
                                     className={
                                       "cal-slot" +
-                                      (sel ? " seleccionado" : ocupado ? " ocupado" : pasado ? " pasado" : "")
+                                      (sel ? " seleccionado" : ocupado ? " ocupado" : pasado ? " pasado" : esFueraDeHorario(fechaISO, h) ? " fuera-horario" : "")
                                     }
                                     title={
                                       reservaAqui

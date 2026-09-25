@@ -27,7 +27,7 @@ const estiloSelect: CSSProperties = {
 // Helpers de fecha/hora — este proyecto no tiene un lib/reservaciones.ts
 // compartido, se duplican inline igual que ya hacen app/reservaciones/page.tsx
 // y app/centro/CentroPanel.tsx.
-const HORAS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8am a 8pm
+import { HORAS_CALENDARIO as HORAS, esFueraDeHorario } from "@/lib/horarioSala";
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 function lunesDeLaSemana(fecha: Date) {
@@ -37,25 +37,6 @@ function lunesDeLaSemana(fecha: Date) {
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
-}
-
-const DIAS_FESTIVOS_MX = [
-  "2026-01-01",
-  "2026-02-02",
-  "2026-03-16",
-  "2026-05-01",
-  "2026-09-16",
-  "2026-11-16",
-  "2026-12-25",
-];
-
-function esFueraDeHorario(fechaISO: string, hora: number) {
-  if (DIAS_FESTIVOS_MX.includes(fechaISO)) return true;
-  const dia = new Date(fechaISO + "T00:00:00").getDay();
-  if (dia === 0) return true;
-  if (dia === 6 && hora >= 14) return true;
-  if (dia >= 1 && dia <= 5 && hora >= 20) return true;
-  return false;
 }
 
 function formatFechaISO(d: Date) {

@@ -4,6 +4,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import MisReservaciones from "../mis-reservaciones/MisReservaciones";
+import { HORAS_CALENDARIO as HORAS, TEXTO_FUERA_DE_HORARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import {
   HORAS_ANTICIPACION_CANCELACION,
   fmtHoras,
@@ -14,7 +15,6 @@ import {
 } from "@/lib/horasCowork";
 
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const HORAS = Array.from({ length: 13 }, (_, i) => 8 + i); // 8am a 8pm
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
 const ESPACIOS_DEFAULT = [
@@ -35,26 +35,6 @@ const ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = {
 // en centros sin un espacio genérico de Coworking en el catálogo estático.
 function esSalaDeJuntas(espacio: string) {
   return !espacio.startsWith("Coworking") && !espacio.startsWith("Sala de Capacitación");
-}
-
-// Festivos oficiales de México (ajusta/agrega según el año)
-const DIAS_FESTIVOS_MX = [
-  "2026-01-01", // Año Nuevo
-  "2026-02-02", // Día de la Constitución (observado)
-  "2026-03-16", // Natalicio de Benito Juárez (observado)
-  "2026-05-01", // Día del Trabajo
-  "2026-09-16", // Independencia
-  "2026-11-16", // Revolución (observado)
-  "2026-12-25", // Navidad
-];
-
-function esFueraDeHorario(fechaISO: string, hora: number) {
-  if (DIAS_FESTIVOS_MX.includes(fechaISO)) return true;
-  const dia = new Date(fechaISO + "T00:00:00").getDay(); // 0 = domingo, 6 = sábado
-  if (dia === 0) return true; // domingo, todo el día
-  if (dia === 6 && hora >= 14) return true; // sábado después de las 2pm
-  if (dia >= 1 && dia <= 5 && hora >= 20) return true; // entre semana después de las 8pm
-  return false;
 }
 
 function lunesDeLaSemana(fecha: Date) {
@@ -879,9 +859,8 @@ function ReservacionesInner() {
                 )}
                 {seleccionFueraHorario && (
                   <div className="nota-info" style={{ background: "rgba(255, 199, 102, 0.2)", color: "#a3701f" }}>
-                    ⚠️ Este horario está fuera del horario normal (domingo, festivo, sábado después
-                    de las 2pm o entre semana después de las 8pm). Se cobra extra y está sujeto a que
-                    recepción te mande la cotización antes de confirmarse.
+                    ⚠️ Este horario está fuera del horario normal ({TEXTO_FUERA_DE_HORARIO}). Se cobra
+                    extra y está sujeto a que recepción te mande la cotización antes de confirmarse.
                   </div>
                 )}
                 <div className="nota-info">⏳ Tu reservación quedará pendiente hasta que el centro la confirme.</div>
