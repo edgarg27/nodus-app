@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoTarjeta } from "@/lib/openpay";
 import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
+import { registrarCargoEnPago, resolverCobroCliente } from "@/lib/cobroCliente";
 import { checkRateLimit, ipDeRequest } from "@/lib/rateLimit";
 import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 
@@ -32,37 +33,9 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
 
   // Qué se va a cobrar: siempre algo que sea del cliente que pide el cobro.
-  let monto = 0;
-  let descripcion = "";
-  let pagoExistenteId: string | null = null;
-  let facturaDelPagoId: string | null = null;
-  if (pagoId) {
-    const { data: pago } = await admin
-      .from("pagos")
-      .select("id, monto, concepto, estado, factura_id, user_id")
-      .eq("id", pagoId)
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-    if (!pago) return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
-    if (pago.estado === "pagado") return NextResponse.json({ error: "Este pago ya está pagado" }, { status: 400 });
-    monto = Number(pago.monto);
-    descripcion = pago.concepto || "Pago Nodus";
-    pagoExistenteId = pago.id;
-    facturaDelPagoId = pago.factura_id;
-  } else {
-    const { data: factura } = await admin
-      .from("facturas")
-      .select("id, folio, concepto, monto, estado, user_id")
-      .eq("id", facturaId)
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-    if (!factura) return NextResponse.json({ error: "Factura no encontrada" }, { status: 404 });
-    if (factura.estado === "pagada") return NextResponse.json({ error: "Esta factura ya está pagada" }, { status: 400 });
-    monto = Number(factura.monto);
-    descripcion = `${factura.folio} - ${factura.concepto}`;
-    facturaDelPagoId = factura.id;
-  }
-  if (!(monto > 0)) return NextResponse.json({ error: "El monto a cobrar no es válido" }, { status: 400 });
+  const r = await resolverCobroCliente(admin, session.user.id, { pagoId, facturaId });
+  if (r.ok === false) return NextResponse.json({ error: r.error }, { status: r.status });
+  const { monto, descripcion, pagoExistenteId, facturaDelPagoId } = r.cobro;
 
   const { data: perfil } = await admin.from("profiles").select("nombre, email").eq("id", session.user.id).maybeSingle();
   // A dónde regresa el cliente después de verificarse con su banco. En producción
@@ -85,24 +58,8 @@ export async function POST(req: NextRequest) {
 
     // Se registra el cargo en el pago (o se crea el pago de la factura) para que
     // el webhook y la verificación lo encuentren.
-    if (pagoExistenteId) {
-      await admin
-        .from("pagos")
-        .update({ openpay_charge_id: cargo.id, notas: "Cargo con tarjeta vía Openpay" })
-        .eq("id", pagoExistenteId);
-    } else {
-      const { error: insErr } = await admin.from("pagos").insert({
-        factura_id: facturaDelPagoId,
-        user_id: session.user.id,
-        monto,
-        estado: "pendiente",
-        notas: "Cargo con tarjeta vía Openpay",
-        openpay_charge_id: cargo.id,
-      });
-      if (insErr) {
-        return NextResponse.json({ error: "El cargo se generó pero no se pudo registrar. Avisa al centro." }, { status: 500 });
-      }
-    }
+    const errorRegistro = await registrarCargoEnPago(admin, session.user.id, r.cobro, cargo.id, "Cargo con tarjeta vía Openpay");
+    if (errorRegistro) return NextResponse.json({ error: errorRegistro }, { status: 500 });
 
     // Queda registrado qué política aceptó (necesita migracion_politica_cancelacion.sql;
     // si esa migración aún no se corrió, el pago sigue su curso sin el registro).
@@ -112,8 +69,8 @@ export async function POST(req: NextRequest) {
       .eq("openpay_charge_id", cargo.id);
 
     if (cargo.status === "completed") {
-      const r = await confirmarPagoPorCargo(admin, cargo.id);
-      return NextResponse.json({ ok: true, estado: r.estado });
+      const resultado = await confirmarPagoPorCargo(admin, cargo.id);
+      return NextResponse.json({ ok: true, estado: resultado.estado });
     }
     if (cargo.payment_method?.url) {
       return NextResponse.json({ ok: true, estado: "verificacion", redirect: cargo.payment_method.url });

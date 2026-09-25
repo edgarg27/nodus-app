@@ -49,9 +49,14 @@ export default function MisTarjetasPage() {
 
   async function cargar() {
     setCargando(true);
+    // Solo las tarjetas de quien abre la pantalla (el personal puede leer todas por soporte).
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { data } = await supabase
       .from("tarjetas_guardadas")
       .select("id, marca, ultimos4, vence_mes, vence_anio, titular, cobro_automatico")
+      .eq("user_id", user?.id || "")
       .eq("activa", true)
       .order("created_at", { ascending: false });
     setTarjetas((data as Tarjeta[]) || []);
