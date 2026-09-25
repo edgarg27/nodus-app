@@ -1509,6 +1509,13 @@ a.stat-card {
   margin: 0 auto;
 }
 
+/* Grupos de módulos con título (admin/superadmin/gerente): mismas
+   columnas en todos los grupos, así un grupo con pocas tarjetas no las
+   estira a lo ancho — deja el hueco vacío (auto-fill en vez de auto-fit). */
+.modulos-grid-fija {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
 /* Sistemas: 5 módulos por renglón en pantallas anchas; en angostas se
    acomoda solo como .modulos-grid. */
 .modulos-grid-5 {

@@ -1,7 +1,7 @@
 "use client";
 
 import AvisoContratoVentas from "./AvisoContratoVentas";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
@@ -1109,319 +1109,362 @@ export default function AdminPanel({
             </div>
           )}
 
-          <div
-            style={
-              rol === "sistemas"
-                ? { maxWidth: 800, margin: "0 auto", width: "100%" }
-                : rol === "atencion_cliente" || rol === "ventas"
-                  ? { maxWidth: 620, margin: "0 auto", width: "100%" }
-                  : undefined
-            }
-          >
+          {rol === "ventas" ? (
+          <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
             <p className="panel-section-label" style={{ marginTop: 8 }}>
               Módulos
             </p>
-            <div
-              className={
-                "modulos-grid" +
-                (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" || rol === "ventas" ? " modulos-grid-compacta" : "")
-              }
-              style={{ marginTop: 8 }}
-            >
-            {rol === "ventas" ? (
-              // Asesora de Ventas: SOLO estos módulos. Va aparte a propósito:
-              // las condiciones de abajo son "a quién no se le muestra" y un
-              // rol nuevo recibiría todo lo de la admin.
-              <>
-                <a className="modulo-card" href="/sala-juntas">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Sala de Juntas</span>
-                </a>
-                <a className="modulo-card" href="/mapa-oficinas">
-                  <span className="modulo-icon">🗺️</span>
-                  <span className="modulo-name">Mapa oficinas</span>
-                </a>
-                <a className="modulo-card" href="/experiencia-cliente">
-                  <span className="modulo-icon">🎉</span>
-                  <span className="modulo-name">Calendario de Eventos</span>
-                </a>
-                <a className="modulo-card" href="/correos">
-                  <span className="modulo-icon">📧</span>
-                  <span className="modulo-name">Correos</span>
-                </a>
-                <a className="modulo-card" href="/contratos">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por firmar)` : ""}</span>
-                </a>
-              </>
-            ) : (
-            <>
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/cobranza">
-                <span className="modulo-icon">💰</span>
-                <span className="modulo-name">Cobranza</span>
-              </a>
-            )}
-            {/* Gastos y Proveedores de sistemas/operaciones/admin ya viven
-                dentro de "Panel de Centro" (con factura/comprobante
-                adjuntos). Cobranza ya no ve este acceso directo: sus gastos
-                los ve dentro de "Ingresos por Centro". */}
-            {(rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/cobranza?tab=gastos">
-                <span className="modulo-icon">💸</span>
-                <span className="modulo-name">Gastos</span>
-              </a>
-            )}
-            {(rol === "atencion_cliente" || rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/atencion-cliente">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/queja.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Quejas y Sugerencias</span>
-              </a>
-            )}
-            {/* Atención a clientes: admin, superadmin y atencion_cliente
-                (misma lista que las políticas de
-                migracion_atencion_clientes_modulos.sql y
-                migracion_atencion_cliente_servicio.sql). */}
-            {(rol === "admin" || rol === "superadmin" || rol === "atencion_cliente") && (
-              <>
-                <a className="modulo-card" href="/documentacion-centro">
-                  <span className="modulo-icon">📁</span>
-                  <span className="modulo-name">Documentación del centro</span>
-                </a>
-              </>
-            )}
-            {(rol === "diseno" || rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/diseno">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/insignia.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Logros</span>
-              </a>
-            )}
-            {rol === "diseno" && (
-              <a className="modulo-card" href="/experiencia-cliente?tab=eventos">
-                <span className="modulo-icon">🎪</span>
-                <span className="modulo-name">Eventos</span>
-              </a>
-            )}
-            {rol === "diseno" && (
-              <a className="modulo-card" href="/documentacion-centro">
-                <span className="modulo-icon">📁</span>
-                <span className="modulo-name">Documentación del centro</span>
-              </a>
-            )}
-            {rol === "diseno" && (
-              <a className="modulo-card" href="/diseno/plantillas">
-                <span className="modulo-icon">📝</span>
-                <span className="modulo-name">Plantillas</span>
-              </a>
-            )}
-            {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/tickets">
-                <span className="modulo-icon">🎫</span>
-                <span className="modulo-name">Tickets</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/contratos">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Contratos</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/registrar-plan">
-                <span className="modulo-icon">📝</span>
-                <span className="modulo-name">Cotizar</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/prospectos">
-                <span className="modulo-icon">🎯</span>
-                <span className="modulo-name">Prospectos</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/paquetes">
-                <span className="modulo-icon">🎁</span>
-                <span className="modulo-name">Paquetes</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/paqueteria">
-                <span className="modulo-icon">📦</span>
-                <span className="modulo-name">Paquetería y Mensajería</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/pagos">
-                <span className="modulo-icon">💰</span>
-                <span className="modulo-name">Pagos</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/deposito-garantia">
-                <span className="modulo-icon">🔒</span>
-                <span className="modulo-name">Depósito en garantía</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/facturas-admin">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Facturas</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno" && (
-              <a className="modulo-card" href="/experiencia-cliente">
-                <span className="modulo-icon">🎉</span>
-                <span className="modulo-name">Calendario de Eventos</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/fidelidad-admin">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Tarjeta de fidelidad</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/reportes">
-                <span className="modulo-icon">📊</span>
-                <span className="modulo-name">Reportes</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/ingresos-centro">
-                <span className="modulo-icon">💹</span>
-                <span className="modulo-name">Ingresos por Centro</span>
-              </a>
-            )}
-            {rol !== "cobranza" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/telefonia">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/telefono.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Telefonía</span>
-              </a>
-            )}
-            {(rol === "sistemas" || (rol === "superadmin" || rol === "gerente")) && (
-              <a className="modulo-card" href="/wifi-solicitudes">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/wifi.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">WiFi</span>
-              </a>
-            )}
-            {(rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/usuarios">
-                <span className="modulo-icon">🔑</span>
-                <span className="modulo-name">Usuarios</span>
-              </a>
-            )}
-            {/* Lo que antes eran pestañas del Panel de Centro: cada uno tiene
-                ahora su propia pantalla (/centro/<módulo>), con el mismo acceso
-                que tenía la pestaña. */}
-            {(rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/centro/resumen">
-                <span className="modulo-icon">📊</span>
-                <span className="modulo-name">Resumen</span>
-              </a>
-            )}
-            {(rol === "admin" || rol === "superadmin" || rol === "gerente") && (
-              <>
-                <a className="modulo-card" href="/centro/invitados">
-                  <span className="modulo-icon">🙋</span>
-                  <span className="modulo-name">Invitados</span>
-                </a>
-                <a className="modulo-card" href="/centro/solicitudes">
-                  <span className="modulo-icon">📨</span>
-                  <span className="modulo-name">Solicitudes</span>
-                </a>
-                <a className="modulo-card" href="/centro/visitas">
-                  <span className="modulo-icon">🚪</span>
-                  <span className="modulo-name">Visitas</span>
-                </a>
-              </>
-            )}
-            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas") && (
-              <a className="modulo-card" href="/centro/vouchers">
-                <span className="modulo-icon">🎟️</span>
-                <span className="modulo-name">Vouchers</span>
-              </a>
-            )}
-            {(rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones") && (
-              <a className="modulo-card" href="/centro/proveedores">
-                <span className="modulo-icon">🧾</span>
-                <span className="modulo-name">Proveedores</span>
-              </a>
-            )}
-            {rol !== "cobranza" && rol !== "diseno" && (
-              <a className="modulo-card" href="/mapa-oficinas">
-                <span className="modulo-icon">🗺️</span>
-                <span className="modulo-name">Mapa oficinas</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/correos">
-                <span className="modulo-icon">📧</span>
-                <span className="modulo-name">Correos</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/alta-cliente">
-                <span className="modulo-icon">👤</span>
-                <span className="modulo-name">Nuevo cliente</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/baja-cliente">
-                <span className="modulo-icon">🚪</span>
-                <span className="modulo-name">Baja de cliente</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "diseno" && (
-              <a className="modulo-card" href="/tours">
-                <span className="modulo-icon">🚶</span>
-                <span className="modulo-name">Tours</span>
-              </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
+            <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
+              {/* Asesora de Ventas: SOLO estos módulos. Va aparte a propósito:
+                  las condiciones de la lista general son "a quién no se le
+                  muestra" y un rol nuevo recibiría todo lo de la admin. */}
               <a className="modulo-card" href="/sala-juntas">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Sala de Juntas</span>
               </a>
-            )}
-            {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/cotizaciones">
-                <span className="modulo-icon">🧾</span>
-                <span className="modulo-name">Cotizaciones</span>
+              <a className="modulo-card" href="/mapa-oficinas">
+                <span className="modulo-icon">🗺️</span>
+                <span className="modulo-name">Mapa oficinas</span>
               </a>
-            )}
-            {rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && (
-              <a className="modulo-card" href="/mantenimiento">
+              <a className="modulo-card" href="/experiencia-cliente">
+                <span className="modulo-icon">🎉</span>
+                <span className="modulo-name">Calendario de Eventos</span>
+              </a>
+              <a className="modulo-card" href="/correos">
+                <span className="modulo-icon">📧</span>
+                <span className="modulo-name">Correos</span>
+              </a>
+              <a className="modulo-card" href="/contratos">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/herramientas.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Mtto.</span>
+                <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por firmar)` : ""}</span>
               </a>
-            )}
-            {rol !== "cobranza" && rol !== "operaciones" && rol !== "diseno" && (
-              <a className="modulo-card" href="/inventario">
-                <span className="modulo-icon">📦</span>
-                <span className="modulo-name">Inventario</span>
-              </a>
-            )}
-            {(rol === "sistemas" || rol === "superadmin" || rol === "gerente") && (
-              <a className="modulo-card" href="/equipos">
-                <span className="modulo-icon">💻</span>
-                <span className="modulo-name">Equipos</span>
-              </a>
-            )}
-            </>
-            )}
             </div>
           </div>
+          ) : (() => {
+            // Módulos en el orden en que se trabaja: primero el flujo de
+            // ventas (prospecto → cotización → contrato → alta/baja), luego
+            // cobros, la operación del día, espacios y al final reportes.
+            // Cada tarjeta conserva exactamente su condición de antes (quién
+            // la ve); solo cambia el orden. Admin/superadmin/gerente los ven
+            // con título por grupo; los demás roles, en el mismo orden sin
+            // títulos.
+            const GRUPOS = [
+              "Ventas y clientes",
+              "Cobros y finanzas",
+              "Operación diaria del centro",
+              "Espacios y servicios",
+              "Reportes y administración",
+            ];
+            const esVentasCom = rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno";
+            const modulos: { grupo: number; ver: boolean; key: string; tarjeta: React.ReactNode }[] = [
+              // ---------- 1. Ventas y clientes ----------
+              { grupo: 0, ver: esVentasCom, key: "prospectos", tarjeta: (
+                <a className="modulo-card" href="/prospectos">
+                  <span className="modulo-icon">🎯</span>
+                  <span className="modulo-name">Prospectos</span>
+                </a>
+              ) },
+              { grupo: 0, ver: esVentasCom, key: "cotizar", tarjeta: (
+                <a className="modulo-card" href="/registrar-plan">
+                  <span className="modulo-icon">📝</span>
+                  <span className="modulo-name">Cotizar</span>
+                </a>
+              ) },
+              { grupo: 0, ver: esVentasCom, key: "cotizaciones", tarjeta: (
+                <a className="modulo-card" href="/cotizaciones">
+                  <span className="modulo-icon">🧾</span>
+                  <span className="modulo-name">Cotizaciones</span>
+                </a>
+              ) },
+              { grupo: 0, ver: esVentasCom, key: "contratos", tarjeta: (
+                <a className="modulo-card" href="/contratos">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Contratos</span>
+                </a>
+              ) },
+              { grupo: 0, ver: esVentasCom, key: "alta", tarjeta: (
+                <a className="modulo-card" href="/alta-cliente">
+                  <span className="modulo-icon">👤</span>
+                  <span className="modulo-name">Nuevo cliente</span>
+                </a>
+              ) },
+              { grupo: 0, ver: esVentasCom, key: "baja", tarjeta: (
+                <a className="modulo-card" href="/baja-cliente">
+                  <span className="modulo-icon">🚪</span>
+                  <span className="modulo-name">Baja de cliente</span>
+                </a>
+              ) },
+
+              // ---------- 2. Cobros y finanzas ----------
+              { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "cobranza", tarjeta: (
+                <a className="modulo-card" href="/cobranza">
+                  <span className="modulo-icon">💰</span>
+                  <span className="modulo-name">Cobranza</span>
+                </a>
+              ) },
+              { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "pagos", tarjeta: (
+                <a className="modulo-card" href="/pagos">
+                  <span className="modulo-icon">💰</span>
+                  <span className="modulo-name">Pagos</span>
+                </a>
+              ) },
+              { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "facturas", tarjeta: (
+                <a className="modulo-card" href="/facturas-admin">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Facturas</span>
+                </a>
+              ) },
+              { grupo: 1, ver: esVentasCom, key: "deposito", tarjeta: (
+                <a className="modulo-card" href="/deposito-garantia">
+                  <span className="modulo-icon">🔒</span>
+                  <span className="modulo-name">Depósito en garantía</span>
+                </a>
+              ) },
+              { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "ingresos", tarjeta: (
+                <a className="modulo-card" href="/ingresos-centro">
+                  <span className="modulo-icon">💹</span>
+                  <span className="modulo-name">Ingresos por Centro</span>
+                </a>
+              ) },
+              // Cobranza ya no ve este acceso directo: sus gastos los ve
+              // dentro de "Ingresos por Centro".
+              { grupo: 1, ver: rol === "superadmin" || rol === "gerente", key: "gastos", tarjeta: (
+                <a className="modulo-card" href="/cobranza?tab=gastos">
+                  <span className="modulo-icon">💸</span>
+                  <span className="modulo-name">Gastos</span>
+                </a>
+              ) },
+
+              // ---------- 3. Operación diaria del centro ----------
+              { grupo: 2, ver: esVentasCom, key: "sala", tarjeta: (
+                <a className="modulo-card" href="/sala-juntas">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Sala de Juntas</span>
+                </a>
+              ) },
+              // Lo que antes eran pestañas del Panel de Centro: cada uno tiene
+              // su propia pantalla (/centro/<módulo>), con el mismo acceso.
+              { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "invitados", tarjeta: (
+                <a className="modulo-card" href="/centro/invitados">
+                  <span className="modulo-icon">🙋</span>
+                  <span className="modulo-name">Invitados</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "solicitudes", tarjeta: (
+                <a className="modulo-card" href="/centro/solicitudes">
+                  <span className="modulo-icon">📨</span>
+                  <span className="modulo-name">Solicitudes</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "visitas", tarjeta: (
+                <a className="modulo-card" href="/centro/visitas">
+                  <span className="modulo-icon">🚪</span>
+                  <span className="modulo-name">Visitas</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "diseno", key: "tours", tarjeta: (
+                <a className="modulo-card" href="/tours">
+                  <span className="modulo-icon">🚶</span>
+                  <span className="modulo-name">Tours</span>
+                </a>
+              ) },
+              { grupo: 2, ver: esVentasCom, key: "paquetes", tarjeta: (
+                <a className="modulo-card" href="/paquetes">
+                  <span className="modulo-icon">🎁</span>
+                  <span className="modulo-name">Paquetes</span>
+                </a>
+              ) },
+              { grupo: 2, ver: esVentasCom, key: "paqueteria", tarjeta: (
+                <a className="modulo-card" href="/paqueteria">
+                  <span className="modulo-icon">📦</span>
+                  <span className="modulo-name">Paquetería y Mensajería</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno", key: "calendario", tarjeta: (
+                <a className="modulo-card" href="/experiencia-cliente">
+                  <span className="modulo-icon">🎉</span>
+                  <span className="modulo-name">Calendario de Eventos</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol === "diseno", key: "eventos-diseno", tarjeta: (
+                <a className="modulo-card" href="/experiencia-cliente?tab=eventos">
+                  <span className="modulo-icon">🎪</span>
+                  <span className="modulo-name">Eventos</span>
+                </a>
+              ) },
+              { grupo: 2, ver: esVentasCom, key: "correos", tarjeta: (
+                <a className="modulo-card" href="/correos">
+                  <span className="modulo-icon">📧</span>
+                  <span className="modulo-name">Correos</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno", key: "tickets", tarjeta: (
+                <a className="modulo-card" href="/tickets">
+                  <span className="modulo-icon">🎫</span>
+                  <span className="modulo-name">Tickets</span>
+                </a>
+              ) },
+              { grupo: 2, ver: rol === "atencion_cliente" || rol === "superadmin" || rol === "gerente", key: "quejas", tarjeta: (
+                <a className="modulo-card" href="/atencion-cliente">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/queja.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Quejas y Sugerencias</span>
+                </a>
+              ) },
+
+              // ---------- 4. Espacios y servicios ----------
+              { grupo: 3, ver: rol !== "cobranza" && rol !== "diseno", key: "mapa", tarjeta: (
+                <a className="modulo-card" href="/mapa-oficinas">
+                  <span className="modulo-icon">🗺️</span>
+                  <span className="modulo-name">Mapa oficinas</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas", key: "vouchers", tarjeta: (
+                <a className="modulo-card" href="/centro/vouchers">
+                  <span className="modulo-icon">🎟️</span>
+                  <span className="modulo-name">Vouchers</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol === "sistemas" || rol === "superadmin" || rol === "gerente", key: "wifi", tarjeta: (
+                <a className="modulo-card" href="/wifi-solicitudes">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/wifi.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">WiFi</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol !== "cobranza" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "telefonia", tarjeta: (
+                <a className="modulo-card" href="/telefonia">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/telefono.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Telefonía</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno", key: "mtto", tarjeta: (
+                <a className="modulo-card" href="/mantenimiento">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/herramientas.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Mtto.</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol !== "cobranza" && rol !== "operaciones" && rol !== "diseno", key: "inventario", tarjeta: (
+                <a className="modulo-card" href="/inventario">
+                  <span className="modulo-icon">📦</span>
+                  <span className="modulo-name">Inventario</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol === "sistemas" || rol === "superadmin" || rol === "gerente", key: "equipos", tarjeta: (
+                <a className="modulo-card" href="/equipos">
+                  <span className="modulo-icon">💻</span>
+                  <span className="modulo-name">Equipos</span>
+                </a>
+              ) },
+              { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones", key: "proveedores", tarjeta: (
+                <a className="modulo-card" href="/centro/proveedores">
+                  <span className="modulo-icon">🧾</span>
+                  <span className="modulo-name">Proveedores</span>
+                </a>
+              ) },
+
+              // ---------- 5. Reportes y administración ----------
+              { grupo: 4, ver: rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente", key: "resumen", tarjeta: (
+                <a className="modulo-card" href="/centro/resumen">
+                  <span className="modulo-icon">📊</span>
+                  <span className="modulo-name">Resumen</span>
+                </a>
+              ) },
+              { grupo: 4, ver: esVentasCom, key: "reportes", tarjeta: (
+                <a className="modulo-card" href="/reportes">
+                  <span className="modulo-icon">📊</span>
+                  <span className="modulo-name">Reportes</span>
+                </a>
+              ) },
+              { grupo: 4, ver: esVentasCom, key: "fidelidad", tarjeta: (
+                <a className="modulo-card" href="/fidelidad-admin">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Tarjeta de fidelidad</span>
+                </a>
+              ) },
+              { grupo: 4, ver: rol === "diseno" || rol === "superadmin" || rol === "gerente", key: "logros", tarjeta: (
+                <a className="modulo-card" href="/diseno">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/insignia.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Logros</span>
+                </a>
+              ) },
+              // Documentación: admin, superadmin, atencion_cliente y diseno
+              // (mismas listas que sus políticas RLS).
+              { grupo: 4, ver: rol === "admin" || rol === "superadmin" || rol === "atencion_cliente" || rol === "diseno", key: "documentacion", tarjeta: (
+                <a className="modulo-card" href="/documentacion-centro">
+                  <span className="modulo-icon">📁</span>
+                  <span className="modulo-name">Documentación del centro</span>
+                </a>
+              ) },
+              { grupo: 4, ver: rol === "diseno", key: "plantillas", tarjeta: (
+                <a className="modulo-card" href="/diseno/plantillas">
+                  <span className="modulo-icon">📝</span>
+                  <span className="modulo-name">Plantillas</span>
+                </a>
+              ) },
+              { grupo: 4, ver: rol === "superadmin" || rol === "gerente", key: "usuarios", tarjeta: (
+                <a className="modulo-card" href="/usuarios">
+                  <span className="modulo-icon">🔑</span>
+                  <span className="modulo-name">Usuarios</span>
+                </a>
+              ) },
+            ];
+            const visibles = modulos.filter((m) => m.ver);
+            const conTitulos = rol === "admin" || rol === "superadmin" || rol === "gerente";
+            const claseGrid =
+              "modulos-grid" + (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" ? " modulos-grid-compacta" : "");
+
+            return (
+              <div
+                style={
+                  rol === "sistemas"
+                    ? { maxWidth: 800, margin: "0 auto", width: "100%" }
+                    : rol === "atencion_cliente"
+                      ? { maxWidth: 620, margin: "0 auto", width: "100%" }
+                      : undefined
+                }
+              >
+                {conTitulos ? (
+                  GRUPOS.map((titulo, g) => {
+                    const delGrupo = visibles.filter((m) => m.grupo === g);
+                    if (delGrupo.length === 0) return null;
+                    return (
+                      <div key={titulo}>
+                        <p className="panel-section-label" style={{ marginTop: g === 0 ? 8 : 18 }}>
+                          {titulo}
+                        </p>
+                        <div className={claseGrid + " modulos-grid-fija"} style={{ marginTop: 8 }}>
+                          {delGrupo.map((m) => (
+                            <Fragment key={m.key}>{m.tarjeta}</Fragment>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <p className="panel-section-label" style={{ marginTop: 8 }}>
+                      Módulos
+                    </p>
+                    <div className={claseGrid} style={{ marginTop: 8 }}>
+                      {visibles.map((m) => (
+                        <Fragment key={m.key}>{m.tarjeta}</Fragment>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
