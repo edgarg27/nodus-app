@@ -745,8 +745,8 @@ export default function CotizarForm({
   // campo propio.
   const observacionesProspecto = prospectoInteresPreseleccionado ? `Interés: ${prospectoInteresPreseleccionado}` : "";
   const [tipoProspecto, setTipoProspecto] = useState(prospectoNombrePreseleccionado ? "Nuevo" : "");
-  const [tipoPersona, setTipoPersona] = useState<"fisica" | "moral" | "">("");
-  const [razonSocial, setRazonSocial] = useState("");
+  // Persona física/moral y razón social se piden hasta que se acepta la
+  // cotización (ver ModalDatosFiscales.tsx), no aquí.
   const [rfc, setRfc] = useState(prospectoRfcPreseleccionado || "");
   const [nombreContesta, setNombreContesta] = useState(prospectoNombrePreseleccionado || "");
   const [telefonoContesta, setTelefonoContesta] = useState(prospectoTelefonoPreseleccionado || "");
@@ -968,7 +968,9 @@ export default function CotizarForm({
 
   const precioPactadoNum = Number(precioPactado) || 0;
   const precioListaNum = Number(precioLista) || 0;
-  const depositoNum = sinDepositoPromo ? 0 : Number(depositoGarantia) || 0;
+  // Coworking no maneja depósito en garantía (es una oficina/espacio
+  // compartido, no un espacio exclusivo que respaldar).
+  const depositoNum = esCoworkingSel || sinDepositoPromo ? 0 : Number(depositoGarantia) || 0;
   const notaSinDepositoPromo = "Sin depósito en garantía por promoción";
   // El depósito se cobra con IVA al aprobar el contrato (ver
   // ContratoModal.tsx → aprobar()) — se muestra aquí igual para que el
@@ -1236,7 +1238,6 @@ export default function CotizarForm({
     setObservaciones("");
     setDetalleMedioContacto("");
     setMedioContacto("");
-    setTipoPersona("");
     setNumeroPersonas("");
     setQuiereCoffee(false);
     setPaqueteCoffeeId("");
@@ -1309,14 +1310,6 @@ export default function CotizarForm({
       setError(`Ese paquete de Coffee Break requiere un mínimo de ${paqueteCoffee?.minimo_personas} persona(s)`);
       return;
     }
-    if (!tipoPersona) {
-      setError("Selecciona si es persona física o moral");
-      return;
-    }
-    if (tipoPersona === "moral" && !razonSocial.trim()) {
-      setError("Falta la razón social de la empresa");
-      return;
-    }
     setError("");
     setGuardando(true);
 
@@ -1328,8 +1321,11 @@ export default function CotizarForm({
       centro,
       cliente_id: clienteIdEfectivo,
       prospecto_id: prospectoIdPreseleccionado || null,
-      tipo_persona: tipoPersona || null,
-      razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
+      // Persona física/moral y razón social ya no se piden al cotizar: se
+      // piden hasta que se acepta la cotización y se crea el contrato (ver
+      // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.
+      tipo_persona: null,
+      razon_social: null,
       rfc: null,
       renovacion: false,
       oficina_id: null,
@@ -1687,14 +1683,6 @@ export default function CotizarForm({
       setError("Captura el tipo de cambio para cotizar en USD");
       return;
     }
-    if (!tipoPersona) {
-      setError("Selecciona si es persona física o moral");
-      return;
-    }
-    if (tipoPersona === "moral" && !razonSocial.trim()) {
-      setError("Falta la razón social de la empresa");
-      return;
-    }
     // Coffee Break es exclusivo de Sala de Juntas — no aplica en este flujo
     // de Coworking/Oficina Privada, así que no se valida aquí.
     setError("");
@@ -1717,8 +1705,11 @@ export default function CotizarForm({
         centro,
         cliente_id: clienteIdEfectivo,
         prospecto_id: prospectoIdPreseleccionado || null,
-        tipo_persona: tipoPersona || null,
-        razon_social: tipoPersona === "moral" ? razonSocial.trim() || null : null,
+        // Persona física/moral y razón social ya no se piden al cotizar: se
+        // piden hasta que se acepta la cotización y se crea el contrato (ver
+        // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.
+        tipo_persona: null,
+        razon_social: null,
         rfc: rfc.trim() ? rfc.trim().toUpperCase() : null,
         renovacion: esRenovacion,
         oficina_id: oficina?.id || null,
@@ -2879,29 +2870,6 @@ export default function CotizarForm({
               </select>
             </div>
             <div>
-              <p className="sub-label">Persona física o moral</p>
-              <select
-                value={tipoPersona}
-                onChange={(e) => setTipoPersona(e.target.value as "fisica" | "moral" | "")}
-              >
-                <option value="" hidden>
-                  Selecciona
-                </option>
-                <option value="fisica">Persona física</option>
-                <option value="moral">Persona moral</option>
-              </select>
-            </div>
-            {tipoPersona === "moral" && (
-              <div>
-                <p className="sub-label">Razón social de la empresa</p>
-                <input
-                  placeholder="Ej. NBC COMPANY, S.A.P.I. DE C.V."
-                  value={razonSocial}
-                  onChange={(e) => setRazonSocial(e.target.value)}
-                />
-              </div>
-            )}
-            <div>
               <p className="sub-label">Medio de contacto</p>
               <select
                 value={medioContacto}
@@ -2936,7 +2904,7 @@ export default function CotizarForm({
               </div>
             )}
             <input
-              placeholder={tipoPersona === "moral" ? "Nombre del representante legal" : "Nombre de quién solicita la cotización"}
+              placeholder="Nombre de quién solicita la cotización"
               value={nombreContesta}
               onChange={(e) => setNombreContesta(e.target.value)}
             />
@@ -3216,31 +3184,33 @@ export default function CotizarForm({
               <p className="sub-label">Precio pactado (unitario, sin IVA)</p>
               <input type="number" step="0.01" value={precioPactado} onChange={(e) => setPrecioPactado(e.target.value)} />
             </div>
-            <div>
-              <p className="sub-label">Depósito en garantía</p>
-              <input
-                type="number"
-                step="0.01"
-                // El campo muestra y captura el monto ya con IVA incluido
-                // (lo que realmente se le cobra al cliente) para no
-                // confundir al staff con dos números distintos. Por dentro
-                // se sigue guardando sin IVA en depositoGarantia — igual
-                // que antes — dividiendo entre 1.16 lo que se escriba aquí.
-                value={depositoGarantia === "" ? "" : depositoConIvaNum}
-                disabled={sinDepositoPromo}
-                onChange={(e) => {
-                  const conIva = Number(e.target.value) || 0;
-                  setDepositoGarantia(e.target.value === "" ? "" : String(round2(conIva / 1.16)));
-                }}
-              />
-              <Checkbox
-                checked={sinDepositoPromo}
-                onChange={setSinDepositoPromo}
-                style={{ fontSize: 12, color: "#555", marginTop: 6 }}
-              >
-                No se cobra depósito en garantía por promoción
-              </Checkbox>
-            </div>
+            {!esCoworkingSel && (
+              <div>
+                <p className="sub-label">Depósito en garantía</p>
+                <input
+                  type="number"
+                  step="0.01"
+                  // El campo muestra y captura el monto ya con IVA incluido
+                  // (lo que realmente se le cobra al cliente) para no
+                  // confundir al staff con dos números distintos. Por dentro
+                  // se sigue guardando sin IVA en depositoGarantia — igual
+                  // que antes — dividiendo entre 1.16 lo que se escriba aquí.
+                  value={depositoGarantia === "" ? "" : depositoConIvaNum}
+                  disabled={sinDepositoPromo}
+                  onChange={(e) => {
+                    const conIva = Number(e.target.value) || 0;
+                    setDepositoGarantia(e.target.value === "" ? "" : String(round2(conIva / 1.16)));
+                  }}
+                />
+                <Checkbox
+                  checked={sinDepositoPromo}
+                  onChange={setSinDepositoPromo}
+                  style={{ fontSize: 12, color: "#555", marginTop: 6 }}
+                >
+                  No se cobra depósito en garantía por promoción
+                </Checkbox>
+              </div>
+            )}
           </div>
           <textarea
             placeholder="Comentarios de precio"
@@ -3642,10 +3612,12 @@ export default function CotizarForm({
                         <span className="resumen-reserva-val">${totalAdicionalesConIva.toLocaleString("es-MX")}</span>
                       </div>
                     )}
-                    <div className="resumen-reserva-row">
-                      <span className="resumen-reserva-label">Depósito en garantía</span>
-                      <span className="resumen-reserva-val">${depositoConIvaNum.toLocaleString("es-MX")}</span>
-                    </div>
+                    {!esCoworkingSel && (
+                      <div className="resumen-reserva-row">
+                        <span className="resumen-reserva-label">Depósito en garantía</span>
+                        <span className="resumen-reserva-val">${depositoConIvaNum.toLocaleString("es-MX")}</span>
+                      </div>
+                    )}
                     {esSalaJuntas && quiereCoffee && paqueteCoffee && (
                       <div className="resumen-reserva-row">
                         <span className="resumen-reserva-label">☕ Coffee Break ({personasCoffeeNum} personas)</span>

@@ -524,6 +524,18 @@ export default function AdminPanel({
     return espaciosPorCliente.get(c.id)?.join(", ") || "";
   }
 
+  // Igual que oficinaDeCliente, pero le anexa la modalidad (ej. "Espacio A ·
+  // Coworking") tomándola del contrato vigente ya cargado en
+  // verDetalleCliente (contratosCliente) — ese sí trae el tipo real de la
+  // oficina, a diferencia de espaciosPorCliente que solo trae el número.
+  function oficinaConModalidad(c: { id: string; numero_oficina: string | null }) {
+    const base = oficinaDeCliente(c);
+    if (!base) return base;
+    const vigente = contratosCliente.find((ct) => ct.estatus === "vigente" && ct.espacio);
+    if (vigente?.espacio?.includes(" · Coworking")) return `${base} · Coworking`;
+    return base;
+  }
+
   // Solo los números ("3", "A") para prellenar el campo al editar.
   function numerosOficinaDeContrato(clienteId: string) {
     return (espaciosPorCliente.get(clienteId) || []).map((e) => e.replace(/^(Oficina|Espacio)\s+/, "")).join(", ");
@@ -1843,7 +1855,7 @@ export default function AdminPanel({
                 {oficinaDeCliente(clienteSeleccionado) && (
                   <div className="modal-row">
                     <span className="modal-label">Oficina</span>
-                    <span className="modal-val">{oficinaDeCliente(clienteSeleccionado).replace(/^Oficina /, "")}</span>
+                    <span className="modal-val">{oficinaConModalidad(clienteSeleccionado).replace(/^Oficina /, "")}</span>
                   </div>
                 )}
                 {clienteSeleccionado.tipo_oficina && (

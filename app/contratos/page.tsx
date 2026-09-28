@@ -454,6 +454,11 @@ export default function ContratosPage() {
   const [cotizacionesCandidatas, setCotizacionesCandidatas] = useState<CotizacionCandidata[]>([]);
   const [cotizacionSeleccionadaId, setCotizacionSeleccionadaId] = useState("");
   const [oficinaSeleccionadaId, setOficinaSeleccionadaId] = useState("");
+  // Coworking no lleva depósito en garantía; Oficina Privada y Working Desk sí
+  // (ver lib/contratoDocx.ts: Working Desk reutiliza la plantilla de Oficina
+  // Privada, "siempre con depósito"). Sin oficina asignada tampoco lleva.
+  const oficinaSelTipo = oficinasDisponibles.find((o) => o.id === oficinaSeleccionadaId)?.tipo;
+  const llevaDeposito = !!oficinaSeleccionadaId && oficinaSelTipo !== "Coworking";
 
   async function seleccionarProspectoContrato(p: ProspectoBusqueda) {
     setProspectoContrato(p);
@@ -553,7 +558,7 @@ export default function ContratosPage() {
       fecha_inicio: formContrato.fecha_inicio,
       fecha_vencimiento: formContrato.fecha_vencimiento,
       renta_mensual: Number(formContrato.renta_mensual),
-      deposito_garantia: Number(formContrato.deposito_garantia) || 0,
+      deposito_garantia: llevaDeposito ? Number(formContrato.deposito_garantia) || 0 : 0,
       horas_sala_juntas: Number(formContrato.horas_sala_juntas) || 0,
       dia_pago: formContrato.dia_pago ? Number(formContrato.dia_pago) : null,
       // Igual que todo contrato creado desde Cotizar: entra "pre_aprobado" y
@@ -882,18 +887,20 @@ export default function ContratosPage() {
                       onChange={(e) => setFormContrato({ ...formContrato, renta_mensual: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <p className="sub-label">Depósito en garantía</p>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formContrato.deposito_garantia}
-                      onChange={(e) => setFormContrato({ ...formContrato, deposito_garantia: e.target.value })}
-                    />
-                    <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>
-                      Se cobra + 16% de IVA al aprobar el contrato.
-                    </p>
-                  </div>
+                  {llevaDeposito && (
+                    <div>
+                      <p className="sub-label">Depósito en garantía</p>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formContrato.deposito_garantia}
+                        onChange={(e) => setFormContrato({ ...formContrato, deposito_garantia: e.target.value })}
+                      />
+                      <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>
+                        Se cobra + 16% de IVA al aprobar el contrato.
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="sub-label">Oficina (si es privada)</p>
                     <select value={oficinaSeleccionadaId} onChange={(e) => setOficinaSeleccionadaId(e.target.value)}>
@@ -912,20 +919,6 @@ export default function ContratosPage() {
                       value={formContrato.horas_sala_juntas}
                       onChange={(e) => setFormContrato({ ...formContrato, horas_sala_juntas: e.target.value })}
                     />
-                  </div>
-                  <div>
-                    <p className="sub-label">Día del mes que paga (ej. 15)</p>
-                    <input
-                      type="number"
-                      min={4}
-                      max={25}
-                      placeholder="15"
-                      value={formContrato.dia_pago}
-                      onChange={(e) => setFormContrato({ ...formContrato, dia_pago: e.target.value })}
-                    />
-                    <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>
-                      Usa un día entre el 4 y el 25.
-                    </p>
                   </div>
                 </div>
 

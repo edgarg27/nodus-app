@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { id, fiscal } = await req.json();
+  const { id, fiscal, tipoPersona: tipoPersonaElegida } = await req.json();
   if (!id) {
     return NextResponse.json({ error: "Falta el id de la cotización" }, { status: 400 });
   }
@@ -130,11 +130,15 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, contrato: null, reservada: true });
   }
+  // Persona física/moral: ya no se pregunta al cotizar, se elige aquí, al
+  // aceptar (ver ModalDatosFiscales.tsx). Si por alguna cotización vieja ya
+  // venía guardada en la venta, se respeta como respaldo.
+  const tipoPersona = tipoPersonaElegida === "moral" || tipoPersonaElegida === "fisica" ? tipoPersonaElegida : venta.tipo_persona === "moral" ? "moral" : "fisica";
+
   // Datos fiscales que se piden al aceptar (ya no se piden al cotizar): se validan,
   // se guardan en la venta y en la cuenta del cliente si ya la tiene, y siguen al
   // contrato.
   if (fiscal) {
-    const tipoP = venta.tipo_persona === "moral" ? "moral" : "fisica";
     const datos = normalizarDatosFiscales({
       rfc: normalizarRfc(fiscal.rfc),
       nombre_fiscal: String(fiscal.nombre_fiscal || "").trim(),
@@ -142,10 +146,10 @@ export async function POST(req: NextRequest) {
       cp_fiscal: String(fiscal.cp_fiscal || "").trim(),
       uso_cfdi: String(fiscal.uso_cfdi || ""),
     });
-    const msg = validarDatosFiscales(datos, tipoP);
+    const msg = validarDatosFiscales(datos, tipoPersona);
     if (msg) return NextResponse.json({ error: msg }, { status: 400 });
-    const cambiosVenta: Record<string, string | null> = { ...datos };
-    if (tipoP === "moral") cambiosVenta.razon_social = datos.nombre_fiscal;
+    const cambiosVenta: Record<string, string | null> = { ...datos, tipo_persona: tipoPersona };
+    if (tipoPersona === "moral") cambiosVenta.razon_social = datos.nombre_fiscal;
     const { error: fiscalError } = await admin.from("cotizaciones_comerciales").update(cambiosVenta).eq("id", venta.id);
     if (fiscalError) {
       return NextResponse.json({ error: "No se pudieron guardar los datos fiscales: " + fiscalError.message }, { status: 500 });
@@ -154,11 +158,8 @@ export async function POST(req: NextRequest) {
     if (venta.cliente_id) await admin.from("profiles").update(datos).eq("id", venta.cliente_id);
   }
   if (!venta.rfc || !String(venta.rfc).trim()) {
-    return NextResponse.json({ error: "Falta el RFC del cliente — captúralo al cotizar en CotizarForm." }, { status: 400 });
+    return NextResponse.json({ error: "Falta el RFC del cliente." }, { status: 400 });
   }
-  // tipo_persona lo agrega la migración de Persona A — mientras no exista
-  // la columna (o no se haya capturado), se asume persona física.
-  const tipoPersona = venta.tipo_persona === "moral" ? "moral" : "fisica";
 
   try {
     const fmtFecha = (f: string | null) =>

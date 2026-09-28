@@ -403,7 +403,6 @@ export default function ContratoModal({
       { campo: "Fecha de vencimiento", anterior: contrato.fecha_vencimiento || "", nuevo: form.fecha_vencimiento || "" },
       { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(form.renta_mensual), dinero: true },
       { campo: "Horas sala de juntas", anterior: num(contrato.horas_sala_juntas), nuevo: num(form.horas_sala_juntas) },
-      { campo: "Día de pago", anterior: num(contrato.dia_pago), nuevo: num(form.dia_pago) },
       { campo: "Depósito en garantía", anterior: num(contrato.deposito_garantia), nuevo: num(form.deposito_garantia), dinero: true },
     ];
     const cambiosPrincipales = camposPrincipales
@@ -648,16 +647,6 @@ export default function ContratoModal({
               step="0.01"
               value={form.renta_mensual}
               onChange={(e) => setForm({ ...form, renta_mensual: e.target.value })}
-            />
-          </div>
-          <div>
-            <p className="sub-label">Día del mes que paga</p>
-            <input
-              type="number"
-              min={4}
-              max={25}
-              value={form.dia_pago}
-              onChange={(e) => setForm({ ...form, dia_pago: e.target.value })}
             />
           </div>
           <div>
