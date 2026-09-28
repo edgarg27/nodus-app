@@ -1229,7 +1229,8 @@ export default function AdminPanel({
               // ---------- 1. Ventas y clientes ----------
               { grupo: 0, ver: esVentasCom, key: "prospectos", tarjeta: (
                 <a className="modulo-card" href="/prospectos">
-                  <span className="modulo-icon">🎯</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/prospectos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Prospectos</span>
                 </a>
               ) },
@@ -1254,13 +1255,15 @@ export default function AdminPanel({
               ) },
               { grupo: 0, ver: esVentasCom, key: "alta", tarjeta: (
                 <a className="modulo-card" href="/alta-cliente">
-                  <span className="modulo-icon">👤</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/nuevo-cliente.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Nuevo cliente</span>
                 </a>
               ) },
               { grupo: 0, ver: esVentasCom, key: "baja", tarjeta: (
                 <a className="modulo-card" href="/baja-cliente">
-                  <span className="modulo-icon">🚪</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/baja-cliente.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Baja de cliente</span>
                 </a>
               ) },
@@ -1268,13 +1271,15 @@ export default function AdminPanel({
               // ---------- 2. Cobros y finanzas ----------
               { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "cobranza", tarjeta: (
                 <a className="modulo-card" href="/cobranza">
-                  <span className="modulo-icon">💰</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/cobranza.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Cobranza</span>
                 </a>
               ) },
               { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "pagos", tarjeta: (
                 <a className="modulo-card" href="/pagos">
-                  <span className="modulo-icon">💰</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/pagos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Pagos</span>
                 </a>
               ) },
@@ -1287,13 +1292,15 @@ export default function AdminPanel({
               ) },
               { grupo: 1, ver: esVentasCom, key: "deposito", tarjeta: (
                 <a className="modulo-card" href="/deposito-garantia">
-                  <span className="modulo-icon">🔒</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/deposito-garantia.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Depósito en garantía</span>
                 </a>
               ) },
               { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "ingresos", tarjeta: (
                 <a className="modulo-card" href="/ingresos-centro">
-                  <span className="modulo-icon">💹</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/ingresos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Ingresos por Centro</span>
                 </a>
               ) },
