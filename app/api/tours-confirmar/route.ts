@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   }.</p>
     ${tour.tipo_espacio_interes ? `<p>Vamos a mostrarte especialmente: <strong>${tour.tipo_espacio_interes}</strong>.</p>` : ""}
     <p>Ubicación: ${ubicacionCentro(tour.centro)}</p>
-    <p>Te mandaremos un recordatorio un día antes. ¡Te esperamos!</p>
+    <p>Te mandaremos un recordatorio un día antes y otro una hora antes. ¡Te esperamos!</p>
   `;
 
   const resultado = await enviarCorreo({

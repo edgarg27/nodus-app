@@ -597,9 +597,11 @@ export default function AdminPanel({
   }
 
   const [borrandoVoucher, setBorrandoVoucher] = useState<string | null>(null);
+  // Confirmación con el modal de la app (antes confirm() nativo).
+  const [confirmarBorrarVoucherId, setConfirmarBorrarVoucherId] = useState<string | null>(null);
 
   async function borrarVoucher(voucherId: string) {
-    if (!confirm("¿Borrar este voucher? Si es real, también se elimina del controlador UniFi.")) return;
+    setConfirmarBorrarVoucherId(null);
     setBorrandoVoucher(voucherId);
     setErrorVoucher("");
     try {
@@ -2063,7 +2065,7 @@ export default function AdminPanel({
                       </p>
                     )}
                     <button
-                      onClick={() => borrarVoucher(vouchersCliente[0].id)}
+                      onClick={() => setConfirmarBorrarVoucherId(vouchersCliente[0].id)}
                       disabled={borrandoVoucher === vouchersCliente[0].id}
                       style={{
                         marginTop: 8,
@@ -2172,7 +2174,7 @@ export default function AdminPanel({
                             {v.codigo}
                           </p>
                           <button
-                            onClick={() => borrarVoucher(v.id)}
+                            onClick={() => setConfirmarBorrarVoucherId(v.id)}
                             disabled={borrandoVoucher === v.id}
                             className="tel-borrar-btn"
                             style={{ fontSize: 11 }}
@@ -2308,6 +2310,25 @@ export default function AdminPanel({
             <button className="reservar-btn" onClick={() => setMostrarCelebracionReporte(false)}>
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {confirmarBorrarVoucherId && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }} onClick={() => setConfirmarBorrarVoucherId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Borrar voucher</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar este voucher? Si es real, también se elimina del controlador UniFi.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmarBorrarVoucherId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarVoucher(confirmarBorrarVoucherId)}>
+                🗑 Borrar
+              </button>
+            </div>
           </div>
         </div>
       )}

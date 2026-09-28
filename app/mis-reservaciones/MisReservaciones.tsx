@@ -23,6 +23,8 @@ type Reservacion = {
   estado: string;
   asistencia?: string | null;
   horas_cobradas?: number | null;
+  user_id?: string | null;
+  para_cliente_id?: string | null;
 };
 
 // Etiqueta del estado. Para Horas Cowork se aclara qué pasó con las horas.
@@ -66,6 +68,7 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
   const [reservaciones, setReservaciones] = useState<Reservacion[]>([]);
   const [motivosRechazo, setMotivosRechazo] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [miId, setMiId] = useState("");
 
   const [cancelando, setCancelando] = useState<Reservacion | null>(null);
   const [motivoCancelacion, setMotivoCancelacion] = useState("");
@@ -92,10 +95,14 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
       .lt("fecha", hoyVencidas)
       .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`);
 
+    // También las que su centro le apartó desde el panel admin: esas se
+    // guardan a nombre de la admin (user_id) con el cliente en
+    // para_cliente_id, y antes no le aparecían.
+    setMiId(user.id);
     const { data } = await supabase
       .from("reservaciones")
       .select("*")
-      .eq("user_id", user.id)
+      .or(`user_id.eq.${user.id},para_cliente_id.eq.${user.id}`)
       .order("created_at", { ascending: false });
     setReservaciones(data || []);
 
@@ -212,7 +219,14 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
                 <p style={{ fontSize: 12, color: "#A32D2D", margin: "6px 0 0" }}>{motivosRechazo[r.id]}</p>
               )}
 
+              {r.user_id !== miId && (
+                <p style={{ fontSize: 12, color: "#0d1b3e", margin: "6px 0 0" }}>
+                  📌 Te la apartó tu centro. Si necesitas cambiarla o cancelarla, contacta a recepción.
+                </p>
+              )}
+
               {r.estado === "confirmada" &&
+                r.user_id === miId &&
                 (puedeCancelarEnLinea(r) ? (
                   <button className="cancelar-btn" onClick={() => cancelar(r.id)}>
                     Cancelar reservación
