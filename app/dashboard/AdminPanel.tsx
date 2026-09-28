@@ -1327,7 +1327,8 @@ export default function AdminPanel({
               // su propia pantalla (/centro/<módulo>), con el mismo acceso.
               { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "invitados", tarjeta: (
                 <a className="modulo-card" href="/centro/invitados">
-                  <span className="modulo-icon">🙋</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/invitados.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Invitados</span>
                 </a>
               ) },
@@ -1345,19 +1346,22 @@ export default function AdminPanel({
               ) },
               { grupo: 2, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "diseno", key: "tours", tarjeta: (
                 <a className="modulo-card" href="/tours">
-                  <span className="modulo-icon">🚶</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/tours.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Tours</span>
                 </a>
               ) },
               { grupo: 2, ver: esVentasCom, key: "paquetes", tarjeta: (
                 <a className="modulo-card" href="/paquetes">
-                  <span className="modulo-icon">🎁</span>
-                  <span className="modulo-name">Paquetes</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/planes.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Planes</span>
                 </a>
               ) },
               { grupo: 2, ver: esVentasCom, key: "paqueteria", tarjeta: (
                 <a className="modulo-card" href="/paqueteria">
-                  <span className="modulo-icon">📦</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/paqueteria-mensajeria.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Paquetería y Mensajería</span>
                 </a>
               ) },
@@ -1369,19 +1373,22 @@ export default function AdminPanel({
               ) },
               { grupo: 2, ver: rol === "diseno", key: "eventos-diseno", tarjeta: (
                 <a className="modulo-card" href="/experiencia-cliente?tab=eventos">
-                  <span className="modulo-icon">🎪</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/eventos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Eventos</span>
                 </a>
               ) },
               { grupo: 2, ver: esVentasCom, key: "correos", tarjeta: (
                 <a className="modulo-card" href="/correos">
-                  <span className="modulo-icon">📧</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Correos</span>
                 </a>
               ) },
               { grupo: 2, ver: rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno", key: "tickets", tarjeta: (
                 <a className="modulo-card" href="/tickets">
-                  <span className="modulo-icon">🎫</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/tickets.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Tickets</span>
                 </a>
               ) },
