@@ -51,6 +51,8 @@ export default function BajaClientePage() {
   const [error, setError] = useState("");
   const [exito, setExito] = useState(false);
   const [abriendoContrato, setAbriendoContrato] = useState(false);
+  // Confirmación final con el modal de la app (en vez del confirm() nativo).
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
 
   async function abrirContrato() {
     if (!contrato?.archivo_url) return;
@@ -152,14 +154,20 @@ export default function BajaClientePage() {
     setCargandoDetalle(false);
   }
 
-  async function darDeBaja() {
+  // Primer clic: valida y abre el modal de confirmación.
+  function pedirConfirmacionBaja() {
     if (!clienteSel || !confirmado) return;
     if (debe && (!montoAdeudado || Number(montoAdeudado) <= 0)) {
       setError("Pon cuánto quedó debiendo el cliente");
       return;
     }
-    if (!confirm(`¿Confirmas dar de baja a ${clienteSel.nombre}? Se borra su cuenta y no podrá volver a entrar.`))
-      return;
+    setError("");
+    setConfirmandoBaja(true);
+  }
+
+  async function darDeBaja() {
+    setConfirmandoBaja(false);
+    if (!clienteSel || !confirmado) return;
     setProcesando(true);
     setError("");
     try {
@@ -214,7 +222,10 @@ export default function BajaClientePage() {
               </svg>
             </div>
             <p className="exito-titulo">{clienteSel.nombre} fue dado de baja</p>
-            <p className="exito-mensaje">Su cuenta y acceso quedaron eliminados. El contrato se conserva como registro.</p>
+            <p className="exito-mensaje">
+              Su cuenta quedó bloqueada y ya no puede entrar. Su contrato, facturas, pagos y demás historial se
+              conservan.{debe ? " Cuando termine de pagar lo pendiente, su baja pasa sola a \"pagado\"." : ""}
+            </p>
             <button
               className="exito-btn"
               onClick={() => {
@@ -374,9 +385,10 @@ export default function BajaClientePage() {
                 (mismo mobiliario, sin daños, llaves/tarjetas de acceso devueltas, etc.).
               </p>
               <p className="warning-box-text">
-                Al confirmar se borran también sus tickets, reservaciones y extensión/DID
-                asignados. Si tenía extensión, se le avisa a sistemas para que la libere en el
-                conmutador. El contrato se conserva como registro histórico.
+                Al confirmar se bloquea su cuenta (ya no podrá entrar), se libera su oficina, se
+                cancelan sus reservaciones futuras y se quita su extensión/DID (se le avisa a
+                sistemas para que la libere en el conmutador). No se borra nada: su contrato,
+                facturas, pagos y demás historial se conservan.
               </p>
               <p className="warning-box-text" style={{ fontWeight: 700 }}>
                 Si encuentras algún faltante o daño, ese costo se le cobrará al cliente antes de
@@ -425,12 +437,32 @@ export default function BajaClientePage() {
 
             {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
-            <button className="btn-dar-baja" onClick={darDeBaja} disabled={!confirmado || procesando}>
+            <button className="btn-dar-baja" onClick={pedirConfirmacionBaja} disabled={!confirmado || procesando}>
               {procesando ? "Procesando..." : "🚪 Dar de baja a este cliente"}
             </button>
           </>
         )}
       </div>
+
+      {confirmandoBaja && clienteSel && (
+        <div className="modal-overlay" onClick={() => setConfirmandoBaja(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Dar de baja a {clienteSel.nombre}</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Confirmas dar de baja a <strong>{clienteSel.nombre}</strong>? Se bloquea su cuenta y no podrá volver a entrar; su historial se conserva.
+              {debe && montoAdeudado ? ` Queda registrado que debe $${Number(montoAdeudado).toLocaleString("es-MX")}.` : ""}
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoBaja(false)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={darDeBaja}>
+                🚪 Sí, dar de baja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -145,7 +145,9 @@ export default async function DashboardPage() {
         oficinasOcupadas,
         contratosPorVencer: contratosPorVencer || 0,
       }}
-      clientesIniciales={clientes || []}
+      // Los dados de baja (perfil inactivo, cuenta bloqueada) no salen en la
+      // lista; sus facturas sí siguen contando arriba para Cobranza.
+      clientesIniciales={(clientes || []).filter((c) => c.activo !== false)}
     />
   );
 }

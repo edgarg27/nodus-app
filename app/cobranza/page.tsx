@@ -24,6 +24,22 @@ type ClienteCobranza = {
   ultimaFacturaMonto: number | null;
 };
 
+// Cliente dado de baja que se fue debiendo (contrato "inactivo_debe"): su
+// cuenta está bloqueada y ya no sale en la lista de arriba, pero hay que
+// seguir cobrándole. Sale de aquí sola cuando ya no tiene nada pendiente
+// (el cron diario pasa su baja a "inactivo_pagado").
+type BajaConAdeudo = {
+  contratoId: string;
+  userId: string | null;
+  nombre: string;
+  empresa: string | null;
+  centro: string | null;
+  oficina: string | null;
+  fechaBaja: string | null;
+  montoAdeudado: number;
+  pendientes: { id: string; tipo: "Pago" | "Factura"; concepto: string; monto: number; estado: string }[];
+};
+
 type Gasto = {
   id: string;
   concepto: string;
@@ -53,6 +69,10 @@ export default function CobranzaPage() {
   const [resultado, setResultado] = useState<any>(null);
   const [error, setError] = useState("");
 
+  const [bajasConAdeudo, setBajasConAdeudo] = useState<BajaConAdeudo[]>([]);
+  // Confirmación de "Ejecutar cobranza ahora" con el modal de la app.
+  const [confirmandoCobranza, setConfirmandoCobranza] = useState(false);
+
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [cargandoGastos, setCargandoGastos] = useState(false);
   const [anioGastos, setAnioGastos] = useState(new Date().getFullYear());
@@ -80,6 +100,7 @@ export default function CobranzaPage() {
     // Los roles globales ven todos los centros aunque su perfil no tenga
     // uno fijo asignado — no bloqueamos la pantalla por eso.
     await fetchClientes(profile?.centro || null, miRol);
+    await fetchBajasConAdeudo(profile?.centro || null, miRol);
     if (global) await fetchGastosGlobales();
     setLoading(false);
   }
@@ -125,6 +146,72 @@ export default function CobranzaPage() {
     setClientes(lista);
   }
 
+  async function fetchBajasConAdeudo(c: string | null, rolActual: string) {
+    let query = supabase
+      .from("contratos")
+      .select("id, user_id, centro, oficina_id, fecha_baja, monto_adeudado, cliente_nombre_historico, cliente_empresa_historico")
+      .eq("estatus", "inactivo_debe")
+      .order("fecha_baja", { ascending: false });
+    if (!ROLES_GLOBALES.includes(rolActual) && c) query = query.eq("centro", c);
+    const { data: contratos } = await query;
+    if (!contratos || contratos.length === 0) {
+      setBajasConAdeudo([]);
+      return;
+    }
+
+    const userIds = Array.from(new Set(contratos.map((x) => x.user_id).filter((x): x is string => !!x)));
+    const oficinaIds = Array.from(new Set(contratos.map((x) => x.oficina_id).filter((x): x is string => !!x)));
+    const [{ data: pagos }, { data: facturas }, { data: oficinas }] = await Promise.all([
+      userIds.length > 0
+        ? supabase
+            .from("pagos")
+            .select("id, user_id, concepto, monto, estado")
+            .in("user_id", userIds)
+            .not("estado", "in", "(pagado,cancelado,rechazado)")
+        : Promise.resolve({ data: [] as { id: string; user_id: string; concepto: string | null; monto: number; estado: string }[] }),
+      userIds.length > 0
+        ? supabase
+            .from("facturas")
+            .select("id, user_id, folio, concepto, monto, estado")
+            .in("user_id", userIds)
+            .not("estado", "in", "(pagada,cancelada)")
+        : Promise.resolve({
+            data: [] as { id: string; user_id: string; folio: string | null; concepto: string | null; monto: number; estado: string }[],
+          }),
+      oficinaIds.length > 0
+        ? supabase.from("oficinas").select("id, numero").in("id", oficinaIds)
+        : Promise.resolve({ data: [] as { id: string; numero: string | null }[] }),
+    ]);
+    const numeroOficina = new Map((oficinas || []).map((o) => [o.id, o.numero]));
+
+    setBajasConAdeudo(
+      contratos.map((ct) => ({
+        contratoId: ct.id,
+        userId: ct.user_id,
+        nombre: ct.cliente_nombre_historico || "Cliente",
+        empresa: ct.cliente_empresa_historico,
+        centro: ct.centro,
+        oficina: ct.oficina_id ? numeroOficina.get(ct.oficina_id) || null : null,
+        fechaBaja: ct.fecha_baja,
+        montoAdeudado: Number(ct.monto_adeudado) || 0,
+        pendientes: [
+          ...(pagos || [])
+            .filter((pg) => pg.user_id === ct.user_id)
+            .map((pg) => ({ id: pg.id, tipo: "Pago" as const, concepto: pg.concepto || "Pago", monto: Number(pg.monto) || 0, estado: pg.estado })),
+          ...(facturas || [])
+            .filter((f) => f.user_id === ct.user_id)
+            .map((f) => ({
+              id: f.id,
+              tipo: "Factura" as const,
+              concepto: [f.folio, f.concepto].filter(Boolean).join(" · ") || "Factura",
+              monto: Number(f.monto) || 0,
+              estado: f.estado,
+            })),
+        ],
+      }))
+    );
+  }
+
   // Todos los gastos, de todos los centros y todos los departamentos
   // (sistemas, operaciones, admin) — cobranza necesita ver el panorama
   // completo de dinero saliendo, no solo lo de un centro.
@@ -136,7 +223,7 @@ export default function CobranzaPage() {
   }
 
   async function ejecutarCobranza() {
-    if (!confirm("¿Ejecutar la cobranza ahora? Esto genera facturas, manda recordatorios y puede suspender a quien no haya pagado.")) return;
+    setConfirmandoCobranza(false);
     setEjecutando(true);
     setError("");
     setResultado(null);
@@ -284,7 +371,7 @@ export default function CobranzaPage() {
 
             {tab === "clientes" && (
               <>
-                <button className="btn-ejecutar-cobranza" onClick={ejecutarCobranza} disabled={ejecutando}>
+                <button className="btn-ejecutar-cobranza" onClick={() => setConfirmandoCobranza(true)} disabled={ejecutando}>
                   {ejecutando ? "Ejecutando..." : "⚡ Ejecutar cobranza ahora"}
                 </button>
                 <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>
@@ -299,6 +386,7 @@ export default function CobranzaPage() {
                     {resultado.facturasGeneradas} · SPEI generados: {resultado.speiGenerados} ·
                     Vouchers renovados: {resultado.vouchersGenerados} · Suspendidos:{" "}
                     {resultado.suspendidos}
+                    {resultado.bajasPagadas ? ` · Bajas que terminaron de pagar: ${resultado.bajasPagadas}` : ""}
                     {resultado.errores?.length > 0 && (
                       <div style={{ color: "#A32D2D", marginTop: 6 }}>
                         {resultado.errores.map((e: string, i: number) => (
@@ -463,6 +551,58 @@ export default function CobranzaPage() {
                       );
                     })
                 )}
+
+                <p className="panel-section-label" style={{ marginTop: 20 }}>
+                  ⚠️ Dados de baja con adeudo ({bajasConAdeudo.length})
+                </p>
+                <p style={{ fontSize: 12, color: "#888", margin: "2px 0 6px" }}>
+                  Clientes que ya se fueron debiendo: su cuenta está bloqueada, pero su historial se conserva. Salen de aquí
+                  solos cuando ya no tienen pagos ni facturas pendientes.
+                </p>
+                {bajasConAdeudo.length === 0 ? (
+                  <div className="empty-card">Nadie se fue debiendo 🎉</div>
+                ) : (
+                  bajasConAdeudo.map((b) => {
+                    const totalPendiente = b.pendientes.reduce((acc, x) => acc + x.monto, 0);
+                    return (
+                      <div className="cobranza-card suspendido" key={b.contratoId} style={{ alignItems: "flex-start" }}>
+                        <div style={{ flex: 1 }}>
+                          <p className="item-card-titulo">
+                            {b.nombre} {b.empresa ? `· ${b.empresa}` : ""}
+                          </p>
+                          <p className="item-card-sub">
+                            {[b.centro, b.oficina ? `Oficina ${b.oficina}` : null].filter(Boolean).join(" · ")}
+                            {b.fechaBaja ? ` · Baja el ${new Date(b.fechaBaja + "T00:00:00").toLocaleDateString("es-MX")}` : ""}
+                          </p>
+                          {b.pendientes.length === 0 ? (
+                            <p className="item-card-extra" style={{ color: "#888" }}>
+                              Sin pagos ni facturas pendientes registrados (el adeudo se anotó a mano al darlo de baja).
+                            </p>
+                          ) : (
+                            <div style={{ marginTop: 4 }}>
+                              {b.pendientes.map((x) => (
+                                <p key={x.tipo + x.id} className="item-card-extra" style={{ margin: 0 }}>
+                                  {x.tipo === "Factura" ? "🧾" : "💳"} {x.concepto} — ${x.monto.toLocaleString("es-MX")} ({x.estado})
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <p className="item-card-titulo" style={{ color: "#A32D2D", margin: 0 }}>
+                            ${b.montoAdeudado.toLocaleString("es-MX")}
+                          </p>
+                          <p className="item-card-sub" style={{ margin: 0 }}>adeudo al darlo de baja</p>
+                          {b.pendientes.length > 0 && (
+                            <p className="item-card-sub" style={{ margin: 0 }}>
+                              Pendiente hoy: ${totalPendiente.toLocaleString("es-MX")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </>
             )}
 
@@ -565,6 +705,26 @@ export default function CobranzaPage() {
           </>
         )}
       </div>
+
+      {confirmandoCobranza && (
+        <div className="modal-overlay" onClick={() => setConfirmandoCobranza(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Ejecutar cobranza ahora</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Ejecutar la cobranza ahora? Esto genera facturas, manda recordatorios y puede suspender a quien no haya
+              pagado.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setConfirmandoCobranza(false)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={ejecutarCobranza}>
+                ⚡ Sí, ejecutar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
