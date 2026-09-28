@@ -30,7 +30,7 @@ export default function ModalDatosFiscales({
   aceptando: boolean;
   error: string;
   onCancelar: () => void;
-  onAceptar: (fiscal: DatosFiscales) => void;
+  onAceptar: (fiscal: DatosFiscales, tipoPersona: TipoPersonaFiscal) => void;
 }) {
   const supabase = createClient();
   const [cargando, setCargando] = useState(true);
@@ -47,6 +47,9 @@ export default function ModalDatosFiscales({
         .select("tipo_persona, razon_social, rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi, cliente_id, nombre_contesta_telefono, centro")
         .eq("id", cotizacionComercialId)
         .maybeSingle();
+      // La persona física/moral ya no se pregunta al cotizar: se pide aquí,
+      // al aceptar. Si por alguna cotización vieja ya venía guardada, se
+      // precarga; si no, el staff la elige.
       const tipoPersona: TipoPersonaFiscal = v?.tipo_persona === "moral" ? "moral" : "fisica";
       setTipo(tipoPersona);
       setNombreContacto(v?.nombre_contesta_telefono || "");
@@ -78,12 +81,19 @@ export default function ModalDatosFiscales({
     const datos = normalizarDatosFiscales({ ...f, rfc: normalizarRfc(f.rfc), nombre_fiscal: f.nombre_fiscal.trim(), cp_fiscal: f.cp_fiscal.trim() });
     const msg = validarDatosFiscales(datos, tipo);
     setErrorLocal(msg);
-    if (!msg) onAceptar(datos);
+    if (!msg) onAceptar(datos, tipo);
   }
 
   const regimenes = REGIMENES_FISCALES.filter((r) => r.aplica.includes(tipo));
   // Si el cliente no da datos fiscales, se le factura como "público en general" (solo personas físicas).
   const publico = esPublicoGeneral(f.rfc);
+  function cambiarTipo(t: TipoPersonaFiscal) {
+    setTipo(t);
+    setErrorLocal("");
+    // El régimen elegido puede no aplicar al nuevo tipo; público en general
+    // solo existe para persona física.
+    setF((prev) => ({ ...prev, regimen_fiscal: "", ...(t === "moral" && esPublicoGeneral(prev.rfc) ? { rfc: "", nombre_fiscal: "" } : {}) }));
+  }
   function alternarPublicoGeneral() {
     setErrorLocal("");
     if (publico) {
@@ -107,6 +117,20 @@ export default function ModalDatosFiscales({
           <p style={{ fontSize: 13, color: "#888" }}>Cargando…</p>
         ) : (
           <>
+            <p className="sub-label">Tipo de persona</p>
+            <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+              {(["fisica", "moral"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={tipo === t ? "reservar-btn" : "tel-borrar-btn"}
+                  style={tipo === t ? { flex: 1, padding: "8px 0" } : { flex: 1, padding: "8px 0", color: "#0d1b3e", border: "1px solid #ddd", background: "#fff", borderRadius: 10 }}
+                  onClick={() => cambiarTipo(t)}
+                >
+                  {t === "fisica" ? "Persona física" : "Persona moral"}
+                </button>
+              ))}
+            </div>
             {tipo === "fisica" && (
               <button
                 type="button"

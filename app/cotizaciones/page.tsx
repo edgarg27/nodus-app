@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import ModalDatosFiscales from "./ModalDatosFiscales";
-import type { DatosFiscales } from "@/lib/datosFiscales";
+import type { DatosFiscales, TipoPersonaFiscal } from "@/lib/datosFiscales";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -72,9 +72,9 @@ export default function CotizacionesPage() {
     return c.nombre.toLowerCase().includes(q) || (c.notas || "").toLowerCase().includes(q);
   });
 
-  // `fiscal`: datos fiscales del cliente que se piden al aceptar (Coworking, Oficina,
-  // Working Desk). Las salas no los llevan.
-  async function aceptarCotizacion(id: string, fiscal?: DatosFiscales) {
+  // `fiscal` y `tipoPersona`: datos fiscales del cliente que se piden al aceptar
+  // (Coworking, Oficina, Working Desk) — ya no se piden al cotizar. Las salas no los llevan.
+  async function aceptarCotizacion(id: string, fiscal?: DatosFiscales, tipoPersona?: TipoPersonaFiscal) {
     if (!fiscal) setConfirmandoAceptarId(null);
     setErrorFiscal("");
     setAceptandoId(id);
@@ -82,7 +82,7 @@ export default function CotizacionesPage() {
       const res = await fetch("/api/cotizacion-aceptar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, fiscal }),
+        body: JSON.stringify({ id, fiscal, tipoPersona }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -237,7 +237,7 @@ export default function CotizacionesPage() {
               setConfirmandoAceptarId(null);
               setErrorFiscal("");
             }}
-            onAceptar={(fiscal) => aceptarCotizacion(confirmandoAceptarId, fiscal)}
+            onAceptar={(fiscal, tipoPersona) => aceptarCotizacion(confirmandoAceptarId, fiscal, tipoPersona)}
           />
         )}
 
