@@ -1191,7 +1191,8 @@ export default function AdminPanel({
                 <span className="modulo-name">Sala de Juntas</span>
               </a>
               <a className="modulo-card" href="/mapa-oficinas">
-                <span className="modulo-icon">🗺️</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Mapa oficinas</span>
               </a>
               <a className="modulo-card" href="/experiencia-cliente">
@@ -1403,13 +1404,15 @@ export default function AdminPanel({
               // ---------- 4. Espacios y servicios ----------
               { grupo: 3, ver: rol !== "cobranza" && rol !== "diseno", key: "mapa", tarjeta: (
                 <a className="modulo-card" href="/mapa-oficinas">
-                  <span className="modulo-icon">🗺️</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Mapa oficinas</span>
                 </a>
               ) },
               { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas", key: "vouchers", tarjeta: (
                 <a className="modulo-card" href="/centro/vouchers">
-                  <span className="modulo-icon">🎟️</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/vouchers.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Vouchers</span>
                 </a>
               ) },
@@ -1423,7 +1426,7 @@ export default function AdminPanel({
               { grupo: 3, ver: rol !== "cobranza" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "telefonia", tarjeta: (
                 <a className="modulo-card" href="/telefonia">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/telefono.png" alt="" className="modulo-icon icon-img-32" />
+                  <img src="/icons/telefonia.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Telefonía</span>
                 </a>
               ) },
@@ -1436,7 +1439,8 @@ export default function AdminPanel({
               ) },
               { grupo: 3, ver: rol !== "cobranza" && rol !== "operaciones" && rol !== "diseno", key: "inventario", tarjeta: (
                 <a className="modulo-card" href="/inventario">
-                  <span className="modulo-icon">📦</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/inventario.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Inventario</span>
                 </a>
               ) },
@@ -1448,7 +1452,8 @@ export default function AdminPanel({
               ) },
               { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones", key: "proveedores", tarjeta: (
                 <a className="modulo-card" href="/centro/proveedores">
-                  <span className="modulo-icon">🧾</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/proveedores.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Proveedores</span>
                 </a>
               ) },
@@ -1456,13 +1461,15 @@ export default function AdminPanel({
               // ---------- 5. Reportes y administración ----------
               { grupo: 4, ver: rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente", key: "resumen", tarjeta: (
                 <a className="modulo-card" href="/centro/resumen">
-                  <span className="modulo-icon">📊</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Resumen</span>
                 </a>
               ) },
               { grupo: 4, ver: esVentasCom, key: "reportes", tarjeta: (
                 <a className="modulo-card" href="/reportes">
-                  <span className="modulo-icon">📊</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/reportes.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Reportes</span>
                 </a>
               ) },
@@ -1484,7 +1491,8 @@ export default function AdminPanel({
               // (mismas listas que sus políticas RLS).
               { grupo: 4, ver: rol === "admin" || rol === "superadmin" || rol === "atencion_cliente" || rol === "diseno", key: "documentacion", tarjeta: (
                 <a className="modulo-card" href="/documentacion-centro">
-                  <span className="modulo-icon">📁</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/documentacion-centro.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Documentación del centro</span>
                 </a>
               ) },
