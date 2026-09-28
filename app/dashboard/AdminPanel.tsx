@@ -1195,7 +1195,8 @@ export default function AdminPanel({
                 <span className="modulo-name">Mapa oficinas</span>
               </a>
               <a className="modulo-card" href="/experiencia-cliente">
-                <span className="modulo-icon">🎉</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/calendario-eventos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Calendario de Eventos</span>
               </a>
               <a className="modulo-card" href="/correos">
@@ -1334,13 +1335,15 @@ export default function AdminPanel({
               ) },
               { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "solicitudes", tarjeta: (
                 <a className="modulo-card" href="/centro/solicitudes">
-                  <span className="modulo-icon">📨</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/solicitudes.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Solicitudes</span>
                 </a>
               ) },
               { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "visitas", tarjeta: (
                 <a className="modulo-card" href="/centro/visitas">
-                  <span className="modulo-icon">🚪</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/visitas.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Visitas</span>
                 </a>
               ) },
@@ -1367,7 +1370,8 @@ export default function AdminPanel({
               ) },
               { grupo: 2, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "diseno", key: "calendario", tarjeta: (
                 <a className="modulo-card" href="/experiencia-cliente">
-                  <span className="modulo-icon">🎉</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/calendario-eventos.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Calendario de Eventos</span>
                 </a>
               ) },
