@@ -12,9 +12,14 @@ type Tour = {
   hora: string | null;
   notas: string | null;
   tipo_espacio_interes: string | null;
+  centro?: string | null;
 };
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente"];
+// Las cuentas globales no tienen centro fijo: eligen en el formulario a
+// qué centro va el tour (antes no podían agendar y el aviso decía que
+// faltaba nombre/fecha).
+const CENTROS_TOUR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const TIPOS_ESPACIO_INTERES = ["Coworking", "Oficina Privada", "Working Desk", "Sala de Juntas"];
 
 function hoyISO() {
@@ -41,6 +46,9 @@ export default function ToursPage() {
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
+  const [centroTour, setCentroTour] = useState(CENTROS_TOUR[0]);
+  const [borrandoTourId, setBorrandoTourId] = useState<string | null>(null);
+  const esGlobal = ROLES_GLOBALES.includes(miRol);
 
   useEffect(() => {
     init();
@@ -56,13 +64,16 @@ export default function ToursPage() {
     setMiRol(profile?.rol || "");
     const c = profile?.centro || null;
     setCentro(c);
-    if (c) await fetchTours(c, profile?.rol || "");
+    if (c) setCentroTour(c);
+    // Los globales ven los tours de todos los centros aunque su perfil no
+    // tenga centro.
+    if (c || ROLES_GLOBALES.includes(profile?.rol || "")) await fetchTours(c, profile?.rol || "");
     setLoading(false);
   }
 
-  async function fetchTours(c: string, rol: string) {
+  async function fetchTours(c: string | null, rol: string) {
     let query = supabase.from("tours").select("*").order("fecha").order("hora");
-    if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
+    if (!ROLES_GLOBALES.includes(rol) && c) query = query.eq("centro", c);
     const { data } = await query;
     setTours(data || []);
   }
@@ -86,8 +97,13 @@ export default function ToursPage() {
   async function agregarTour(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!centro || !form.nombre.trim() || !form.fecha) {
+    const centroDestino = esGlobal ? centroTour : centro;
+    if (!form.nombre.trim() || !form.fecha) {
       setError("Nombre y fecha son obligatorios");
+      return;
+    }
+    if (!centroDestino) {
+      setError("Tu cuenta no tiene un centro asignado; pide que te asignen uno.");
       return;
     }
     setGuardando(true);
@@ -99,7 +115,7 @@ export default function ToursPage() {
     const { data: nuevo, error: insertError } = await supabase
       .from("tours")
       .insert({
-        centro,
+        centro: centroDestino,
         nombre: form.nombre,
         telefono: form.telefono || null,
         correo: form.correo || null,
@@ -121,7 +137,7 @@ export default function ToursPage() {
     // Si el tour es para hoy, se manda una notificación de una vez
     if (form.fecha === hoyISO() && nuevo) {
       await supabase.from("notificaciones").insert({
-        centro,
+        centro: centroDestino,
         tipo: "nuevo_tour",
         mensaje: `Hoy tienes un tour que programaste: ${form.nombre}${form.hora ? ` a las ${form.hora}` : ""}.`,
       });
@@ -142,13 +158,13 @@ export default function ToursPage() {
     setGuardando(false);
     setEnviado(true);
     setTimeout(() => setEnviado(false), 1800);
-    if (centro) fetchTours(centro, miRol);
+    fetchTours(centro, miRol);
   }
 
   async function borrarTour(id: string) {
-    if (!confirm("¿Borrar este tour?")) return;
+    setBorrandoTourId(null);
     await supabase.from("tours").delete().eq("id", id);
-    if (centro) fetchTours(centro, miRol);
+    fetchTours(centro, miRol);
   }
 
   return (
@@ -158,7 +174,7 @@ export default function ToursPage() {
           ← Regresar
         </a>
         <p className="rep-title">Tours</p>
-        <p className="rep-sub">{centro || "Selecciona un centro"}</p>
+        <p className="rep-sub">{esGlobal ? "Todos los centros" : centro || "Selecciona un centro"}</p>
       </div>
 
       <div className="rep-content">
@@ -210,6 +226,15 @@ export default function ToursPage() {
             {mostrarForm && (
               <form className="form-card" onSubmit={agregarTour}>
                 <div className="tel-form-grid">
+                  {esGlobal && (
+                    <select value={centroTour} onChange={(e) => setCentroTour(e.target.value)} title="Centro del tour">
+                      {CENTROS_TOUR.map((c) => (
+                        <option key={c} value={c}>
+                          🏢 {c}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <input
                     placeholder="Nombre de quien hace el tour"
                     value={form.nombre}
@@ -323,8 +348,9 @@ export default function ToursPage() {
                     {t.tipo_espacio_interes && (
                       <p style={{ fontSize: 12, color: "#0d1b3e", margin: 0 }}>📌 {t.tipo_espacio_interes}</p>
                     )}
+                    {esGlobal && t.centro && <p style={{ fontSize: 12, color: "#888", margin: 0 }}>🏢 {t.centro}</p>}
                   </div>
-                  <button className="tel-borrar-btn" onClick={() => borrarTour(t.id)}>
+                  <button className="tel-borrar-btn" onClick={() => setBorrandoTourId(t.id)}>
                     🗑
                   </button>
                 </div>
@@ -333,6 +359,25 @@ export default function ToursPage() {
           </>
         )}
       </div>
+
+      {borrandoTourId && (
+        <div className="modal-overlay" onClick={() => setBorrandoTourId(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Borrar tour</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar este tour?
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setBorrandoTourId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarTour(borrandoTourId)}>
+                🗑 Borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

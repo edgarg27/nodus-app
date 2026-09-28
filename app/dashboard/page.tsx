@@ -16,7 +16,7 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("nombre, rol, centro")
+    .select("nombre, rol, centro, numero_usuario")
     .eq("id", session.user.id)
     .single();
 
@@ -131,6 +131,7 @@ export default async function DashboardPage() {
     <AdminPanel
       nombre={profile?.nombre || session.user.email || "Sistemas"}
       rol={profile?.rol || ""}
+      numeroUsuario={profile?.numero_usuario || null}
       centro={miCentro}
       resumen={{
         totalClientes: (clientes || []).filter((c) => c.activo !== false && !c.suspendido).length,

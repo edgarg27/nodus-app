@@ -103,12 +103,16 @@ export default function AdminPanel({
   centro,
   resumen,
   clientesIniciales,
+  numeroUsuario = null,
 }: {
   nombre: string;
   rol: string;
   centro: string | null;
   resumen: Resumen;
   clientesIniciales: Cliente[];
+  // N.º de usuario (N-1234): con él también se inicia sesión y se recupera
+  // la contraseña; se muestra en el menú de la cuenta.
+  numeroUsuario?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -462,14 +466,14 @@ export default function AdminPanel({
     } else if (n.tipo === "nuevo_voucher") {
       router.push("/centro/vouchers");
     } else if (n.tipo === "ticket_en_proceso" || n.tipo === "ticket_resuelto" || n.tipo === "nuevo_ticket") {
-      router.push(n.mensaje?.includes("📶") ? "/wifi-solicitudes" : "/tickets");
+      router.push(n.mensaje?.includes("📶") ? "/centro/vouchers" : "/tickets");
     } else if (n.tipo === "proximo_mantenimiento") {
       router.push("/mantenimiento");
     } else if (n.tipo === "nuevo_gasto") {
       // La pestaña de gastos en /cobranza solo renderiza contenido para roles
       // con alcance global (esGlobal); admin (alcance de un solo centro) debe
       // ir a /gastos, que sí muestra los gastos de su centro.
-      router.push(esGlobal ? "/cobranza?tab=gastos" : "/gastos");
+      router.push("/gastos");
     } else if (
       n.tipo === "pago_confirmado" ||
       n.tipo === "fecha_pago_hoy" ||
@@ -942,6 +946,11 @@ export default function AdminPanel({
                     {labelRol(rol)}
                     {centro ? ` · ${centro}` : ""}
                   </p>
+                  {numeroUsuario && (
+                    <p className="avatar-dropdown-rol" style={{ marginTop: 2 }}>
+                      N.º de usuario: <strong style={{ color: "#0d1b3e" }}>{numeroUsuario}</strong>
+                    </p>
+                  )}
                   <button className="avatar-dropdown-item" onClick={handleLogout}>
                     🚪 Cerrar sesión
                   </button>
@@ -1320,7 +1329,7 @@ export default function AdminPanel({
               // Cobranza ya no ve este acceso directo: sus gastos los ve
               // dentro de "Ingresos por Centro".
               { grupo: 1, ver: rol === "superadmin" || rol === "gerente", key: "gastos", tarjeta: (
-                <a className="modulo-card" href="/cobranza?tab=gastos">
+                <a className="modulo-card" href="/gastos">
                   <span className="modulo-icon">💸</span>
                   <span className="modulo-name">Gastos</span>
                 </a>
@@ -1427,13 +1436,6 @@ export default function AdminPanel({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/vouchers.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Vouchers</span>
-                </a>
-              ) },
-              { grupo: 3, ver: rol === "sistemas" || rol === "superadmin" || rol === "gerente", key: "wifi", tarjeta: (
-                <a className="modulo-card" href="/wifi-solicitudes">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/wifi.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">WiFi</span>
                 </a>
               ) },
               { grupo: 3, ver: rol !== "cobranza" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "telefonia", tarjeta: (
