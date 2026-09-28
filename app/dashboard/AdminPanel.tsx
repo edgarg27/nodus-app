@@ -1236,13 +1236,15 @@ export default function AdminPanel({
               ) },
               { grupo: 0, ver: esVentasCom, key: "cotizar", tarjeta: (
                 <a className="modulo-card" href="/registrar-plan">
-                  <span className="modulo-icon">📝</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/cotizar.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Cotizar</span>
                 </a>
               ) },
               { grupo: 0, ver: esVentasCom, key: "cotizaciones", tarjeta: (
                 <a className="modulo-card" href="/cotizaciones">
-                  <span className="modulo-icon">🧾</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/cotizaciones.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Cotizaciones</span>
                 </a>
               ) },
