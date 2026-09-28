@@ -87,6 +87,7 @@ type Resumen = {
   oficinasTotal: number;
   oficinasOcupadas: number;
   contratosPorVencer: number;
+  eventosProximos: number;
 };
 
 // Mismos colores que ya usa /tickets para la urgencia.
@@ -1058,6 +1059,13 @@ export default function AdminPanel({
                     {resumen.ticketsUrgentes > 0 ? `🔴 ${resumen.ticketsUrgentes} urgente${resumen.ticketsUrgentes === 1 ? "" : "s"}` : "Sin urgentes"}
                   </p>
                 </a>
+                <a className="stat-card" href="/experiencia-cliente">
+                  <p className="stat-val">{resumen.eventosProximos}</p>
+                  <p className="stat-lbl">Calendario de Eventos</p>
+                  <p className="stat-delta">
+                    {resumen.eventosProximos > 0 ? "Eventos por venir →" : "Sin eventos por venir"}
+                  </p>
+                </a>
               </div>
 
               <p className="panel-section-label" style={{ marginTop: 8 }}>
@@ -1201,7 +1209,8 @@ export default function AdminPanel({
                 <span className="modulo-name">Calendario de Eventos</span>
               </a>
               <a className="modulo-card" href="/correos">
-                <span className="modulo-icon">📧</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Correos</span>
               </a>
               <a className="modulo-card" href="/contratos">

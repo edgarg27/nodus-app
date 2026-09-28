@@ -82,6 +82,7 @@ export default async function DashboardPage() {
     { data: oficinasRows },
     { data: contratosOcupados },
     { count: contratosPorVencer },
+    { count: eventosProximos },
   ] = await Promise.all([
     facturasPendQuery,
     facturasVencQuery,
@@ -116,6 +117,7 @@ export default async function DashboardPage() {
         .gte("fecha_vencimiento", hoy)
         .lte("fecha_vencimiento", limite30)
     ),
+    filtrarCentro(supabase.from("eventos_centro").select("*", { count: "exact", head: true }).gte("fecha", hoy)),
   ]);
 
   const facturasVencidas = facturasVencidasRows?.length || 0;
@@ -144,6 +146,7 @@ export default async function DashboardPage() {
         oficinasTotal,
         oficinasOcupadas,
         contratosPorVencer: contratosPorVencer || 0,
+        eventosProximos: eventosProximos || 0,
       }}
       // Los dados de baja (perfil inactivo, cuenta bloqueada) no salen en la
       // lista; sus facturas sí siguen contando arriba para Cobranza.
