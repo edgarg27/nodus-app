@@ -334,6 +334,37 @@ async function yaExisteNotifEsteMs(admin: ReturnType<typeof createAdminClient>, 
   return !!data;
 }
 
+// Bajas "con adeudo" (contratos inactivo_debe): en cuanto el cliente ya no
+// tiene facturas ni pagos pendientes, su baja pasa sola a "pagado". Su
+// cuenta sigue bloqueada y no se borra nada (ver /api/dar-baja-cliente).
+async function cerrarBajasPagadas(admin: Admin, errores: string[]) {
+  let cerradas = 0;
+  const { data: bajas } = await admin
+    .from("contratos")
+    .select("id, user_id")
+    .eq("estatus", "inactivo_debe")
+    .not("user_id", "is", null);
+  for (const b of bajas || []) {
+    const [{ count: pagosPend }, { count: facturasPend }] = await Promise.all([
+      admin
+        .from("pagos")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", b.user_id)
+        .not("estado", "in", "(pagado,cancelado,rechazado)"),
+      admin
+        .from("facturas")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", b.user_id)
+        .not("estado", "in", "(pagada,cancelada)"),
+    ]);
+    if ((pagosPend || 0) > 0 || (facturasPend || 0) > 0) continue;
+    const { error } = await admin.from("contratos").update({ estatus: "inactivo_pagado", monto_adeudado: 0 }).eq("id", b.id);
+    if (error) errores.push(`Baja ${b.id}: ${error.message}`);
+    else cerradas++;
+  }
+  return cerradas;
+}
+
 export async function POST(req: NextRequest) {
   // Se puede llamar de dos formas: con el secreto del cron (para la tarea
   // programada), o con sesión de staff (para el botón "Ejecutar ahora").
@@ -368,8 +399,15 @@ export async function POST(req: NextRequest) {
     suspendidos: 0,
     cobrosAutomaticos: 0,
     cobrosAutomaticosFallidos: 0,
+    bajasPagadas: 0,
     errores: [] as string[],
   };
+
+  try {
+    resumen.bajasPagadas = await cerrarBajasPagadas(admin, resumen.errores);
+  } catch (err: any) {
+    resumen.errores.push(`Bajas pagadas: ${err.message}`);
+  }
 
   // Todos los contratos vigentes con día de pago definido
   const { data: contratos } = await admin

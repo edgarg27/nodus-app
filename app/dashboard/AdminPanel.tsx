@@ -8,6 +8,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { labelRol } from "@/lib/roles";
+import { espaciosDeClientes } from "@/lib/coworking";
 
 type Cliente = {
   id: string;
@@ -65,6 +66,11 @@ type ContratoResumen = {
   renta_mensual: number;
   estatus: string | null;
   archivo_url: string | null;
+  oficina_id: string | null;
+  paquete_id: string | null;
+  // Resueltos aparte (oficinas / paquetes) para mostrar qué renta.
+  espacio?: string | null;
+  paquete?: string | null;
 };
 
 type Resumen = {
@@ -193,6 +199,10 @@ export default function AdminPanel({
   }
   const [vouchersCliente, setVouchersCliente] = useState<Voucher[]>([]);
   const [contratosCliente, setContratosCliente] = useState<ContratoResumen[]>([]);
+  // user_id → espacios de sus contratos vigentes (ej. ["Oficina 3"]).
+  // profiles.numero_oficina casi nunca se llena al dar de alta, así que la
+  // oficina se toma del contrato cuando el perfil no la trae.
+  const [espaciosPorCliente, setEspaciosPorCliente] = useState<Map<string, string[]>>(new Map());
   const [generandoVoucher, setGenerandoVoucher] = useState(false);
   const [voucherEnviado, setVoucherEnviado] = useState(false);
   const [errorVoucher, setErrorVoucher] = useState("");
@@ -258,6 +268,7 @@ export default function AdminPanel({
 
   useEffect(() => {
     fetchNotificaciones();
+    espaciosDeClientes(supabase).then((r) => setEspaciosPorCliente(r.espacios));
     fetchMisReportes();
     fetchTicketsUrgentes();
     fetchBannersPromocionales(supabase).then(setBannersPromo);
@@ -501,10 +512,22 @@ export default function AdminPanel({
     );
   }, [busqueda, clientes]);
 
+  // "Oficina 3" (o "Espacio A"): primero lo que dice el perfil; si está
+  // vacío, lo que dice su contrato vigente.
+  function oficinaDeCliente(c: { id: string; numero_oficina: string | null }) {
+    if (c.numero_oficina) return `Oficina ${c.numero_oficina}`;
+    return espaciosPorCliente.get(c.id)?.join(", ") || "";
+  }
+
+  // Solo los números ("3", "A") para prellenar el campo al editar.
+  function numerosOficinaDeContrato(clienteId: string) {
+    return (espaciosPorCliente.get(clienteId) || []).map((e) => e.replace(/^(Oficina|Espacio)\s+/, "")).join(", ");
+  }
+
   async function verDetalleCliente(cliente: Cliente) {
     setEditandoDatos(false);
     setFormEmpresa(cliente.empresa || "");
-    setFormOficina(cliente.numero_oficina || "");
+    setFormOficina(cliente.numero_oficina || numerosOficinaDeContrato(cliente.id));
     setFormTelefono(cliente.telefono || "");
     setFormOcupantes(cliente.ocupantes_oficina || "");
     setFormNombre(cliente.nombre || "");
@@ -532,13 +555,39 @@ export default function AdminPanel({
         .order("created_at", { ascending: false }),
       supabase
         .from("contratos")
-        .select("id, fecha_inicio, fecha_vencimiento, renta_mensual, estatus, archivo_url")
+        .select("id, fecha_inicio, fecha_vencimiento, renta_mensual, estatus, archivo_url, oficina_id, paquete_id")
         .eq("user_id", cliente.id)
         .order("created_at", { ascending: false }),
     ]);
     setFacturasCliente(facturas || []);
     setVouchersCliente(vouchers || []);
-    setContratosCliente(contratos || []);
+
+    // Qué renta en cada contrato: número y tipo de la oficina/espacio y el
+    // paquete (el contrato solo guarda los ids).
+    const listaContratos = contratos || [];
+    const oficinaIds = Array.from(new Set(listaContratos.map((c) => c.oficina_id).filter((x): x is string => !!x)));
+    const paqueteIds = Array.from(new Set(listaContratos.map((c) => c.paquete_id).filter((x): x is string => !!x)));
+    const [{ data: ofs }, { data: paqs }] = await Promise.all([
+      oficinaIds.length > 0
+        ? supabase.from("oficinas").select("id, numero, tipo").in("id", oficinaIds)
+        : Promise.resolve({ data: [] as { id: string; numero: string | null; tipo: string | null }[] }),
+      paqueteIds.length > 0
+        ? supabase.from("paquetes").select("id, nombre").in("id", paqueteIds)
+        : Promise.resolve({ data: [] as { id: string; nombre: string | null }[] }),
+    ]);
+    const oficinaPorId = new Map((ofs || []).map((o) => [o.id, o]));
+    const paquetePorId = new Map((paqs || []).map((p) => [p.id, p.nombre]));
+    setContratosCliente(
+      listaContratos.map((c) => {
+        const o = c.oficina_id ? oficinaPorId.get(c.oficina_id) : undefined;
+        const esCow = (o?.tipo || "").toLowerCase() === "coworking";
+        return {
+          ...c,
+          espacio: o ? `${esCow ? "Espacio" : "Oficina"} ${o.numero}${o.tipo && !esCow ? ` · ${o.tipo}` : esCow ? " · Coworking" : ""}` : null,
+          paquete: c.paquete_id ? paquetePorId.get(c.paquete_id) || null : null,
+        };
+      })
+    );
     setLoadingDetalle(false);
   }
 
@@ -1517,7 +1566,7 @@ export default function AdminPanel({
                   Email: c.email,
                   Empresa: c.empresa || "",
                   Centro: c.centro || "",
-                  Oficina: c.numero_oficina || "",
+                  Oficina: oficinaDeCliente(c).replace(/^Oficina /, ""),
                   RFC: c.rfc || "",
                   Activo: c.activo ? "Sí" : "No",
                 }))
@@ -1551,7 +1600,7 @@ export default function AdminPanel({
                     {c.centro && (
                       <p className="cliente-centro">
                         🏢 {c.centro}
-                        {c.numero_oficina ? ` · Oficina ${c.numero_oficina}` : ""}
+                        {oficinaDeCliente(c) ? ` · ${oficinaDeCliente(c)}` : ""}
                       </p>
                     )}
                   </div>
@@ -1752,10 +1801,10 @@ export default function AdminPanel({
                   <span className="modal-label">Centro</span>
                   <span className="modal-val">{clienteSeleccionado.centro || "-"}</span>
                 </div>
-                {clienteSeleccionado.numero_oficina && (
+                {oficinaDeCliente(clienteSeleccionado) && (
                   <div className="modal-row">
                     <span className="modal-label">Oficina</span>
-                    <span className="modal-val">{clienteSeleccionado.numero_oficina}</span>
+                    <span className="modal-val">{oficinaDeCliente(clienteSeleccionado).replace(/^Oficina /, "")}</span>
                   </div>
                 )}
                 {clienteSeleccionado.tipo_oficina && (
@@ -1798,6 +1847,13 @@ export default function AdminPanel({
                 return (
                   <div className="factura-row" key={ct.id}>
                     <div>
+                      {(ct.espacio || ct.paquete) && (
+                        <p className="factura-folio" style={{ marginBottom: 2 }}>
+                          {ct.espacio ? `🏢 ${ct.espacio}` : ""}
+                          {ct.espacio && ct.paquete ? " · " : ""}
+                          {ct.paquete ? `📦 ${ct.paquete}` : ""}
+                        </p>
+                      )}
                       <p className="factura-folio">
                         {ct.fecha_inicio} → {ct.fecha_vencimiento}
                       </p>

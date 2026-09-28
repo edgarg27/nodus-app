@@ -46,11 +46,25 @@ export async function POST(req: NextRequest) {
   const fechaBajaFinal = fechaBaja || new Date().toISOString().split("T")[0];
   const estatusFinal = debe ? "inactivo_debe" : "inactivo_pagado";
 
-  // 1) Guardar en los contratos una copia de los datos del cliente
-  //    para que sigan siendo legibles cuando ya no exista el perfil,
-  //    marcar el estatus final, cuánto debe si aplica, y la fecha real
-  //    en que dejó el espacio.
-  const { data: contratosDelCliente } = await admin
+  // "Dar de baja" ya NO borra nada: se bloquea la cuenta y todo su
+  // historial (perfil, facturas, pagos, vouchers, tickets…) se queda ligado
+  // a él en la base. Antes se intentaba borrar perfil y cuenta; la base lo
+  // impedía (facturas/pagos ligados) y la pantalla decía "listo" igual.
+  // Cada paso se revisa y, si falla, se responde qué sí se hizo.
+  const hechos: string[] = [];
+  function fallo(paso: string, detalle?: string) {
+    const yaHecho = hechos.length > 0 ? ` Sí se hizo: ${hechos.join("; ")}.` : "";
+    return NextResponse.json(
+      { error: `No se pudo terminar la baja: falló "${paso}".${yaHecho}${detalle ? ` Detalle: ${detalle}` : ""}` },
+      { status: 500 }
+    );
+  }
+
+  // 1) Contrato: copia de los datos del cliente (para leerlo aunque cambie
+  //    el perfil), estatus final, cuánto debe y fecha real de salida.
+  //    inactivo_debe pasa solo a inactivo_pagado cuando ya no tiene pagos
+  //    pendientes (cron diario, ver cerrarBajasPagadas).
+  const { data: contratosDelCliente, error: errContrato } = await admin
     .from("contratos")
     .update({
       cliente_nombre_historico: cliente.nombre,
@@ -63,22 +77,26 @@ export async function POST(req: NextRequest) {
     .eq("user_id", clienteId)
     .eq("estatus", "vigente")
     .select("oficina_id");
+  if (errContrato) return fallo("marcar el contrato como dado de baja", errContrato.message);
+  hechos.push("contrato marcado como dado de baja");
 
-  // 1.1) Liberar la(s) oficina(s) que tenía — nada más lo hacía, y se
-  //      quedaban marcadas "ocupada" para siempre (ver Reportes/Ocupación
-  //      por centro), bloqueando que se le pudieran asignar a alguien más.
+  // 1.1) Liberar la(s) oficina(s) que tenía (y cualquiera que lo tuviera
+  //      como cliente), para que se puedan volver a rentar.
   const oficinaIds = (contratosDelCliente || []).map((c) => c.oficina_id).filter(Boolean);
   if (oficinaIds.length > 0) {
-    await admin.from("oficinas").update({ estado: "disponible", cliente_id: null }).in("id", oficinaIds);
+    const { error } = await admin.from("oficinas").update({ estado: "disponible", cliente_id: null }).in("id", oficinaIds);
+    if (error) return fallo("liberar su oficina", error.message);
   }
+  await admin.from("oficinas").update({ estado: "disponible", cliente_id: null }).eq("cliente_id", clienteId);
+  hechos.push("oficina liberada");
 
-  // 2) Si tenía extensión/DID asignado, avisar a sistemas ANTES de
-  //    borrarla, para que la liberen del lado del conmutador real.
+  // 2) Extensión/DID: avisar a sistemas para que la libere en el
+  //    conmutador y quitarla (es lo único que se borra: es una línea que
+  //    se le asigna a otro).
   const { data: extensionesCliente } = await admin
     .from("extensiones")
     .select("extension, did, centro")
     .eq("user_id", clienteId);
-
   if (extensionesCliente && extensionesCliente.length > 0) {
     for (const ext of extensionesCliente) {
       await admin.from("notificaciones").insert({
@@ -89,18 +107,36 @@ export async function POST(req: NextRequest) {
         } asignada — libérala en el conmutador.`,
       });
     }
+    const { error } = await admin.from("extensiones").delete().eq("user_id", clienteId);
+    if (error) return fallo("quitar su extensión", error.message);
+    hechos.push("extensión liberada");
   }
 
-  // 3) Borrar todo lo que le pertenecía: tickets, reservaciones, extensiones
-  await admin.from("tickets").delete().eq("user_id", clienteId);
-  await admin.from("reservaciones").delete().eq("user_id", clienteId);
-  await admin.from("extensiones").delete().eq("user_id", clienteId);
+  // 3) Reservaciones futuras: se cancelan (no se borran) para liberar esos
+  //    horarios; las pasadas se quedan como están.
+  {
+    const hoy = new Date().toISOString().split("T")[0];
+    const { error } = await admin
+      .from("reservaciones")
+      .update({ estado: "cancelada" })
+      .eq("user_id", clienteId)
+      .gte("fecha", hoy)
+      .in("estado", ["pendiente", "confirmada"]);
+    if (error) return fallo("cancelar sus reservaciones futuras", error.message);
+    hechos.push("reservaciones futuras canceladas");
+  }
 
-  // 4) Borrar el perfil de verdad
-  await admin.from("profiles").delete().eq("id", clienteId);
-
-  // 5) Borrar la cuenta de acceso de verdad (Authentication)
-  await admin.auth.admin.deleteUser(clienteId);
+  // 4) Bloquear: el perfil queda inactivo (sale de las listas de clientes)
+  //    y la cuenta de acceso queda vetada (no puede iniciar sesión ni
+  //    renovar la que tenga abierta).
+  {
+    const { error } = await admin.from("profiles").update({ activo: false }).eq("id", clienteId);
+    if (error) return fallo("marcar su perfil como inactivo", error.message);
+  }
+  {
+    const { error } = await admin.auth.admin.updateUserById(clienteId, { ban_duration: "876000h" });
+    if (error) return fallo("bloquear su cuenta de acceso", error.message);
+  }
 
   return NextResponse.json({ ok: true });
 }
