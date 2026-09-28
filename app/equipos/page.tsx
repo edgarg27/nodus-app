@@ -148,6 +148,8 @@ export default function EquiposPage() {
   const [guardandoResp, setGuardandoResp] = useState(false);
   const [errorResp, setErrorResp] = useState("");
   const [exitoResp, setExitoResp] = useState(false);
+  // Borrar equipo: confirmación con el modal de la app (sin confirm()).
+  const [borrandoEquipoId, setBorrandoEquipoId] = useState<string | null>(null);
 
   const firma1 = useFirma();
   const firma2 = useFirma();
@@ -213,12 +215,7 @@ export default function EquiposPage() {
   }
 
   async function borrarEquipo(id: string) {
-    if (
-      !confirm(
-        "¿Borrar este registro de equipo? Esto es solo para errores de captura — si el equipo ya no está asignado, mejor cambia su estatus a 'Devuelto'."
-      )
-    )
-      return;
+    setBorrandoEquipoId(null);
     await supabase.from("equipos_asignados").delete().eq("id", id);
     fetchEquipos();
   }
@@ -976,9 +973,13 @@ export default function EquiposPage() {
                     </p>
                     {e.notas && <p className="item-card-extra">{e.notas}</p>}
                     {e.responsiva_url ? (
-                      <a href={e.responsiva_url} target="_blank" className="ver-pdf-btn" style={{ marginTop: 6, display: "inline-block" }}>
+                      <BotonArchivo
+                        url={e.responsiva_url}
+                        bucket="responsivas-equipo"
+                        style={{ marginTop: 6, display: "inline-block" }}
+                      >
                         📄 Ver responsiva
-                      </a>
+                      </BotonArchivo>
                     ) : (
                       <button
                         className="tel-borrar-btn"
@@ -1006,7 +1007,7 @@ export default function EquiposPage() {
                       <option value="asignado">📦 Asignado</option>
                       <option value="devuelto">↩️ Devuelto</option>
                     </select>
-                    <button className="tel-borrar-btn" onClick={() => borrarEquipo(e.id)}>
+                    <button className="tel-borrar-btn" onClick={() => setBorrandoEquipoId(e.id)}>
                       🗑 Borrar
                     </button>
                   </div>
@@ -1107,6 +1108,26 @@ export default function EquiposPage() {
               </button>
             </div>
             {formularioResponsiva}
+          </div>
+        </div>
+      )}
+
+      {borrandoEquipoId && (
+        <div className="modal-overlay" onClick={() => setBorrandoEquipoId(null)}>
+          <div className="modal-card" onClick={(ev) => ev.stopPropagation()}>
+            <p className="modal-nombre">Borrar registro de equipo</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Borrar este registro de equipo? Esto es solo para errores de captura — si el equipo ya no está asignado,
+              mejor cambia su estatus a &quot;Devuelto&quot;.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setBorrandoEquipoId(null)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => borrarEquipo(borrandoEquipoId)}>
+                🗑 Borrar
+              </button>
+            </div>
           </div>
         </div>
       )}

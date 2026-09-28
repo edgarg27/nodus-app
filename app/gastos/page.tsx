@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
+import ResumenGastos from "./ResumenGastos";
 
 type Gasto = {
   id: string;
@@ -232,6 +233,9 @@ export default function GastosPage() {
       </div>
 
       <div className="rep-content">
+        {/* Resumen con gráficas (antes pestaña "Gastos" de Cobranza). */}
+        {esGlobal && !loading && <ResumenGastos gastos={gastos} />}
+
         <button className="btn-enviar" style={{ marginBottom: 4 }} onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? "Cancelar" : "+ Registrar gasto"}
         </button>

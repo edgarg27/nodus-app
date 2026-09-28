@@ -12,6 +12,7 @@ import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
+import SolicitudesWifi from "./SolicitudesWifi";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
 // user_id null + "para" = voucher manual (visita, proveedor…), ver
@@ -390,6 +391,27 @@ export default function CentroPanel({
   const [menuNotifAbierto, setMenuNotifAbierto] = useState(false);
   const [vouchers, setVouchers] = useState<VoucherCentro[]>([]);
   const [generandoVoucherPara, setGenerandoVoucherPara] = useState<string | null>(null);
+  // Confirmaciones con el modal de la app en vez del confirm() nativo
+  // ("localhost dice…"): confirmar() abre el modal y espera la respuesta.
+  const [confirmacion, setConfirmacion] = useState<{
+    titulo: string;
+    mensaje: string;
+    boton: string;
+    responder: (ok: boolean) => void;
+  } | null>(null);
+  function confirmar(titulo: string, mensaje: string, boton = "Aceptar"): Promise<boolean> {
+    return new Promise((resolve) => {
+      setConfirmacion({
+        titulo,
+        mensaje,
+        boton,
+        responder: (ok) => {
+          setConfirmacion(null);
+          resolve(ok);
+        },
+      });
+    });
+  }
   // Contratos vigentes de los clientes: quién es de Coworking (a ellos se
   // les genera voucher normal) y qué espacio dice su contrato (para
   // agrupar). null = todavía cargando. Ver lib/coworking.ts.
@@ -853,7 +875,7 @@ export default function CentroPanel({
   }
 
   async function borrarProveedor(id: string, centroDelProveedor?: string) {
-    if (!confirm("¿Borrar este proveedor?")) return;
+    if (!(await confirmar("Borrar proveedor", "¿Borrar este proveedor?", "🗑 Borrar"))) return;
     await supabase.from("proveedores").delete().eq("id", id);
     if (esGlobal && centroDelProveedor) {
       recargarDatosCentroGlobal(centroDelProveedor);
@@ -948,7 +970,7 @@ export default function CentroPanel({
   }
 
   async function borrarGasto(id: string, centroDelGasto?: string) {
-    if (!confirm("¿Borrar este gasto?")) return;
+    if (!(await confirmar("Borrar gasto", "¿Borrar este gasto?", "🗑 Borrar"))) return;
     await supabase.from("gastos").delete().eq("id", id);
     if (rol === "sistemas") fetchGastosSistemas();
     else if (esGlobal && centroDelGasto) recargarDatosCentroGlobal(centroDelGasto);
@@ -1513,7 +1535,7 @@ export default function CentroPanel({
   }
 
   async function borrarProspecto(id: string) {
-    if (!confirm("¿Borrar este prospecto?")) return;
+    if (!(await confirmar("Borrar prospecto", "¿Borrar este prospecto?", "🗑 Borrar"))) return;
     await supabase.from("prospectos").delete().eq("id", id);
     fetchTodo(centro);
   }
@@ -1560,7 +1582,14 @@ export default function CentroPanel({
   // El cliente no llegó ni avisó: sus horas quedan cobradas.
   async function marcarNoAsistio(reserva: Reservacion) {
     const horas = horasPlaneadas(reserva);
-    if (!confirm(`¿Marcar que ${reserva.cliente_nombre || "el cliente"} no asistió? Sus ${fmtHoras(horas)} hora(s) quedan cobradas.`)) return;
+    if (
+      !(await confirmar(
+        "No asistió",
+        `¿Marcar que ${reserva.cliente_nombre || "el cliente"} no asistió? Sus ${fmtHoras(horas)} hora(s) quedan cobradas.`,
+        "Sí, no asistió"
+      ))
+    )
+      return;
     const { error } = await supabase
       .from("reservaciones")
       .update({ asistencia: "no_llego", horas_cobradas: horas })
@@ -1804,7 +1833,8 @@ export default function CentroPanel({
   }
 
   async function borrarVoucherCentro(voucherId: string) {
-    if (!confirm("¿Borrar este voucher? Si es real, también se elimina del controlador UniFi.")) return;
+    if (!(await confirmar("Borrar voucher", "¿Borrar este voucher? Si es real, también se elimina del controlador UniFi.", "🗑 Borrar")))
+      return;
     setErrorVoucher("");
     try {
       const res = await fetch("/api/eliminar-voucher", {
@@ -3177,6 +3207,14 @@ export default function CentroPanel({
             {/* ---------------- VOUCHERS ---------------- */}
             {tab === "vouchers" && (
               <>
+                {/* Solicitudes de WiFi de los clientes de Coworking (antes
+                    tarjeta aparte "WiFi" → /wifi-solicitudes). */}
+                <SolicitudesWifi
+                  centro={centro}
+                  esGlobal={esGlobal}
+                  onVoucherGenerado={() => (esGlobal ? fetchVouchersTodosLosCentros() : centro ? fetchTodo(centro) : undefined)}
+                />
+
                 <p className="panel-section-label">Duración al generar</p>
                 <select
                   className="ticket-admin-select"
@@ -4426,6 +4464,25 @@ export default function CentroPanel({
               </button>
               <button className="btn-rechazar" onClick={confirmarProspectoPerdido}>
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmacion && (
+        <div className="modal-overlay" onClick={() => confirmacion.responder(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">{confirmacion.titulo}</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              {confirmacion.mensaje}
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => confirmacion.responder(false)}>
+                Cancelar
+              </button>
+              <button className="btn-aceptar" onClick={() => confirmacion.responder(true)}>
+                {confirmacion.boton}
               </button>
             </div>
           </div>

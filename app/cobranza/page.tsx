@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza"];
-const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 type ClienteCobranza = {
   id: string;
@@ -40,17 +39,6 @@ type BajaConAdeudo = {
   pendientes: { id: string; tipo: "Pago" | "Factura"; concepto: string; monto: number; estado: string }[];
 };
 
-type Gasto = {
-  id: string;
-  concepto: string;
-  categoria: string | null;
-  monto: number;
-  fecha: string;
-  notas: string | null;
-  tipo: string | null;
-  centro: string | null;
-};
-
 export default function CobranzaPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -58,9 +46,6 @@ export default function CobranzaPage() {
   const [rol, setRol] = useState("");
   const [esGlobal, setEsGlobal] = useState(false);
   const [centro, setCentro] = useState<string | null>(null);
-  const [tab, setTab] = useState<"clientes" | "gastos">(
-    searchParams.get("tab") === "gastos" ? "gastos" : "clientes"
-  );
 
   const [clientes, setClientes] = useState<ClienteCobranza[]>([]);
   const [filtroPago, setFiltroPago] = useState<"todos" | "corriente" | "pendiente" | "vencida">("todos");
@@ -73,12 +58,16 @@ export default function CobranzaPage() {
   // Confirmación de "Ejecutar cobranza ahora" con el modal de la app.
   const [confirmandoCobranza, setConfirmandoCobranza] = useState(false);
 
-  const [gastos, setGastos] = useState<Gasto[]>([]);
-  const [cargandoGastos, setCargandoGastos] = useState(false);
-  const [anioGastos, setAnioGastos] = useState(new Date().getFullYear());
 
   useEffect(() => {
+    // Los gastos ya no viven aquí: los enlaces viejos a la pestaña
+    // (/cobranza?tab=gastos) llevan a la pantalla Gastos.
+    if (searchParams.get("tab") === "gastos") {
+      window.location.replace("/gastos");
+      return;
+    }
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function init() {
@@ -101,7 +90,6 @@ export default function CobranzaPage() {
     // uno fijo asignado — no bloqueamos la pantalla por eso.
     await fetchClientes(profile?.centro || null, miRol);
     await fetchBajasConAdeudo(profile?.centro || null, miRol);
-    if (global) await fetchGastosGlobales();
     setLoading(false);
   }
 
@@ -212,16 +200,6 @@ export default function CobranzaPage() {
     );
   }
 
-  // Todos los gastos, de todos los centros y todos los departamentos
-  // (sistemas, operaciones, admin) — cobranza necesita ver el panorama
-  // completo de dinero saliendo, no solo lo de un centro.
-  async function fetchGastosGlobales() {
-    setCargandoGastos(true);
-    const { data } = await supabase.from("gastos").select("*").order("fecha", { ascending: false });
-    setGastos(data || []);
-    setCargandoGastos(false);
-  }
-
   async function ejecutarCobranza() {
     setConfirmandoCobranza(false);
     setEjecutando(true);
@@ -270,65 +248,6 @@ export default function CobranzaPage() {
     vencida: clientes.filter((c) => c.ultimaFacturaEstado === "vencida").length,
   };
 
-  // ---------- Gráficas de gastos ----------
-  function renderBarras(titulo: string, datos: { centro: string; valor: number }[], color: string) {
-    const max = Math.max(...datos.map((d) => d.valor), 1);
-    const total = datos.reduce((s, d) => s + d.valor, 0);
-    return (
-      <div className="rep-ocupacion-card" style={{ marginBottom: 12 }}>
-        <div className="rep-ocupacion-header">
-          <span className="rep-ocupacion-centro">{titulo}</span>
-          <span className="rep-ocupacion-porcentaje">
-            ${total.toLocaleString("es-MX", { maximumFractionDigits: 0 })}
-          </span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-          {datos.map((d) => (
-            <div key={d.centro}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-                <span>{d.centro}</span>
-                <b>${d.valor.toLocaleString("es-MX", { maximumFractionDigits: 0 })}</b>
-              </div>
-              <div style={{ background: "#f0f0f0", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                <div
-                  style={{
-                    width: `${(d.valor / max) * 100}%`,
-                    background: color,
-                    height: "100%",
-                    borderRadius: 6,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const centrosConGasto = Array.from(new Set(gastos.map((g) => g.centro || "Sin centro"))).sort();
-  const gastosPorCentro = centrosConGasto.map((c) => ({
-    centro: c,
-    valor: gastos.filter((g) => (g.centro || "Sin centro") === c).reduce((s, g) => s + Number(g.monto), 0),
-  }));
-  const gastosPorDepto = ["sistemas", "operaciones", "admin"].map((t) => ({
-    centro: t === "sistemas" ? "🖥️ Sistemas" : t === "operaciones" ? "🔧 Operaciones" : "🧑‍💼 Admin",
-    valor: gastos.filter((g) => (g.tipo || "admin") === t).reduce((s, g) => s + Number(g.monto), 0),
-  }));
-  const totalGlobal = gastos.reduce((s, g) => s + Number(g.monto), 0);
-  const aniosDisponibles = Array.from(
-    new Set([...gastos.map((g) => new Date(g.fecha).getFullYear()), new Date().getFullYear()])
-  ).sort((a, b) => b - a);
-  const gastosPorMesGlobal = MESES.map((m, i) => ({
-    centro: m,
-    valor: gastos
-      .filter((g) => {
-        const d = new Date(g.fecha);
-        return d.getFullYear() === anioGastos && d.getMonth() === i;
-      })
-      .reduce((s, g) => s + Number(g.monto), 0),
-  }));
-
   return (
     <div className="panel">
       <div className="rep-header">
@@ -352,24 +271,6 @@ export default function CobranzaPage() {
           </div>
         ) : (
           <>
-            {esGlobal && (
-              <div className="tickets-filtros">
-                <button
-                  className={"filtro-chip" + (tab === "clientes" ? " active" : "")}
-                  onClick={() => setTab("clientes")}
-                >
-                  👥 Clientes
-                </button>
-                <button
-                  className={"filtro-chip" + (tab === "gastos" ? " active" : "")}
-                  onClick={() => setTab("gastos")}
-                >
-                  💸 Gastos
-                </button>
-              </div>
-            )}
-
-            {tab === "clientes" && (
               <>
                 <button className="btn-ejecutar-cobranza" onClick={() => setConfirmandoCobranza(true)} disabled={ejecutando}>
                   {ejecutando ? "Ejecutando..." : "⚡ Ejecutar cobranza ahora"}
@@ -604,104 +505,6 @@ export default function CobranzaPage() {
                   })
                 )}
               </>
-            )}
-
-            {tab === "gastos" && esGlobal && (
-              <>
-                {cargandoGastos ? (
-                  <div className="nodus-inline-loading">
-            <div className="nodus-spinner nodus-spinner-sm">
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-              <span className="nodus-spinner-petal"></span>
-            </div>
-            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Cargando gastos de todos los centros...</p>
-          </div>
-                ) : (
-                  <>
-                    <div className="gastos-total-card">
-                      <p className="gastos-total-monto">
-                        ${totalGlobal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="gastos-total-lbl">Total de gastos · todos los centros y departamentos</p>
-                    </div>
-
-                    {renderBarras("💸 Gastos por centro", gastosPorCentro, "#F07E3A")}
-                    {renderBarras("🏷️ Gastos por departamento", gastosPorDepto, "#185FA5")}
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                      <select
-                        className="ticket-admin-select"
-                        value={anioGastos}
-                        onChange={(e) => setAnioGastos(Number(e.target.value))}
-                      >
-                        {aniosDisponibles.map((a) => (
-                          <option key={a} value={a}>
-                            {a}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {renderBarras(`📅 Gastos por mes (${anioGastos})`, gastosPorMesGlobal, "#0F6E56")}
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                      <p className="panel-section-label" style={{ margin: 0 }}>
-                        Historial ({gastos.length})
-                      </p>
-                      <button
-                        className="btn-exportar"
-                        onClick={() => {
-                          const porCentro: Record<string, Record<string, any>[]> = {};
-                          gastos.forEach((g) => {
-                            const key = g.centro || "Sin centro";
-                            if (!porCentro[key]) porCentro[key] = [];
-                            porCentro[key].push({
-                              Departamento: g.tipo === "sistemas" ? "Sistemas" : g.tipo === "operaciones" ? "Operaciones" : "Admin",
-                              Concepto: g.concepto,
-                              Categoria: g.categoria || "",
-                              Monto: g.monto,
-                              Fecha: g.fecha,
-                            });
-                          });
-                          exportarExcelPorCentro("gastos-globales", porCentro);
-                        }}
-                      >
-                        📥 Excel
-                      </button>
-                    </div>
-                    {gastos.length === 0 ? (
-                      <div className="empty-card">Sin gastos registrados</div>
-                    ) : (
-                      centrosConGasto.map((c) => {
-                        const gastosDelCentro = gastos.filter((g) => (g.centro || "Sin centro") === c);
-                        return (
-                          <div key={c} style={{ marginBottom: 16 }}>
-                            <p className="panel-section-label" style={{ marginTop: 12 }}>
-                              🏢 {c} ({gastosDelCentro.length})
-                            </p>
-                            {gastosDelCentro.map((g) => (
-                              <div className="item-card" key={g.id}>
-                                <div className="item-card-info">
-                                  <p className="item-card-titulo">{g.concepto}</p>
-                                  <p className="item-card-sub">
-                                    {g.tipo === "sistemas" ? "🖥️ Sistemas" : g.tipo === "operaciones" ? "🔧 Operaciones" : "🧑‍💼 Admin"}
-                                    {" · "}
-                                    {g.categoria || "—"} · {new Date(g.fecha).toLocaleDateString("es-MX")}
-                                  </p>
-                                  {g.notas && <p className="item-card-extra">{g.notas}</p>}
-                                </div>
-                                <p className="item-card-monto">${Number(g.monto).toLocaleString("es-MX")}</p>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })
-                    )}
-                  </>
-                )}
-              </>
-            )}
           </>
         )}
       </div>
