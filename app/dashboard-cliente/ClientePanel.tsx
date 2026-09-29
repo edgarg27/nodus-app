@@ -617,19 +617,18 @@ export default function ClientePanel({
             <span className="quick-name">Logros</span>
           </a>
           <a className="quick-card" href="/mis-visitas">
-            <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
-              👥
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/visitas.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Visitas</span>
           </a>
           <a className="quick-card" href="/paqueteria">
-            <span className="quick-icon" style={{ fontSize: 26 }}>📦</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/paqueteria-mensajeria.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Paquetería y Mensajería</span>
           </a>
           <a className="quick-card" href="/calendario-eventos">
-            <span className="quick-icon" style={{ fontSize: 24, lineHeight: "28px" }}>
-              📅
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/calendario-eventos.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Calendario de Eventos</span>
           </a>
         </div>
