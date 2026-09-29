@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { checkRateLimit, ipDeRequest } from "@/lib/rateLimit";
+import { origenPublico } from "@/lib/origenPublico";
 
 // "¿Olvidaste tu contraseña?" del login (público, sin sesión). Manda el
 // enlace por Resend con el estilo de Nodus — así no dependemos del límite
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(RESPUESTA_OK);
   }
 
-  const resultado = await mandarCorreoContrasena({ email, tipo: "recovery", origin: req.nextUrl.origin });
+  const resultado = await mandarCorreoContrasena({ email, tipo: "recovery", origin: origenPublico(req) });
   if (!resultado.ok) {
     console.error("[recuperar-password] no se pudo mandar el correo:", resultado.error);
   }

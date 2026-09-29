@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
+import { origenPublico } from "@/lib/origenPublico";
 
 const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas"];
 
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   } else {
     // Modo invitación: le manda un correo para que el propio usuario ponga
     // su contraseña la primera vez que entra.
-    const origin = req.nextUrl.origin;
+    const origin = origenPublico(req);
     const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
     if (!invitacion.ok || !invitacion.userId) {
       return NextResponse.json(

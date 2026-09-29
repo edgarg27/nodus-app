@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarEmpresa } from "@/lib/empresa";
 import { rolPuede } from "@/lib/permisosApi";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
+import { origenPublico } from "@/lib/origenPublico";
 
 async function generarNumeroUsuarioUnico(admin: ReturnType<typeof createAdminClient>) {
   for (let intento = 0; intento < 15; intento++) {
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const numeroUsuario = await generarNumeroUsuarioUnico(admin);
 
-  const origin = req.nextUrl.origin;
+  const origin = origenPublico(req);
   const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
 
   if (!invitacion.ok || !invitacion.userId) {
