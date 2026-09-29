@@ -51,25 +51,28 @@ export async function mandarCorreoContrasena({
 
   const enlace = `${origin}/crear-password?token_hash=${encodeURIComponent(hashedToken)}&type=${tipo}`;
   const esInvite = tipo === "invite";
+  const saludo = nombre ? `¡Hola, ${esc(nombre)}! 👋` : "¡Hola! 👋";
 
   const resultado = await enviarCorreo({
     to: email,
-    subject: "Accede a tu cuenta de Nodus",
+    subject: esInvite ? "¡Bienvenido a Nodus! Crea tu cuenta" : "Accede a tu cuenta de Nodus",
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#0d1b3e">
-        <h2 style="margin:0 0 12px">Nodus Flex Center</h2>
+        <h2 style="margin:0 0 4px;color:#0d1b3e">Nodus Flex Center</h2>
+        <p style="font-size:16px;margin:16px 0 8px">${saludo}</p>
         <p>${
           esInvite
-            ? "Te invitaron a crear tu cuenta en Nodus. Usa este enlace para poner tu contraseña."
-            : "Usa este enlace para poner la contraseña de tu cuenta (si ya tenías una, se reemplaza por la nueva)."
+            ? "Ya casi terminamos de armar tu cuenta en Nodus. Solo falta que pongas tu contraseña para poder entrar."
+            : "Aquí tienes tu enlace para poner la contraseña de tu cuenta (si ya tenías una, esta la reemplaza)."
         }</p>
-        <p style="margin:24px 0">
-          <a href="${esc(enlace)}" style="background:#f07e3a;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;display:inline-block">
-            ${esInvite ? "Crear mi cuenta" : "Poner mi contraseña"}
+        <p style="margin:28px 0;text-align:center">
+          <a href="${esc(enlace)}" style="background:#f07e3a;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;display:inline-block;font-size:15px">
+            ${esInvite ? "Crear mi cuenta →" : "Poner mi contraseña →"}
           </a>
         </p>
-        <p style="font-size:13px;color:#666">El enlace vence en 1 hora y solo se puede usar una vez. Si no lo esperabas, ignora este correo: no pasa nada.</p>
-        <p style="font-size:12px;color:#999;word-break:break-all">Si el botón no funciona, copia y pega este enlace en tu navegador:<br>${esc(enlace)}</p>
+        ${esInvite ? '<p style="margin:0 0 8px">¡Te esperamos! 🎉</p>' : ""}
+        <p style="font-size:13px;color:#666">Este enlace vence en 1 hora y solo se puede usar una vez. Si no lo esperabas, ignora este correo — no pasa nada.</p>
+        <p style="font-size:12px;color:#999;word-break:break-all">¿No funciona el botón? Copia y pega este enlace en tu navegador:<br>${esc(enlace)}</p>
       </div>
     `,
   });

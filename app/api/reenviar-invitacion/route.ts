@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { rolPuede } from "@/lib/permisosApi";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
+import { origenPublico } from "@/lib/origenPublico";
 
 // Botón "📧 Reenviar invitación" en el detalle de cliente de AdminPanel.tsx
 // — por si el link/token del correo original (ver /api/crear-cliente) ya
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta el correo del cliente" }, { status: 400 });
   }
 
-  const origin = req.nextUrl.origin;
+  const origin = origenPublico(req);
   const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
 
   if (!invitacion.ok) {

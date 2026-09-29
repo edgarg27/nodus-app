@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createClientJs } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { mandarCorreoContrasena } from "@/lib/correoContrasena";
+import { origenPublico } from "@/lib/origenPublico";
 
 // Panel "Editar cliente" del detalle de cliente en AdminPanel.tsx. Permite
 // al admin cambiar TODOS los datos de una cuenta de cliente (incluido el
@@ -116,24 +117,10 @@ export async function POST(req: NextRequest) {
     const correo = authActual?.user?.email || objetivo.email;
     if (!correo) return NextResponse.json({ error: "El cliente no tiene correo" }, { status: 400 });
 
-    // Cliente sin sesión y con la llave pública: es lo que hace que
-    // Supabase MANDE el correo de recuperación (con el admin solo se
-    // generaría el link sin enviarlo). Flujo implícito para que el link
-    // traiga el token en el "#", que es lo que lee /crear-password.
-    const publico = createClientJs(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false, flowType: "implicit" },
-    });
-    const { error } = await publico.auth.resetPasswordForEmail(correo, {
-      redirectTo: `${req.nextUrl.origin}/crear-password`,
-    });
-    if (error) {
-      const esFalloDeCorreo = error.status === 500 || error.name === "AuthRetryableFetchError" || error.status === 429;
+    const resultado = await mandarCorreoContrasena({ email: correo, tipo: "recovery", origin: origenPublico(req) });
+    if (!resultado.ok) {
       return NextResponse.json(
-        {
-          error: esFalloDeCorreo
-            ? "No se pudo mandar el correo — probablemente se alcanzó el límite de correos. Espera unos minutos, o ponle una contraseña nueva directamente."
-            : error.message || "No se pudo enviar el correo de restablecimiento",
-        },
+        { error: resultado.error || "No se pudo enviar el correo de restablecimiento" },
         { status: 400 }
       );
     }
