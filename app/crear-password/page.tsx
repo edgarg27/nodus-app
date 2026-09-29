@@ -118,9 +118,9 @@ export default function CrearPasswordPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={handleSubmit}>
-        <h1>{esReset ? "Nueva contraseña" : "Bienvenido a Nodus"}</h1>
+        <h1>{esReset ? "Tu contraseña" : "Bienvenido a Nodus"}</h1>
         <p className="subtitle">
-          {esReset ? "Escribe la nueva contraseña de tu cuenta" : "Crea una contraseña para tu cuenta"}
+          {esReset ? "Escribe la contraseña de tu cuenta" : "Crea una contraseña para tu cuenta"}
         </p>
 
         <label htmlFor="password">Contraseña</label>
