@@ -14,7 +14,7 @@ import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, ty
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 import SolicitudesWifi from "./SolicitudesWifi";
 
-type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string };
+type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string; telefono?: string | null };
 // user_id null + "para" = voucher manual (visita, proveedor…), ver
 // /api/voucher-manual y migracion_vouchers_manuales.sql.
 type VoucherCentro = {
@@ -557,7 +557,7 @@ export default function CentroPanel({
     ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, nombre, email, numero_oficina, empresa, centro")
+        .select("id, nombre, email, numero_oficina, empresa, centro, telefono")
         .eq("rol", "cliente")
         .eq("centro", c),
       supabase.from("oficinas").select("numero, tipo, estado").eq("centro", c),
@@ -1094,18 +1094,32 @@ export default function CentroPanel({
     }
   }
 
+  function normalizarTelefono(t: string | null | undefined) {
+    return (t || "").replace(/\D/g, "");
+  }
+
   // Un prospecto que ya se volvió cliente sin marcarse "convertido" salía
   // dos veces en "¿para quién?" y, si elegían el prospecto, el cliente no
-  // veía la reservación en su app. Se reconoce por correo o por nombre.
-  function clienteDeProspecto(pr: { nombre: string; email: string | null }) {
+  // veía la reservación en su app. Se reconoce por correo (basta solo) o,
+  // si no hay correo que coincida, por nombre/empresa + teléfono juntos —
+  // el nombre solo no basta: dos personas distintas pueden compartir
+  // nombre, y eso ocultaría (o mezclaría) a un prospecto que en realidad
+  // es alguien nuevo.
+  function clienteDeProspecto(pr: { nombre: string; email: string | null; telefono: string | null }) {
     const correo = (pr.email || "").trim().toLowerCase();
+    if (correo) {
+      const porCorreo = clientes.find((cl) => (cl.email || "").trim().toLowerCase() === correo);
+      if (porCorreo) return porCorreo;
+    }
+    const telefono = normalizarTelefono(pr.telefono);
+    if (!telefono) return null;
     const nombre = pr.nombre.trim().toLowerCase();
     return (
-      clientes.find((cl) => correo && (cl.email || "").trim().toLowerCase() === correo) ||
       clientes.find(
-        (cl) => cl.nombre.trim().toLowerCase() === nombre || (cl.empresa || "").trim().toLowerCase() === nombre
-      ) ||
-      null
+        (cl) =>
+          normalizarTelefono(cl.telefono) === telefono &&
+          (cl.nombre.trim().toLowerCase() === nombre || (cl.empresa || "").trim().toLowerCase() === nombre)
+      ) || null
     );
   }
 
