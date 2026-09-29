@@ -40,8 +40,16 @@ export default function DatosFiscalesPage() {
         const rfc = normalizarRfc(p?.rfc || "");
         const publico = !rfc || esPublicoGeneral(rfc);
         setEraPublico(publico);
+        // El tipo de persona es el que se capturó al cotizar; aquí solo se
+        // muestra (no se puede cambiar). Lo decide el servidor.
+        try {
+          const r = await fetch("/api/datos-fiscales");
+          const j = await r.json();
+          if (j?.tipo === "moral" || j?.tipo === "fisica") setTipo(j.tipo);
+        } catch {
+          if (rfc.length === 12) setTipo("moral");
+        }
         if (!publico) {
-          setTipo(rfc.length === 12 ? "moral" : "fisica");
           setF({
             rfc,
             nombre_fiscal: p?.nombre_fiscal || "",
@@ -58,11 +66,6 @@ export default function DatosFiscalesPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function cambiarTipo(t: TipoPersonaFiscal) {
-    setTipo(t);
-    setF((prev) => ({ ...prev, regimen_fiscal: "" }));
-  }
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -115,19 +118,21 @@ export default function DatosFiscalesPage() {
 
             <div>
               <p className="sub-label">Tipo de persona</p>
-              <div style={{ display: "flex", gap: 8 }}>
-                {(["fisica", "moral"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className={tipo === t ? "reservar-btn" : "tel-borrar-btn"}
-                    style={tipo === t ? { flex: 1 } : { flex: 1, color: "#0d1b3e", border: "1px solid #ddd", background: "#fff", borderRadius: 10 }}
-                    onClick={() => cambiarTipo(t)}
-                  >
-                    {t === "fisica" ? "Persona física" : "Persona moral"}
-                  </button>
-                ))}
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  background: "#fff",
+                  border: "1px solid #eee",
+                  fontWeight: 600,
+                  color: "#0d1b3e",
+                }}
+              >
+                {tipo === "moral" ? "🏢 Persona moral" : "👤 Persona física"}
               </div>
+              <p style={{ fontSize: 12, color: "#888", margin: "4px 0 0" }}>
+                Es el que se registró en tu contrato. Si no es correcto, pide a tu centro que lo corrija.
+              </p>
             </div>
             <div>
               <p className="sub-label">RFC</p>

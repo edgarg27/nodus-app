@@ -71,9 +71,16 @@ export function validarDatosFiscales(d: DatosFiscales, tipo: TipoPersonaFiscal):
     return "Una persona moral necesita su RFC: público en general solo aplica a personas físicas";
   }
   if (!RFC_GENERICOS.includes(rfc) && !(tipo === "moral" ? RFC_MORAL : RFC_FISICA).test(rfc)) {
-    return tipo === "moral"
-      ? "El RFC de una persona moral tiene 12 caracteres (ej. ABC010101AB1)"
-      : "El RFC de una persona física tiene 13 caracteres (ej. ABCD010101AB1)";
+    // Decir QUÉ está mal: antes siempre decía "tiene 13 caracteres" aunque
+    // el RFC sí tuviera 13 y el problema fuera el formato.
+    const largo = tipo === "moral" ? 12 : 13;
+    const letras = tipo === "moral" ? 3 : 4;
+    const ejemplo = tipo === "moral" ? "ABC010101AB1" : "ABCD010101AB1";
+    const quien = tipo === "moral" ? "persona moral" : "persona física";
+    if (rfc.length !== largo) {
+      return `El RFC de una ${quien} tiene ${largo} caracteres y este tiene ${rfc.length} (ej. ${ejemplo})`;
+    }
+    return `El RFC no tiene el formato correcto: ${letras} letras, 6 números de la fecha (AAMMDD) y 3 de homoclave (ej. ${ejemplo})`;
   }
   if (!String(d.nombre_fiscal || "").trim()) {
     return tipo === "moral" ? "Falta la razón social" : "Falta el nombre completo como aparece en su constancia fiscal";

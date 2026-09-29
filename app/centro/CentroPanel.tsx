@@ -1094,6 +1094,21 @@ export default function CentroPanel({
     }
   }
 
+  // Un prospecto que ya se volvió cliente sin marcarse "convertido" salía
+  // dos veces en "¿para quién?" y, si elegían el prospecto, el cliente no
+  // veía la reservación en su app. Se reconoce por correo o por nombre.
+  function clienteDeProspecto(pr: { nombre: string; email: string | null }) {
+    const correo = (pr.email || "").trim().toLowerCase();
+    const nombre = pr.nombre.trim().toLowerCase();
+    return (
+      clientes.find((cl) => correo && (cl.email || "").trim().toLowerCase() === correo) ||
+      clientes.find(
+        (cl) => cl.nombre.trim().toLowerCase() === nombre || (cl.empresa || "").trim().toLowerCase() === nombre
+      ) ||
+      null
+    );
+  }
+
   // El admin reserva directo, sin límite de horas de contrato y ya
   // confirmada (no necesita aprobarse a sí mismo).
   async function confirmarReservaAdmin() {
@@ -1116,8 +1131,13 @@ export default function CentroPanel({
         paraNombre = clientes.find((cl) => cl.id === idPara)?.nombre || null;
         paraClienteId = idPara;
       } else {
-        paraNombre = prospectos.find((pr) => pr.id === idPara)?.nombre || null;
+        const pr = prospectos.find((x) => x.id === idPara);
+        paraNombre = pr?.nombre || null;
         prospectoId = idPara;
+        // Si ese prospecto ya es cliente, la reservación también se le liga
+        // a su cuenta para que la vea en su app.
+        const cl = pr ? clienteDeProspecto(pr) : null;
+        if (cl) paraClienteId = cl.id;
       }
     }
     setCalGuardando(true);
@@ -2628,7 +2648,7 @@ export default function CentroPanel({
                             </optgroup>
                             <optgroup label="Prospectos (si todavía no es cliente)">
                               {prospectos
-                                .filter((pr) => pr.estado !== "convertido")
+                                .filter((pr) => pr.estado !== "convertido" && !clienteDeProspecto(pr))
                                 .sort((a, b) => a.nombre.localeCompare(b.nombre))
                                 .map((pr) => (
                                   <option key={pr.id} value={`p:${pr.id}`}>

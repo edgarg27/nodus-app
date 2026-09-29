@@ -154,6 +154,12 @@ export default function ContratoPage() {
     cambiar_espacio: "Cambiar o ampliar mi espacio",
     otro: "Otra solicitud",
   };
+  const ICONO_SOLICITUD: Record<string, string> = {
+    renovar: "🔄",
+    mas_horas: "⏱️",
+    cambiar_espacio: "🏢",
+    otro: "💬",
+  };
 
   async function cargarSolicitudes(userId: string) {
     const { data } = await supabase
@@ -382,28 +388,63 @@ export default function ContratoPage() {
                   ) : (
                     <>
                       <p className="modal-nombre">Hacer una solicitud</p>
+                      <p style={{ fontSize: 13, color: "#888", margin: "2px 0 10px" }}>
+                        Tu centro la recibe y te contacta.
+                      </p>
                       <p className="sub-label">¿Qué necesitas?</p>
-                      <select value={tipoSolicitud} onChange={(e) => setTipoSolicitud(e.target.value)}>
-                        {Object.entries(ETIQUETA_SOLICITUD).map(([valor, texto]) => (
-                          <option key={valor} value={valor}>
-                            {texto}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="sub-label" style={{ marginTop: 8 }}>
+                      {/* Opciones como tarjetas (mismo estilo que el resto de la
+                          app) en vez del <select> nativo. */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {Object.entries(ETIQUETA_SOLICITUD).map(([valor, texto]) => {
+                          const icono = ICONO_SOLICITUD[valor] || "📝";
+                          const activo = tipoSolicitud === valor;
+                          return (
+                            <button
+                              key={valor}
+                              type="button"
+                              onClick={() => setTipoSolicitud(valor)}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 4,
+                                padding: "12px 8px",
+                                borderRadius: 12,
+                                border: activo ? "2px solid #f07e3a" : "1px solid #eee",
+                                background: activo ? "#fff4ec" : "#fff",
+                                color: "#0d1b3e",
+                                fontWeight: activo ? 700 : 500,
+                                fontSize: 13,
+                                cursor: "pointer",
+                                font: "inherit",
+                                textAlign: "center",
+                              }}
+                            >
+                              <span style={{ fontSize: 22 }}>{icono}</span>
+                              {texto}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="sub-label" style={{ marginTop: 12 }}>
                         Cuéntanos más (opcional)
                       </p>
                       <textarea
                         placeholder="Ej. Quiero renovar por 6 meses / necesito 4 horas más de sala al mes"
                         value={mensajeSolicitud}
                         onChange={(e) => setMensajeSolicitud(e.target.value)}
+                        rows={3}
+                        className="modal-textarea"
+                        // La ventana es una columna flexible: sin esto el cuadro
+                        // se encogía hasta no dejar ver el texto.
+                        style={{ flexShrink: 0, minHeight: 96 }}
                       />
                       {errorSolicitud && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorSolicitud}</p>}
-                      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
                         <button className="tel-borrar-btn" onClick={() => setMostrarSolicitud(false)} disabled={enviandoSolicitud}>
                           Cancelar
                         </button>
-                        <button className="reservar-btn" onClick={enviarSolicitud} disabled={enviandoSolicitud}>
+                        <button className="reservar-btn" style={{ flex: 1 }} onClick={enviarSolicitud} disabled={enviandoSolicitud}>
                           {enviandoSolicitud ? "Enviando..." : "Enviar solicitud"}
                         </button>
                       </div>
