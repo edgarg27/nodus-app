@@ -51,17 +51,21 @@ export async function POST(req: NextRequest) {
 
   const resultado = await enviarCorreo({
     to: email,
-    subject: "Restablece tu contraseña de Nodus",
+    // Texto neutral a propósito: este mismo enlace lo recibe tanto quien
+    // olvidó su contraseña como quien todavía nunca puso una (ej. una
+    // invitación que se reenvía por esta vía) — "restablecer" confundía
+    // a los del segundo caso, como si ya hubieran tenido una antes.
+    subject: "Accede a tu cuenta de Nodus",
     html: `
       <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#0d1b3e">
         <h2 style="margin:0 0 12px">Nodus Flex Center</h2>
-        <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
+        <p>Usa este enlace para poner la contraseña de tu cuenta (si ya tenías una, se reemplaza por la nueva).</p>
         <p style="margin:24px 0">
           <a href="${esc(enlace)}" style="background:#f07e3a;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px;display:inline-block">
-            Crear nueva contraseña
+            Poner mi contraseña
           </a>
         </p>
-        <p style="font-size:13px;color:#666">El enlace vence en 1 hora y solo se puede usar una vez. Si no lo pediste tú, ignora este correo: tu contraseña no cambia.</p>
+        <p style="font-size:13px;color:#666">El enlace vence en 1 hora y solo se puede usar una vez. Si no lo esperabas, ignora este correo: no pasa nada.</p>
         <p style="font-size:12px;color:#999;word-break:break-all">Si el botón no funciona, copia y pega este enlace en tu navegador:<br>${esc(enlace)}</p>
       </div>
     `,
