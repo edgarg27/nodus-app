@@ -4,49 +4,74 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+type Estado = "cargando" | "confirmar" | "form" | "invalido" | "exito";
+
 export default function CrearPasswordPage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [listo, setListo] = useState(false);
-  const [sesionValida, setSesionValida] = useState(false);
+  const [estado, setEstado] = useState<Estado>("cargando");
+  const [tokenHash, setTokenHash] = useState<string | null>(null);
+  const [tipoOtp, setTipoOtp] = useState<"invite" | "recovery" | "email">("invite");
   const [password, setPassword] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const [exito, setExito] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   // El enlace de "¿Olvidaste tu contraseña?" trae type=recovery; el de una
   // invitación de alta trae type=invite. Cambia el texto y a dónde se va.
   const [esReset, setEsReset] = useState(false);
 
   useEffect(() => {
-    async function activarSesion() {
-      // @supabase/ssr no procesa automático el token que viene en el "#" de
-      // la URL (eso es del flujo clásico/implícito); hay que leerlo a mano
-      // y activarlo con setSession.
-      const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.slice(1)
-        : window.location.hash;
-      const params = new URLSearchParams(hash);
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
+    async function revisarEnlace() {
+      const query = new URLSearchParams(window.location.search);
+      const th = query.get("token_hash");
+      const tipo = query.get("type");
+
+      // Enlace nuevo (ver lib/correoContrasena.ts): trae token_hash + type
+      // en vez de activar la sesión solo con visitarlo. No se llama a
+      // verifyOtp aquí todavía — se espera a que la persona le dé clic a
+      // "Continuar" (ver por qué en el comentario de correoContrasena.ts:
+      // así un escáner de correo automático no gasta el enlace).
+      if (th && tipo) {
+        setTokenHash(th);
+        setTipoOtp(tipo === "recovery" ? "recovery" : tipo === "email" ? "email" : "invite");
+        setEsReset(tipo === "recovery");
+        setEstado("confirmar");
+        return;
+      }
+
+      // Compatibilidad con enlaces viejos (type=... + tokens en el "#" de
+      // la URL, el flujo clásico/implícito de Supabase) o con una sesión
+      // que ya esté activa.
+      const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+      const hashParams = new URLSearchParams(hash);
+      const access_token = hashParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token");
 
       if (access_token && refresh_token) {
-        setEsReset(params.get("type") === "recovery");
+        setEsReset(hashParams.get("type") === "recovery");
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-        setSesionValida(!error);
-        // Limpia el token de la URL para que no se quede visible/copiable
         window.history.replaceState(null, "", window.location.pathname);
-      } else {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        setSesionValida(!!session);
+        setEstado(error ? "invalido" : "form");
+        return;
       }
-      setListo(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setEstado(session ? "form" : "invalido");
     }
-    activarSesion();
+    revisarEnlace();
   }, []);
+
+  async function confirmarEnlace() {
+    if (!tokenHash) return;
+    setConfirmando(true);
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: tipoOtp });
+    setConfirmando(false);
+    setEstado(error ? "invalido" : "form");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,7 +95,7 @@ export default function CrearPasswordPage() {
       );
       return;
     }
-    setExito(true);
+    setEstado("exito");
     setTimeout(() => {
       // Tras recuperar contraseña puede ser cliente o staff: /login los manda
       // a su panel (el middleware redirige según el rol de la sesión).
@@ -79,11 +104,29 @@ export default function CrearPasswordPage() {
     }, 1800);
   }
 
-  if (!listo) {
+  if (estado === "cargando") {
     return <div className="login-wrap" />;
   }
 
-  if (!sesionValida) {
+  if (estado === "confirmar") {
+    return (
+      <div className="login-wrap">
+        <div className="login-card" style={{ textAlign: "center" }}>
+          <h1>{esReset ? "Restablecer contraseña" : "Bienvenido a Nodus"}</h1>
+          <p className="subtitle">
+            {esReset
+              ? "Confirma para poner la contraseña de tu cuenta."
+              : "Confirma para crear la contraseña de tu cuenta."}
+          </p>
+          <button onClick={confirmarEnlace} disabled={confirmando} style={{ marginTop: 8 }}>
+            {confirmando ? "Confirmando..." : "Continuar"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (estado === "invalido") {
     return (
       <div className="login-wrap">
         <div className="login-card">
@@ -103,7 +146,7 @@ export default function CrearPasswordPage() {
     );
   }
 
-  if (exito) {
+  if (estado === "exito") {
     return (
       <div className="login-wrap">
         <div className="login-card" style={{ textAlign: "center" }}>

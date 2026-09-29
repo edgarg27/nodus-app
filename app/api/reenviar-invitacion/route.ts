@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 
 // Botón "📧 Reenviar invitación" en el detalle de cliente de AdminPanel.tsx
 // — por si el link/token del correo original (ver /api/crear-cliente) ya
@@ -29,18 +29,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta el correo del cliente" }, { status: 400 });
   }
 
-  const admin = createAdminClient();
   const origin = req.nextUrl.origin;
-  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/crear-password`,
-    data: { nombre },
-  });
+  const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
 
-  if (inviteError) {
-    const esFalloDeCorreo = inviteError.status === 500 || inviteError.name === "AuthRetryableFetchError";
-    const mensaje = esFalloDeCorreo
-      ? "No se pudo mandar el correo — probablemente se alcanzó el límite de correos de Supabase. Espera unos minutos e intenta de nuevo."
-      : inviteError.message || "No se pudo reenviar la invitación (¿ya confirmó su cuenta?)";
+  if (!invitacion.ok) {
+    const mensaje = invitacion.error?.includes("already been registered")
+      ? "No se pudo reenviar la invitación: el cliente ya confirmó su cuenta"
+      : invitacion.error || "No se pudo reenviar la invitación";
     return NextResponse.json({ error: mensaje }, { status: 400 });
   }
 

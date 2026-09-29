@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 
 const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas"];
 
@@ -59,17 +60,14 @@ export async function POST(req: NextRequest) {
     // Modo invitación: le manda un correo para que el propio usuario ponga
     // su contraseña la primera vez que entra.
     const origin = req.nextUrl.origin;
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${origin}/crear-password`,
-      data: { nombre },
-    });
-    if (error || !data?.user) {
+    const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
+    if (!invitacion.ok || !invitacion.userId) {
       return NextResponse.json(
-        { error: error?.message || "No se pudo invitar la cuenta (¿ya existe ese correo?)" },
+        { error: invitacion.error || "No se pudo invitar la cuenta (¿ya existe ese correo?)" },
         { status: 400 }
       );
     }
-    nuevoId = data.user.id;
+    nuevoId = invitacion.userId;
   }
 
   const { error: profileError } = await admin.from("profiles").upsert({
