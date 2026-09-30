@@ -2,6 +2,7 @@ import { consultarCargo } from "@/lib/openpay";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { generarFacturaAutomatica } from "@/lib/facturapi";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -53,5 +54,6 @@ export async function confirmarPagoPorCargo(admin: Admin, chargeId: string): Pro
   }
 
   await enviarGraciasPorPago(admin, pago.id);
+  await generarFacturaAutomatica(admin, pago.id, (cargo as any).method);
   return { estado: "pagado", pagoId: pago.id };
 }

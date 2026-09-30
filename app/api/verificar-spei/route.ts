@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { consultarCargo } from "@/lib/openpay";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { enviarGraciasPorPago } from "@/lib/correosPagos";
-import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
 
+// Botón "verificar pago" del cliente en /pagar-spei. Usa el mismo camino que
+// el webhook y la verificación de tarjeta (confirmarPagoPorCargo) para no
+// duplicar la lógica de marcar pagado — incluye la factura automática.
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -20,12 +21,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta pagoId" }, { status: 400 });
   }
 
-  const { data: pago } = await supabase
+  const admin = createAdminClient();
+  const { data: pago } = await admin
     .from("pagos")
-    .select("id, openpay_charge_id, factura_id, user_id, estado")
+    .select("id, openpay_charge_id, estado")
     .eq("id", pagoId)
     .eq("user_id", session.user.id)
-    .single();
+    .maybeSingle();
 
   if (!pago || !pago.openpay_charge_id) {
     return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
@@ -36,39 +38,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const cargo = await consultarCargo(pago.openpay_charge_id);
-
-    if (cargo.status === "completed") {
-      await supabase.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).eq("id", pago.id);
-      await supabase.from("profiles").update({ suspendido: false }).eq("id", session.user.id);
-
-      const { data: factura } = await supabase
-        .from("facturas")
-        .update({ estado: "pagada" })
-        .eq("id", pago.factura_id)
-        .select("folio, monto, centro")
-        .single();
-
-      const { data: cliente } = await supabase
-        .from("profiles")
-        .select("nombre")
-        .eq("id", session.user.id)
-        .single();
-
-      if (factura?.centro) {
-        await supabase.from("notificaciones").insert({
-          centro: factura.centro,
-          tipo: "pago_confirmado",
-          mensaje: `💰 Se confirmó el pago de ${cliente?.nombre || "un cliente"} — factura ${factura.folio} · $${Number(factura.monto).toLocaleString("es-MX")}`,
-        });
-      }
-
-      await enviarGraciasPorPago(createAdminClient(), pago.id);
-
+    const resultado = await confirmarPagoPorCargo(admin, pago.openpay_charge_id);
+    if (resultado.estado === "pagado") {
       return NextResponse.json({ ok: true, estado: "pagado" });
     }
-
-    return NextResponse.json({ ok: true, estado: "pendiente_spei", openpayStatus: cargo.status });
+    return NextResponse.json({ ok: true, estado: "pendiente_spei", openpayStatus: resultado.estado });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "No se pudo verificar el pago" }, { status: 500 });
   }

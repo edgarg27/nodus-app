@@ -418,6 +418,7 @@ export default function FacturasAdminPage() {
                     <option value="">Todas</option>
                     <option value="manual">Manual</option>
                     <option value="cfdi_import">Importación CFDI</option>
+                    <option value="facturapi_auto">Automática (Facturapi)</option>
                   </select>
                 </div>
                 <div>
