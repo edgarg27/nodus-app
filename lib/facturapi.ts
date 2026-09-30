@@ -129,11 +129,17 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       facturapi.invoices
         .downloadXml(invoice.id)
         .then(bufferDeDescarga)
-        .catch(() => null),
+        .catch((err: any) => {
+          console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el XML:`, err?.message || err);
+          return null;
+        }),
       facturapi.invoices
         .downloadPdf(invoice.id)
         .then(bufferDeDescarga)
-        .catch(() => null),
+        .catch((err: any) => {
+          console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el PDF:`, err?.message || err);
+          return null;
+        }),
     ]);
     const base = String(invoice.uuid || invoice.id).slice(0, 8);
     const [xmlUrl, archivoUrl] = await Promise.all([
