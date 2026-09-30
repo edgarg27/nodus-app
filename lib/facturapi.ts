@@ -25,16 +25,14 @@ export function formaPagoDesdeMetodoOpenpay(metodo?: string | null): string {
   return "04";
 }
 
-async function bufferDeDescarga(descarga: any): Promise<Buffer> {
-  if (descarga && typeof descarga.arrayBuffer === "function") {
-    return Buffer.from(await descarga.arrayBuffer());
-  }
-  return await new Promise<Buffer>((resolve, reject) => {
-    const partes: Buffer[] = [];
-    descarga.on("data", (parte: any) => partes.push(Buffer.isBuffer(parte) ? parte : Buffer.from(parte)));
-    descarga.on("end", () => resolve(Buffer.concat(partes)));
-    descarga.on("error", reject);
-  });
+// El SDK de Facturapi expone downloadXml/downloadPdf como stream, pero bajo el
+// empaquetado de Next.js (webpack) ese stream llega ya consumido ("Body is
+// unusable: Body has already been read"). Se evita el problema por completo
+// pidiendo una URL firmada y descargándola nosotros mismos con fetch normal.
+async function bufferDesdeUrlFirmada(url: string): Promise<Buffer> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Descarga falló con estado ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 async function subirArchivoFactura(admin: Admin, nombreBase: string, buffer: Buffer, ext: "xml" | "pdf") {
@@ -127,15 +125,15 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
 
     const [xmlBuf, pdfBuf] = await Promise.all([
       facturapi.invoices
-        .downloadXml(invoice.id)
-        .then(bufferDeDescarga)
+        .downloadXmlUrl(invoice.id)
+        .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
         .catch((err: any) => {
           console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el XML:`, err?.message || err);
           return null;
         }),
       facturapi.invoices
-        .downloadPdf(invoice.id)
-        .then(bufferDeDescarga)
+        .downloadPdfUrl(invoice.id)
+        .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
         .catch((err: any) => {
           console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el PDF:`, err?.message || err);
           return null;
