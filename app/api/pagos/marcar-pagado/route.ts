@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { rolPuede } from "@/lib/permisosApi";
+import { generarFacturaAutomatica } from "@/lib/facturapi";
 
 // Requiere sesión de staff. Puede marcar pagado CUALQUIER pago, con o sin
 // factura_id. Lo usa /pagos (botón "✓ Marcar como pagado"), tanto para
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
   // Solo la primera vez que pasa a pagado (evita dos correos por doble clic).
   if (pago && pago.estado !== "pagado") {
     await enviarGraciasPorPago(admin, pagoId);
+    // Pago marcado a mano: con comprobante se asume transferencia, sin él, efectivo.
+    await generarFacturaAutomatica(admin, pagoId, comprobanteUrl ? "bank_account" : "cash");
   }
 
   return NextResponse.json({ ok: true });
