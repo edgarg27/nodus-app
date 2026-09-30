@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
+import { conceptoParaCliente } from "@/lib/adicionales";
 
 type Factura = {
   id: string;
@@ -195,6 +196,31 @@ export default function EstadoCuentaPage() {
           </div>
         ) : (
           <>
+            {/* Pagar todo junto: facturas pendientes/vencidas + otros pagos,
+                cuando hay más de un concepto. También se pueden seguir
+                pagando por separado abajo. */}
+            {pendientes.length + vencidas.length + pagosPendientes.length > 1 && (
+              <div className="factura-card-full" style={{ borderLeftColor: "#0d1b3e" }}>
+                <div className="factura-top">
+                  <div>
+                    <p className="factura-folio">Saldo total pendiente</p>
+                    <p className="factura-fecha">
+                      {pendientes.length + vencidas.length + pagosPendientes.length} conceptos por liquidar
+                    </p>
+                  </div>
+                  <div className="factura-right">
+                    <p className="factura-monto">{formatMonto(totalPendiente)}</p>
+                  </div>
+                </div>
+                <a className="pagar-btn-full" href="/pagar-todo">
+                  💳 Liquidar saldo
+                </a>
+                <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0", textAlign: "center" }}>
+                  O paga cada concepto por separado aquí abajo.
+                </p>
+              </div>
+            )}
+
             {vencidas.length > 0 && (
               <>
                 <p className="sec-label-red">⚠️ Facturas vencidas ({vencidas.length})</p>
@@ -203,7 +229,7 @@ export default function EstadoCuentaPage() {
                     <div className="factura-top">
                       <div>
                         <p className="factura-folio">{f.folio}</p>
-                        <p className="factura-concepto">{f.concepto}</p>
+                        <p className="factura-concepto">{conceptoParaCliente(f.concepto, "")}</p>
                         <p className="factura-fecha">Venció: {formatFecha(f.fecha_vencimiento)}</p>
                         <ArchivosFactura f={f} />
                       </div>
@@ -249,7 +275,7 @@ export default function EstadoCuentaPage() {
                     <div className="factura-top">
                       <div>
                         <p className="factura-folio">{f.folio}</p>
-                        <p className="factura-concepto">{f.concepto}</p>
+                        <p className="factura-concepto">{conceptoParaCliente(f.concepto, "")}</p>
                         <p className="factura-fecha">Vence: {formatFecha(f.fecha_vencimiento)}</p>
                         <ArchivosFactura f={f} />
                       </div>
@@ -292,7 +318,7 @@ export default function EstadoCuentaPage() {
                   <div className="factura-card-full" key={p.id}>
                     <div className="factura-top">
                       <div>
-                        <p className="factura-folio">{p.concepto || "Pago"}</p>
+                        <p className="factura-folio">{conceptoParaCliente(p.concepto)}</p>
                         <p className="factura-fecha">Desde {formatFecha(p.created_at)}</p>
                       </div>
                       <div className="factura-right">
@@ -329,7 +355,7 @@ export default function EstadoCuentaPage() {
                   <div className="historial-card" key={f.id}>
                     <div>
                       <p className="factura-folio">{f.folio}</p>
-                      <p className="factura-concepto">{f.concepto}</p>
+                      <p className="factura-concepto">{conceptoParaCliente(f.concepto, "")}</p>
                       <p className="factura-fecha">Pagada el {formatFecha(f.fecha_emision)}</p>
                       <ArchivosFactura f={f} />
                     </div>
@@ -346,7 +372,7 @@ export default function EstadoCuentaPage() {
                 {pagosPagados.map((p) => (
                   <div className="historial-card" key={p.id}>
                     <div>
-                      <p className="factura-folio">{p.concepto || "Pago"}</p>
+                      <p className="factura-folio">{conceptoParaCliente(p.concepto)}</p>
                       <p className="factura-fecha">
                         Pagado el {formatFecha(p.fecha_pago || p.created_at)}
                       </p>
