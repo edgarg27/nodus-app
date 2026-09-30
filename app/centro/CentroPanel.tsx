@@ -349,6 +349,15 @@ export default function CentroPanel({
   const [calError, setCalError] = useState("");
   // A quién se le aparta el espacio: "c:<id de cliente>" o "p:<id de prospecto>".
   const [calPara, setCalPara] = useState("");
+  // Horas de sala del cliente elegido en "¿para quién?": la reserva que
+  // hace la admin para un cliente se liga a su contrato vigente y le
+  // descuenta horas igual que si él la hubiera hecho; lo que se pase son
+  // horas extra con costo.
+  const [calHorasCliente, setCalHorasCliente] = useState<{
+    contratoId: string;
+    restantes: number;
+    precioHora: number;
+  } | null>(null);
   // Ventana que pregunta a quién se le aparta el horario al pulsar "Reservar".
   const [calPreguntaPara, setCalPreguntaPara] = useState(false);
   // Reservaciones que ya tienen su carta responsiva firmada.
@@ -1098,6 +1107,51 @@ export default function CentroPanel({
     return (t || "").replace(/\D/g, "");
   }
 
+  // Mismo cálculo que la pantalla del cliente (app/reservaciones): horas de
+  // sala del contrato vigente menos las ya reservadas en el mes calendario
+  // (sin contar canceladas), y el precio por hora extra del centro.
+  async function horasSalaDeCliente(clienteId: string) {
+    const { data: contrato } = await supabase
+      .from("contratos")
+      .select("id, horas_sala_juntas")
+      .eq("user_id", clienteId)
+      .eq("estatus", "vigente")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!contrato) return null;
+    const ventMes = ventanaHoras({});
+    const { data: usadas } = await supabase
+      .from("reservaciones")
+      .select("espacio, hora_inicio, hora_fin, estado, fecha")
+      .eq("contrato_id", contrato.id)
+      .in("estado", ["pendiente", "confirmada"])
+      .gte("fecha", ventMes.desde)
+      .lte("fecha", ventMes.hasta);
+    let usadasSala = 0;
+    (usadas || []).forEach((r) => {
+      if (!r.espacio || !r.hora_inicio || !r.hora_fin || esEspacioCowork(r.espacio)) return;
+      usadasSala += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
+    });
+    const { data: precio } = await supabase.from("precios_sala_juntas").select("precio_hora").eq("centro", centro).maybeSingle();
+    return {
+      contratoId: contrato.id as string,
+      restantes: Math.max(Number(contrato.horas_sala_juntas || 0) - usadasSala, 0),
+      precioHora: Number(precio?.precio_hora ?? 150),
+    };
+  }
+
+  useEffect(() => {
+    setCalHorasCliente(null);
+    if (!calPara.startsWith("c:")) return;
+    let vigente = true;
+    horasSalaDeCliente(calPara.slice(2)).then((h) => vigente && setCalHorasCliente(h));
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calPara]);
+
   // Un prospecto que ya se volvió cliente sin marcarse "convertido" salía
   // dos veces en "¿para quién?" y, si elegían el prospecto, el cliente no
   // veía la reservación en su app. Se reconoce por correo (basta solo) o,
@@ -1159,6 +1213,16 @@ export default function CentroPanel({
       data: { user },
     } = await supabase.auth.getUser();
     const horarioTexto = `${calFormatHora(calSeleccion.horaInicio)} - ${calFormatHora(calSeleccion.horaFin)}`;
+
+    // Para un cliente con contrato vigente: cuenta en sus horas; lo que se
+    // pase de lo que le queda son horas extra con costo (igual que cuando
+    // él reserva de más). Horas Cowork no tiene extras.
+    const duracion = calSeleccion.horaFin - calSeleccion.horaInicio;
+    const horasCliente = paraClienteId ? await horasSalaDeCliente(paraClienteId) : null;
+    const esSala = !esEspacioCowork(calEspacio);
+    const horasIncluidas = horasCliente ? (esSala ? Math.min(duracion, horasCliente.restantes) : duracion) : 0;
+    const horasExtra = horasCliente && esSala ? Math.max(duracion - horasCliente.restantes, 0) : 0;
+    const costoExtra = horasCliente ? horasExtra * horasCliente.precioHora : 0;
     const { data: nuevaReserva, error: insertError } = await supabase
       .from("reservaciones")
       .insert({
@@ -1175,9 +1239,10 @@ export default function CentroPanel({
         fuera_horario: Array.from({ length: calSeleccion.horaFin - calSeleccion.horaInicio }, (_, i) => calSeleccion.horaInicio + i).some((h) =>
           esFueraDeHorario(calSeleccion.fecha, h)
         ),
-        horas_incluidas: 0,
-        horas_extra: 0,
-        costo_extra: 0,
+        horas_incluidas: horasIncluidas,
+        horas_extra: horasExtra,
+        costo_extra: costoExtra,
+        contrato_id: horasCliente?.contratoId ?? null,
         para_nombre: paraNombre,
         para_cliente_id: paraClienteId,
         prospecto_id: prospectoId,
@@ -2674,6 +2739,35 @@ export default function CentroPanel({
                           <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>
                             Su nombre aparece en el calendario debajo del tuyo.
                           </p>
+                          {calPara.startsWith("c:") && calSeleccion && (
+                            (() => {
+                              if (!calHorasCliente) {
+                                return (
+                                  <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>
+                                    Revisando sus horas de sala… (si no tiene contrato vigente, no se le descuentan)
+                                  </p>
+                                );
+                              }
+                              const dur = calSeleccion.horaFin - calSeleccion.horaInicio;
+                              const extra = esEspacioCowork(calEspacio) ? 0 : Math.max(dur - calHorasCliente.restantes, 0);
+                              return (
+                                <p
+                                  style={{
+                                    fontSize: 12,
+                                    margin: "6px 0 0",
+                                    color: extra > 0 ? "#A32D2D" : "#0F6E56",
+                                    fontWeight: extra > 0 ? 600 : 400,
+                                  }}
+                                >
+                                  {extra > 0
+                                    ? `Le quedan ${calHorasCliente.restantes} h este mes: ${extra} h serán extra a $${calHorasCliente.precioHora}/h = $${(
+                                        extra * calHorasCliente.precioHora
+                                      ).toLocaleString("es-MX")}`
+                                    : `Se descuentan ${dur} h de sus horas del mes (le quedan ${calHorasCliente.restantes}).`}
+                                </p>
+                              );
+                            })()
+                          )}
                           {calError && <p style={{ color: "#A32D2D", fontSize: 13, margin: "8px 0 0" }}>{calError}</p>}
                           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                             <button className="tel-borrar-btn" onClick={() => setCalPreguntaPara(false)} disabled={calGuardando}>

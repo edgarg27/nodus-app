@@ -231,7 +231,8 @@ export default function ClientePanel({
       const { data: usadas } = await supabase
         .from("reservaciones")
         .select("hora_inicio, hora_fin, espacio, fecha, estado, horas_cobradas, asistencia")
-        .eq("user_id", user.id)
+        // Por contrato (no por user_id): así cuentan también las que le
+        // aparta su centro desde el panel, que van a nombre de la admin.
         .eq("contrato_id", contratoId)
         .in("estado", ["pendiente", "confirmada", "cancelada"])
         .gte("fecha", ventMes.desde < ventBolsa.desde ? ventMes.desde : ventBolsa.desde)

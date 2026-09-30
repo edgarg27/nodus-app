@@ -45,3 +45,14 @@ export function totalAdicionalesMensuales(items: { concepto: string; monto: numb
     .reduce((s, a) => s + conIva(a.concepto, Number(a.monto) || 0), 0);
   return round2(total);
 }
+
+// Nombre del cobro para mostrarlo al CLIENTE: sin "(incl. IVA)" / "(con IVA)".
+// El monto sí incluye el IVA, pero la palabra no se le muestra (misma regla
+// que en Cotizar para depósito y estacionamiento). El concepto guardado en la
+// base no cambia: otras partes lo buscan por su nombre exacto.
+export function conceptoParaCliente(concepto: string | null | undefined, porDefecto = "Pago") {
+  const limpio = String(concepto || "")
+    .replace(/\s*\((?:incl\.?|incluye|con|m[aá]s|\+)\s*IVA\)/gi, "")
+    .trim();
+  return limpio || porDefecto;
+}

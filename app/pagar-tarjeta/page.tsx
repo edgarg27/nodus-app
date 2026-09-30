@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import AceptoPolitica from "@/app/components/AceptoPolitica";
 import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
+import { conceptoParaCliente } from "@/lib/adicionales";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 const OPENPAY_JS = "https://resources.openpay.mx/lib/openpay-js/1.2.38/openpay.v1.min.js";
@@ -86,10 +87,10 @@ function PagarTarjetaInner() {
     setCargando(true);
     if (pagoId) {
       const { data } = await supabase.from("pagos").select("monto, concepto, estado").eq("id", pagoId).maybeSingle();
-      if (data) setDetalle({ titulo: data.concepto || "Pago", monto: Number(data.monto), pagado: data.estado === "pagado" });
+      if (data) setDetalle({ titulo: conceptoParaCliente(data.concepto), monto: Number(data.monto), pagado: data.estado === "pagado" });
     } else if (facturaId) {
       const { data } = await supabase.from("facturas").select("folio, concepto, monto, estado").eq("id", facturaId).maybeSingle();
-      if (data) setDetalle({ titulo: `${data.folio} · ${data.concepto}`, monto: Number(data.monto), pagado: data.estado === "pagada" });
+      if (data) setDetalle({ titulo: `${data.folio} · ${conceptoParaCliente(data.concepto, "")}`, monto: Number(data.monto), pagado: data.estado === "pagada" });
     }
     // Solo las tarjetas de quien paga (el personal puede leer todas por soporte).
     const {
