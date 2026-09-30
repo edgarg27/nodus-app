@@ -364,6 +364,17 @@ function PagarTarjetaInner() {
               </div>
             ) : (
               <form id="form-tarjeta" onSubmit={pagar} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/openpay-logo.jpg" alt="Openpay" style={{ height: 20, borderRadius: 4 }} />
+                  <span style={{ width: 1, height: 18, background: "#ddd" }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/visa.png" alt="Visa" style={{ height: 20 }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/mastercard.png" alt="Mastercard" style={{ height: 20 }} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/amex.png" alt="American Express" style={{ height: 20 }} />
+                </div>
                 <div>
                   <p className="sub-label">Nombre en la tarjeta</p>
                   <input style={estiloCampo} value={titular} onChange={(e) => setTitular(e.target.value)} autoComplete="cc-name" />
