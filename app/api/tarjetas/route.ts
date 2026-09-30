@@ -30,6 +30,21 @@ export async function POST(req: NextRequest) {
   const { data: perfil } = await admin.from("profiles").select("nombre, email, rol").eq("id", session.user.id).maybeSingle();
   if (!perfil) return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 });
 
+  // Máximo 3 tarjetas guardadas por cliente (requisito de certificación de
+  // Openpay: "Limita el almacenamiento de tarjetas por cliente a máximo de
+  // 3 tarjetas").
+  const { count: tarjetasActivas } = await admin
+    .from("tarjetas_guardadas")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", session.user.id)
+    .eq("activa", true);
+  if ((tarjetasActivas || 0) >= 3) {
+    return NextResponse.json(
+      { error: "Ya tienes 3 tarjetas guardadas (el máximo). Borra una antes de agregar otra." },
+      { status: 400 }
+    );
+  }
+
   try {
     // Un solo cliente de Openpay por cuenta de Nodus.
     const { data: previa } = await admin

@@ -255,6 +255,8 @@ export default function MisTarjetasPage() {
 
         {!configOpenpay.configurado ? (
           <div className="nota-info">El guardado de tarjetas todavía no está disponible.</div>
+        ) : tarjetas.length >= 3 ? (
+          <div className="nota-info">Ya tienes 3 tarjetas guardadas (el máximo). Borra una para poder agregar otra.</div>
         ) : !mostrarForm ? (
           <button className="reservar-btn" onClick={() => setMostrarForm(true)}>
             + Agregar tarjeta
