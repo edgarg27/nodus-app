@@ -163,7 +163,7 @@ export default function ContratosVentas() {
     <>
       {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
-      <p className="panel-section-label">✍ Contratos por firmar ({porFirmar.length})</p>
+      <p className="panel-section-label">Contratos por firmar ({porFirmar.length})</p>
       {cargando ? (
         <div className="empty-card">Cargando…</div>
       ) : porFirmar.length === 0 ? (
@@ -215,7 +215,7 @@ export default function ContratosVentas() {
 
       {firmados.length > 0 && (
         <>
-          <p className="panel-section-label">✅ Contratos firmados ({firmados.length})</p>
+          <p className="panel-section-label">Contratos firmados ({firmados.length})</p>
           {firmados.map((c) =>
             tarjeta(
               c,

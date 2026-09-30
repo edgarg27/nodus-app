@@ -4309,7 +4309,7 @@ export default function CentroPanel({
           <div className="daypass-modal-card" onClick={(e) => e.stopPropagation()}>
             {!dayPassGenerado ? (
               <>
-                <p className="modal-nombre">🎫 Generar Day Pass</p>
+                <p className="modal-nombre">Generar Day Pass</p>
                 <p className="sub-label">Tipo</p>
                 <select
                   value={dayPassForm.tipo}
@@ -4366,7 +4366,7 @@ export default function CentroPanel({
               </>
             ) : (
               <>
-                <p className="modal-nombre">✅ Day Pass generado</p>
+                <p className="modal-nombre">Day Pass generado</p>
                 <div className="daypass-ticket-wrap">
                   <div className="daypass-ticket-3d">
                     <div className="daypass-ticket daypass-ticket-imprimible">

@@ -296,7 +296,7 @@ function PagarTarjetaInner() {
         ) : (
           <>
             <div className="resumen-reserva-card">
-              <p className="resumen-reserva-title">💰 Detalle del pago</p>
+              <p className="resumen-reserva-title">Detalle del pago</p>
               <div className="resumen-reserva-row">
                 <span className="resumen-reserva-label">Concepto</span>
                 <span className="resumen-reserva-val">{detalle.titulo}</span>

@@ -1098,7 +1098,7 @@ export default function EquiposPage() {
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header-row">
               <div style={{ flex: 1 }}>
-                <p className="modal-nombre">↩️ Generar devolución</p>
+                <p className="modal-nombre">Generar devolución</p>
                 <p className="modal-email">
                   {respAsignadoA} · {respTipoEquipo}
                 </p>

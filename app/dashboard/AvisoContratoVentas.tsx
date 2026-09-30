@@ -113,7 +113,7 @@ export default function AvisoContratoVentas() {
   return (
     <div className="modal-overlay">
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <p className="modal-nombre">📥 {avisos.length === 1 ? "Te llegó un contrato a firma" : `Te llegaron ${avisos.length} contratos a firma`}</p>
+        <p className="modal-nombre">{avisos.length === 1 ? "Te llegó un contrato a firma" : `Te llegaron ${avisos.length} contratos a firma`}</p>
         <p className="modal-email">Esta es la última versión que subió la administradora.</p>
         {avisos.map((a) => (
           <div key={a.clave} className="cotizacion-card" style={{ padding: "8px 10px", margin: "8px 0", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
