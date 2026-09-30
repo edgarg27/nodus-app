@@ -258,7 +258,7 @@ export default function CalendarioEventosPage() {
 
             {proxFestivos.length > 0 && (
               <div style={{ marginTop: 14 }}>
-                <p className="panel-section-label">🚫 Próximos días sin servicio (el centro no abre)</p>
+                <p className="panel-section-label">Próximos días sin servicio (el centro no abre)</p>
                 {proxFestivos.map((f) => (
                   <div className="item-card" key={f.fecha} style={{ marginBottom: 6, flexDirection: "column", alignItems: "stretch" }}>
                     <div className="item-card-info">

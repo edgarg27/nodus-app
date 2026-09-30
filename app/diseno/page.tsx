@@ -166,7 +166,7 @@ export default function DisenoPage() {
                 <div className="item-card" key={l.id} style={{ flexDirection: "column", alignItems: "stretch" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <div className="item-card-info">
-                      <p className="item-card-titulo">🏆 {l.titulo}</p>
+                      <p className="item-card-titulo">{l.titulo}</p>
                       <p className="item-card-sub">
                         {l.empresa || l.cliente_nombre || "Cliente"}
                         {l.centro ? ` · ${l.centro}` : ""}

@@ -184,7 +184,7 @@ export default function SolicitudesWifi({
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <p className="panel-section-label">📶 Solicitudes de WiFi ({pendientes.length})</p>
+      <p className="panel-section-label">Solicitudes de WiFi ({pendientes.length})</p>
       <p style={{ fontSize: 12, color: "#888", margin: "2px 0 6px" }}>
         Las mandan los clientes de Coworking desde su app. Elige la duración y genera su código.
       </p>

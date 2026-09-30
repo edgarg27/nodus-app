@@ -516,7 +516,7 @@ export default function FidelidadAdminPage() {
       {regaloModal && (
         <div className="modal-overlay" onClick={() => setRegaloModal(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <p className="modal-nombre">🎉 ¡Tarjeta completa!</p>
+            <p className="modal-nombre">¡Tarjeta completa!</p>
             <p className="modal-email">
               El regalo de la casilla 9 es: <strong>{LABEL_TIPO_ESPACIO_FIDELIDAD[regaloModal.tipo_espacio]}</strong>
               {regaloModal.detalle ? ` (${regaloModal.detalle})` : ""} — fue lo que más rentó en sus 8 visitas.

@@ -234,7 +234,7 @@ export default function TelefoniaPage() {
 
       <div className="rep-content">
         {/* ---------- Internet por centro ---------- */}
-        <p className="panel-section-label">🌐 Internet por centro</p>
+        <p className="panel-section-label">Internet por centro</p>
         {todosLosCentros.map((centro) => {
           const info = internet.find((i) => i.centro === centro);
           const editando = editandoInternet === centro;

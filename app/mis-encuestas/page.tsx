@@ -77,7 +77,7 @@ export default function MisEncuestasPage() {
           <>
             {pendientes.length > 0 && (
               <>
-                <p className="panel-section-label">📝 Pendientes ({pendientes.length})</p>
+                <p className="panel-section-label">Pendientes ({pendientes.length})</p>
                 {pendientes.map((e) => (
                   <a className="contrato-card-admin" key={e.id} href={`/encuesta/${e.token}`} style={{ display: "block" }}>
                     <p className="contrato-cliente-nombre">{e.encuesta_titulo}</p>

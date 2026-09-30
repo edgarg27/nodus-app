@@ -136,7 +136,7 @@ export default function ProveedoresPage() {
     return (
       <div className="item-card" key={p.id}>
         <div className="item-card-info">
-          <p className="item-card-titulo">🏭 {p.nombre}</p>
+          <p className="item-card-titulo">{p.nombre}</p>
           <p className="item-card-sub">
             {[p.categoria, p.contacto].filter(Boolean).join(" · ") || "Sin categoría / contacto"}
           </p>

@@ -159,7 +159,7 @@ export default function ModalDisponibilidad({
       <div className="modal-card disp-modal" onClick={(e) => e.stopPropagation()}>
         <div className="disp-header">
           <div>
-            <p className="modal-nombre">🔍 Verificar disponibilidad</p>
+            <p className="modal-nombre">Verificar disponibilidad</p>
             <p className="modal-email">Consulta si una oficina está libre antes de cotizar</p>
           </div>
           <button className="modal-cerrar" onClick={onClose} aria-label="Cerrar">

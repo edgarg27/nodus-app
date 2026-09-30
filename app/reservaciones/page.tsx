@@ -891,7 +891,7 @@ function ReservacionesInner() {
       {modalCoffeeAbierto && (
         <div className="modal-overlay" onClick={() => !enviando && setModalCoffeeAbierto(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <p className="modal-nombre">☕ ¿Quieres agregar Coffee Break?</p>
+            <p className="modal-nombre">¿Quieres agregar Coffee Break?</p>
 
             {quiereCoffee === null && (
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>

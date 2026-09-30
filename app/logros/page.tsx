@@ -197,7 +197,7 @@ export default function LogrosPage() {
           logros.map((l) => (
             <div className="item-card" key={l.id} style={{ alignItems: "flex-start" }}>
               <div className="item-card-info">
-                <p className="item-card-titulo">🏆 {l.titulo}</p>
+                <p className="item-card-titulo">{l.titulo}</p>
                 {l.descripcion && <p className="item-card-sub">{l.descripcion}</p>}
                 <p className="item-card-extra">{new Date(l.created_at).toLocaleDateString("es-MX")}</p>
                 {l.banner_url && l.estado === "publicado" && (
