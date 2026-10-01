@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     notas,
     nombreDestinatario,
     adicionales,
+    oficinasLayout,
     cotizacionComercialId,
   } = await req.json();
 
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
             costoUnitario: Number(a.costoUnitario) || 0,
           }))
         : undefined,
+      oficinasLayout: Array.isArray(oficinasLayout) ? oficinasLayout.slice(0, 5).map((n: any) => String(n)) : undefined,
     });
 
     const admin = createAdminClient();

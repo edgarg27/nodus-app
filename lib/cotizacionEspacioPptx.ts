@@ -9,6 +9,7 @@ import {
   reemplazarTablaEnSlide,
 } from "./pptxHelpers";
 import { cargarArchivoPlantilla } from "./plantillasStorage";
+import { marcarOficinasEnLayout } from "./layoutOficinas";
 
 // Mismo mecanismo que ya se usa para Sala de Juntas (ver
 // lib/cotizacionSalaPptx.ts), extendido a otros tipos de espacio:
@@ -66,6 +67,9 @@ export type DatosCotizacionEspacio = {
   // sumados en subtotal/ivaMonto/total (eso se calcula en CotizarForm.tsx
   // antes de llamar aquí).
   adicionales?: AdicionalPptx[];
+  // Números de oficina (oficinas.numero) que se marcan en la diapositiva
+  // del plano — ver lib/layoutOficinas.ts. Solo Oficina Privada.
+  oficinasLayout?: string[];
 };
 
 async function cargarPlantilla(tipoEspacio: string, centro: string) {
@@ -222,6 +226,11 @@ async function generarOficinaPrivada(datos: DatosCotizacionEspacio): Promise<Buf
     // razón que en Coworking: no pisar los conteos de "$"/"1" de arriba.
     slide = reemplazarTablaEnSlide(slide, 0, (tablaXml) => llenarAdicionalesOficina(tablaXml, datos.adicionales));
     zip.file(slidePath, slide);
+  }
+  // Working Desk comparte esta plantilla, pero su número ("Working Desk
+  // 1") no es la Oficina 1 del plano: solo se marca en Oficina Privada.
+  if (normalizarTipo(datos.tipoEspacio) === "oficina privada" && datos.oficinasLayout?.length) {
+    await marcarOficinasEnLayout(zip, datos.centro, datos.oficinasLayout);
   }
   return zip.generateAsync({ type: "nodebuffer" });
 }

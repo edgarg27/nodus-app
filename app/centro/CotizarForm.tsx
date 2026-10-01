@@ -999,6 +999,12 @@ export default function CotizarForm({
   // junto con el contrato al confirmar; el pago de cada uno se genera
   // hasta que el contrato se aprueba (igual que la renta), no antes. ----------
   const [adicionalesDraft, setAdicionalesDraft] = useState<AdicionalDraft[]>([]);
+  // Texto que se está escribiendo en el precio/cantidad de un adicional
+  // (clave "<clave>:precio" o "<clave>:cantidad"). Mientras el campo tiene
+  // el foco se muestra tal cual lo escribe el usuario: si se mostrara el
+  // número guardado, al borrar todo regresaba a "0" (o a "1") y no dejaba
+  // capturar el precio real. Al salir del campo se vuelve a mostrar el valor.
+  const [textoAdicional, setTextoAdicional] = useState<Record<string, string>>({});
   const [mostrarPickerAdicional, setMostrarPickerAdicional] = useState(false);
   const [busquedaAdicional, setBusquedaAdicional] = useState("");
   const [nuevoTipoAbierto, setNuevoTipoAbierto] = useState(false);
@@ -1979,6 +1985,8 @@ export default function CotizarForm({
               cantidad: a.cantidad,
               costoUnitario: conIva(a.concepto, a.costo_unitario),
             })),
+            // Oficina que se marca en el plano del PowerPoint (lib/layoutOficinas.ts).
+            oficinasLayout: oficina?.numero != null ? [String(oficina.numero)] : [],
           }),
         });
         const dataEspacio = await respEspacio.json().catch(() => ({}));
@@ -3417,9 +3425,24 @@ export default function CotizarForm({
                     // que se le cobra al cliente; por dentro se sigue
                     // guardando sin IVA en costo_unitario, igual que antes.
                     value={
-                      llevaIva(a.concepto) ? round2(a.costo_unitario * 1.16) : a.costo_unitario
+                      textoAdicional[`${a.clave}:precio`] ??
+                      String(llevaIva(a.concepto) ? round2(a.costo_unitario * 1.16) : a.costo_unitario)
+                    }
+                    placeholder="0"
+                    onFocus={(e) => {
+                      const actual = llevaIva(a.concepto) ? round2(a.costo_unitario * 1.16) : a.costo_unitario;
+                      // Si está en 0, el campo se vacía para escribir el precio directo.
+                      setTextoAdicional((prev) => ({ ...prev, [`${a.clave}:precio`]: actual ? String(actual) : "" }));
+                      e.target.select();
+                    }}
+                    onBlur={() =>
+                      setTextoAdicional((prev) => {
+                        const { [`${a.clave}:precio`]: _, ...resto } = prev;
+                        return resto;
+                      })
                     }
                     onChange={(e) => {
+                      setTextoAdicional((prev) => ({ ...prev, [`${a.clave}:precio`]: e.target.value }));
                       const esEstacionamiento = llevaIva(a.concepto);
                       const valor = esEstacionamiento
                         ? String(round2((Number(e.target.value) || 0) / 1.16))
@@ -3432,8 +3455,22 @@ export default function CotizarForm({
                   <input
                     type="number"
                     min={1}
-                    value={a.cantidad}
-                    onChange={(e) => actualizarAdicionalDraft(a.clave, "cantidad", e.target.value)}
+                    value={textoAdicional[`${a.clave}:cantidad`] ?? String(a.cantidad)}
+                    onFocus={(e) => {
+                      setTextoAdicional((prev) => ({ ...prev, [`${a.clave}:cantidad`]: String(a.cantidad) }));
+                      e.target.select();
+                    }}
+                    onBlur={() =>
+                      setTextoAdicional((prev) => {
+                        const { [`${a.clave}:cantidad`]: _, ...resto } = prev;
+                        return resto;
+                      })
+                    }
+                    onChange={(e) => {
+                      setTextoAdicional((prev) => ({ ...prev, [`${a.clave}:cantidad`]: e.target.value }));
+                      // Vacío mientras se escribe: no se toca la cantidad guardada.
+                      if (e.target.value !== "") actualizarAdicionalDraft(a.clave, "cantidad", e.target.value);
+                    }}
                     style={{ width: 50, border: "1px solid #eee", borderRadius: 8, padding: "6px 8px", fontSize: 12 }}
                   />
                 </div>
