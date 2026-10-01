@@ -33,6 +33,7 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/alta-cliente", roles: ["admin", "gerente"] },
   { prefijo: "/baja-cliente", roles: ["admin", "gerente"] },
   { prefijo: "/deposito-garantia", roles: ["admin", "gerente"] },
+  { prefijo: "/expedientes", roles: ["admin", "gerente"] },
   { prefijo: "/fidelidad-admin", roles: ["admin", "gerente"] },
   { prefijo: "/reportes", roles: ["admin", "gerente"] },
   { prefijo: "/precios-sala-juntas", roles: ["admin", "gerente", "sistemas"] },

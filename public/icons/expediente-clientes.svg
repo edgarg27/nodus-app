@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Mismo estilo que los demás íconos con contorno negro (ej. mantenimiento.png) -->
+  <g stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Saco -->
+    <path d="M90 490v-40c0-58 42-98 100-108h132c58 10 100 50 100 108v40z" fill="#3D8BD9"/>
+    <!-- Camisa -->
+    <path d="M210 342h92l-46 66z" fill="#F4F7FB"/>
+    <!-- Cuello (piel) -->
+    <path d="M228 290h56v52l-28 22-28-22z" fill="#F2B98F"/>
+    <!-- Cabello atrás -->
+    <path d="M152 196c0-72 46-124 104-124s104 52 104 124v68c0 15-12 26-26 26H178c-14 0-26-11-26-26z" fill="#5B3A29"/>
+    <!-- Orejas -->
+    <ellipse cx="178" cy="214" rx="14" ry="22" fill="#F2B98F"/>
+    <ellipse cx="334" cy="214" rx="14" ry="22" fill="#F2B98F"/>
+    <!-- Cara -->
+    <ellipse cx="256" cy="208" rx="78" ry="90" fill="#F7C8A0"/>
+    <!-- Fleco -->
+    <path d="M178 192c8-56 40-96 82-96 42 0 72 34 80 84-38 0-76-14-102-42-14 28-34 46-60 54z" fill="#6B4632"/>
+    <!-- Boca -->
+    <path d="M234 252c13 11 31 11 44 0" fill="none" stroke-width="10"/>
+    <!-- Expediente (carpeta) -->
+    <g transform="rotate(-8 370 410)">
+      <path d="M290 356c0-8 6-14 14-14h42c4 0 8 2 10 5l10 13h64c8 0 14 6 14 14v120c0 8-6 14-14 14H304c-8 0-14-6-14-14z" fill="#F5A623"/>
+      <rect x="306" y="368" width="112" height="88" rx="4" fill="#FFFFFF"/>
+      <path d="M290 404h154v84c0 8-6 14-14 14H304c-8 0-14-6-14-14z" fill="#FFC14D"/>
+    </g>
+    <!-- Mano -->
+    <ellipse cx="300" cy="452" rx="24" ry="20" fill="#F7C8A0"/>
+  </g>
+  <!-- Detalles sin contorno -->
+  <circle cx="228" cy="214" r="9" fill="#000"/>
+  <circle cx="284" cy="214" r="9" fill="#000"/>
+  <ellipse cx="208" cy="242" rx="12" ry="7" fill="#F2A98A" opacity="0.7"/>
+  <ellipse cx="304" cy="242" rx="12" ry="7" fill="#F2A98A" opacity="0.7"/>
+  <g transform="rotate(-8 370 410)" fill="#9DB6D6">
+    <rect x="322" y="382" width="66" height="9" rx="4.5"/>
+  </g>
+</svg>
