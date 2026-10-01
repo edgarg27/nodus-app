@@ -71,6 +71,7 @@ export default function TicketsPage() {
 
   const [mostrarFormReporte, setMostrarFormReporte] = useState(false);
   const [formReporte, setFormReporte] = useState({ asunto: "", descripcion: "", categoria: "sistemas" });
+  const [fotosReporte, setFotosReporte] = useState<File[]>([]);
   const [guardandoReporte, setGuardandoReporte] = useState(false);
   const [reporteEnviado, setReporteEnviado] = useState(false);
   const [miNombre, setMiNombre] = useState("");
@@ -365,6 +366,22 @@ export default function TicketsPage() {
     const { count } = await supabase.from("tickets").select("*", { count: "exact", head: true });
     const folio = `REP-${((count || 0) + 1).toString().padStart(4, "0")}`;
 
+    // Fotos del reporte: mismo bucket y mismo criterio que usa el cliente en
+    // /soporte (si alguna falla al subir, se omite y el reporte sigue).
+    const fotosUrls: string[] = [];
+    for (const archivo of fotosReporte) {
+      const fileName = `${folio}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${
+        archivo.name.split(".").pop() || "jpg"
+      }`;
+      const { error: uploadError } = await supabase.storage
+        .from("tickets")
+        .upload(fileName, archivo, { contentType: archivo.type, upsert: true });
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from("tickets").getPublicUrl(fileName);
+        fotosUrls.push(urlData.publicUrl);
+      }
+    }
+
     await supabase.from("tickets").insert({
       user_id: miId,
       folio,
@@ -374,6 +391,8 @@ export default function TicketsPage() {
       estado: "abierto",
       cliente_nombre: miNombre,
       centro: miCentro,
+      foto_url: fotosUrls[0] || null,
+      foto_urls: fotosUrls.length > 0 ? fotosUrls : null,
     });
 
     await supabase.from("notificaciones").insert({
@@ -394,6 +413,8 @@ export default function TicketsPage() {
           descripcion: formReporte.descripcion,
           clienteNombre: miNombre,
           centro: miCentro,
+          fotoUrl: fotosUrls[0] || null,
+          fotoUrls: fotosUrls,
         },
       });
     } catch {
@@ -401,6 +422,7 @@ export default function TicketsPage() {
     }
 
     setFormReporte({ asunto: "", descripcion: "", categoria: "sistemas" });
+    setFotosReporte([]);
     setGuardandoReporte(false);
     setReporteEnviado(true);
     setTimeout(() => {
@@ -706,6 +728,8 @@ export default function TicketsPage() {
               value={formReporte.descripcion}
               onChange={(e) => setFormReporte({ ...formReporte, descripcion: e.target.value })}
             />
+            <p className="sub-label">Agregar fotos (opcional)</p>
+            <FileDropzone files={fotosReporte} onChange={setFotosReporte} maxFiles={5} accept="image/*" />
             <button
               className={
                 "btn-enviar" + (guardandoReporte ? " sending" : "") + (reporteEnviado ? " sent" : "")
