@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
 import { pedirLinkFirmado } from "@/lib/storage";
@@ -8,13 +8,30 @@ import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
 
 // Expediente de clientes: los archivos que la administradora tenga de cada
-// cliente (identificación, constancia fiscal, comprobantes, contrato…). No
-// es una lista fija de documentos: se sube lo que haya, con el nombre que se
-// quiera. Admin ve los clientes de su centro; superadmin y gerente, todos
-// (con selector). El cliente no ve su expediente. Tabla y bucket privado en
-// migracion_expedientes_clientes.sql.
+// cliente (identificación, constancia fiscal, comprobantes, contrato…).
+// Además del checklist fijo de abajo (DOCUMENTOS_REQUERIDOS), se puede subir
+// cualquier otro archivo libre, con el nombre que se quiera. Admin ve los
+// clientes de su centro; superadmin y gerente, todos (con selector). El
+// cliente no ve su expediente. Tabla y bucket privado en
+// migracion_expedientes_clientes.sql; la columna tipo_documento que liga un
+// archivo a una casilla del checklist está en
+// migracion_expediente_tipo_documento.sql.
 
 const BUCKET = "expedientes-clientes";
+
+// Checklist fijo que se muestra arriba de "Otros documentos", con su propio
+// botón de carga y ✓/✗ según si ya se subió. `clave` se guarda en
+// expediente_archivos.tipo_documento; si se sube otro archivo para la misma
+// clave, se reemplaza (ver migracion_expediente_tipo_documento.sql).
+const DOCUMENTOS_REQUERIDOS: { clave: string; etiqueta: string }[] = [
+  { clave: "deposito_garantia", etiqueta: "Depósito en garantía" },
+  { clave: "mes_renta_iva", etiqueta: "Mes de renta + IVA" },
+  { clave: "opinion_cumplimiento", etiqueta: "Opinión de cumplimiento de obligaciones fiscales" },
+  { clave: "acta_constitutiva", etiqueta: "Acta constitutiva" },
+  { clave: "identificacion_oficial", etiqueta: "Identificación oficial" },
+  { clave: "cif", etiqueta: "Código de identificación fiscal (CIF)" },
+  { clave: "comprobante_domicilio", etiqueta: "Comprobante de domicilio" },
+];
 
 type Cliente = {
   id: string;
@@ -51,6 +68,7 @@ type Archivo = {
   tipo_mime: string | null;
   tamano_bytes: number | null;
   subido_por_nombre: string | null;
+  tipo_documento: string | null;
   created_at: string;
 };
 
@@ -122,6 +140,13 @@ export default function ExpedientesPage() {
   const [borrando, setBorrando] = useState<Archivo | null>(null);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState<{ titulo: string; mensaje: string } | null>(null);
+
+  // Checklist de documentos requeridos: un solo <input type="file"> oculto
+  // compartido por todas las filas; claveEnCurso dice a cuál casilla
+  // corresponde el archivo que se acaba de elegir.
+  const inputRequeridoRef = useRef<HTMLInputElement>(null);
+  const [claveEnCurso, setClaveEnCurso] = useState<string | null>(null);
+  const [subiendoClave, setSubiendoClave] = useState<string | null>(null);
 
   useEffect(() => {
     if (centro && permitido) {
@@ -247,6 +272,71 @@ export default function ExpedientesPage() {
     await fetchDetalle(clienteSel.id);
   }
 
+  // Checklist: sube (o reemplaza) el archivo de una casilla fija. A
+  // diferencia de subirArchivos(), aquí solo puede haber un archivo por
+  // clave — si ya había uno, se borra antes de guardar el nuevo (ver
+  // migracion_expediente_tipo_documento.sql).
+  async function subirDocumentoRequerido(clave: string, etiqueta: string, archivo: File) {
+    if (!clienteSel) return;
+    setError("");
+    setSubiendoClave(clave);
+    const centroCliente = clienteSel.centro || centro;
+    if (!centroCliente) {
+      setSubiendoClave(null);
+      return;
+    }
+
+    const existente = archivos.find((a) => a.tipo_documento === clave);
+    if (existente) {
+      await supabase.from("expediente_archivos").delete().eq("id", existente.id);
+      await supabase.storage.from(BUCKET).remove([existente.archivo_path]);
+    }
+
+    const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "bin";
+    const ruta = `${clienteSel.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(ruta, archivo, { contentType: archivo.type });
+    if (upErr) {
+      setSubiendoClave(null);
+      setError(`No se pudo subir "${etiqueta}": ${upErr.message}`);
+      await fetchDetalle(clienteSel.id);
+      return;
+    }
+
+    const { error: insErr } = await supabase.from("expediente_archivos").insert({
+      cliente_id: clienteSel.id,
+      centro: centroCliente,
+      nombre: etiqueta,
+      archivo_path: ruta,
+      tipo_mime: archivo.type || null,
+      tamano_bytes: archivo.size,
+      subido_por: userId,
+      subido_por_nombre: nombre,
+      tipo_documento: clave,
+    });
+    if (insErr) {
+      await supabase.storage.from(BUCKET).remove([ruta]);
+      setSubiendoClave(null);
+      setError(`No se pudo subir "${etiqueta}": ${insErr.message}`);
+      await fetchDetalle(clienteSel.id);
+      return;
+    }
+
+    if (!existente) {
+      setConteoPorCliente((prev) => ({ ...prev, [clienteSel.id]: (prev[clienteSel.id] || 0) + 1 }));
+    }
+    setSubiendoClave(null);
+    await fetchDetalle(clienteSel.id);
+  }
+
+  function onArchivoRequeridoElegido(e: ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!archivo || !claveEnCurso) return;
+    const doc = DOCUMENTOS_REQUERIDOS.find((d) => d.clave === claveEnCurso);
+    setClaveEnCurso(null);
+    if (doc) subirDocumentoRequerido(doc.clave, doc.etiqueta, archivo);
+  }
+
   // El bucket es privado: se abre con un link firmado que caduca.
   async function abrirArchivo(a: Archivo) {
     setAbriendoId(a.id);
@@ -305,6 +395,10 @@ export default function ExpedientesPage() {
   }
 
   // ---------- Pantalla ----------
+  // Los del checklist (tipo_documento set) se muestran arriba, en "Documentos
+  // requeridos" — aquí solo lo que no corresponde a ninguna casilla fija.
+  const archivosLibres = archivos.filter((a) => !a.tipo_documento);
+
   const archivosDeContrato = contratos.flatMap((c) => {
     const lista: { clave: string; titulo: string; url: string; fecha: string }[] = [];
     const etiqueta = `${fmtFecha(c.fecha_inicio)} – ${fmtFecha(c.fecha_vencimiento)}`;
@@ -445,9 +539,59 @@ export default function ExpedientesPage() {
               )}
             </div>
 
+            <p className="sub-label">Documentos requeridos</p>
+            <div className="form-card expediente-checklist">
+              <input
+                ref={inputRequeridoRef}
+                type="file"
+                className="expediente-checklist-input"
+                onChange={onArchivoRequeridoElegido}
+              />
+              {DOCUMENTOS_REQUERIDOS.map((doc) => {
+                const a = archivos.find((x) => x.tipo_documento === doc.clave);
+                const ocupado = subiendoClave === doc.clave;
+                return (
+                  <div className="expediente-checklist-fila" key={doc.clave}>
+                    <span className={"expediente-checklist-estado" + (a ? " listo" : "")}>{a ? "✓" : "✗"}</span>
+                    <span className="expediente-checklist-etiqueta">{doc.etiqueta}</span>
+                    <div className="expediente-acciones">
+                      {a && (
+                        <button
+                          type="button"
+                          className="tel-borrar-btn"
+                          style={{ color: "#0d1b3e", fontWeight: 600 }}
+                          onClick={() => abrirArchivo(a)}
+                          disabled={abriendoId === a.id}
+                        >
+                          {abriendoId === a.id ? "Abriendo…" : "Ver"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="tel-borrar-btn"
+                        style={{ color: "#0d1b3e", fontWeight: 600 }}
+                        disabled={ocupado}
+                        onClick={() => {
+                          setClaveEnCurso(doc.clave);
+                          inputRequeridoRef.current?.click();
+                        }}
+                      >
+                        {ocupado ? "Subiendo…" : a ? "Reemplazar" : "Seleccionar archivo"}
+                      </button>
+                      {a && (
+                        <button type="button" className="tel-borrar-btn" onClick={() => setBorrando(a)}>
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="expediente-seccion-titulo">
               <p className="sub-label" style={{ margin: 0 }}>
-                Documentos del expediente {archivos.length > 0 ? `(${archivos.length})` : ""}
+                Otros documentos {archivos.filter((a) => !a.tipo_documento).length > 0 ? `(${archivos.filter((a) => !a.tipo_documento).length})` : ""}
               </p>
               <button
                 type="button"
@@ -493,11 +637,11 @@ export default function ExpedientesPage() {
               <p style={{ color: "#888", fontSize: 13 }}>Cargando expediente…</p>
             ) : (
               <>
-                {archivos.length === 0 && archivosDeContrato.length === 0 && (
-                  <div className="empty-card">Este expediente está vacío. Sube los documentos que tengas del cliente.</div>
+                {archivosLibres.length === 0 && archivosDeContrato.length === 0 && (
+                  <div className="empty-card">No hay otros documentos. Sube lo que más tengas del cliente.</div>
                 )}
 
-                {archivos.map((a) => {
+                {archivosLibres.map((a) => {
                   const enRenombre = renombrando?.id === a.id;
                   return (
                     <div className="item-card expediente-archivo" key={a.id}>
