@@ -10,6 +10,7 @@
 export type AccionApi =
   | "pagosCrear"
   | "adicionalesCobrar"
+  | "fidelidadCrear"
   | "pagosMarcarPagado"
   | "pagosVincular"
   | "facturaDescargar"
@@ -28,6 +29,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   pagosCrear: ["admin", "gerente", "ventas", "sistemas", "operaciones"],
   // Cobros adicionales sueltos (/adicionales): hora extra de sala, copias, frituras…
   adicionalesCobrar: ["admin", "gerente"],
+  // Crear una tarjeta de fidelidad desde /fidelidad-admin (mismos roles que esa pantalla).
+  fidelidadCrear: ["admin", "gerente"],
   // Dinero: marcar pagado, ligar pagos a facturas, bajar facturas de cualquier cliente.
   pagosMarcarPagado: ["admin", "gerente", "cobranza"],
   pagosVincular: ["admin", "gerente", "cobranza"],
