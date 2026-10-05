@@ -6,7 +6,7 @@ import { cpCentro } from "@/lib/centros";
 import {
   DATOS_PUBLICO_GENERAL,
   REGIMENES_FISCALES,
-  USOS_CFDI,
+  usosParaTipo,
   USO_CFDI_DEFAULT,
   esPublicoGeneral,
   normalizarDatosFiscales,
@@ -92,7 +92,7 @@ export default function ModalDatosFiscales({
     setErrorLocal("");
     // El régimen elegido puede no aplicar al nuevo tipo; público en general
     // solo existe para persona física.
-    setF((prev) => ({ ...prev, regimen_fiscal: "", ...(t === "moral" && esPublicoGeneral(prev.rfc) ? { rfc: "", nombre_fiscal: "" } : {}) }));
+    setF((prev) => ({ ...prev, regimen_fiscal: "", uso_cfdi: usosParaTipo(t).some((u) => u.clave === prev.uso_cfdi) ? prev.uso_cfdi : USO_CFDI_DEFAULT, ...(t === "moral" && esPublicoGeneral(prev.rfc) ? { rfc: "", nombre_fiscal: "" } : {}) }));
   }
   function alternarPublicoGeneral() {
     setErrorLocal("");
@@ -187,7 +187,7 @@ export default function ModalDatosFiscales({
               <div style={{ flex: 1 }}>
                 <p className="sub-label">Uso de la factura</p>
                 <select style={estiloCampo} disabled={publico} value={f.uso_cfdi} onChange={(e) => setF({ ...f, uso_cfdi: e.target.value })}>
-                  {USOS_CFDI.map((u) => (
+                  {usosParaTipo(tipo).map((u) => (
                     <option key={u.clave} value={u.clave}>
                       {u.clave} · {u.nombre}
                     </option>

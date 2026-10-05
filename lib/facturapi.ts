@@ -6,7 +6,7 @@
 
 import Facturapi from "facturapi";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { normalizarDatosFiscales, esPublicoGeneral } from "@/lib/datosFiscales";
+import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
 import { tipoCobroAdicional } from "@/lib/adicionales";
 
@@ -92,6 +92,9 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
 
     const hoy = new Date();
     const publicoGeneral = esPublicoGeneral(datos.rfc);
+    // Un uso que ya no existe en CFDI 4.0 (p. ej. "P01") o que no aplica al tipo de persona haría
+    // que el SAT rechace la factura: se cae a G03 en vez de dejar al cliente sin factura.
+    const usoCfdi = usosParaTipo(datos.rfc.length === 12 ? "moral" : "fisica").some((u) => u.clave === datos.uso_cfdi) ? datos.uso_cfdi : "G03";
     // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
     const claveSat = tipoCobroAdicional(pago.adicional_tipo);
     const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
@@ -120,7 +123,7 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       ],
       payment_form: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
       payment_method: "PUE",
-      use: datos.uso_cfdi,
+      use: usoCfdi,
       // El SAT exige el nodo "Información Global" cuando el receptor es
       // público en general (XAXX010101000): se factura como resumen diario.
       ...(publicoGeneral

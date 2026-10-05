@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   REGIMENES_FISCALES,
-  USOS_CFDI,
+  usosParaTipo,
   USO_CFDI_DEFAULT,
   esPublicoGeneral,
   normalizarRfc,
@@ -172,7 +172,7 @@ export default function DatosFiscalesPage() {
             <div>
               <p className="sub-label">Uso de la factura</p>
               <select style={estiloCampo} value={f.uso_cfdi} onChange={(e) => setF({ ...f, uso_cfdi: e.target.value })}>
-                {USOS_CFDI.map((u) => (
+                {usosParaTipo(tipo).map((u) => (
                   <option key={u.clave} value={u.clave}>
                     {u.clave} · {u.nombre}
                   </option>
