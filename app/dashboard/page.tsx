@@ -69,6 +69,8 @@ export default async function DashboardPage() {
   const en30Dias = new Date(hoy + "T00:00:00Z");
   en30Dias.setUTCDate(en30Dias.getUTCDate() + 30);
   const limite30 = en30Dias.toISOString().slice(0, 10);
+  // Tours que todavía no pasan: de hoy en adelante, y los de hoy solo si su hora no ha llegado.
+  const ahoraMx = new Date().toLocaleTimeString("en-GB", { timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: false });
 
   const [
     { count: facturasPendientes },
@@ -77,6 +79,7 @@ export default async function DashboardPage() {
     { count: solicitudesInvitados },
     { count: solicitudesClientes },
     { count: reservacionesPendientes },
+    { count: toursPendientes },
     { count: ticketsAbiertos },
     { count: ticketsUrgentes },
     { data: oficinasRows },
@@ -91,6 +94,12 @@ export default async function DashboardPage() {
     filtrarCentro(supabase.from("solicitudes_cliente").select("*", { count: "exact", head: true }).eq("estado", "pendiente")),
     filtrarCentro(
       supabase.from("reservaciones").select("*", { count: "exact", head: true }).eq("estado", "pendiente").gte("fecha", hoy)
+    ),
+    filtrarCentro(
+      supabase
+        .from("tours")
+        .select("*", { count: "exact", head: true })
+        .or(`fecha.gt.${hoy},and(fecha.eq.${hoy},hora.gte.${ahoraMx})`)
     ),
     filtrarCentro(
       supabase.from("tickets").select("*", { count: "exact", head: true }).in("estado", ["abierto", "en_proceso"])
@@ -142,6 +151,7 @@ export default async function DashboardPage() {
         solicitudesInvitados: solicitudesInvitados || 0,
         solicitudesClientes: solicitudesClientes || 0,
         reservacionesPendientes: reservacionesPendientes || 0,
+        toursPendientes: toursPendientes || 0,
         ticketsAbiertos: ticketsAbiertos || 0,
         ticketsUrgentes: ticketsUrgentes || 0,
         oficinasTotal,
