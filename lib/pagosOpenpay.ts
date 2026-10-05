@@ -17,14 +17,15 @@ export async function confirmarPagoPorCargo(admin: Admin, chargeId: string): Pro
 
   const { data: pago } = await admin
     .from("pagos")
-    .select("id, factura_id, estado, user_id, concepto, monto")
+    .select("id, factura_id, estado, user_id, concepto, monto, adicional_tipo")
     .eq("openpay_charge_id", chargeId)
     .maybeSingle();
   if (!pago) return { estado: "completed" };
   if (pago.estado === "pagado") return { estado: "pagado", pagoId: pago.id };
 
   await admin.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).eq("id", pago.id);
-  await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
+  // Un cobro adicional (copias, frituras…) no reactiva una cuenta suspendida.
+  if (!pago.adicional_tipo) await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
 
   const { data: cliente } = await admin.from("profiles").select("nombre, email, centro").eq("id", pago.user_id).maybeSingle();
 

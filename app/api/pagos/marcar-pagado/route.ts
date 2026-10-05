@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: pago } = await admin.from("pagos").select("id, user_id, estado").eq("id", pagoId).maybeSingle();
+  const { data: pago } = await admin.from("pagos").select("id, user_id, estado, adicional_tipo").eq("id", pagoId).maybeSingle();
 
   const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string } = { estado: "pagado" };
   if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: "No se pudo marcar el pago como pagado" }, { status: 500 });
   }
-  if (pago?.user_id) {
+  // Un cobro adicional (copias, frituras…) no reactiva una cuenta suspendida:
+  // eso solo lo hace pagar lo que se debe.
+  if (pago?.user_id && !pago.adicional_tipo) {
     await admin.from("profiles").update({ suspendido: false }).eq("id", pago.user_id);
   }
   // Solo la primera vez que pasa a pagado (evita dos correos por doble clic).
