@@ -37,7 +37,7 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
 };
 
 // Mismas opciones que ya usa CotizarForm.tsx para "Medio de contacto" al cotizar.
-const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Otro"];
+const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
