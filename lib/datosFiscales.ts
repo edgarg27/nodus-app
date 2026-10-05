@@ -11,17 +11,33 @@ export type DatosFiscales = {
 
 export type TipoPersonaFiscal = "fisica" | "moral";
 
-// Regímenes más comunes del catálogo del SAT y a qué tipo de persona aplican.
+// Catálogo de regímenes fiscales del SAT (c_RegimenFiscal, CFDI 4.0) y a qué tipo de
+// persona aplica cada uno. Antes solo estaban los más comunes y faltaban varios
+// (p. ej. Arrendamiento de personas morales o Sociedades Cooperativas).
 export const REGIMENES_FISCALES: { clave: string; nombre: string; aplica: TipoPersonaFiscal[] }[] = [
   { clave: "601", nombre: "General de Ley Personas Morales", aplica: ["moral"] },
   { clave: "603", nombre: "Personas Morales con Fines no Lucrativos", aplica: ["moral"] },
   { clave: "605", nombre: "Sueldos y Salarios e Ingresos Asimilados a Salarios", aplica: ["fisica"] },
   { clave: "606", nombre: "Arrendamiento", aplica: ["fisica"] },
+  { clave: "607", nombre: "Régimen de Enajenación o Adquisición de Bienes", aplica: ["fisica"] },
+  { clave: "608", nombre: "Demás ingresos", aplica: ["fisica"] },
+  { clave: "609", nombre: "Consolidación", aplica: ["moral"] },
+  { clave: "610", nombre: "Residentes en el Extranjero sin Establecimiento Permanente en México", aplica: ["fisica", "moral"] },
+  { clave: "611", nombre: "Ingresos por Dividendos (socios y accionistas)", aplica: ["fisica"] },
   { clave: "612", nombre: "Personas Físicas con Actividades Empresariales y Profesionales", aplica: ["fisica"] },
+  { clave: "614", nombre: "Ingresos por intereses", aplica: ["fisica"] },
+  { clave: "615", nombre: "Régimen de los ingresos por obtención de premios", aplica: ["fisica"] },
   { clave: "616", nombre: "Sin obligaciones fiscales", aplica: ["fisica"] },
+  { clave: "620", nombre: "Sociedades Cooperativas de Producción que optan por diferir sus ingresos", aplica: ["moral"] },
   { clave: "621", nombre: "Incorporación Fiscal", aplica: ["fisica"] },
-  { clave: "625", nombre: "Actividades Empresariales con ingresos por Plataformas Tecnológicas", aplica: ["fisica"] },
+  { clave: "622", nombre: "Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras", aplica: ["fisica", "moral"] },
+  { clave: "623", nombre: "Opcional para Grupos de Sociedades", aplica: ["moral"] },
+  { clave: "624", nombre: "Coordinados", aplica: ["moral"] },
+  { clave: "625", nombre: "Actividades Empresariales con ingresos a través de Plataformas Tecnológicas", aplica: ["fisica"] },
   { clave: "626", nombre: "Régimen Simplificado de Confianza (RESICO)", aplica: ["fisica", "moral"] },
+  { clave: "628", nombre: "Hidrocarburos", aplica: ["moral"] },
+  { clave: "629", nombre: "De los Regímenes Fiscales Preferentes y de las Empresas Multinacionales", aplica: ["fisica", "moral"] },
+  { clave: "630", nombre: "Enajenación de acciones en bolsa de valores", aplica: ["fisica"] },
 ];
 
 export const USOS_CFDI: { clave: string; nombre: string }[] = [
