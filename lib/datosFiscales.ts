@@ -40,12 +40,39 @@ export const REGIMENES_FISCALES: { clave: string; nombre: string; aplica: TipoPe
   { clave: "630", nombre: "Enajenación de acciones en bolsa de valores", aplica: ["fisica"] },
 ];
 
-export const USOS_CFDI: { clave: string; nombre: string }[] = [
-  { clave: "G03", nombre: "Gastos en general" },
-  { clave: "G01", nombre: "Adquisición de mercancías" },
-  { clave: "P01", nombre: "Por definir" },
-  { clave: "S01", nombre: "Sin efectos fiscales" },
+// Usos del CFDI 4.0 (c_UsoCFDI) que se pueden elegir al facturar un servicio. Los D01 a D10
+// (deducciones personales) son solo de persona física; los demás, de ambas. No se incluyen
+// P01 "Por definir" (ya no existe en 4.0: el SAT lo rechaza), CP01 (solo para complementos
+// de pago) ni CN01 (solo nómina). El SAT además valida que el uso sea compatible con el
+// régimen del receptor; si una factura automática se rechaza, el centro recibe el aviso.
+export const USOS_CFDI: { clave: string; nombre: string; aplica: TipoPersonaFiscal[] }[] = [
+  { clave: "G03", nombre: "Gastos en general", aplica: ["fisica", "moral"] },
+  { clave: "G01", nombre: "Adquisición de mercancías", aplica: ["fisica", "moral"] },
+  { clave: "G02", nombre: "Devoluciones, descuentos o bonificaciones", aplica: ["fisica", "moral"] },
+  { clave: "I01", nombre: "Construcciones", aplica: ["fisica", "moral"] },
+  { clave: "I02", nombre: "Mobiliario y equipo de oficina por inversiones", aplica: ["fisica", "moral"] },
+  { clave: "I03", nombre: "Equipo de transporte", aplica: ["fisica", "moral"] },
+  { clave: "I04", nombre: "Equipo de cómputo y accesorios", aplica: ["fisica", "moral"] },
+  { clave: "I05", nombre: "Dados, troqueles, moldes, matrices y herramental", aplica: ["fisica", "moral"] },
+  { clave: "I06", nombre: "Comunicaciones telefónicas", aplica: ["fisica", "moral"] },
+  { clave: "I07", nombre: "Comunicaciones satelitales", aplica: ["fisica", "moral"] },
+  { clave: "I08", nombre: "Otra maquinaria y equipo", aplica: ["fisica", "moral"] },
+  { clave: "D01", nombre: "Honorarios médicos, dentales y gastos hospitalarios", aplica: ["fisica"] },
+  { clave: "D02", nombre: "Gastos médicos por incapacidad o discapacidad", aplica: ["fisica"] },
+  { clave: "D03", nombre: "Gastos funerales", aplica: ["fisica"] },
+  { clave: "D04", nombre: "Donativos", aplica: ["fisica"] },
+  { clave: "D05", nombre: "Intereses reales por créditos hipotecarios (casa habitación)", aplica: ["fisica"] },
+  { clave: "D06", nombre: "Aportaciones voluntarias al SAR", aplica: ["fisica"] },
+  { clave: "D07", nombre: "Primas por seguros de gastos médicos", aplica: ["fisica"] },
+  { clave: "D08", nombre: "Gastos de transportación escolar obligatoria", aplica: ["fisica"] },
+  { clave: "D09", nombre: "Depósitos en cuentas para el ahorro, primas de planes de pensiones", aplica: ["fisica"] },
+  { clave: "D10", nombre: "Pagos por servicios educativos (colegiaturas)", aplica: ["fisica"] },
+  { clave: "S01", nombre: "Sin efectos fiscales", aplica: ["fisica", "moral"] },
 ];
+
+export function usosParaTipo(tipo: TipoPersonaFiscal) {
+  return USOS_CFDI.filter((u) => u.aplica.includes(tipo));
+}
 
 export const USO_CFDI_DEFAULT = "G03";
 
@@ -105,6 +132,6 @@ export function validarDatosFiscales(d: DatosFiscales, tipo: TipoPersonaFiscal):
     return "Elige el régimen fiscal";
   }
   if (!/^\d{5}$/.test(String(d.cp_fiscal || "").trim())) return "El código postal fiscal son 5 dígitos";
-  if (!USOS_CFDI.some((u) => u.clave === d.uso_cfdi)) return "Elige el uso de la factura";
+  if (!usosParaTipo(tipo).some((u) => u.clave === d.uso_cfdi)) return "Elige el uso de la factura";
   return "";
 }
