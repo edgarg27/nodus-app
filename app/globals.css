@@ -6325,3 +6325,66 @@ a.stat-card {
   font-weight: 600;
   color: #0d1b3e;
 }
+
+/* ---------- Adicionales (/adicionales) ---------- */
+.adicional-cliente-elegido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #f4f6fa;
+  border: 1px solid #e6eaf2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0d1b3e;
+}
+
+.adicional-resultados {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.adicional-resultado {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #0d1b3e;
+  cursor: pointer;
+}
+
+.adicional-resultado:hover {
+  border-color: #0d1b3e;
+}
+
+.adicional-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: #555;
+}
+
+.adicional-total strong {
+  font-size: 18px;
+  color: #0d1b3e;
+}
+
+.adicional-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 12px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}

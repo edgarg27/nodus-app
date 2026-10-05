@@ -46,6 +46,30 @@ export function totalAdicionalesMensuales(items: { concepto: string; monto: numb
   return round2(total);
 }
 
+// Cobros adicionales sueltos (/adicionales): lo que el admin le cobra a un
+// cliente fuera de su contrato. Cada tipo trae la clave del SAT con la que se
+// factura (lib/facturapi.ts). Las de copias y frituras y la genérica de "Otro"
+// están por confirmar con el contador. El monto que se captura y se cobra ya
+// lleva IVA incluido, igual que el resto de los cobros.
+export const TIPOS_COBRO_ADICIONAL = [
+  { clave: "sala_juntas", etiqueta: "Hora extra de sala de juntas", concepto: "Hora extra de sala de juntas", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "copias", etiqueta: "Copias / impresiones", concepto: "Copias e impresiones", satProdServ: "82121700", satUnidad: "H87" },
+  { clave: "botanas", etiqueta: "Frituras y botanas", concepto: "Frituras y botanas", satProdServ: "50192100", satUnidad: "H87" },
+  { clave: "otro", etiqueta: "Otro", concepto: "", satProdServ: "01010101", satUnidad: "E48" },
+] as const;
+
+export type TipoCobroAdicional = (typeof TIPOS_COBRO_ADICIONAL)[number]["clave"];
+
+export function tipoCobroAdicional(clave: string | null | undefined) {
+  return TIPOS_COBRO_ADICIONAL.find((t) => t.clave === clave) || null;
+}
+
+// Concepto que se guarda en el cobro: "Copias e impresiones (x50)".
+export function conceptoCobroAdicional(concepto: string, cantidad: number) {
+  const base = concepto.trim();
+  return cantidad === 1 ? base : `${base} (x${cantidad})`;
+}
+
 // Nombre del cobro para mostrarlo al CLIENTE: sin "(incl. IVA)" / "(con IVA)".
 // El monto sí incluye el IVA, pero la palabra no se le muestra (misma regla
 // que en Cotizar para depósito y estacionamiento). El concepto guardado en la

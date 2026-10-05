@@ -9,6 +9,7 @@
 
 export type AccionApi =
   | "pagosCrear"
+  | "adicionalesCobrar"
   | "pagosMarcarPagado"
   | "pagosVincular"
   | "facturaDescargar"
@@ -25,6 +26,8 @@ export type AccionApi =
 const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   // Cotizar y aprobar contratos (Centro, Alta de cliente, Contratos): generan cobros sueltos.
   pagosCrear: ["admin", "gerente", "ventas", "sistemas", "operaciones"],
+  // Cobros adicionales sueltos (/adicionales): hora extra de sala, copias, frituras…
+  adicionalesCobrar: ["admin", "gerente"],
   // Dinero: marcar pagado, ligar pagos a facturas, bajar facturas de cualquier cliente.
   pagosMarcarPagado: ["admin", "gerente", "cobranza"],
   pagosVincular: ["admin", "gerente", "cobranza"],

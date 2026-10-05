@@ -8,6 +8,7 @@ import Facturapi from "facturapi";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales, esPublicoGeneral } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
+import { tipoCobroAdicional } from "@/lib/adicionales";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -57,7 +58,7 @@ async function avisarFacturaFallida(admin: Admin, pagoId: string, centro: string
 export async function generarFacturaAutomatica(admin: Admin, pagoId: string, metodoOpenpay?: string | null): Promise<void> {
   const { data: pago } = await admin
     .from("pagos")
-    .select("id, user_id, monto, concepto, factura_id")
+    .select("id, user_id, monto, concepto, factura_id, adicional_tipo")
     .eq("id", pagoId)
     .maybeSingle();
   if (!pago) return;
@@ -91,6 +92,10 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
 
     const hoy = new Date();
     const publicoGeneral = esPublicoGeneral(datos.rfc);
+    // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
+    const claveSat = tipoCobroAdicional(pago.adicional_tipo);
+    const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
+    const unidad = claveSat?.satUnidad || CLAVE_UNIDAD;
 
     const invoice: any = await facturapi.invoices.create({
       customer: {
@@ -105,8 +110,8 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
           quantity: 1,
           product: {
             description: pago.concepto || "Servicios Nodus Flex Center",
-            product_key: CLAVE_PROD_SERV,
-            unit_key: CLAVE_UNIDAD,
+            product_key: prodServ,
+            unit_key: unidad,
             price: Number(pago.monto),
             tax_included: true,
             taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }],

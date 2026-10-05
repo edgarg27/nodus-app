@@ -1326,6 +1326,15 @@ export default function AdminPanel({
                   <span className="modulo-name">Facturas</span>
                 </a>
               ) },
+              // Adicionales: cobros sueltos (hora extra de sala, copias, frituras…).
+              // Mismos roles que su ruta y su API (permisosRutas.ts / permisosApi.ts).
+              { grupo: 1, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "adicionales", tarjeta: (
+                <a className="modulo-card" href="/adicionales">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/adicionales.svg" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Adicionales</span>
+                </a>
+              ) },
               { grupo: 1, ver: esVentasCom, key: "deposito", tarjeta: (
                 <a className="modulo-card" href="/deposito-garantia">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

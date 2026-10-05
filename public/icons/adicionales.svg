@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Mismo estilo que los demás íconos con contorno negro (ej. expediente-clientes.svg) -->
+  <g stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Ticket -->
+    <path d="M118 52h236v396l-30-22-30 22-30-22-30 22-30-22-30 22-26-22z" fill="#FFFFFF"/>
+    <!-- Renglones del ticket -->
+    <path d="M160 128h152M160 184h152M160 240h96" fill="none" stroke-width="14"/>
+    <!-- Monedas -->
+    <ellipse cx="368" cy="418" rx="86" ry="30" fill="#E0A21B"/>
+    <path d="M282 418v-34c0 17 38 30 86 30s86-13 86-30v34c0 17-38 30-86 30s-86-13-86-30z" fill="#F5B93C"/>
+    <ellipse cx="368" cy="384" rx="86" ry="30" fill="#FFD25E"/>
+    <ellipse cx="344" cy="330" rx="78" ry="26" fill="#FFD25E"/>
+    <path d="M266 330v30c0 14 35 26 78 26s78-12 78-26v-30c0 14-35 26-78 26s-78-12-78-26z" fill="#F5B93C"/>
+    <!-- Más -->
+    <circle cx="396" cy="168" r="62" fill="#3DB27A"/>
+    <path d="M396 138v60M366 168h60" fill="none" stroke="#FFFFFF" stroke-width="16"/>
+  </g>
+</svg>
