@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { conceptoParaCliente } from "@/lib/adicionales";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 type Factura = {
   id: string;
@@ -62,7 +63,7 @@ function formatMonto(monto: number) {
 
 function formatFecha(fecha: string) {
   try {
-    return new Date(fecha).toLocaleDateString("es-MX", {
+    return fechaLocal(fecha).toLocaleDateString("es-MX", {
       day: "numeric",
       month: "short",
       year: "numeric",

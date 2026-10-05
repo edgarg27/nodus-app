@@ -28,6 +28,7 @@ const estiloSelect: CSSProperties = {
 // compartido, se duplican inline igual que ya hacen app/reservaciones/page.tsx
 // y app/centro/CentroPanel.tsx.
 import { HORAS_CALENDARIO as HORAS, esFueraDeHorario } from "@/lib/horarioSala";
+import { fechaLocal } from "@/lib/fechaMexico";
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 function lunesDeLaSemana(fecha: Date) {
@@ -2363,7 +2364,7 @@ export default function CotizarForm({
                     return (
                       <option key={c.id} value={c.id}>
                         {ofi ? `${ofi.tipo} ${ofi.numero}` : "Contrato"} · vence{" "}
-                        {new Date(c.fecha_vencimiento).toLocaleDateString("es-MX")}
+                        {fechaLocal(c.fecha_vencimiento).toLocaleDateString("es-MX")}
                       </option>
                     );
                   })}

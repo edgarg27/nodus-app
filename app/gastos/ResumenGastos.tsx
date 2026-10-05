@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 // Resumen de gastos con gráficas (total, por centro, por departamento y
 // por mes). Antes era la pestaña "Gastos" dentro de Cobranza; ahora vive
@@ -51,14 +52,14 @@ export default function ResumenGastos({ gastos }: { gastos: GastoResumen[] }) {
     valor: gastos.filter((g) => (g.tipo || "admin") === t).reduce((s, g) => s + Number(g.monto), 0),
   }));
   const total = gastos.reduce((s, g) => s + Number(g.monto), 0);
-  const anios = Array.from(new Set([...gastos.map((g) => new Date(g.fecha).getFullYear()), new Date().getFullYear()])).sort(
+  const anios = Array.from(new Set([...gastos.map((g) => fechaLocal(g.fecha).getFullYear()), new Date().getFullYear()])).sort(
     (a, b) => b - a
   );
   const porMes = MESES.map((m, i) => ({
     etiqueta: m,
     valor: gastos
       .filter((g) => {
-        const d = new Date(g.fecha);
+        const d = fechaLocal(g.fecha);
         return d.getFullYear() === anio && d.getMonth() === i;
       })
       .reduce((s, g) => s + Number(g.monto), 0),
