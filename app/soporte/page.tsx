@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ImagenPrivada from "@/app/components/ImagenPrivada";
 import FileDropzone from "./FileDropzone";
@@ -108,8 +108,22 @@ export default function SoportePage() {
     return `REP-${numero}`;
   }
 
+  // Candado síncrono contra el doble clic (ver tickets/page.tsx): sin él se creaban dos
+  // tickets con el mismo folio.
+  const enviandoReporte = useRef(false);
+
   async function handleEnviar(e: React.FormEvent) {
     e.preventDefault();
+    if (enviandoReporte.current) return;
+    enviandoReporte.current = true;
+    try {
+      await guardarReporte();
+    } finally {
+      enviandoReporte.current = false;
+    }
+  }
+
+  async function guardarReporte() {
     setError("");
 
     if (!categoria || !asunto || !descripcion) {

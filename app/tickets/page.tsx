@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ImagenPrivada from "@/app/components/ImagenPrivada";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
@@ -358,8 +358,23 @@ export default function TicketsPage() {
     cerrarModal();
   }
 
+  // Candado síncrono: con dos clics seguidos (o un toque doble) el segundo llegaba antes
+  // de que el botón se deshabilitara y se creaban dos tickets con el mismo folio, dos
+  // avisos y dos correos. El estado guardandoReporte no alcanza porque se actualiza después.
+  const enviandoReporte = useRef(false);
+
   async function crearReporteStaff(e: React.FormEvent) {
     e.preventDefault();
+    if (enviandoReporte.current) return;
+    enviandoReporte.current = true;
+    try {
+      await guardarReporteStaff();
+    } finally {
+      enviandoReporte.current = false;
+    }
+  }
+
+  async function guardarReporteStaff() {
     if (!formReporte.asunto.trim() || !formReporte.descripcion.trim() || !miCentro) return;
     setGuardandoReporte(true);
 
