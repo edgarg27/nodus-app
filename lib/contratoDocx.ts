@@ -1,6 +1,10 @@
 import JSZip from "jszip";
 import { fmtMoneda, reemplazarTodasDocx } from "./docxHelpers";
 import { cargarArchivoPlantilla } from "./plantillasStorage";
+import { importeEnLetra } from "./importeLetra";
+
+// "$1,500.00" sin " MXN": la plantilla ya pone el importe con letra y "M.N." entre paréntesis.
+const fmtImporte = (n: number) => fmtMoneda(n).replace(/ MXN$/, "");
 
 // Plantillas reales de contrato (NBC) — solo centro Bosques. Coworking
 // tiene 3 variantes por tipo de persona: paquete "30 Horas" (término fijo
@@ -115,8 +119,11 @@ export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buf
   doc = reemplazarTodasDocx(doc, "{{FECHA_FIN}}", datos.fechaFin || "—");
   doc = reemplazarTodasDocx(doc, "{{DURACION_MESES}}", datos.duracionMeses != null ? String(datos.duracionMeses) : "—");
   doc = reemplazarTodasDocx(doc, "{{HORAS_SALA_JUNTAS}}", datos.horasSalaJuntas != null ? String(datos.horasSalaJuntas) : "0");
-  doc = reemplazarTodasDocx(doc, "{{PRECIO_MENSUAL}}", fmtMoneda(datos.precioMensual));
-  doc = reemplazarTodasDocx(doc, "{{DEPOSITO_GARANTIA}}", fmtMoneda(datos.depositoGarantia));
+  doc = reemplazarTodasDocx(doc, "{{PRECIO_MENSUAL}}", fmtImporte(datos.precioMensual));
+  // El monto con letra va entre paréntesis en la plantilla: "$1,500.00 (mil quinientos pesos 00/100 M.N.)".
+  doc = reemplazarTodasDocx(doc, "{{PRECIO_MENSUAL_LETRA}}", importeEnLetra(datos.precioMensual));
+  doc = reemplazarTodasDocx(doc, "{{DEPOSITO_GARANTIA}}", fmtImporte(datos.depositoGarantia));
+  doc = reemplazarTodasDocx(doc, "{{DEPOSITO_GARANTIA_LETRA}}", importeEnLetra(datos.depositoGarantia));
   doc = reemplazarTodasDocx(
     doc,
     "{{FECHA_EMISION}}",
