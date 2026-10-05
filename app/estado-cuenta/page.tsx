@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { conceptoParaCliente } from "@/lib/adicionales";
 import { fechaLocal } from "@/lib/fechaMexico";
+import { esClienteCoworking } from "@/lib/coworking";
 
 type Factura = {
   id: string;
@@ -73,6 +74,36 @@ function formatFecha(fecha: string) {
   }
 }
 
+// Orden de las formas de pago de una factura según el espacio del cliente: Coworking
+// ve primero la tarjeta, Oficina ve primero la referencia de pago (SPEI). Siempre
+// están las dos, más el comprobante.
+function BotonesPago({ f, esCow, vencida }: { f: Factura; esCow: boolean; vencida?: boolean }) {
+  const clase = "pagar-btn-full" + (vencida ? " vencida" : "");
+  const tarjeta = (
+    <a key="tarjeta" className={clase} href={`/pagar-tarjeta?facturaId=${f.id}`} style={{ marginBottom: 6 }}>
+      💳 Pagar con tarjeta
+    </a>
+  );
+  const spei = (
+    <a
+      key="spei"
+      className={clase}
+      href={`/pagar-spei?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}`}
+      style={{ marginBottom: 6 }}
+    >
+      {esCow ? "🏦 Pagar por SPEI (automático)" : "🏦 Pagar con referencia de pago"}
+    </a>
+  );
+  return (
+    <>
+      {esCow ? [tarjeta, spei] : [spei, tarjeta]}
+      <a className={clase} href={`/subir-comprobante?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}&monto=${f.monto}`}>
+        💳 Ya pagué, subir comprobante
+      </a>
+    </>
+  );
+}
+
 export default function EstadoCuentaPage() {
   const supabase = createClient();
   const [facturas, setFacturas] = useState<Factura[]>([]);
@@ -80,6 +111,9 @@ export default function EstadoCuentaPage() {
   const [loading, setLoading] = useState(true);
   const [nombre, setNombre] = useState("Cliente");
   const [sub, setSub] = useState("");
+  // Coworking se domicilia (cobro automático) y Oficina paga con referencia: cambia
+  // qué se ofrece primero, pero las dos opciones están siempre disponibles.
+  const [esCow, setEsCow] = useState(false);
 
   useEffect(() => {
     fetchFacturas();
@@ -118,6 +152,11 @@ export default function EstadoCuentaPage() {
       .order("fecha_vencimiento", { ascending: false });
 
     setFacturas(data || []);
+    try {
+      setEsCow(await esClienteCoworking(supabase, user.id));
+    } catch {
+      setEsCow(false);
+    }
 
     const { data: pagosData } = await supabase
       .from("pagos")
@@ -181,9 +220,18 @@ export default function EstadoCuentaPage() {
           </div>
         </div>
 
-        <a className="pagar-btn-full" href="/mis-tarjetas" style={{ marginBottom: 10, display: "block", textAlign: "center" }}>
-          💳 Mis tarjetas y cobro automático
-        </a>
+        {esCow ? (
+          <a className="pagar-btn-full" href="/mis-tarjetas" style={{ marginBottom: 10, display: "block", textAlign: "center" }}>
+            💳 Domicilia tu pago: mis tarjetas y cobro automático
+          </a>
+        ) : (
+          <p style={{ fontSize: 13, color: "#555", textAlign: "center", margin: "0 0 12px" }}>
+            ¿Prefieres pago domiciliado?{" "}
+            <a href="/mis-tarjetas" style={{ color: "#f07e3a", fontWeight: 600 }}>
+              Mis tarjetas y cobro automático
+            </a>
+          </p>
+        )}
 
         {loading ? (
           <div className="nodus-inline-loading">
@@ -243,24 +291,7 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full vencida" href={`/pagar-tarjeta?facturaId=${f.id}`} style={{ marginBottom: 6 }}>
-                      💳 Pagar con tarjeta
-                    </a>
-                    <a
-                      className="pagar-btn-full vencida"
-                      href={`/pagar-spei?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}`}
-                      style={{ marginBottom: 6 }}
-                    >
-                      🏦 Pagar por SPEI (automático)
-                    </a>
-                    <a
-                      className="pagar-btn-full vencida"
-                      href={`/subir-comprobante?facturaId=${f.id}&folio=${encodeURIComponent(
-                        f.folio
-                      )}&monto=${f.monto}`}
-                    >
-                      💳 Ya pagué, subir comprobante
-                    </a>
+                    <BotonesPago f={f} esCow={esCow} vencida />
                   </div>
                 ))}
               </>
@@ -287,24 +318,7 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full" href={`/pagar-tarjeta?facturaId=${f.id}`} style={{ marginBottom: 6 }}>
-                      💳 Pagar con tarjeta
-                    </a>
-                    <a
-                      className="pagar-btn-full"
-                      href={`/pagar-spei?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}`}
-                      style={{ marginBottom: 6 }}
-                    >
-                      🏦 Pagar por SPEI (automático)
-                    </a>
-                    <a
-                      className="pagar-btn-full"
-                      href={`/subir-comprobante?facturaId=${f.id}&folio=${encodeURIComponent(
-                        f.folio
-                      )}&monto=${f.monto}`}
-                    >
-                      💳 Ya pagué, subir comprobante
-                    </a>
+                    <BotonesPago f={f} esCow={esCow} />
                   </div>
                 ))}
               </>
