@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza"];
 
@@ -398,7 +399,7 @@ export default function CobranzaPage() {
                             <p className="item-card-extra" style={{ color: "#a32d2d" }}>
                               🚫 Suspendido
                               {c.suspendido_desde
-                                ? ` desde ${new Date(c.suspendido_desde).toLocaleDateString("es-MX")}`
+                                ? ` desde ${fechaLocal(c.suspendido_desde).toLocaleDateString("es-MX")}`
                                 : ""}
                             </p>
                           )}
@@ -437,7 +438,7 @@ export default function CobranzaPage() {
                                     <p className="item-card-extra" style={{ color: "#a32d2d" }}>
                                       🚫 Suspendido
                                       {c.suspendido_desde
-                                        ? ` desde ${new Date(c.suspendido_desde).toLocaleDateString("es-MX")}`
+                                        ? ` desde ${fechaLocal(c.suspendido_desde).toLocaleDateString("es-MX")}`
                                         : ""}
                                     </p>
                                   )}

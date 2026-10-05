@@ -8,7 +8,7 @@ import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
-import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { hoyMexicoISO, fechaLocal } from "@/lib/fechaMexico";
 import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
@@ -2095,7 +2095,7 @@ export default function CentroPanel({
   function gastosPorMes(lista: Gasto[], anio: number) {
     const totales = new Array(12).fill(0);
     lista.forEach((g) => {
-      const d = new Date(g.fecha);
+      const d = fechaLocal(g.fecha);
       if (d.getFullYear() === anio) totales[d.getMonth()] += Number(g.monto);
     });
     return MESES.map((m, i) => ({ centro: m, valor: Math.round(totales[i] * 100) / 100 }));
@@ -2105,7 +2105,7 @@ export default function CentroPanel({
   function gastosPorAnio(lista: Gasto[]) {
     const porAnio: Record<number, number> = {};
     lista.forEach((g) => {
-      const anio = new Date(g.fecha).getFullYear();
+      const anio = fechaLocal(g.fecha).getFullYear();
       porAnio[anio] = (porAnio[anio] || 0) + Number(g.monto);
     });
     return Object.keys(porAnio)
@@ -2115,7 +2115,7 @@ export default function CentroPanel({
 
   // Años que tienen al menos un gasto registrado, más el año actual.
   function aniosConDatos(lista: Gasto[]) {
-    const anios = new Set(lista.map((g) => new Date(g.fecha).getFullYear()));
+    const anios = new Set(lista.map((g) => fechaLocal(g.fecha).getFullYear()));
     anios.add(new Date().getFullYear());
     return Array.from(anios).sort((a, b) => b - a);
   }
@@ -3716,7 +3716,7 @@ export default function CentroPanel({
                           (g) => rol !== "operaciones" || g.tipo === "operaciones"
                         );
                         const totalAnio = listaCentro
-                          .filter((g) => new Date(g.fecha).getFullYear() === anioGastosCentro)
+                          .filter((g) => fechaLocal(g.fecha).getFullYear() === anioGastosCentro)
                           .reduce((s, g) => s + Number(g.monto), 0);
                         return (
                           <>
@@ -3787,7 +3787,7 @@ export default function CentroPanel({
                                       {(rol === "superadmin" || rol === "gerente") && (
                                         <>{g.tipo === "admin" ? "🧑‍💼 Admin" : "🔧 Operaciones"} · </>
                                       )}
-                                      {g.categoria || "—"} · {new Date(g.fecha).toLocaleDateString("es-MX")}
+                                      {g.categoria || "—"} · {fechaLocal(g.fecha).toLocaleDateString("es-MX")}
                                     </p>
                                     {g.notas && <p className="item-card-extra">{g.notas}</p>}
                                     {(g.factura_url || g.comprobante_pago_url) && (
@@ -3965,7 +3965,7 @@ export default function CentroPanel({
                             <p className="item-card-titulo">{g.concepto}</p>
                             <p className="item-card-sub">
                               🏢 {g.centro} · {g.categoria || "—"} ·{" "}
-                              {new Date(g.fecha).toLocaleDateString("es-MX")}
+                              {fechaLocal(g.fecha).toLocaleDateString("es-MX")}
                             </p>
                             {g.notas && <p className="item-card-extra">{g.notas}</p>}
                             {(g.factura_url || g.comprobante_pago_url) && (
@@ -4096,7 +4096,7 @@ export default function CentroPanel({
                           <div className="item-card-info">
                             <p className="item-card-titulo">{g.concepto}</p>
                             <p className="item-card-sub">
-                              {g.categoria || "—"} · {new Date(g.fecha).toLocaleDateString("es-MX")}
+                              {g.categoria || "—"} · {fechaLocal(g.fecha).toLocaleDateString("es-MX")}
                             </p>
                             {g.notas && <p className="item-card-extra">{g.notas}</p>}
                             {(g.factura_url || g.comprobante_pago_url) && (

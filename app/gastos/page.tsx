@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 import ResumenGastos from "./ResumenGastos";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 type Gasto = {
   id: string;
@@ -364,7 +365,7 @@ export default function GastosPage() {
               <div className="item-card-info">
                 <p className="item-card-titulo">{g.concepto}</p>
                 <p className="item-card-sub">
-                  {new Date(g.fecha).toLocaleDateString("es-MX")}
+                  {fechaLocal(g.fecha).toLocaleDateString("es-MX")}
                   {g.categoria ? ` · ${g.categoria}` : ""}
                   {proveedorNombre(g.proveedor_id) ? ` · ${proveedorNombre(g.proveedor_id)}` : ""}
                 </p>

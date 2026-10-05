@@ -6,6 +6,7 @@ import { rentaMensualConIva } from "@/lib/formaPago";
 import { normalizarDatosFiscales, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
 import { rolPuede } from "@/lib/permisosApi";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
 // datos de la venta ya capturados en CotizarForm.tsx (cotizaciones_comerciales)
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const fmtFecha = (f: string | null) =>
-      f ? new Date(f).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : null;
+      f ? fechaLocal(f).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : null;
 
     const precioMensual = Number(venta.precio_pactado ?? venta.cargo_recurrente ?? venta.precio_neto ?? 0);
     const depositoGarantia = Number(venta.deposito_garantia ?? 0);

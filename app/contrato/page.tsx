@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import { conIva, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 type Adicional = { id: string; concepto: string; cantidad: number | null; monto: number | null };
 
@@ -25,7 +26,7 @@ type Contrato = {
 const CONCEPTO_PAGO_DEPOSITO = "Depósito en garantía (incl. IVA)";
 
 function formatFecha(fecha: string) {
-  return new Date(fecha).toLocaleDateString("es-MX", {
+  return fechaLocal(fecha).toLocaleDateString("es-MX", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -137,8 +138,8 @@ export default function ContratoPage() {
   function calcularInfo() {
     if (!contrato) return { mesesRestantes: 0, porcentaje: 0 };
     const hoy = new Date();
-    const inicio = new Date(contrato.fecha_inicio);
-    const fin = new Date(contrato.fecha_vencimiento);
+    const inicio = fechaLocal(contrato.fecha_inicio);
+    const fin = fechaLocal(contrato.fecha_vencimiento);
     const totalDias = (fin.getTime() - inicio.getTime()) / 86400000;
     const diasTranscurridos = (hoy.getTime() - inicio.getTime()) / 86400000;
     const porcentaje = Math.min(Math.max((diasTranscurridos / totalDias) * 100, 0), 100);

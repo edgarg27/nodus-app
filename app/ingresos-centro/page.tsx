@@ -6,6 +6,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 import { conIva, esCobroMensual, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { CATEGORIA_PAGO_INFO, type CategoriaPago, categorizarPago, pagoEstaCubierto } from "@/lib/pagosCategoria";
+import { fechaLocal } from "@/lib/fechaMexico";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -807,7 +808,7 @@ export default function IngresosCentroPage() {
                       <div className="item-card-info">
                         <p className="item-card-titulo">{g.concepto}</p>
                         <p className="item-card-sub">
-                          {new Date(g.fecha).toLocaleDateString("es-MX")}
+                          {fechaLocal(g.fecha).toLocaleDateString("es-MX")}
                           {g.categoria ? ` · ${g.categoria}` : ""}
                           {proveedorNombre(g.proveedor_id) ? ` · ${proveedorNombre(g.proveedor_id)}` : ""}
                         </p>
