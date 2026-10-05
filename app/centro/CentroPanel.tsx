@@ -228,7 +228,7 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
 
 // Medio por el que llegó el prospecto — mismas opciones que ya usa
 // CotizarForm.tsx para "Medio de contacto" al cotizar.
-const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Otro"];
+const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
 
 // Cada módulo que antes era pestaña del Panel de Centro ahora es su propia
 // pantalla (/centro/<vista>) con su encabezado azul; comparten este mismo

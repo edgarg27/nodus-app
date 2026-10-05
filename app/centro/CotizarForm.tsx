@@ -135,7 +135,7 @@ type AdicionalDraft = {
 };
 
 const TIPOS_PROSPECTO = ["Nuevo", "Referido", "Recurrente", "Otro"];
-const MEDIOS_CONTACTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Otro"];
+const MEDIOS_CONTACTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
 const MODALIDADES = ["Hora", "Día", "Semana", "Mes"] as const;
 type Modalidad = (typeof MODALIDADES)[number];
 const LABEL_MODALIDAD: Record<Modalidad, string> = { Hora: "hora", Día: "día", Semana: "semana", Mes: "mes" };
@@ -2895,7 +2895,7 @@ export default function CotizarForm({
                 ))}
               </select>
             </div>
-            {medioContacto && medioContacto !== "Teléfono" && (
+            {medioContacto && medioContacto !== "Teléfono" && medioContacto !== "Venta en piso" && (
               <div>
                 <p className="sub-label">{labelDetalleMedioContacto[medioContacto] || "Detalle"}</p>
                 <input
