@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   TIPOS_ESPACIO_FIDELIDAD,
@@ -10,6 +10,8 @@ import {
   type TipoEspacioFidelidad,
 } from "@/lib/fidelidad";
 import FidelidadCard from "@/app/components/FidelidadCard";
+import AvisoExito from "@/app/components/AvisoExito";
+import { CENTROS } from "@/lib/useCentroAdmin";
 
 // Módulo de tarjetas de fidelidad para el staff: ver las tarjetas, buscar
 // por folio, poner o quitar sellos, entregar el regalo y eliminar tarjetas.
@@ -58,6 +60,14 @@ export default function FidelidadAdminPage() {
   const [errorSello, setErrorSello] = useState("");
   const [regaloModal, setRegaloModal] = useState<{ tipo_espacio: TipoEspacioFidelidad; detalle: string | null } | null>(null);
 
+  // Tarjeta que crea el admin directamente, sin que el cliente la pida en línea.
+  const [mostrarNueva, setMostrarNueva] = useState(false);
+  const [nuevaForm, setNuevaForm] = useState({ nombre: "", telefono: "", email: "", centro: "" });
+  const [creandoTarjeta, setCreandoTarjeta] = useState(false);
+  const creandoRef = useRef(false);
+  const [errorNueva, setErrorNueva] = useState("");
+  const [avisoCreada, setAvisoCreada] = useState<string | null>(null);
+
   useEffect(() => {
     cargarTarjetas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,6 +91,42 @@ export default function FidelidadAdminPage() {
     const { data } = await query;
     setTarjetasFidelidad(data || []);
     setLoading(false);
+  }
+
+  async function crearTarjetaNueva(e: React.FormEvent) {
+    e.preventDefault();
+    if (creandoRef.current) return;
+    setErrorNueva("");
+    if (!nuevaForm.nombre.trim() || !nuevaForm.telefono.trim()) {
+      setErrorNueva("Nombre y teléfono son obligatorios");
+      return;
+    }
+    creandoRef.current = true;
+    setCreandoTarjeta(true);
+    try {
+      const res = await fetch("/api/fidelidad-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...nuevaForm, centro: nuevaForm.centro || centro || CENTROS[0] }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.tarjeta) {
+        setErrorNueva(json.error || "No se pudo crear la tarjeta");
+        return;
+      }
+      const t = json.tarjeta as TarjetaFidelidad;
+      setNuevaForm({ nombre: "", telefono: "", email: "", centro: nuevaForm.centro });
+      setMostrarNueva(false);
+      setAvisoCreada(
+        `Folio #${String(t.folio).padStart(6, "0")} para ${t.nombre}.${t.email ? " Se le mandó su folio por correo." : ""}`
+      );
+      // Se deja abierta para poder ponerle su primer sello de una vez.
+      await cargarTarjeta(t);
+      await cargarTarjetas();
+    } finally {
+      creandoRef.current = false;
+      setCreandoTarjeta(false);
+    }
   }
 
   // Búsqueda por folio o por nombre — sin filtrar por centro, porque el
@@ -335,6 +381,60 @@ export default function FidelidadAdminPage() {
           <p className="empty-card">Cargando...</p>
         ) : (
           <>
+            <button
+              type="button"
+              className="btn-aceptar"
+              style={{ marginBottom: 12 }}
+              onClick={() => {
+                setMostrarNueva((v) => !v);
+                setErrorNueva("");
+              }}
+            >
+              {mostrarNueva ? "Cerrar" : "+ Nueva tarjeta"}
+            </button>
+
+            {mostrarNueva && (
+              <form className="form-card" onSubmit={crearTarjetaNueva} style={{ marginBottom: 12 }}>
+                <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>Nueva tarjeta de fidelidad</p>
+                <input
+                  type="text"
+                  placeholder="Nombre completo"
+                  value={nuevaForm.nombre}
+                  maxLength={120}
+                  onChange={(e) => setNuevaForm({ ...nuevaForm, nombre: e.target.value })}
+                />
+                <input
+                  type="tel"
+                  placeholder="Teléfono"
+                  value={nuevaForm.telefono}
+                  maxLength={30}
+                  onChange={(e) => setNuevaForm({ ...nuevaForm, telefono: e.target.value })}
+                />
+                <input
+                  type="email"
+                  placeholder="Correo (opcional, para mandarle su folio)"
+                  value={nuevaForm.email}
+                  onChange={(e) => setNuevaForm({ ...nuevaForm, email: e.target.value })}
+                />
+                {esGlobal && (
+                  <select
+                    value={nuevaForm.centro || centro || CENTROS[0]}
+                    onChange={(e) => setNuevaForm({ ...nuevaForm, centro: e.target.value })}
+                  >
+                    {CENTROS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {errorNueva && <p style={{ color: "#A32D2D", fontSize: 13, margin: 0 }}>{errorNueva}</p>}
+                <button className="btn-enviar" type="submit" disabled={creandoTarjeta}>
+                  {creandoTarjeta ? "Creando..." : "Crear tarjeta"}
+                </button>
+              </form>
+            )}
+
             <form className="form-card" onSubmit={buscarTarjeta}>
               <p className="sub-label">Buscar tarjeta por folio o nombre</p>
               <div style={{ display: "flex", gap: 8 }}>
@@ -512,6 +612,8 @@ export default function FidelidadAdminPage() {
           </>
         )}
       </div>
+
+      {avisoCreada && <AvisoExito titulo="¡Tarjeta creada!" mensaje={avisoCreada} onCerrar={() => setAvisoCreada(null)} />}
 
       {regaloModal && (
         <div className="modal-overlay" onClick={() => setRegaloModal(null)}>
