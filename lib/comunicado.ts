@@ -2,7 +2,11 @@
 // previa de la pantalla y en el envío real (/api/comunicados), para que lo
 // que se ve es lo que le llega al cliente.
 
-export const LOGO_URL = "https://xpywjzdsbngcdqqzfgoh.supabase.co/storage/v1/object/public/contratos/logo-nodus-blanco.png";
+// El logo vive en public/images de la app (URL absoluta, porque lo abre el programa de
+// correo del cliente). Antes estaba en el bucket "contratos" de Supabase, que ya es
+// privado y daba 400: por eso el logo salía roto en los correos masivos.
+const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
+export const LOGO_URL = `${SITIO}/images/logo-nodus-blanco-correo.png`;
 
 export function escaparHtml(t: string): string {
   return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
