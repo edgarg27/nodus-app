@@ -82,6 +82,7 @@ type Resumen = {
   solicitudesInvitados: number;
   solicitudesClientes: number;
   reservacionesPendientes: number;
+  toursPendientes: number;
   ticketsAbiertos: number;
   ticketsUrgentes: number;
   oficinasTotal: number;
@@ -1064,6 +1065,11 @@ export default function AdminPanel({
                   <p className="stat-val">{resumen.reservacionesPendientes}</p>
                   <p className="stat-lbl">Reservaciones por confirmar</p>
                   <p className="stat-delta">Salas pendientes →</p>
+                </a>
+                <a className={`stat-card${resumen.toursPendientes > 0 ? " stat-card-alerta" : ""}`} href="/tours">
+                  <p className="stat-val">{resumen.toursPendientes}</p>
+                  <p className="stat-lbl">Tours pendientes</p>
+                  <p className="stat-delta">{resumen.toursPendientes > 0 ? "Tours por realizar →" : "Sin tours por realizar"}</p>
                 </a>
                 <a
                   className={`stat-card${resumen.facturasVencidas > 0 ? " stat-card-alerta" : ""}`}
