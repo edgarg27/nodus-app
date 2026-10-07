@@ -21,6 +21,7 @@ export type AccionApi =
   | "darBajaCliente"
   | "cobroDiarioManual"
   | "recordatorioTours"
+  | "seguimientoProspectos"
   | "toursConfirmar"
   | "vouchers";
 
@@ -43,6 +44,9 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   // Botón "generar facturas ahora" de Cobranza (el cron real entra con CRON_SECRET).
   cobroDiarioManual: ["admin", "gerente", "cobranza"],
   recordatorioTours: ["admin", "gerente", "atencion_cliente", "ventas"],
+  // Correos del seguimiento de prospectos: los roles que pueden escribir en
+  // prospectos (ver migracion_prospectos_actividades.sql).
+  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones"],
   toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas"],
   vouchers: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente"],
 };

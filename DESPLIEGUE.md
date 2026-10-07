@@ -17,7 +17,7 @@ Base de datos, usuarios y archivos ──► Supabase (en la nube, aparte)
 
 - **app**: Nodus corriendo en un contenedor. Trae LibreOffice para convertir las cotizaciones de PowerPoint a PDF.
 - **caddy**: recibe las visitas, saca y renueva **solo** el certificado HTTPS y se las pasa a la app. Es lo único abierto a internet.
-- **cron**: cada día llama al cobro diario (7:00 am, hora de México) y a los recordatorios de tours (6:00 pm).
+- **cron**: cada día llama al cobro diario (7:00 am, hora de México), al resumen del seguimiento de prospectos (9:00 am) y a los recordatorios de tours (6:00 pm).
 - **Supabase** (base de datos, cuentas y archivos) **no** vive en el servidor: sigue en su nube.
 
 El servidor no guarda datos importantes: si se pierde, se levanta otro igual con esta guía y no se pierde información.

@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
+import SeguimientoModal, {
+  type ActividadProspecto,
+  estaAtrasada,
+  etiquetaActividad,
+  formatoFechaCorta,
+  ordenarActividades,
+} from "./SeguimientoModal";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -75,6 +82,8 @@ export default function ProspectosPage() {
   const [comentarioPerdido, setComentarioPerdido] = useState("");
   const [avisoExito, setAvisoExito] = useState(false);
   const [nombreRegistrado, setNombreRegistrado] = useState("");
+  const [actividadesPorProspecto, setActividadesPorProspecto] = useState<Record<string, ActividadProspecto[]>>({});
+  const [seguimientoDe, setSeguimientoDe] = useState<Prospecto | null>(null);
 
   useEffect(() => {
     init();
@@ -110,7 +119,30 @@ export default function ProspectosPage() {
     setProspectos(lista);
     await marcarSeguimientoAutomatico(lista);
 
-    const idsRegistro = Array.from(new Set(lista.map((p) => p.registrado_por).filter((id): id is string => !!id)));
+    // Actividades de seguimiento (ver migracion_prospectos_actividades.sql). Si la
+    // migración aún no se corrió, la consulta falla y la lista solo sale vacía.
+    let actividades: ActividadProspecto[] = [];
+    if (lista.length > 0) {
+      const { data: filas } = await supabase
+        .from("prospecto_actividades")
+        .select("*")
+        .in("prospecto_id", lista.map((p) => p.id));
+      actividades = filas || [];
+    }
+    const porProspecto: Record<string, ActividadProspecto[]> = {};
+    actividades.forEach((a) => {
+      (porProspecto[a.prospecto_id] ||= []).push(a);
+    });
+    setActividadesPorProspecto(porProspecto);
+
+    const idsRegistro = Array.from(
+      new Set(
+        [
+          ...lista.map((p) => p.registrado_por),
+          ...actividades.flatMap((a) => [a.creado_por, a.completada_por]),
+        ].filter((id): id is string => !!id)
+      )
+    );
     if (idsRegistro.length > 0) {
       const { data: perfiles } = await supabase.from("profiles").select("id, nombre").in("id", idsRegistro);
       setNombrePorRegistradoPor(Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre])));
@@ -199,6 +231,37 @@ export default function ProspectosPage() {
     );
     setProspectoPerdiendo(null);
     setComentarioPerdido("");
+  }
+
+  // Mismo cambio que hace el select de estado, sin pasar por "perdido".
+  async function marcarContactado(id: string) {
+    await supabase.from("prospectos").update({ estado: "contactado" }).eq("id", id).eq("estado", "nuevo");
+    setProspectos((prev) => prev.map((p) => (p.id === id && p.estado === "nuevo" ? { ...p, estado: "contactado" } : p)));
+    setSeguimientoDe((p) => (p && p.id === id && p.estado === "nuevo" ? { ...p, estado: "contactado" } : p));
+  }
+
+  // Para la tarjeta y el Excel: avance y siguiente actividad pendiente.
+  function resumenSeguimiento(prospectoId: string) {
+    const lista = actividadesPorProspecto[prospectoId] || [];
+    const { pendientes, hechas } = ordenarActividades(lista);
+    return {
+      total: lista.length,
+      hechas: hechas.length,
+      proxima: pendientes[0] || null,
+      ultimaHecha: hechas[0] || null,
+      hayAtrasadas: pendientes.some(estaAtrasada),
+    };
+  }
+
+  // Los nombres de quien registra o palomea una actividad nueva pueden no estar
+  // cargados todavía (p. ej. la primera vez que alguien usa el seguimiento).
+  async function completarNombres(lista: ActividadProspecto[]) {
+    const faltan = Array.from(
+      new Set(lista.flatMap((a) => [a.creado_por, a.completada_por]).filter((id): id is string => !!id && !nombrePorRegistradoPor[id]))
+    );
+    if (faltan.length === 0) return;
+    const { data: perfiles } = await supabase.from("profiles").select("id, nombre").in("id", faltan);
+    setNombrePorRegistradoPor((prev) => ({ ...prev, ...Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre])) }));
   }
 
   async function borrarProspecto(id: string) {
@@ -315,19 +378,34 @@ export default function ProspectosPage() {
                 onClick={() =>
                   exportarExcel(
                     "prospectos",
-                    prospectos.map((p) => ({
-                      Nombre: p.nombre,
-                      Telefono: p.telefono || "",
-                      Email: p.email || "",
-                      Empresa: p.empresa || "",
-                      RFC: p.rfc || "",
-                      Interes: p.interes || "",
-                      Medio: p.medio || "",
-                      Centro: p.centro || "",
-                      Estado: p.estado,
-                      "Motivo perdido": p.comentario_perdido || "",
-                      Notas: p.notas || "",
-                    }))
+                    prospectos.map((p) => {
+                      const seg = resumenSeguimiento(p.id);
+                      return {
+                        Nombre: p.nombre,
+                        Telefono: p.telefono || "",
+                        Email: p.email || "",
+                        Empresa: p.empresa || "",
+                        RFC: p.rfc || "",
+                        Interes: p.interes || "",
+                        Medio: p.medio || "",
+                        Centro: p.centro || "",
+                        Estado: p.estado,
+                        "Motivo perdido": p.comentario_perdido || "",
+                        Notas: p.notas || "",
+                        "Actividades hechas": seg.hechas,
+                        "Actividades pendientes": seg.total - seg.hechas,
+                        "Próxima actividad": seg.proxima
+                          ? `${etiquetaActividad(seg.proxima).replace(/^\S+\s/, "")} · ${formatoFechaCorta(seg.proxima.fecha)}${
+                              estaAtrasada(seg.proxima) ? " (atrasada)" : ""
+                            }${seg.proxima.descripcion ? ` · ${seg.proxima.descripcion}` : ""}`
+                          : "",
+                        "Última actividad hecha": seg.ultimaHecha
+                          ? `${etiquetaActividad(seg.ultimaHecha).replace(/^\S+\s/, "")} · ${formatoFechaCorta(seg.ultimaHecha.fecha)}${
+                              seg.ultimaHecha.descripcion ? ` · ${seg.ultimaHecha.descripcion}` : ""
+                            }`
+                          : "",
+                      };
+                    })
                   )
                 }
               >
@@ -359,6 +437,7 @@ export default function ProspectosPage() {
                       </p>
                       {lista.map((p) => {
                         const est = ESTADOS_PROSPECTO[p.estado] || ESTADOS_PROSPECTO.nuevo;
+                        const seg = resumenSeguimiento(p.id);
                         return (
                           <div className="item-card" key={p.id} style={{ marginBottom: 8 }}>
                             <div className="item-card-info">
@@ -382,6 +461,13 @@ export default function ProspectosPage() {
                                   ? ` · Registró: ${nombrePorRegistradoPor[p.registrado_por]}`
                                   : ""}
                               </p>
+                              {seg.proxima && (
+                                <p className="item-card-extra">
+                                  <span className="seg-proximo">Próximo:</span> {etiquetaActividad(seg.proxima)} ·{" "}
+                                  {formatoFechaCorta(seg.proxima.fecha)}
+                                  {estaAtrasada(seg.proxima) && <span className="seg-proximo-atrasada">Atrasada</span>}
+                                </p>
+                              )}
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
                               <select
@@ -398,6 +484,14 @@ export default function ProspectosPage() {
                                     </option>
                                   ))}
                               </select>
+                              <button
+                                className="seg-btn-tarjeta"
+                                onClick={() => setSeguimientoDe(p)}
+                                title={seg.hayAtrasadas ? "Tiene actividades atrasadas" : undefined}
+                              >
+                                {seg.hayAtrasadas && <span className="seg-btn-alerta" aria-hidden="true" />}
+                                📋 Seguimiento{seg.total > 0 ? ` (${seg.hechas}/${seg.total})` : ""}
+                              </button>
                               <a
                                 className="tel-borrar-btn"
                                 style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
@@ -465,6 +559,20 @@ export default function ProspectosPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {seguimientoDe && (
+        <SeguimientoModal
+          prospecto={seguimientoDe}
+          actividades={actividadesPorProspecto[seguimientoDe.id] || []}
+          nombres={nombrePorRegistradoPor}
+          onActividadesChange={(lista) => {
+            setActividadesPorProspecto((prev) => ({ ...prev, [seguimientoDe.id]: lista }));
+            completarNombres(lista);
+          }}
+          onContactado={() => marcarContactado(seguimientoDe.id)}
+          onClose={() => setSeguimientoDe(null)}
+        />
       )}
 
       {prospectoPerdiendo && (
