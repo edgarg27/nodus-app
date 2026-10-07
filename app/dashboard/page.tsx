@@ -4,7 +4,7 @@ import AdminPanel from "./AdminPanel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
 export default async function DashboardPage() {
   const supabase = createClient();

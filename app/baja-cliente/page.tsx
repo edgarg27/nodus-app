@@ -28,7 +28,7 @@ type Contrato = {
 
 type PagoPendiente = { id: string; concepto: string | null; monto: number; estado: string };
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
 export default function BajaClientePage() {
   const supabase = createClient();

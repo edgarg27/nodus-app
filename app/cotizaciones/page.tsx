@@ -7,7 +7,7 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import ModalDatosFiscales from "./ModalDatosFiscales";
 import type { DatosFiscales, TipoPersonaFiscal } from "@/lib/datosFiscales";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
 type Cotizacion = {
   id: string;

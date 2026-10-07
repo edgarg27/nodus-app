@@ -15,7 +15,7 @@ type Tour = {
   centro?: string | null;
 };
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente", "gerente_ventas"];
 // Las cuentas globales no tienen centro fijo: eligen en el formulario a
 // qué centro va el tour (antes no podían agendar y el aviso decía que
 // faltaba nombre/fecha).

@@ -27,28 +27,28 @@ export type AccionApi =
 
 const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   // Cotizar y aprobar contratos (Centro, Alta de cliente, Contratos): generan cobros sueltos.
-  pagosCrear: ["admin", "gerente", "ventas", "sistemas", "operaciones"],
+  pagosCrear: ["admin", "gerente", "ventas", "sistemas", "operaciones", "gerente_ventas"],
   // Cobros adicionales sueltos (/adicionales): hora extra de sala, copias, frituras…
-  adicionalesCobrar: ["admin", "gerente"],
+  adicionalesCobrar: ["admin", "gerente", "gerente_ventas"],
   // Crear una tarjeta de fidelidad desde /fidelidad-admin (mismos roles que esa pantalla).
   fidelidadCrear: ["admin", "gerente"],
   // Dinero: marcar pagado, ligar pagos a facturas, bajar facturas de cualquier cliente.
-  pagosMarcarPagado: ["admin", "gerente", "cobranza"],
-  pagosVincular: ["admin", "gerente", "cobranza"],
-  facturaDescargar: ["admin", "gerente", "cobranza"],
-  cotizacionAceptar: ["admin", "gerente"],
-  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones"],
-  crearCliente: ["admin", "gerente", "sistemas"],
-  reenviarInvitacion: ["admin", "gerente", "sistemas"],
-  darBajaCliente: ["admin", "gerente", "sistemas"],
+  pagosMarcarPagado: ["admin", "gerente", "cobranza", "gerente_ventas"],
+  pagosVincular: ["admin", "gerente", "cobranza", "gerente_ventas"],
+  facturaDescargar: ["admin", "gerente", "cobranza", "gerente_ventas"],
+  cotizacionAceptar: ["admin", "gerente", "gerente_ventas"],
+  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
+  crearCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],
+  reenviarInvitacion: ["admin", "gerente", "sistemas", "gerente_ventas"],
+  darBajaCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],
   // Botón "generar facturas ahora" de Cobranza (el cron real entra con CRON_SECRET).
-  cobroDiarioManual: ["admin", "gerente", "cobranza"],
-  recordatorioTours: ["admin", "gerente", "atencion_cliente", "ventas"],
+  cobroDiarioManual: ["admin", "gerente", "cobranza", "gerente_ventas"],
+  recordatorioTours: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
   // Correos del seguimiento de prospectos: los roles que pueden escribir en
   // prospectos (ver migracion_prospectos_actividades.sql).
-  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones"],
-  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas"],
-  vouchers: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente"],
+  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
+  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
+  vouchers: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "gerente_ventas"],
 };
 
 export function rolPuede(rol: string | null | undefined, accion: AccionApi): boolean {

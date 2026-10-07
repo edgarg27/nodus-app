@@ -12,9 +12,9 @@ import { conceptoCobroAdicional, tipoCobroAdicional } from "@/lib/adicionales";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-// admin solo toca clientes de su propio centro; superadmin y gerente, de todos.
+// admin solo toca clientes de su propio centro; superadmin, gerente y gerente_ventas, de todos.
 function puedeTocarCentro(rol: string, miCentro: string | null | undefined, centroCliente: string | null | undefined) {
-  if (rol === "superadmin" || rol === "gerente") return true;
+  if (rol === "superadmin" || rol === "gerente" || rol === "gerente_ventas") return true;
   return !!miCentro && miCentro === centroCliente;
 }
 

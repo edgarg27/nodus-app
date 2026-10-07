@@ -286,7 +286,7 @@ export default function CentroPanel({
 
   const puedeEditarInternet = rol === "sistemas" || (rol === "superadmin" || rol === "gerente");
   const puedeEditarTelefonia = rol === "admin" || (rol === "superadmin" || rol === "gerente");
-  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones";
+  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones" || rol === "gerente_ventas";
   const TABS_POR_ROL =
     rol === "sistemas"
       ? TABS_TODAS.filter(

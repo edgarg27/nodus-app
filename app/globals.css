@@ -1529,6 +1529,15 @@ a.stat-card {
   }
 }
 
+/* Gerente de Ventas: 6 módulos por renglón en pantallas anchas (cada uno de
+   sus dos grupos tiene 6), a todo lo ancho como los grupos del admin; en
+   angostas se acomoda solo como .modulos-grid. */
+@media (min-width: 860px) {
+  .modulos-grid-6 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
 /* Lista de espacios de Coworking dentro de la tarjeta de cada letra
    (Cotizar): se desliza solo por dentro (overscroll-behavior evita que la
    página se mueva cuando el cursor está encima) y la barrita delgada solo

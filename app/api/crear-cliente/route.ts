@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { nombre, email, empresa, rfc, telefono, centro: centroBody, diaPago, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi } = body;
 
-  const centro = miProfile.rol === "sistemas" || miProfile.rol === "superadmin" || miProfile.rol === "gerente" ? centroBody : miProfile.centro;
+  const centro = miProfile.rol === "sistemas" || miProfile.rol === "superadmin" || miProfile.rol === "gerente" || miProfile.rol === "gerente_ventas" ? centroBody : miProfile.centro;
 
   if (!nombre || !email || !centro) {
     return NextResponse.json({ error: "Faltan datos obligatorios (nombre, correo, centro)" }, { status: 400 });

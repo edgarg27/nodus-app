@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { origenPublico } from "@/lib/origenPublico";
 
-const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas"];
+const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas"];
 
 async function verificarSoyGerente(req: NextRequest) {
   const supabase = createClient();

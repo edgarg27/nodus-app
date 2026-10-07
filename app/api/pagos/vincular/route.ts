@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+  const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
   const esGlobal = ROLES_GLOBALES.includes(miProfile.rol);
 
   if (!esGlobal) {
