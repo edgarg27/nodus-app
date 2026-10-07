@@ -18,6 +18,8 @@ cat > /etc/crontabs/root <<'EOF'
 0 18 * * * /bin/sh /llamar.sh recordatorio-tours
 # Recordatorio por correo una hora antes de cada tour (revisa cada 10 min).
 */10 * * * * /bin/sh /llamar.sh recordatorio-tours-hora
+# Resumen por correo del seguimiento de prospectos: actividades de hoy y atrasadas.
+0 9 * * * /bin/sh /llamar.sh recordatorio-seguimiento
 EOF
 
 echo "[cron] listo: $(date)"
