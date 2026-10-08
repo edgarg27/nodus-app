@@ -28,7 +28,7 @@ const ROLES_STAFF = [
 
 // Solo un superadmin puede crear cuentas con estos roles (el gerente tiene sus
 // mismos privilegios, pero no puede multiplicarlos).
-const ROLES_RESERVADOS = ["superadmin", "gerente"];
+const ROLES_RESERVADOS = ["superadmin", "gerente", "ceo"];
 
 const ROL_ICONO: Record<string, string> = {
   admin: "🧑‍💼",
@@ -281,7 +281,7 @@ export default function UsuariosPage() {
                       {u.centro ? ` · ${u.centro}` : ""}
                     </p>
                   </div>
-                  {(u.rol !== "superadmin" || miRol === "superadmin") && (
+                  {(!ROLES_RESERVADOS.includes(u.rol || "") || miRol === "superadmin") && (
                     <button className="tel-borrar-btn" onClick={() => borrarUsuario(u)} disabled={borrando === u.id}>
                       {borrando === u.id ? "..." : "🗑 Borrar"}
                     </button>
