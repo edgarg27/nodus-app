@@ -865,6 +865,11 @@ export default function AdminPanel({
               ? `${CORREOS_BIENVENIDA.includes((correo || "").toLowerCase()) ? "Bienvenida" : "Bienvenido"}${
                   nombre.trim() ? `, ${nombre.trim().split(/\s+/)[0]}` : ""
                 }`
+              : rol === "admin"
+              ? // La cuenta admin de cada centro es del equipo, no de una persona.
+                centro
+                ? `Bienvenida, Equipo ${centro}`
+                : "Bienvenida"
               : "Panel Admin"}
           </p>
           <p className="panel-header-sub">
