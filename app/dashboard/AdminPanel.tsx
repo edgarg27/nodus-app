@@ -973,7 +973,7 @@ export default function AdminPanel({
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
             onClick={() => setTab("admin")}
           >
-            {rol === "gerente_ventas" ? "Panel" : "Administrador"}
+            Panel
           </button>
           {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && (
             <button
