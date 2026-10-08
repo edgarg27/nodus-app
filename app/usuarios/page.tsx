@@ -26,6 +26,10 @@ const ROLES_STAFF = [
   { id: "captive", label: "Captive" },
 ];
 
+// Solo un superadmin puede crear cuentas con estos roles (el gerente tiene sus
+// mismos privilegios, pero no puede multiplicarlos).
+const ROLES_RESERVADOS = ["superadmin", "gerente"];
+
 const ROL_ICONO: Record<string, string> = {
   admin: "🧑‍💼",
   superadmin: "👑",
@@ -191,7 +195,7 @@ export default function UsuariosPage() {
                     required
                   />
                   <select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}>
-                    {ROLES_STAFF.filter((r) => r.id !== "superadmin" || miRol === "superadmin").map((r) => (
+                    {ROLES_STAFF.filter((r) => !(ROLES_RESERVADOS.includes(r.id) && miRol !== "superadmin")).map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.label}
                       </option>
@@ -277,9 +281,11 @@ export default function UsuariosPage() {
                       {u.centro ? ` · ${u.centro}` : ""}
                     </p>
                   </div>
-                  <button className="tel-borrar-btn" onClick={() => borrarUsuario(u)} disabled={borrando === u.id}>
-                    {borrando === u.id ? "..." : "🗑 Borrar"}
-                  </button>
+                  {(u.rol !== "superadmin" || miRol === "superadmin") && (
+                    <button className="tel-borrar-btn" onClick={() => borrarUsuario(u)} disabled={borrando === u.id}>
+                      {borrando === u.id ? "..." : "🗑 Borrar"}
+                    </button>
+                  )}
                 </div>
               ))
             )}
