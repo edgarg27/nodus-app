@@ -4,6 +4,10 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { origenPublico } from "@/lib/origenPublico";
 
+// Roles que solo un superadmin puede crear o borrar (el gerente tiene sus mismos
+// privilegios, pero no puede multiplicarlos; el CEO es una sola persona).
+const ROLES_RESERVADOS = ["superadmin", "gerente", "ceo"];
+
 const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas", "ceo", "captive"];
 
 async function verificarSoyGerente(req: NextRequest) {
@@ -37,10 +41,8 @@ export async function POST(req: NextRequest) {
   if (!ROLES_STAFF.includes(rol)) {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
   }
-  // Solo un superadmin puede dar de alta cuentas superadmin o gerente (el
-  // gerente tiene sus mismos privilegios, pero no puede multiplicarlos).
-  if ((rol === "superadmin" || rol === "gerente") && yo.rol !== "superadmin") {
-    return NextResponse.json({ error: "Solo un superadmin puede crear cuentas superadmin o gerente" }, { status: 403 });
+  if (ROLES_RESERVADOS.includes(rol) && yo.rol !== "superadmin") {
+    return NextResponse.json({ error: "Solo un superadmin puede crear cuentas superadmin, gerente o CEO" }, { status: 403 });
   }
 
   const admin = createAdminClient();
@@ -108,11 +110,11 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Un gerente no puede borrar cuentas superadmin ni otras de gerente.
+  // Un gerente no puede borrar cuentas superadmin, gerente ni CEO.
   if (yo.rol !== "superadmin") {
     const { data: objetivo } = await admin.from("profiles").select("rol").eq("id", userId).maybeSingle();
-    if (objetivo?.rol === "superadmin" || objetivo?.rol === "gerente") {
-      return NextResponse.json({ error: "Solo un superadmin puede borrar cuentas superadmin o gerente" }, { status: 403 });
+    if (ROLES_RESERVADOS.includes(objetivo?.rol || "")) {
+      return NextResponse.json({ error: "Solo un superadmin puede borrar cuentas superadmin, gerente o CEO" }, { status: 403 });
     }
   }
 

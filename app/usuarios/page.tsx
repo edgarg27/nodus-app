@@ -28,7 +28,7 @@ const ROLES_STAFF = [
 
 // Solo un superadmin puede crear cuentas con estos roles (el gerente tiene sus
 // mismos privilegios, pero no puede multiplicarlos).
-const ROLES_RESERVADOS = ["superadmin", "gerente"];
+const ROLES_RESERVADOS = ["superadmin", "gerente", "ceo"];
 
 const ROL_ICONO: Record<string, string> = {
   admin: "🧑‍💼",
