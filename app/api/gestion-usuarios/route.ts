@@ -20,13 +20,13 @@ async function verificarSoyGerente(req: NextRequest) {
     .single();
 
   if (miProfile?.rol !== "superadmin" && miProfile?.rol !== "gerente") return null;
-  return session.user.id;
+  return { id: session.user.id, rol: miProfile.rol as string };
 }
 
 // Crear una cuenta de staff nueva
 export async function POST(req: NextRequest) {
-  const miId = await verificarSoyGerente(req);
-  if (!miId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const yo = await verificarSoyGerente(req);
+  if (!yo) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const body = await req.json();
   const { nombre, email, rol, centro, password } = body;
@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
   }
   if (!ROLES_STAFF.includes(rol)) {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
+  }
+  // Solo un superadmin puede dar de alta a otro superadmin (el gerente tiene
+  // sus mismos privilegios, pero esta alta se reserva).
+  if (rol === "superadmin" && yo.rol !== "superadmin") {
+    return NextResponse.json({ error: "Solo un superadmin puede crear cuentas superadmin" }, { status: 403 });
   }
 
   const admin = createAdminClient();
@@ -92,12 +97,12 @@ export async function POST(req: NextRequest) {
 
 // Borrar una cuenta de staff
 export async function DELETE(req: NextRequest) {
-  const miId = await verificarSoyGerente(req);
-  if (!miId) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const yo = await verificarSoyGerente(req);
+  if (!yo) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { userId } = await req.json();
   if (!userId) return NextResponse.json({ error: "Falta el id del usuario" }, { status: 400 });
-  if (userId === miId) {
+  if (userId === yo.id) {
     return NextResponse.json({ error: "No puedes borrar tu propia cuenta desde aquí" }, { status: 400 });
   }
 

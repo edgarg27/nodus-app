@@ -191,7 +191,7 @@ export default function UsuariosPage() {
                     required
                   />
                   <select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value })}>
-                    {ROLES_STAFF.map((r) => (
+                    {ROLES_STAFF.filter((r) => r.id !== "superadmin" || miRol === "superadmin").map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.label}
                       </option>
