@@ -108,11 +108,11 @@ export async function DELETE(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Un gerente no puede borrar cuentas superadmin.
+  // Un gerente no puede borrar cuentas superadmin ni otras de gerente.
   if (yo.rol !== "superadmin") {
     const { data: objetivo } = await admin.from("profiles").select("rol").eq("id", userId).maybeSingle();
-    if (objetivo?.rol === "superadmin") {
-      return NextResponse.json({ error: "Solo un superadmin puede borrar cuentas superadmin" }, { status: 403 });
+    if (objetivo?.rol === "superadmin" || objetivo?.rol === "gerente") {
+      return NextResponse.json({ error: "Solo un superadmin puede borrar cuentas superadmin o gerente" }, { status: 403 });
     }
   }
 

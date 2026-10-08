@@ -281,7 +281,7 @@ export default function UsuariosPage() {
                       {u.centro ? ` · ${u.centro}` : ""}
                     </p>
                   </div>
-                  {(u.rol !== "superadmin" || miRol === "superadmin") && (
+                  {(!ROLES_RESERVADOS.includes(u.rol || "") || miRol === "superadmin") && (
                     <button className="tel-borrar-btn" onClick={() => borrarUsuario(u)} disabled={borrando === u.id}>
                       {borrando === u.id ? "..." : "🗑 Borrar"}
                     </button>
