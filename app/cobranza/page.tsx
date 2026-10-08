@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import { fechaLocal } from "@/lib/fechaMexico";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza", "gerente_ventas"];
 
 type ClienteCobranza = {
   id: string;

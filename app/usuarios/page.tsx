@@ -21,6 +21,9 @@ const ROLES_STAFF = [
   { id: "atencion_cliente", label: "Atención al Cliente" },
   { id: "diseno", label: "Diseño" },
   { id: "ventas", label: "Asesora de Ventas" },
+  { id: "gerente_ventas", label: "Gerente de Ventas" },
+  { id: "ceo", label: "CEO" },
+  { id: "captive", label: "Captive" },
 ];
 
 const ROL_ICONO: Record<string, string> = {

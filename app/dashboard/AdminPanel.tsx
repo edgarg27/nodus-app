@@ -8,6 +8,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { labelRol } from "@/lib/roles";
+import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
 
 type Cliente = {
@@ -228,7 +229,7 @@ export default function AdminPanel({
   const [formTelefono, setFormTelefono] = useState("");
   const [formOcupantes, setFormOcupantes] = useState("");
   // Edición completa (solo admin/gerente/superadmin, vía /api/gestion-clientes).
-  const puedeGestionarClientes = rol === "admin" || rol === "gerente" || rol === "superadmin";
+  const puedeGestionarClientes = rol === "admin" || rol === "gerente" || rol === "superadmin" || rol === "gerente_ventas";
   const [formNombre, setFormNombre] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formRfc, setFormRfc] = useState("");
@@ -267,6 +268,7 @@ export default function AdminPanel({
   const esGlobal =
     rol === "sistemas" ||
     (rol === "superadmin" || rol === "gerente") ||
+    rol === "gerente_ventas" ||
     rol === "operaciones" ||
     rol === "cobranza" ||
     rol === "atencion_cliente" ||
@@ -377,66 +379,35 @@ export default function AdminPanel({
     }
   }
 
-  const TIPOS_NOTIF_SISTEMAS = ["ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_ticket", "nuevo_voucher", "nuevo_did"];
-  const TIPOS_NOTIF_OPERACIONES = ["ticket_en_proceso", "ticket_resuelto", "nuevo_ticket", "proximo_mantenimiento"];
-  const TIPOS_NOTIF_COBRANZA = ["pago_confirmado", "fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "cuenta_pausada", "nuevo_gasto"];
-  const TIPOS_NOTIF_ATENCION = ["nueva_queja"];
-  const TIPOS_NOTIF_DISENO = ["nuevo_logro"];
-  // Ventas: solo lo suyo. Los avisos de reservaciones de clientes son de la
-  // administradora; a Ventas le llegan los tours, los contratos que le mandan a
-  // firma y la respuesta a SUS reservaciones (esas van por user_id, ver abajo).
-  const TIPOS_NOTIF_VENTAS = ["nuevo_tour", "contrato_a_firma"];
-  const TIPOS_NOTIF_VENTAS_PROPIAS = ["reservacion_confirmada", "reservacion_rechazada"];
-
-  const TIPOS_TICKET = ["nuevo_ticket", "ticket_en_proceso", "ticket_resuelto"];
-
+  // Qué avisos le tocan a cada rol: lib/avisosPorRol.ts (un solo lugar).
   async function fetchNotificaciones() {
-    let query = supabase.from("notificaciones").select("*").order("created_at", { ascending: false }).limit(20);
+    const tipos = AVISOS_POR_ROL[rol] || [];
+    let query = supabase
+      .from("notificaciones")
+      .select("*")
+      .in("tipo", tipos)
+      .order("created_at", { ascending: false })
+      .limit(20);
     if (!esGlobal && centro) query = query.eq("centro", centro);
-    if (rol === "sistemas") query = query.in("tipo", TIPOS_NOTIF_SISTEMAS);
-    else if (rol === "operaciones") query = query.in("tipo", TIPOS_NOTIF_OPERACIONES);
-    else if (rol === "cobranza") query = query.in("tipo", TIPOS_NOTIF_COBRANZA);
-    else if (rol === "atencion_cliente") query = query.in("tipo", TIPOS_NOTIF_ATENCION);
-    else if (rol === "diseno") query = query.in("tipo", TIPOS_NOTIF_DISENO);
-    else if (rol === "ventas") query = query.in("tipo", TIPOS_NOTIF_VENTAS);
-    const { data } = await query;
-    let propias: any[] = [];
-    if (rol === "ventas") {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data: respuestas } = await supabase
-          .from("notificaciones")
-          .select("*")
-          .eq("user_id", user.id)
-          .in("tipo", TIPOS_NOTIF_VENTAS_PROPIAS)
-          .order("created_at", { ascending: false })
-          .limit(20);
-        propias = respuestas || [];
-      }
-    }
-    // Filtro extra: un "nuevo_ticket"/"ticket_en_proceso"/"ticket_resuelto" solo
-    // le corresponde a sistemas si es de categoría "sistemas", y a operaciones
-    // si es de categoría "mantenimiento" — el tipo solo no basta para separarlos.
-    let lista = [...(data || []), ...propias]
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const [{ data }, { data: propias }] = await Promise.all([
+      query,
+      user
+        ? supabase
+            .from("notificaciones")
+            .select("*")
+            .eq("user_id", user.id)
+            .in("tipo", AVISOS_PROPIOS)
+            .order("created_at", { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const lista = [...(data || []), ...(propias || [])]
+      .filter((n) => AVISOS_PROPIOS.includes(n.tipo) || avisoEsParaRol(rol, n))
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
       .slice(0, 20);
-    // "Contrato a firma" es solo de Ventas. Las respuestas a una reservación ("Tu
-    // reservación … fue confirmada") son para quien la pidió, no para el resto del
-    // personal, que las veía mezcladas con sus avisos.
-    if (rol !== "ventas") {
-      lista = lista.filter((n) => !["contrato_a_firma", "reservacion_confirmada", "reservacion_rechazada"].includes(n.tipo));
-    }
-    if (rol === "sistemas") {
-      lista = lista.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "sistemas");
-    } else if (rol === "operaciones") {
-      lista = lista.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "mantenimiento");
-    }
-    // Logros, quejas y sugerencias solo le llegan al superadmin, no al admin/gerente.
-    if (rol === "gerente" || rol === "admin") {
-      lista = lista.filter((n) => n.tipo !== "nueva_queja" && n.tipo !== "nuevo_logro");
-    }
     setNotificaciones(lista);
   }
 
@@ -875,14 +846,14 @@ export default function AdminPanel({
               ? "Panel de Sistemas"
               : rol === "operaciones"
               ? "Panel de Operaciones"
-              : rol === "cobranza"
-              ? "Panel de Cobranza"
               : rol === "atencion_cliente"
               ? "Panel de Atención al Cliente"
               : rol === "diseno"
               ? "Panel de Diseño"
-              : rol === "ventas"
-              ? "Panel de Ventas"
+              : rol === "ventas" || rol === "gerente_ventas" || rol === "cobranza"
+              ? nombre.trim()
+                ? `Hola, ${nombre.trim().split(/\s+/)[0]}`
+                : "Hola"
               : "Panel Admin"}
           </p>
           <p className="panel-header-sub">
@@ -991,7 +962,7 @@ export default function AdminPanel({
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
             onClick={() => setTab("admin")}
           >
-            Administrador
+            {rol === "gerente_ventas" ? "Panel" : "Administrador"}
           </button>
           {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && (
             <button
@@ -1019,7 +990,7 @@ export default function AdminPanel({
               </div>
             ))}
 
-          {ticketsUrgentes.length > 0 && rol !== "ventas" && (
+          {ticketsUrgentes.length > 0 && rol !== "ventas" && rol !== "gerente_ventas" && (
             <a href="/tickets" className="alerta-urgente alerta-urgente-link">
               <span className="alerta-urgente-dot" />
               <span className="alerta-urgente-body">
@@ -1038,7 +1009,7 @@ export default function AdminPanel({
             </a>
           )}
 
-          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && (
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && rol !== "gerente_ventas" && (
             deslizadorConBanners(
                 <div className="resumen-deslizable-contenido">
               <p className="panel-section-label">Por atender</p>
@@ -1200,7 +1171,7 @@ export default function AdminPanel({
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas") && (
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas" || rol === "gerente_ventas") && (
             <div style={{ maxWidth: 700, width: "100%", margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
@@ -1214,14 +1185,20 @@ export default function AdminPanel({
           )}
 
           {rol === "ventas" ? (
-          <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
+          // Mismo ancho que .modulos-grid-5, para que "Módulos" quede alineado con las tarjetas.
+          <div style={{ maxWidth: 800, margin: "0 auto", width: "100%" }}>
             <p className="panel-section-label" style={{ marginTop: 8 }}>
               Módulos
             </p>
-            <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
+            <div className="modulos-grid modulos-grid-5" style={{ marginTop: 8 }}>
               {/* Asesora de Ventas: SOLO estos módulos. Va aparte a propósito:
                   las condiciones de la lista general son "a quién no se le
                   muestra" y un rol nuevo recibiría todo lo de la admin. */}
+              <a className="modulo-card" href="/contratos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por firmar)` : ""}</span>
+              </a>
               <a className="modulo-card" href="/sala-juntas">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
@@ -1242,10 +1219,116 @@ export default function AdminPanel({
                 <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Correos</span>
               </a>
+            </div>
+          </div>
+          ) : rol === "gerente_ventas" ? (
+          <div style={{ width: "100%" }}>
+            <p className="panel-section-label" style={{ marginTop: 8 }}>
+              Ventas y clientes
+            </p>
+            <div className="modulos-grid modulos-grid-6" style={{ marginTop: 8 }}>
+              {/* Gerente de Ventas: ventas, cobros y servicios, en todos los centros
+                  (mismas pantallas que permite lib/permisosRutas.ts). Va aparte
+                  por el mismo motivo que el bloque de Asesora de Ventas. */}
+              <a className="modulo-card" href="/prospectos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/prospectos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Prospectos</span>
+              </a>
+              <a className="modulo-card" href="/registrar-plan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizar.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizar</span>
+              </a>
+              <a className="modulo-card" href="/cotizaciones">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizaciones.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizaciones</span>
+              </a>
               <a className="modulo-card" href="/contratos">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Contratos{contratosPorSubir > 0 ? ` (${contratosPorSubir} por firmar)` : ""}</span>
+                <span className="modulo-name">Contratos</span>
+              </a>
+              <a className="modulo-card" href="/alta-cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/nuevo-cliente.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Nuevo cliente</span>
+              </a>
+              <a className="modulo-card" href="/baja-cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/baja-cliente.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Baja de cliente</span>
+              </a>
+            </div>
+            <p className="panel-section-label" style={{ marginTop: 16 }}>
+              Cobros y finanzas
+            </p>
+            <div className="modulos-grid modulos-grid-6" style={{ marginTop: 8 }}>
+              <a className="modulo-card" href="/cobranza">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cobranza.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cobranza</span>
+              </a>
+              <a className="modulo-card" href="/pagos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/pagos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Pagos</span>
+              </a>
+              <a className="modulo-card" href="/facturas-admin">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Facturas</span>
+              </a>
+              <a className="modulo-card" href="/adicionales">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/adicionales.svg" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Adicionales</span>
+              </a>
+              <a className="modulo-card" href="/deposito-garantia">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/deposito-garantia.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Depósito en garantía</span>
+              </a>
+              <a className="modulo-card" href="/ingresos-centro">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/ingresos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Ingresos por Centro</span>
+              </a>
+            </div>
+            <p className="panel-section-label" style={{ marginTop: 16 }}>
+              Servicios y administración
+            </p>
+            <div className="modulos-grid modulos-grid-6" style={{ marginTop: 8 }}>
+              <a className="modulo-card" href="/tours">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tours.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tours</span>
+              </a>
+              <a className="modulo-card" href="/paquetes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/planes.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Planes</span>
+              </a>
+              <a className="modulo-card" href="/experiencia-cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/calendario-eventos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Calendario de Eventos</span>
+              </a>
+              <a className="modulo-card" href="/correos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Correos</span>
+              </a>
+              <a className="modulo-card" href="/centro/resumen">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Resumen</span>
+              </a>
+              <a className="modulo-card" href="/expedientes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/expediente-clientes.svg" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Expediente de clientes</span>
               </a>
             </div>
           </div>

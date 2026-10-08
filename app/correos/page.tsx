@@ -7,7 +7,7 @@ import { construirHtmlComunicado } from "@/lib/comunicado";
 
 type Cliente = { id: string; nombre: string; email: string; empresa: string | null; numero_oficina: string | null };
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const BUCKET_IMAGENES = "comunicados";
 
 type Resultado = { clientes: number; omitidos: number; fallidos: number; desde: string; usaSuCorreo: boolean };

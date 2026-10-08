@@ -118,7 +118,7 @@ function oficinaDe(c: Cliente) {
 
 export default function ExpedientesPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(["gerente"], ["gerente"]);
+  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(["gerente", "gerente_ventas"], ["gerente", "gerente_ventas"]);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [conteoPorCliente, setConteoPorCliente] = useState<Record<string, number>>({});

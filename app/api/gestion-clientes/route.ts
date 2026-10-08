@@ -8,7 +8,7 @@ import { origenPublico } from "@/lib/origenPublico";
 // al admin cambiar TODOS los datos de una cuenta de cliente (incluido el
 // correo de acceso) y resolver problemas de contraseña. Solo para admin,
 // gerente y superadmin, y solo sobre cuentas con rol "cliente".
-const ROLES_PERMITIDOS = ["admin", "gerente", "superadmin"];
+const ROLES_PERMITIDOS = ["admin", "gerente", "superadmin", "gerente_ventas"];
 
 async function verificarPermiso() {
   const supabase = createClient();

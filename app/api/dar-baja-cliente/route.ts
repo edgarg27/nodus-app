@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   }
 
-  if (miProfile.rol !== "sistemas" && miProfile.rol !== "superadmin" && miProfile.rol !== "gerente" && miProfile.centro !== cliente.centro) {
+  if (miProfile.rol !== "sistemas" && miProfile.rol !== "superadmin" && miProfile.rol !== "gerente" && miProfile.rol !== "gerente_ventas" && miProfile.centro !== cliente.centro) {
     return NextResponse.json({ error: "No puedes dar de baja clientes de otro centro" }, { status: 403 });
   }
 

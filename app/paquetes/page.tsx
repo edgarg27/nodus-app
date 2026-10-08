@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 type Paquete = {
@@ -381,7 +381,7 @@ export default function PaquetesPage() {
         <a className="rep-back" href="/dashboard">
           ← Regresar
         </a>
-        <p className="rep-title">Paquetes</p>
+        <p className="rep-title">Planes</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (
           <div className="centro-selector">
@@ -697,7 +697,7 @@ export default function PaquetesPage() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
-                📦 Paquetes ({paquetes.length})
+                📦 Planes ({paquetes.length})
               </p>
               {puedeGestionarPaquetes && (
                 <button
@@ -705,7 +705,7 @@ export default function PaquetesPage() {
                   style={{ color: "#0d1b3e", fontWeight: 600 }}
                   onClick={() => (mostrarForm ? setMostrarForm(false) : abrirNuevo())}
                 >
-                  {mostrarForm ? "Cancelar" : "+ Nuevo paquete"}
+                  {mostrarForm ? "Cancelar" : "+ Nuevo plan"}
                 </button>
               )}
             </div>
@@ -715,7 +715,7 @@ export default function PaquetesPage() {
                 <p className="sub-label">Nombre del paquete</p>
                 <input
                   type="text"
-                  placeholder="Ej. Paquete Coworking 10 días"
+                  placeholder="Ej. Plan Coworking 10 días"
                   value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                 />
@@ -893,7 +893,7 @@ export default function PaquetesPage() {
                     <span>¡Listo!</span>
                   </span>
                   <span className="btn-enviar-text">
-                    {editandoId ? "Guardar cambios" : "+ Guardar paquete"}
+                    {editandoId ? "Guardar cambios" : "+ Guardar plan"}
                   </span>
                 </button>
               </form>

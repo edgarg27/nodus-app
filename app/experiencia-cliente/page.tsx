@@ -10,7 +10,7 @@ import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 // RLS de dias_centro, ver migracion_permisos_diseno_ventas.sql). Diseño también
 // avisa cuándo no abre un centro, y por eso elige el centro como los roles globales.
 const ROLES_EDITAN_DIAS = ["admin", "superadmin", "gerente", "diseno"];
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente", "diseno"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente", "diseno", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 

@@ -76,7 +76,7 @@ export type Contrato = {
   cliente_telefono?: string | null;
 };
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 export default function ContratosPage() {
