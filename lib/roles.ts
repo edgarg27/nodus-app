@@ -20,3 +20,13 @@ export const ROL_LABEL: Record<string, string> = {
 export function labelRol(rol: string): string {
   return ROL_LABEL[rol] || rol;
 }
+
+// "gerente" tiene exactamente los mismos privilegios que "superadmin" (solo
+// cambia el nombre que se muestra). Todo permiso de superadmin se pregunta
+// con esto, no con rol === "superadmin". Las políticas RLS hacen lo mismo
+// (ver migracion_gerente_igual_superadmin.sql).
+export const ROLES_SUPERADMIN = ["superadmin", "gerente"];
+
+export function esSuperadmin(rol: string | null | undefined): boolean {
+  return !!rol && ROLES_SUPERADMIN.includes(rol);
+}

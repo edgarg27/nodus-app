@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { esSuperadmin } from "@/lib/roles";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 
 // atencion_cliente es cuenta sin centro: ve todos, con selector.
@@ -58,15 +59,15 @@ export default function InventarioPage() {
   const [borrandoId, setBorrandoId] = useState<string | null>(null);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
-  const esSuper = miRol === "superadmin";
+  const esSuper = esSuperadmin(miRol);
 
-  // Superadmin: el filtro que eligió; los demás: siempre su propia área.
+  // Superadmin/gerente: el filtro que eligió; los demás: siempre su propia área.
   function areaAFiltrar(rol: string, filtro: FiltroArea): Area | null {
-    if (rol === "superadmin") return filtro === "todos" ? null : filtro;
+    if (esSuperadmin(rol)) return filtro === "todos" ? null : filtro;
     return areaPropia(rol);
   }
 
-  // Para la columna "Registró" (solo superadmin).
+  // Para la columna "Registró" (solo superadmin/gerente).
   async function cargarNombres(lista: Item[]) {
     const ids = Array.from(new Set(lista.map((i) => i.registrado_por).filter((x): x is string => !!x)));
     if (ids.length === 0) return {} as Record<string, string>;
@@ -169,7 +170,7 @@ export default function InventarioPage() {
     if (area) q = q.eq("area", area);
     const { data } = await q.order("dispositivo");
     setItems(data || []);
-    if (rol === "superadmin") setNombrePorId(await cargarNombres(data || []));
+    if (esSuperadmin(rol)) setNombrePorId(await cargarNombres(data || []));
   }
 
   const itemsFiltrados = items.filter((i) => {

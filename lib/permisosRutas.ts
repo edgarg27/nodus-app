@@ -10,6 +10,8 @@
 // OJO: esto protege las PANTALLAS. Los datos siguen protegidos por RLS (que hoy
 // distingue cliente de personal, no un rol de personal de otro).
 
+import { esSuperadmin } from "./roles";
+
 export const ROLES_PERSONAL = [
   "admin",
   "superadmin",
@@ -25,7 +27,8 @@ export const ROLES_PERSONAL = [
   "captive",
 ];
 
-// superadmin puede abrir todo, así que no se lista en cada regla.
+// superadmin (y gerente, que tiene sus mismos privilegios) puede abrir todo, así
+// que no se lista en cada regla.
 const REGLAS: { prefijo: string; roles: string[] }[] = [
   // ----- Administración del centro -----
   { prefijo: "/contratos", roles: ["admin", "gerente", "ventas", "gerente_ventas"] },
@@ -96,7 +99,7 @@ const RUTAS_CEO = ["/dashboard"];
 // `rol` es un rol de personal (los clientes se manejan aparte). Regresa false si ese
 // rol no debe abrir `ruta`.
 export function rutaPermitida(rol: string, ruta: string): boolean {
-  if (rol === "superadmin") return true;
+  if (esSuperadmin(rol)) return true;
   if (rol === "ceo" || rol === "captive") return RUTAS_CEO.some((r) => ruta === r || ruta.startsWith(r + "/"));
   if (CHECKIN_DAY_PASS.test(ruta)) return ROLES_CHECKIN.includes(rol);
   const regla = REGLAS_ORDENADAS.find((r) => ruta === r.prefijo || ruta.startsWith(r.prefijo + "/"));

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { esSuperadmin } from "@/lib/roles";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -200,9 +201,9 @@ export default function PaquetesPage() {
   }
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
-  // Solo superadmin puede crear/editar/borrar paquetes — el resto de roles
+  // Solo superadmin/gerente puede crear/editar/borrar paquetes — el resto de roles
   // (incluyendo "admin" de centro) únicamente los visualiza.
-  const puedeGestionarPaquetes = miRol === "superadmin";
+  const puedeGestionarPaquetes = esSuperadmin(miRol);
 
   useEffect(() => {
     init();
