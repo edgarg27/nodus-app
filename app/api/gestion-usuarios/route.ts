@@ -37,10 +37,10 @@ export async function POST(req: NextRequest) {
   if (!ROLES_STAFF.includes(rol)) {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
   }
-  // Solo un superadmin puede dar de alta a otro superadmin (el gerente tiene
-  // sus mismos privilegios, pero esta alta se reserva).
-  if (rol === "superadmin" && yo.rol !== "superadmin") {
-    return NextResponse.json({ error: "Solo un superadmin puede crear cuentas superadmin" }, { status: 403 });
+  // Solo un superadmin puede dar de alta cuentas superadmin o gerente (el
+  // gerente tiene sus mismos privilegios, pero no puede multiplicarlos).
+  if ((rol === "superadmin" || rol === "gerente") && yo.rol !== "superadmin") {
+    return NextResponse.json({ error: "Solo un superadmin puede crear cuentas superadmin o gerente" }, { status: 403 });
   }
 
   const admin = createAdminClient();
@@ -107,6 +107,14 @@ export async function DELETE(req: NextRequest) {
   }
 
   const admin = createAdminClient();
+
+  // Un gerente no puede borrar cuentas superadmin.
+  if (yo.rol !== "superadmin") {
+    const { data: objetivo } = await admin.from("profiles").select("rol").eq("id", userId).maybeSingle();
+    if (objetivo?.rol === "superadmin") {
+      return NextResponse.json({ error: "Solo un superadmin puede borrar cuentas superadmin" }, { status: 403 });
+    }
+  }
 
   const { error: authError } = await admin.auth.admin.deleteUser(userId);
   if (authError) {
