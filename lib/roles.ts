@@ -13,6 +13,8 @@ export const ROL_LABEL: Record<string, string> = {
   diseno: "Diseño",
   ventas: "Asesora de Ventas",
   gerente_ventas: "Gerente de Ventas",
+  ceo: "CEO",
+  captive: "Captive",
 };
 
 export function labelRol(rol: string): string {

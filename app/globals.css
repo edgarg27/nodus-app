@@ -6835,3 +6835,532 @@ a.stat-card {
   font-size: 13px;
   background: #fff;
 }
+
+/* ---------------------------------------------------------------------------
+   Panel de Dirección (app/dashboard/PanelDireccion.tsx)
+   --------------------------------------------------------------------------- */
+.dir-contenido {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dir-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dir-seccion-titulo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.dir-filtro {
+  border: 1px solid #dde1ea;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: #fff;
+  color: #0d1b3e;
+  font-family: inherit;
+}
+
+.dir-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.dir-kpi {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  border: 1px solid #eef0f4;
+}
+
+.dir-kpi-num {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.dir-kpi-de {
+  font-size: 15px;
+  font-weight: 600;
+  color: #888;
+}
+
+.dir-kpi-label {
+  font-size: 12px;
+  color: #777;
+  margin: 4px 0 0;
+}
+
+.dir-nota {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.dir-centros {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.dir-centro {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 18px;
+  border: 1px solid #eef0f4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dir-centro-cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dir-centro-nombre {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0;
+}
+
+.dir-centro-pct {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.dir-barra-ocupacion {
+  height: 8px;
+  border-radius: 4px;
+  background: #f0f1f4;
+  overflow: hidden;
+}
+
+.dir-barra-ocupacion > div {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.dir-centro-sub {
+  font-size: 12px;
+  color: #777;
+  margin: 0;
+}
+
+.dir-tipos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid #f2f3f6;
+  padding-top: 8px;
+}
+
+.dir-tipo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+}
+
+.dir-tipo strong {
+  color: #0d1b3e;
+}
+
+.dir-disponibles summary {
+  font-size: 12px;
+  font-weight: 600;
+  color: #185fa5;
+  cursor: pointer;
+}
+
+.dir-disponibles p {
+  font-size: 12px;
+  color: #555;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.dir-rangos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dir-rango {
+  border: 1px solid #dde1ea;
+  background: #fff;
+  color: #0d1b3e;
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dir-rango-on {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+.dir-rango-alerta:not(.dir-rango-on) {
+  color: #a32d2d;
+  border-color: #f0c4c4;
+}
+
+.dir-tabla-envoltura {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #eef0f4;
+  overflow-x: auto;
+}
+
+.dir-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dir-tabla th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eef0f4;
+  white-space: nowrap;
+}
+
+.dir-tabla td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f4f5f7;
+  color: #1a1a1a;
+  vertical-align: top;
+}
+
+.dir-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+.dir-tabla-sub {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.dir-vencido {
+  color: #a32d2d;
+  font-weight: 700;
+}
+
+/* Panel de Dirección: pestañas de sección, tarjetas y gráficas. */
+.dir-tabs-envoltura {
+  background: #fff;
+  border-bottom: 1px solid #eef0f4;
+  overflow-x: auto;
+}
+
+.dir-tabs {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 20px;
+  display: flex;
+  gap: 6px;
+}
+
+.dir-tab {
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dir-tab:hover {
+  background: #f4f5f8;
+}
+
+.dir-tab-on,
+.dir-tab-on:hover {
+  background: #0d1b3e;
+  color: #fff;
+}
+
+.dir-filtros {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dir-subtitulo {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 14px 0 0;
+}
+
+.dir-delta {
+  display: block;
+  font-size: 11px;
+  color: #999;
+  margin-top: 6px;
+}
+
+.dir-delta-bien {
+  color: #0f6e56;
+  font-weight: 700;
+}
+
+.dir-delta-mal {
+  color: #a32d2d;
+  font-weight: 700;
+}
+
+.dir-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px;
+  border: 1px solid #eef0f4;
+  min-width: 0;
+}
+
+.dir-card-titulo {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0 0 14px;
+}
+
+.dir-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.dir-vacio {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+}
+
+.dir-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dir-lista-texto {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: #444;
+}
+
+.dir-lista-texto small {
+  display: block;
+  font-size: 11px;
+  color: #999;
+}
+
+.dir-lista-texto strong {
+  color: #0d1b3e;
+  white-space: nowrap;
+}
+
+.dir-lista-barra {
+  height: 6px;
+  border-radius: 3px;
+  background: #f2f3f6;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.dir-lista-barra > div {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.dir-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 180px;
+}
+
+.dir-barras-mes {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dir-barras-grupo {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+
+.dir-barras-barra {
+  width: 100%;
+  max-width: 26px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+}
+
+.dir-barras-etiqueta {
+  font-size: 11px;
+  color: #888;
+}
+
+.dir-leyenda {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #555;
+}
+
+.dir-leyenda i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.dir-tabla-plana {
+  border: none;
+  border-radius: 0;
+}
+
+.dir-alertas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dir-alerta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid #f5d9c4;
+  background: #fff8f2;
+  color: #5c3a1c;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dir-alerta-grave {
+  border-color: #f0c4c4;
+  background: #fdf5f5;
+  color: #7a1f1f;
+}
+
+.dir-alerta-ir {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dir-perdidos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dir-perdido p {
+  margin: 0;
+  font-size: 13px;
+  color: #333;
+}
+
+.dir-perdido p span {
+  color: #999;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.dir-perdido-motivo {
+  color: #7a1f1f !important;
+  font-style: italic;
+  margin-top: 2px !important;
+}
+
+/* Panel de Dirección · Resumen: carrusel a la izquierda, alertas a la
+   derecha; en pantallas angostas, uno debajo del otro. */
+.dir-resumen-fila {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .dir-resumen-fila {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+}
+
+.dir-carrusel {
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* Panel de Dirección (Captive): lista de precios de los espacios disponibles. */
+.dir-precios {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.dir-precio {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: #444;
+  border-bottom: 1px dashed #eef0f4;
+  padding-bottom: 4px;
+}
+
+.dir-precio strong {
+  color: #0d1b3e;
+  white-space: nowrap;
+}

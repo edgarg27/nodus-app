@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import AdminPanel from "./AdminPanel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
+import { labelRol } from "@/lib/roles";
+import PanelDireccion from "./PanelDireccion";
+import { cargarDatosDireccion } from "./datosDireccion";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
@@ -28,6 +31,20 @@ export default async function DashboardPage() {
   // candado — no puede confiar en que siempre lleguen por esa puerta.
   if (!profile?.rol) redirect("/login");
   if (profile.rol === "cliente") redirect("/dashboard-cliente");
+
+  // CEO y Captive: su propio panel de números (Panel de Dirección), solo
+  // consulta. Captive además ve los precios de los espacios disponibles.
+  if (profile.rol === "ceo" || profile.rol === "captive") {
+    const datos = await cargarDatosDireccion(supabase);
+    return (
+      <PanelDireccion
+        datos={datos}
+        nombre={profile.nombre || ""}
+        rolLabel={labelRol(profile.rol)}
+        mostrarPrecios={profile.rol === "captive"}
+      />
+    );
+  }
 
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;

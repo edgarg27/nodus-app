@@ -21,6 +21,8 @@ export const ROLES_PERSONAL = [
   "diseno",
   "ventas",
   "gerente_ventas",
+  "ceo",
+  "captive",
 ];
 
 // superadmin puede abrir todo, así que no se lista en cada regla.
@@ -86,10 +88,16 @@ const ROLES_CHECKIN = ["admin", "gerente"];
 
 const REGLAS_ORDENADAS = [...REGLAS].sort((a, b) => b.prefijo.length - a.prefijo.length);
 
+// CEO y Captive (solo consulta) abren únicamente su Panel de Dirección: las demás pantallas son
+// de captura y edición. Lista cerrada a propósito (al revés que REGLAS): una
+// pantalla nueva no le queda abierta por omisión.
+const RUTAS_CEO = ["/dashboard"];
+
 // `rol` es un rol de personal (los clientes se manejan aparte). Regresa false si ese
 // rol no debe abrir `ruta`.
 export function rutaPermitida(rol: string, ruta: string): boolean {
   if (rol === "superadmin") return true;
+  if (rol === "ceo" || rol === "captive") return RUTAS_CEO.some((r) => ruta === r || ruta.startsWith(r + "/"));
   if (CHECKIN_DAY_PASS.test(ruta)) return ROLES_CHECKIN.includes(rol);
   const regla = REGLAS_ORDENADAS.find((r) => ruta === r.prefijo || ruta.startsWith(r.prefijo + "/"));
   if (!regla) return true;
