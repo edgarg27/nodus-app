@@ -2,10 +2,12 @@
 // dispara desde sus pantallas). Antes solo se comprobaba "no ser cliente": cualquier
 // cuenta de personal (Ventas, Diseño…) podía llamar directo a /api/pagos/marcar-pagado,
 // a /api/dar-baja-cliente, etc. Aquí cada acción lista los roles de las pantallas que
-// la usan (ver lib/permisosRutas.ts). superadmin puede todo; un cliente, nada.
+// la usan (ver lib/permisosRutas.ts). superadmin (y gerente) puede todo; un cliente, nada.
 //
 // Al crear una ruta /api nueva para el personal, hay que agregarla aquí y llamar a
 // rolPuede() en la ruta.
+
+import { esSuperadmin } from "./roles";
 
 export type AccionApi =
   | "pagosCrear"
@@ -53,6 +55,6 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
 
 export function rolPuede(rol: string | null | undefined, accion: AccionApi): boolean {
   if (!rol || rol === "cliente") return false;
-  if (rol === "superadmin") return true;
+  if (esSuperadmin(rol)) return true;
   return ROLES_POR_ACCION[accion].includes(rol);
 }

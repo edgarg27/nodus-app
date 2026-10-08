@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ROLES_SUPERADMIN, esSuperadmin } from "@/lib/roles";
 
 export const CENTROS = [
   "Bosques",
@@ -14,9 +15,9 @@ export const CENTROS = [
 ];
 
 // Por ahora los módulos de Decoraciones, Eventos y Documentación del centro
-// los administra solo admin y superadmin (las políticas RLS de
+// los administra solo admin y superadmin/gerente (las políticas RLS de
 // migracion_atencion_clientes_modulos.sql usan la misma lista).
-export const ROLES_ADMIN_CENTRO = ["admin", "superadmin"];
+export const ROLES_ADMIN_CENTRO = ["admin", ...ROLES_SUPERADMIN];
 
 // Superadmin ve todos los centros con un selector; admin queda fijo al
 // centro de su propio perfil. `rolesExtra` permite que una pantalla en
@@ -46,7 +47,7 @@ export function useCentroAdmin(rolesExtra: string[] = [], rolesGlobales: string[
       }
       const { data: perfil } = await supabase.from("profiles").select("rol, nombre, centro").eq("id", user.id).single();
       const r = perfil?.rol || "";
-      const esGlobalParaMi = r === "superadmin" || rolesGlobales.includes(r);
+      const esGlobalParaMi = esSuperadmin(r) || rolesGlobales.includes(r);
       setRol(r);
       setNombre(perfil?.nombre || "");
       setUserId(user.id);
@@ -62,7 +63,7 @@ export function useCentroAdmin(rolesExtra: string[] = [], rolesGlobales: string[
     userId,
     centro,
     setCentro,
-    esGlobal: rol === "superadmin" || rolesGlobales.includes(rol),
+    esGlobal: esSuperadmin(rol) || rolesGlobales.includes(rol),
     permitido: ROLES_ADMIN_CENTRO.includes(rol) || rolesExtra.includes(rol),
   };
 }

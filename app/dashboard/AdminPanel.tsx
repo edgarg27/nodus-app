@@ -7,9 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
-import { labelRol } from "@/lib/roles";
+import { esSuperadmin, labelRol } from "@/lib/roles";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
+
+// Cuentas de superadmin/gerente a las que el encabezado saluda con "Bienvenida"
+// (no guardamos el género en el perfil; las demás dicen "Bienvenido").
+const CORREOS_BIENVENIDA = ["mflores@nodusbc.mx"];
 
 type Cliente = {
   id: string;
@@ -106,6 +110,7 @@ export default function AdminPanel({
   resumen,
   clientesIniciales,
   numeroUsuario = null,
+  correo = null,
 }: {
   nombre: string;
   rol: string;
@@ -115,6 +120,8 @@ export default function AdminPanel({
   // N.º de usuario (N-1234): con él también se inicia sesión y se recupera
   // la contraseña; se muestra en el menú de la cuenta.
   numeroUsuario?: string | null;
+  // Correo de la cuenta: decide "Bienvenida" o "Bienvenido" del superadmin/gerente.
+  correo?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -854,6 +861,10 @@ export default function AdminPanel({
               ? nombre.trim()
                 ? `Hola, ${nombre.trim().split(/\s+/)[0]}`
                 : "Hola"
+              : esSuperadmin(rol)
+              ? `${CORREOS_BIENVENIDA.includes((correo || "").toLowerCase()) ? "Bienvenida" : "Bienvenido"}${
+                  nombre.trim() ? `, ${nombre.trim().split(/\s+/)[0]}` : ""
+                }`
               : "Panel Admin"}
           </p>
           <p className="panel-header-sub">
@@ -1614,9 +1625,9 @@ export default function AdminPanel({
                   <span className="modulo-name">Logros</span>
                 </a>
               ) },
-              // Documentación: admin, superadmin, atencion_cliente y diseno
+              // Documentación: admin, superadmin, gerente, atencion_cliente y diseno
               // (mismas listas que sus políticas RLS).
-              { grupo: 4, ver: rol === "admin" || rol === "superadmin" || rol === "atencion_cliente" || rol === "diseno", key: "documentacion", tarjeta: (
+              { grupo: 4, ver: rol === "admin" || esSuperadmin(rol) || rol === "atencion_cliente" || rol === "diseno", key: "documentacion", tarjeta: (
                 <a className="modulo-card" href="/documentacion-centro">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/documentacion-centro.png" alt="" className="modulo-icon icon-img-32" />

@@ -38,7 +38,8 @@ const sin = (lista: string[], quitar: string[]) => lista.filter((t) => !quitar.i
 // (y de Atención al Cliente / Diseño, que son sus módulos).
 export const AVISOS_POR_ROL: Record<string, string[]> = {
   superadmin: sin(todosLosDePersonal, PERSONAL.contratosAFirma),
-  gerente: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros]),
+  // Gerente = superadmin con otro nombre.
+  gerente: sin(todosLosDePersonal, PERSONAL.contratosAFirma),
   admin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros]),
   sistemas: [...PERSONAL.tickets, ...PERSONAL.telefonia, ...PERSONAL.vouchers],
   operaciones: [...PERSONAL.tickets, ...PERSONAL.mantenimiento],

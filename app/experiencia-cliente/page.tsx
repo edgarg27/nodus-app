@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { esSuperadmin } from "@/lib/roles";
 import { empresasDistintas } from "@/lib/empresa";
 import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 
@@ -53,9 +54,9 @@ export default function ExperienciaClientePage() {
   const [tab, setTab] = useState<"calendario" | "cumpleanos" | "eventos" | "encuestas">(tabInicial);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
-  // El apartado de Encuestas es solo para superadmin — el resto de roles
+  // El apartado de Encuestas es solo para superadmin/gerente — el resto de roles
   // (incluyendo "admin" de centro) ni siquiera ve la pestaña.
-  const puedeVerEncuestas = miRol === "superadmin";
+  const puedeVerEncuestas = esSuperadmin(miRol);
 
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);

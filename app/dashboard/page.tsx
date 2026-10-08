@@ -158,6 +158,7 @@ export default async function DashboardPage() {
       nombre={profile?.nombre || session.user.email || "Sistemas"}
       rol={profile?.rol || ""}
       numeroUsuario={profile?.numero_usuario || null}
+      correo={session.user.email || null}
       centro={miCentro}
       resumen={{
         totalClientes: (clientes || []).filter((c) => c.activo !== false && !c.suspendido).length,
