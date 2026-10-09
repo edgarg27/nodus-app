@@ -85,7 +85,9 @@ export default function UsuariosPage() {
       .neq("rol", "cliente")
       .order("rol")
       .order("nombre");
-    setUsuarios(data || []);
+    // Las cuentas superadmin solo las ve un superadmin (el gerente sabe que
+    // existen, pero no aparecen en su lista).
+    setUsuarios((data || []).filter((u) => u.rol !== "superadmin" || perfil?.rol === "superadmin"));
     setLoading(false);
   }
 
