@@ -35,6 +35,11 @@ function sePuedeCancelar(f: { fuente?: string | null; uuid_cfdi?: string | null;
   return f.fuente === "facturapi_auto" && !!f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && f.cancelacion_estatus !== "en_proceso";
 }
 
+// Un cobro sin CFDI, con cliente y todavía por cobrar, se puede facturar a pago diferido (PPD).
+function sePuedeFacturar(f: { user_id?: string | null; uuid_cfdi?: string | null; estado: string }) {
+  return !!f.user_id && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada";
+}
+
 type Cliente = { id: string; nombre: string; email: string; empresa: string | null };
 
 type Factura = {
@@ -51,6 +56,7 @@ type Factura = {
   uuid_cfdi?: string | null;
   cancelacion_estatus?: "en_proceso" | "cancelada" | "rechazada" | null;
   cancelacion_motivo?: string | null;
+  metodo_pago?: string | null;
   rfc_receptor?: string | null;
   cliente_nombre?: string;
   cliente_email?: string;
@@ -331,6 +337,40 @@ export default function FacturasAdminPage() {
     });
   }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente]);
 
+  // ---- Facturar cobros pendientes (CFDI a pago diferido) ----
+  const [facturando, setFacturando] = useState(false);
+  async function facturarCobros(ids: string[]) {
+    if (ids.length === 0) return;
+    const aviso =
+      ids.length === 1
+        ? "¿Emitir la factura (CFDI) de este cobro? Se timbra ante el SAT a pago diferido (PPD); cuando el cliente pague habrá que emitir su complemento de pago."
+        : `¿Emitir las ${ids.length} facturas (CFDI) seleccionadas? Se timbran ante el SAT a pago diferido (PPD); cuando los clientes paguen habrá que emitir sus complementos de pago.`;
+    if (!confirm(aviso)) return;
+    setFacturando(true);
+    const res = await fetch("/api/facturas/facturar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facturaIds: ids }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setFacturando(false);
+    if (!res.ok && !data.resultados) {
+      setAvisoCancelar(data.error || "No se pudo facturar");
+      return;
+    }
+    const resultados: { id: string; folio?: string; ok: boolean; error?: string }[] = data.resultados || [];
+    const fallidas = resultados.filter((r) => !r.ok);
+    const hechas = resultados.length - fallidas.length;
+    setSeleccion((s) => s.filter((i) => !resultados.some((r) => r.id === i && r.ok)));
+    setAvisoCancelar(
+      (hechas > 0 ? "✓ " + hechas + " factura(s) emitida(s). " : "") +
+        (fallidas.length > 0
+          ? "✗ " + fallidas.length + " no se pudo(ieron): " + fallidas.slice(0, 3).map((r) => (r.folio || "") + " — " + r.error).join(" · ") + (fallidas.length > 3 ? " …" : "")
+          : "")
+    );
+    if (centro) fetchTodo(centro);
+  }
+
   // ---- Cancelación de CFDI ----
   const puedoCancelar = ROLES_CANCELAR.includes(miRol);
   const [seleccion, setSeleccion] = useState<string[]>([]);
@@ -342,6 +382,14 @@ export default function FacturasAdminPage() {
   const [avisoCancelar, setAvisoCancelar] = useState("");
   const [actualizandoEstatus, setActualizandoEstatus] = useState(false);
   const hayEnProceso = facturas.some((f) => f.cancelacion_estatus === "en_proceso");
+  const seleccionFacturables = seleccion.filter((id) => {
+    const f = facturas.find((x) => x.id === id);
+    return !!f && sePuedeFacturar(f);
+  });
+  const seleccionCancelables = seleccion.filter((id) => {
+    const f = facturas.find((x) => x.id === id);
+    return !!f && sePuedeCancelar(f);
+  });
 
   function abrirCancelar(ids: string[]) {
     setModalCancelar(ids);
@@ -456,9 +504,14 @@ export default function FacturasAdminPage() {
                     {actualizandoEstatus ? "Consultando..." : "🔄 Actualizar estatus"}
                   </button>
                 )}
-                {puedoCancelar && seleccion.length > 0 && (
-                  <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccion)}>
-                    ✕ Cancelar seleccionadas ({seleccion.length})
+                {puedoCancelar && seleccionFacturables.length > 0 && (
+                  <button className="btn-exportar" disabled={facturando} onClick={() => facturarCobros(seleccionFacturables)}>
+                    {facturando ? "Facturando..." : `🧾 Facturar seleccionados (${seleccionFacturables.length})`}
+                  </button>
+                )}
+                {puedoCancelar && seleccionCancelables.length > 0 && (
+                  <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
+                    ✕ Cancelar seleccionadas ({seleccionCancelables.length})
                   </button>
                 )}
                 <a className="btn-exportar" href="/facturas-admin/importar">
@@ -523,7 +576,7 @@ export default function FacturasAdminPage() {
                     <option value="">Todas</option>
                     <option value="manual">Manual</option>
                     <option value="cfdi_import">Importación CFDI</option>
-                    <option value="facturapi_auto">Automática (Facturapi)</option>
+                    <option value="facturapi_auto">Emitida con Facturapi</option>
                   </select>
                 </div>
                 <div>
@@ -737,7 +790,7 @@ export default function FacturasAdminPage() {
                         </p>
                         {f.uuid_cfdi && (
                           <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                            🧾 CFDI · {f.rfc_receptor} · {f.uuid_cfdi}
+                            🧾 CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.rfc_receptor} · {f.uuid_cfdi}
                           </p>
                         )}
                         {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] && (
@@ -779,10 +832,10 @@ export default function FacturasAdminPage() {
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {puedoCancelar && sePuedeCancelar(f) && (
+                      {puedoCancelar && (sePuedeCancelar(f) || sePuedeFacturar(f)) && (
                         <input
                           type="checkbox"
-                          aria-label="Seleccionar para cancelar"
+                          aria-label="Seleccionar"
                           checked={seleccion.includes(f.id)}
                           onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, f.id] : s.filter((i) => i !== f.id)))}
                         />
@@ -790,6 +843,11 @@ export default function FacturasAdminPage() {
                       <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
                         {facturaExpandidaId === f.id ? "Ocultar pagos" : "Ver pagos vinculados"}
                       </button>
+                      {puedoCancelar && sePuedeFacturar(f) && (
+                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
+                          🧾 Facturar (CFDI)
+                        </button>
+                      )}
                       {puedoCancelar && sePuedeCancelar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
                           ✕ Cancelar factura
