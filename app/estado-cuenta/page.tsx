@@ -17,6 +17,7 @@ type Factura = {
   estado: string;
   archivo_url: string | null;
   xml_url?: string | null;
+  cancelacion_estatus?: string | null;
 };
 
 // Ver y descargar el PDF/XML de una factura (la descarga pasa por el servidor,
@@ -24,7 +25,13 @@ type Factura = {
 function ArchivosFactura({ f }: { f: Factura }) {
   if (!f.archivo_url && !f.xml_url) return null;
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4, alignItems: "center" }}>
+      {f.cancelacion_estatus === "cancelada" && (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#A32D2D" }}>CFDI cancelado</span>
+      )}
+      {f.cancelacion_estatus === "en_proceso" && (
+        <span style={{ fontSize: 12, fontWeight: 600, color: "#854F0B" }}>Cancelación en proceso</span>
+      )}
       {f.archivo_url && (
         <BotonArchivo url={f.archivo_url} bucket="facturas">
           📄 Ver factura

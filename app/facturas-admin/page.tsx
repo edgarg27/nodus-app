@@ -15,6 +15,26 @@ const ESTATUS_LABEL: Record<string, { label: string; bg: string; color: string }
   vencida: { label: "⚠️ Vencida", bg: "#FCEBEB", color: "#A32D2D" },
 };
 
+const ROLES_CANCELAR = ["admin", "gerente", "cobranza", "superadmin"];
+
+const MOTIVOS_CANCELACION: { clave: string; texto: string }[] = [
+  { clave: "02", texto: "02 · Comprobante emitido con errores sin relación" },
+  { clave: "01", texto: "01 · Comprobante emitido con errores con relación (lleva factura sustituta)" },
+  { clave: "03", texto: "03 · No se llevó a cabo la operación" },
+  { clave: "04", texto: "04 · Operación nominativa en una factura global" },
+];
+
+const CANCELACION_LABEL: Record<string, { label: string; bg: string; color: string }> = {
+  en_proceso: { label: "⏳ Cancelación en proceso", bg: "#FAEEDA", color: "#854F0B" },
+  cancelada: { label: "✕ CFDI cancelado", bg: "#FCEBEB", color: "#A32D2D" },
+  rechazada: { label: "↩ Cancelación rechazada (sigue vigente)", bg: "#E8EEF9", color: "#254B8C" },
+};
+
+// Una factura emitida desde Nodus (Facturapi) con CFDI vigente se puede cancelar.
+function sePuedeCancelar(f: { fuente?: string | null; uuid_cfdi?: string | null; cancelacion_estatus?: string | null }) {
+  return f.fuente === "facturapi_auto" && !!f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && f.cancelacion_estatus !== "en_proceso";
+}
+
 type Cliente = { id: string; nombre: string; email: string; empresa: string | null };
 
 type Factura = {
@@ -29,6 +49,8 @@ type Factura = {
   archivo_url: string | null;
   fuente?: string | null;
   uuid_cfdi?: string | null;
+  cancelacion_estatus?: "en_proceso" | "cancelada" | "rechazada" | null;
+  cancelacion_motivo?: string | null;
   rfc_receptor?: string | null;
   cliente_nombre?: string;
   cliente_email?: string;
@@ -298,7 +320,9 @@ export default function FacturasAdminPage() {
           .toLowerCase();
         if (!enTexto.includes(q)) return false;
       }
-      if (filtroEstado && f.estado !== filtroEstado) return false;
+      if (filtroEstado === "cancelacion") {
+        if (!f.cancelacion_estatus) return false;
+      } else if (filtroEstado && f.estado !== filtroEstado) return false;
       if (filtroFuente && (f.fuente || "manual") !== filtroFuente) return false;
       if (filtroDesde && f.fecha_emision < filtroDesde) return false;
       if (filtroHasta && f.fecha_emision > filtroHasta) return false;
@@ -306,6 +330,76 @@ export default function FacturasAdminPage() {
       return true;
     });
   }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente]);
+
+  // ---- Cancelación de CFDI ----
+  const puedoCancelar = ROLES_CANCELAR.includes(miRol);
+  const [seleccion, setSeleccion] = useState<string[]>([]);
+  const [modalCancelar, setModalCancelar] = useState<string[] | null>(null);
+  const [motivoCancelar, setMotivoCancelar] = useState("02");
+  const [sustitutaUuid, setSustitutaUuid] = useState("");
+  const [cancelando, setCancelando] = useState(false);
+  const [errorCancelar, setErrorCancelar] = useState("");
+  const [avisoCancelar, setAvisoCancelar] = useState("");
+  const [actualizandoEstatus, setActualizandoEstatus] = useState(false);
+  const hayEnProceso = facturas.some((f) => f.cancelacion_estatus === "en_proceso");
+
+  function abrirCancelar(ids: string[]) {
+    setModalCancelar(ids);
+    setMotivoCancelar("02");
+    setSustitutaUuid("");
+    setErrorCancelar("");
+  }
+
+  async function confirmarCancelar() {
+    if (!modalCancelar) return;
+    setCancelando(true);
+    setErrorCancelar("");
+    const res = await fetch("/api/facturas/cancelar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facturaIds: modalCancelar, motivo: motivoCancelar, sustitutaUuid }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setCancelando(false);
+    if (!res.ok && !data.resultados) {
+      setErrorCancelar(data.error || "No se pudo cancelar");
+      return;
+    }
+    const resultados: { id: string; ok: boolean; estatus?: string; error?: string }[] = data.resultados || [];
+    const fallidas = resultados.filter((r) => !r.ok);
+    const hechas = resultados.length - fallidas.length;
+    setModalCancelar(null);
+    setSeleccion([]);
+    setAvisoCancelar(
+      (hechas > 0 ? `✓ ${hechas} cancelación(es) enviada(s) al SAT. ` : "") +
+        (fallidas.length > 0 ? `✗ ${fallidas.length} no se pudo(ieron): ${fallidas[0].error}` : "")
+    );
+    if (centro) fetchTodo(centro);
+  }
+
+  async function actualizarEstatusCancelaciones(silencioso = false) {
+    setActualizandoEstatus(true);
+    const res = await fetch("/api/facturas/estatus-cancelacion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = await res.json().catch(() => ({}));
+    setActualizandoEstatus(false);
+    const cambiaron = (data.resultados || []).filter((r: { estatus?: string }) => r.estatus && r.estatus !== "en_proceso").length;
+    if (cambiaron > 0 && centro) fetchTodo(centro);
+    if (!silencioso) setAvisoCancelar(cambiaron > 0 ? `✓ ${cambiaron} cancelación(es) cambió de estatus.` : "Sin cambios: siguen esperando respuesta del cliente.");
+  }
+
+  // Al abrir la pantalla, se revisan solas las cancelaciones que esperaban respuesta.
+  const [revisoCancelaciones, setRevisoCancelaciones] = useState(false);
+  useEffect(() => {
+    if (!revisoCancelaciones && hayEnProceso && puedoCancelar) {
+      setRevisoCancelaciones(true);
+      actualizarEstatusCancelaciones(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayEnProceso, puedoCancelar]);
 
   const [asignando, setAsignando] = useState<string | null>(null);
   async function asignarCliente(facturaId: string, clienteId: string) {
@@ -357,6 +451,16 @@ export default function FacturasAdminPage() {
                 🧾 Facturas ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturas.length}` : facturas.length})
               </p>
               <div style={{ display: "flex", gap: 8 }}>
+                {puedoCancelar && hayEnProceso && (
+                  <button className="btn-exportar" disabled={actualizandoEstatus} onClick={() => actualizarEstatusCancelaciones()}>
+                    {actualizandoEstatus ? "Consultando..." : "🔄 Actualizar estatus"}
+                  </button>
+                )}
+                {puedoCancelar && seleccion.length > 0 && (
+                  <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccion)}>
+                    ✕ Cancelar seleccionadas ({seleccion.length})
+                  </button>
+                )}
                 <a className="btn-exportar" href="/facturas-admin/importar">
                   📄 Importar CFDI
                 </a>
@@ -410,6 +514,7 @@ export default function FacturasAdminPage() {
                     <option value="parcial">Parcial</option>
                     <option value="pagada">Pagada</option>
                     <option value="vencida">Vencida</option>
+                    <option value="cancelacion">Con cancelación</option>
                   </select>
                 </div>
                 <div>
@@ -560,6 +665,56 @@ export default function FacturasAdminPage() {
               </form>
             )}
 
+            {avisoCancelar && (
+              <div className="form-card" style={{ marginTop: 8, fontSize: 13 }}>
+                {avisoCancelar}
+                <button className="tel-borrar-btn" style={{ marginLeft: 8 }} onClick={() => setAvisoCancelar("")}>
+                  Cerrar
+                </button>
+              </div>
+            )}
+
+            {modalCancelar && (
+              <div
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                onClick={() => !cancelando && setModalCancelar(null)}
+              >
+                <div className="form-card" style={{ maxWidth: 460, width: "100%", maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+                  <p className="contrato-cliente-nombre">Cancelar {modalCancelar.length === 1 ? "factura" : modalCancelar.length + " facturas"} ante el SAT</p>
+                  <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 10px" }}>
+                    Esta acción no se puede deshacer. Si el cliente tiene que aceptarla, quedará "en proceso" hasta que responda.
+                  </p>
+                  <p className="sub-label">Motivo</p>
+                  <select value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)}>
+                    {MOTIVOS_CANCELACION.filter((m) => m.clave !== "01" || modalCancelar.length === 1).map((m) => (
+                      <option key={m.clave} value={m.clave}>
+                        {m.texto}
+                      </option>
+                    ))}
+                  </select>
+                  {motivoCancelar === "01" && (
+                    <>
+                      <p className="sub-label" style={{ marginTop: 8 }}>UUID de la factura que la sustituye</p>
+                      <input
+                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        value={sustitutaUuid}
+                        onChange={(e) => setSustitutaUuid(e.target.value)}
+                      />
+                    </>
+                  )}
+                  {errorCancelar && <p style={{ fontSize: 12, color: "#A32D2D", marginTop: 8 }}>{errorCancelar}</p>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 700 }} disabled={cancelando} onClick={confirmarCancelar}>
+                      {cancelando ? "Cancelando..." : "Sí, cancelar"}
+                    </button>
+                    <button className="tel-borrar-btn" disabled={cancelando} onClick={() => setModalCancelar(null)}>
+                      No, volver
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {facturas.length === 0 ? (
               <div className="empty-card">Sin facturas registradas en {centro}</div>
             ) : facturasFiltradas.length === 0 ? (
@@ -583,6 +738,15 @@ export default function FacturasAdminPage() {
                         {f.uuid_cfdi && (
                           <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
                             🧾 CFDI · {f.rfc_receptor} · {f.uuid_cfdi}
+                          </p>
+                        )}
+                        {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] && (
+                          <p
+                            className="contrato-detalle"
+                            style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: CANCELACION_LABEL[f.cancelacion_estatus].bg, color: CANCELACION_LABEL[f.cancelacion_estatus].color }}
+                          >
+                            {CANCELACION_LABEL[f.cancelacion_estatus].label}
+                            {f.cancelacion_motivo ? " · motivo " + f.cancelacion_motivo : ""}
                           </p>
                         )}
                         {!f.user_id && (
@@ -614,10 +778,23 @@ export default function FacturasAdminPage() {
                         </span>
                       </span>
                     </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {puedoCancelar && sePuedeCancelar(f) && (
+                        <input
+                          type="checkbox"
+                          aria-label="Seleccionar para cancelar"
+                          checked={seleccion.includes(f.id)}
+                          onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, f.id] : s.filter((i) => i !== f.id)))}
+                        />
+                      )}
                       <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
                         {facturaExpandidaId === f.id ? "Ocultar pagos" : "Ver pagos vinculados"}
                       </button>
+                      {puedoCancelar && sePuedeCancelar(f) && (
+                        <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
+                          ✕ Cancelar factura
+                        </button>
+                      )}
                     </div>
 
                     {facturaExpandidaId === f.id && (
