@@ -348,7 +348,7 @@ export default function ImportarCfdiPage() {
                       )
                     }
                   >
-                    📥 Excel
+                    Excel
                   </button>
                 </div>
                 {reporte.map((r, i) => (

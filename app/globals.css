@@ -2851,6 +2851,7 @@ a.stat-card {
   color: #a32d2d;
   cursor: pointer;
   font-size: 13px;
+  text-decoration: none;
 }
 
 .tel-form-grid {
@@ -3649,6 +3650,7 @@ a.stat-card {
 .btn-exportar {
   background: #0f6e56;
   color: #fff;
+  text-decoration: none;
   border: none;
   padding: 8px 14px;
   border-radius: 8px;

@@ -655,34 +655,34 @@ export default function FacturasAdminPage() {
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
-                🧾 Facturas ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturas.length}` : facturas.length})
+                Facturas ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturas.length}` : facturas.length})
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 {puedoCancelar && hayEnProceso && (
                   <button className="btn-exportar" disabled={actualizandoEstatus} onClick={() => actualizarEstatusCancelaciones()}>
-                    {actualizandoEstatus ? "Consultando..." : "🔄 Actualizar estatus"}
+                    {actualizandoEstatus ? "Consultando..." : "Actualizar estatus"}
                   </button>
                 )}
                 {puedoCancelar && seleccionFacturables.length > 0 && (
                   <button className="btn-exportar" disabled={facturando} onClick={() => facturarCobros(seleccionFacturables)}>
-                    {facturando ? "Facturando..." : `🧾 Facturar seleccionados (${seleccionFacturables.length})`}
+                    {facturando ? "Facturando..." : `Facturar seleccionados (${seleccionFacturables.length})`}
                   </button>
                 )}
                 {puedoCancelar && seleccionComplementables.length > 0 && (
                   <button className="btn-exportar" onClick={() => abrirComplemento(seleccionComplementables)}>
-                    💵 Emitir complemento de pago ({seleccionComplementables.length})
+                    Emitir complemento de pago ({seleccionComplementables.length})
                   </button>
                 )}
                 {puedoCancelar && seleccionCancelables.length > 0 && (
                   <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
-                    ✕ Cancelar seleccionadas ({seleccionCancelables.length})
+                    Cancelar seleccionadas ({seleccionCancelables.length})
                   </button>
                 )}
                 <a className="btn-exportar" href="/facturas-admin/por-cliente">
-                  👤 Por cliente
+                  Por cliente
                 </a>
                 <a className="btn-exportar" href="/facturas-admin/importar">
-                  📄 Importar CFDI
+                  Importar CFDI
                 </a>
                 <button
                   className="btn-exportar"
@@ -703,7 +703,7 @@ export default function FacturasAdminPage() {
                     )
                   }
                 >
-                  📥 Excel
+                  Excel
                 </button>
                 <button
                   className="tel-borrar-btn"
@@ -965,7 +965,7 @@ export default function FacturasAdminPage() {
                 </p>
                 {seleccionPagos.length > 0 && (
                   <button className="btn-exportar" disabled={facturando} onClick={() => facturarPagosSueltos(seleccionPagos)}>
-                    {facturando ? "Facturando..." : "🧾 Facturar seleccionados (" + seleccionPagos.length + ")"}
+                    {facturando ? "Facturando..." : "Facturar seleccionados (" + seleccionPagos.length + ")"}
                   </button>
                 )}
                 {pagosSueltos
@@ -991,7 +991,7 @@ export default function FacturasAdminPage() {
                           </p>
                         </div>
                         <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarPagosSueltos([p.id])}>
-                          🧾 Facturar (CFDI)
+                          Facturar (CFDI)
                         </button>
                       </div>
                     );
@@ -1022,17 +1022,17 @@ export default function FacturasAdminPage() {
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
                         {c.archivo_url && (
                           <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=pdf"}>
-                            ⬇ PDF
+                            Descargar PDF
                           </a>
                         )}
                         {c.xml_url && (
                           <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=xml"}>
-                            ⬇ XML
+                            Descargar XML
                           </a>
                         )}
                         {puedoCancelar && (!c.cancelacion_estatus || c.cancelacion_estatus === "rechazada") && (
                           <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelarComplemento(c.id)}>
-                            ✕ Cancelar complemento
+                            Cancelar complemento
                           </button>
                         )}
                       </div>
@@ -1105,7 +1105,7 @@ export default function FacturasAdminPage() {
                         </p>
                         {f.uuid_cfdi && (
                           <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                            🧾 CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.rfc_receptor} · {f.uuid_cfdi}
+                            CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.rfc_receptor} · {f.uuid_cfdi}
                           </p>
                         )}
                         {f.metodo_pago === "PPD" && f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && (
@@ -1143,7 +1143,7 @@ export default function FacturasAdminPage() {
                         )}
                         {f.archivo_url && (
                           <BotonArchivo url={f.archivo_url} bucket="facturas">
-                            📥 Ver PDF
+                            Ver PDF
                           </BotonArchivo>
                         )}
                       </div>
@@ -1167,22 +1167,22 @@ export default function FacturasAdminPage() {
                       </button>
                       {f.user_id && (
                         <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href={"/facturas-admin/por-cliente?cliente=" + f.user_id}>
-                          📅 Historial del cliente
+                          Historial del cliente
                         </a>
                       )}
                       {puedoCancelar && sePuedeComplementar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
-                          💵 Complemento de pago
+                          Complemento de pago
                         </button>
                       )}
                       {puedoCancelar && sePuedeFacturar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
-                          🧾 Facturar (CFDI)
+                          Facturar (CFDI)
                         </button>
                       )}
                       {puedoCancelar && sePuedeCancelar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
-                          ✕ Cancelar factura
+                          Cancelar factura
                         </button>
                       )}
                     </div>
