@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { refrescarCancelaciones } from "@/lib/facturapiCancelacion";
+import { refrescarCancelacionesComplementos } from "@/lib/complementoPago";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
@@ -34,9 +35,10 @@ export async function POST(req: NextRequest) {
       .eq("cancelacion_estatus", "en_proceso");
     const permitidos = new Set((delCentro || []).map((f) => f.id));
     ids = (ids ?? Array.from(permitidos)).filter((i) => permitidos.has(i));
-    if (ids.length === 0) return NextResponse.json({ ok: true, resultados: [] });
   }
 
-  const resultados = await refrescarCancelaciones(admin, ids);
-  return NextResponse.json({ ok: true, resultados });
+  const resultados = ids && ids.length === 0 ? [] : await refrescarCancelaciones(admin, ids);
+  // También los complementos de pago cuya cancelación esperaba al cliente.
+  const complementosCambiados = await refrescarCancelacionesComplementos(admin, ROLES_GLOBALES.includes(miProfile!.rol) ? null : miProfile!.centro);
+  return NextResponse.json({ ok: true, resultados, complementosCambiados });
 }

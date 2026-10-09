@@ -20,12 +20,16 @@ export async function GET(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "Falta la factura" }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: factura } = await admin
-    .from("facturas")
-    .select("id, user_id, folio, archivo_url, xml_url")
-    .eq("id", id)
-    .maybeSingle();
-  if (!factura) return NextResponse.json({ error: "Factura no encontrada" }, { status: 404 });
+  // ?origen=complemento baja el PDF/XML de un complemento de pago en vez de una factura.
+  const esComplemento = req.nextUrl.searchParams.get("origen") === "complemento";
+  const { data: fila } = esComplemento
+    ? await admin.from("complementos_pago").select("id, user_id, serie, folio_fiscal, archivo_url, xml_url").eq("id", id).maybeSingle()
+    : await admin.from("facturas").select("id, user_id, folio, archivo_url, xml_url").eq("id", id).maybeSingle();
+  if (!fila) return NextResponse.json({ error: "Factura no encontrada" }, { status: 404 });
+  const factura = {
+    ...fila,
+    folio: esComplemento ? `${(fila as any).serie || ""}${(fila as any).folio_fiscal || ""}` : (fila as any).folio,
+  } as { id: string; user_id: string | null; folio: string; archivo_url: string | null; xml_url: string | null };
 
   if (factura.user_id !== session.user.id) {
     const { data: perfil } = await admin.from("profiles").select("rol").eq("id", session.user.id).maybeSingle();
@@ -50,11 +54,11 @@ export async function GET(req: NextRequest) {
   if (descargaError || !blob) return NextResponse.json({ error: "No se pudo obtener el archivo" }, { status: 502 });
   const contenido = await blob.arrayBuffer();
 
-  const nombre = String(factura.folio || "factura").replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-|-$/g, "") || "factura";
+  const nombre = String(factura.folio || (esComplemento ? "complemento" : "factura")).replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-|-$/g, "") || "factura";
   return new NextResponse(contenido, {
     headers: {
       "Content-Type": tipo === "xml" ? "application/xml" : "application/pdf",
-      "Content-Disposition": `attachment; filename="Factura-${nombre}.${tipo}"`,
+      "Content-Disposition": `attachment; filename="${esComplemento ? "Complemento" : "Factura"}-${nombre}.${tipo}"`,
       "Cache-Control": "private, no-store",
     },
   });
