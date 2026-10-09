@@ -645,6 +645,9 @@ export default function FacturasAdminPage() {
                     ✕ Cancelar seleccionadas ({seleccionCancelables.length})
                   </button>
                 )}
+                <a className="btn-exportar" href="/facturas-admin/por-cliente">
+                  👤 Por cliente
+                </a>
                 <a className="btn-exportar" href="/facturas-admin/importar">
                   📄 Importar CFDI
                 </a>
@@ -1075,6 +1078,11 @@ export default function FacturasAdminPage() {
                       <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
                         {facturaExpandidaId === f.id ? "Ocultar pagos" : "Ver pagos vinculados"}
                       </button>
+                      {f.user_id && (
+                        <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href={"/facturas-admin/por-cliente?cliente=" + f.user_id}>
+                          📅 Historial del cliente
+                        </a>
+                      )}
                       {puedoCancelar && sePuedeComplementar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
                           💵 Complemento de pago
