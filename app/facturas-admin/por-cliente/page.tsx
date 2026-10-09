@@ -329,7 +329,7 @@ export default function FacturasPorClientePage() {
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
               <button className="btn-exportar" onClick={exportar}>
-                📥 Excel
+                Excel
               </button>
             </div>
 
@@ -358,7 +358,7 @@ export default function FacturasPorClientePage() {
                             </p>
                             {f.uuid_cfdi && (
                               <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                                🧾 CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.uuid_cfdi}
+                                CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.uuid_cfdi}
                               </p>
                             )}
                             {ppd && (
@@ -375,12 +375,12 @@ export default function FacturasPorClientePage() {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
                               {f.archivo_url && (
                                 <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=pdf`}>
-                                  ⬇ PDF
+                                  Descargar PDF
                                 </a>
                               )}
                               {f.xml_url && (
                                 <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=xml`}>
-                                  ⬇ XML
+                                  Descargar XML
                                 </a>
                               )}
                             </div>
@@ -416,12 +416,12 @@ export default function FacturasPorClientePage() {
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
                       {c.archivo_url && (
                         <a className="ver-pdf-btn" href={`/api/facturas/descargar?origen=complemento&id=${c.id}&tipo=pdf`}>
-                          ⬇ PDF
+                          Descargar PDF
                         </a>
                       )}
                       {c.xml_url && (
                         <a className="ver-pdf-btn" href={`/api/facturas/descargar?origen=complemento&id=${c.id}&tipo=xml`}>
-                          ⬇ XML
+                          Descargar XML
                         </a>
                       )}
                     </div>
