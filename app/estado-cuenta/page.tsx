@@ -114,6 +114,9 @@ function BotonesPago({ f, esCow, vencida }: { f: Factura; esCow: boolean; vencid
 export default function EstadoCuentaPage() {
   const supabase = createClient();
   const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [complementos, setComplementos] = useState<
+    { id: string; serie: string | null; folio_fiscal: string | null; fecha_pago: string; monto: number; archivo_url: string | null; xml_url: string | null; cancelacion_estatus: string | null }[]
+  >([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [nombre, setNombre] = useState("Cliente");
@@ -159,6 +162,14 @@ export default function EstadoCuentaPage() {
       .order("fecha_vencimiento", { ascending: false });
 
     setFacturas(data || []);
+
+    // Complementos de pago de las facturas que se pagaron a pago diferido (PPD).
+    const { data: comps } = await supabase
+      .from("complementos_pago")
+      .select("id, serie, folio_fiscal, fecha_pago, monto, archivo_url, xml_url, cancelacion_estatus")
+      .eq("user_id", user.id)
+      .order("fecha_pago", { ascending: false });
+    setComplementos((comps || []).filter((c) => c.cancelacion_estatus !== "cancelada"));
     try {
       setEsCow(await esClienteCoworking(supabase, user.id));
     } catch {
@@ -406,6 +417,42 @@ export default function EstadoCuentaPage() {
                       <span className="factura-badge" style={{ background: "#E1F5EE" }}>
                         <span className="factura-badge-text">✓ Pagada</span>
                       </span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {complementos.length > 0 && (
+              <>
+                <p className="panel-section-label" style={{ marginTop: 8 }}>
+                  🧾 Complementos de pago ({complementos.length})
+                </p>
+                {complementos.map((c) => (
+                  <div className="historial-card" key={c.id}>
+                    <div>
+                      <p className="factura-folio">
+                        {c.serie || ""}
+                        {c.folio_fiscal || ""}
+                      </p>
+                      <p className="factura-fecha">Pago del {formatFecha(c.fecha_pago)}</p>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                        {c.archivo_url && (
+                          <a className="ver-pdf-btn" href={`/api/facturas/descargar?origen=complemento&id=${c.id}&tipo=pdf`}>
+                            ⬇ Descargar PDF
+                          </a>
+                        )}
+                        {c.xml_url && (
+                          <a className="ver-pdf-btn" href={`/api/facturas/descargar?origen=complemento&id=${c.id}&tipo=xml`}>
+                            ⬇ Descargar XML
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="factura-right">
+                      <p className="factura-monto" style={{ color: "#0F6E56" }}>
+                        {formatMonto(c.monto)}
+                      </p>
                     </div>
                   </div>
                 ))}

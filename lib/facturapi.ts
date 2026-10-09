@@ -17,6 +17,7 @@ import { tipoCobroAdicional } from "@/lib/adicionales";
 type Admin = ReturnType<typeof createAdminClient>;
 
 const facturapi = new Facturapi(process.env.FACTURAPI_API_KEY || "");
+export const clienteFacturapi = facturapi;
 
 // SAT c_ClaveProdServ / c_ClaveUnidad para renta de espacio de oficina/coworking.
 const CLAVE_PROD_SERV = "80131500";
@@ -34,13 +35,13 @@ export function formaPagoDesdeMetodoOpenpay(metodo?: string | null): string {
 // empaquetado de Next.js (webpack) ese stream llega ya consumido ("Body is
 // unusable: Body has already been read"). Se evita el problema por completo
 // pidiendo una URL firmada y descargándola nosotros mismos con fetch normal.
-async function bufferDesdeUrlFirmada(url: string): Promise<Buffer> {
+export async function bufferDesdeUrlFirmada(url: string): Promise<Buffer> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Descarga falló con estado ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function subirArchivoFactura(admin: Admin, nombreBase: string, buffer: Buffer, ext: "xml" | "pdf") {
+export async function subirArchivoFactura(admin: Admin, nombreBase: string, buffer: Buffer, ext: "xml" | "pdf") {
   const fileName = `facturapi-${nombreBase}-${Date.now()}.${ext}`;
   const { error } = await admin.storage
     .from("facturas")
@@ -241,13 +242,26 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       facturaExistente = data;
       if (facturaExistente?.uuid_cfdi) {
         // Ya facturado (webhook + verificación pueden coincidir): no se duplica. Si la factura
-        // se emitió a pago diferido (PPD), este pago todavía necesita su complemento de pago.
-        if (facturaExistente.metodo_pago === "PPD" && cliente?.centro) {
-          await admin.from("notificaciones").insert({
-            centro: cliente.centro,
-            tipo: "complemento_pago_pendiente",
-            mensaje: `El cliente ${cliente.nombre || ""} pagó la factura ${facturaExistente.folio || ""} (pago diferido): falta emitir su complemento de pago.`,
+        // se emitió a pago diferido (PPD), este pago se cubre con su complemento de pago.
+        if (facturaExistente.metodo_pago === "PPD") {
+          const { emitirComplementoPago } = await import("@/lib/complementoPago");
+          const { hoyMexicoISO } = await import("@/lib/fechaMexico");
+          const r = await emitirComplementoPago(admin, {
+            userId: pago.user_id,
+            items: [{ facturaId: facturaExistente.id, importe: Number(pago.monto) }],
+            topeSaldo: true,
+            formaPago: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
+            fecha: hoyMexicoISO(),
+            usuarioId: null,
+            pagoId: pago.id,
           });
+          if (!r.ok && cliente?.centro) {
+            await admin.from("notificaciones").insert({
+              centro: cliente.centro,
+              tipo: "complemento_pago_pendiente",
+              mensaje: `El cliente ${cliente.nombre || ""} pagó la factura ${facturaExistente.folio || ""} (pago diferido) y no se pudo emitir su complemento de pago: ${r.error}. Emítelo desde Facturas.`,
+            });
+          }
         }
         return;
       }

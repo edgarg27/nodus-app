@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -61,6 +63,22 @@ type Factura = {
   cliente_nombre?: string;
   cliente_email?: string;
 };
+
+type Complemento = {
+  id: string;
+  user_id: string | null;
+  cliente_nombre?: string;
+  serie: string | null;
+  folio_fiscal: string | null;
+  uuid_cfdi: string | null;
+  forma_pago: string;
+  fecha_pago: string;
+  monto: number;
+  archivo_url: string | null;
+  xml_url: string | null;
+  cancelacion_estatus: "en_proceso" | "cancelada" | "rechazada" | null;
+};
+type FilaComplemento = { complemento_id: string; factura_id: string; importe: number };
 
 type Pago = { id: string; monto: number; concepto: string | null; estado: string; factura_id: string | null; created_at: string };
 type PagoSuelto = Pago & { user_id: string };
@@ -150,6 +168,20 @@ export default function FacturasAdminPage() {
             .order("created_at", { ascending: false })
         : { data: [] as PagoSuelto[] };
     setPagosSueltos((sueltos as PagoSuelto[]) || []);
+
+    // Complementos de pago del centro y qué facturas cubre cada uno (para calcular saldos).
+    const { data: comps } = await supabase
+      .from("complementos_pago")
+      .select("id, user_id, serie, folio_fiscal, uuid_cfdi, forma_pago, fecha_pago, monto, archivo_url, xml_url, cancelacion_estatus")
+      .eq("centro", c)
+      .order("created_at", { ascending: false })
+      .limit(300);
+    const compIds = (comps || []).map((x) => x.id);
+    const { data: filasComp } = compIds.length
+      ? await supabase.from("complemento_pago_facturas").select("complemento_id, factura_id, importe").in("complemento_id", compIds)
+      : { data: [] as FilaComplemento[] };
+    setComplementos(((comps as Complemento[]) || []).map((x) => ({ ...x, cliente_nombre: x.user_id ? nombrePorId[x.user_id] || "Cliente" : "Cliente" })));
+    setFilasComplemento((filasComp as FilaComplemento[]) || []);
     setLoading(false);
   }
 
@@ -337,6 +369,86 @@ export default function FacturasAdminPage() {
     });
   }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente]);
 
+  // ---- Complementos de pago (facturas a pago diferido) ----
+  const [complementos, setComplementos] = useState<Complemento[]>([]);
+  const [filasComplemento, setFilasComplemento] = useState<FilaComplemento[]>([]);
+  const [tipoCancelar, setTipoCancelar] = useState<"factura" | "complemento">("factura");
+  const [modalComplemento, setModalComplemento] = useState<{ userId: string; ids: string[] } | null>(null);
+  const [formaPagoComp, setFormaPagoComp] = useState("03");
+  const [fechaPagoComp, setFechaPagoComp] = useState("");
+  const [importesComp, setImportesComp] = useState<Record<string, string>>({});
+  const [emitiendoComp, setEmitiendoComp] = useState(false);
+  const [errorComp, setErrorComp] = useState("");
+
+  // Lo cubierto por complementos no cancelados; el saldo es lo que falta.
+  function saldoDe(facturaId: string): number {
+    const f = facturas.find((x) => x.id === facturaId);
+    if (!f) return 0;
+    const cancelados = new Set(complementos.filter((c) => c.cancelacion_estatus === "cancelada").map((c) => c.id));
+    const cubierto = filasComplemento.filter((r) => r.factura_id === facturaId && !cancelados.has(r.complemento_id)).reduce((s, r) => s + Number(r.importe), 0);
+    return Math.round((Number(f.monto) - cubierto) * 100) / 100;
+  }
+
+  function sePuedeComplementar(f: Factura) {
+    return (
+      !!f.user_id &&
+      !!f.uuid_cfdi &&
+      f.metodo_pago === "PPD" &&
+      f.cancelacion_estatus !== "cancelada" &&
+      f.cancelacion_estatus !== "en_proceso" &&
+      saldoDe(f.id) > 0
+    );
+  }
+
+  function abrirComplemento(ids: string[]) {
+    const elegidas = ids.map((id) => facturas.find((f) => f.id === id)).filter(Boolean) as Factura[];
+    const clientesDistintos = new Set(elegidas.map((f) => f.user_id));
+    if (elegidas.length === 0) return;
+    if (clientesDistintos.size > 1) {
+      setAvisoCancelar("Un complemento cubre facturas de un solo cliente: elige facturas del mismo cliente.");
+      return;
+    }
+    setModalComplemento({ userId: elegidas[0].user_id as string, ids });
+    setFormaPagoComp("03");
+    setFechaPagoComp(hoyMexicoISO());
+    setImportesComp(Object.fromEntries(ids.map((id) => [id, String(saldoDe(id))])));
+    setErrorComp("");
+  }
+
+  async function emitirComplemento() {
+    if (!modalComplemento) return;
+    const items = modalComplemento.ids.map((id) => ({ facturaId: id, importe: Number(importesComp[id]) }));
+    if (items.some((i) => !(i.importe > 0))) {
+      setErrorComp("Escribe un importe mayor a cero para cada factura");
+      return;
+    }
+    setEmitiendoComp(true);
+    setErrorComp("");
+    const res = await fetch("/api/complementos/emitir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: modalComplemento.userId, items, formaPago: formaPagoComp, fecha: fechaPagoComp }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setEmitiendoComp(false);
+    if (!res.ok) {
+      setErrorComp(data.error || "No se pudo emitir el complemento");
+      return;
+    }
+    setModalComplemento(null);
+    setSeleccion([]);
+    setAvisoCancelar("✓ Complemento de pago emitido (" + items.length + " factura(s)).");
+    if (centro) fetchTodo(centro);
+  }
+
+  function abrirCancelarComplemento(id: string) {
+    setTipoCancelar("complemento");
+    setModalCancelar([id]);
+    setMotivoCancelar("02");
+    setSustitutaUuid("");
+    setErrorCancelar("");
+  }
+
   // ---- Facturar cobros pendientes (CFDI a pago diferido) ----
   const [facturando, setFacturando] = useState(false);
   async function facturarCobros(ids: string[]) {
@@ -381,7 +493,11 @@ export default function FacturasAdminPage() {
   const [errorCancelar, setErrorCancelar] = useState("");
   const [avisoCancelar, setAvisoCancelar] = useState("");
   const [actualizandoEstatus, setActualizandoEstatus] = useState(false);
-  const hayEnProceso = facturas.some((f) => f.cancelacion_estatus === "en_proceso");
+  const hayEnProceso = facturas.some((f) => f.cancelacion_estatus === "en_proceso") || complementos.some((c) => c.cancelacion_estatus === "en_proceso");
+  const seleccionComplementables = seleccion.filter((id) => {
+    const f = facturas.find((x) => x.id === id);
+    return !!f && sePuedeComplementar(f);
+  });
   const seleccionFacturables = seleccion.filter((id) => {
     const f = facturas.find((x) => x.id === id);
     return !!f && sePuedeFacturar(f);
@@ -392,6 +508,7 @@ export default function FacturasAdminPage() {
   });
 
   function abrirCancelar(ids: string[]) {
+    setTipoCancelar("factura");
     setModalCancelar(ids);
     setMotivoCancelar("02");
     setSustitutaUuid("");
@@ -402,15 +519,24 @@ export default function FacturasAdminPage() {
     if (!modalCancelar) return;
     setCancelando(true);
     setErrorCancelar("");
-    const res = await fetch("/api/facturas/cancelar", {
+    const esComp = tipoCancelar === "complemento";
+    const res = await fetch(esComp ? "/api/complementos/cancelar" : "/api/facturas/cancelar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facturaIds: modalCancelar, motivo: motivoCancelar, sustitutaUuid }),
+      body: JSON.stringify(
+        esComp ? { complementoId: modalCancelar[0], motivo: motivoCancelar, sustitutaUuid } : { facturaIds: modalCancelar, motivo: motivoCancelar, sustitutaUuid }
+      ),
     });
     const data = await res.json().catch(() => ({}));
     setCancelando(false);
     if (!res.ok && !data.resultados) {
       setErrorCancelar(data.error || "No se pudo cancelar");
+      return;
+    }
+    if (esComp) {
+      setModalCancelar(null);
+      setAvisoCancelar("✓ Cancelación del complemento enviada al SAT. Lo que cubría vuelve al saldo de sus facturas.");
+      if (centro) fetchTodo(centro);
       return;
     }
     const resultados: { id: string; ok: boolean; estatus?: string; error?: string }[] = data.resultados || [];
@@ -507,6 +633,11 @@ export default function FacturasAdminPage() {
                 {puedoCancelar && seleccionFacturables.length > 0 && (
                   <button className="btn-exportar" disabled={facturando} onClick={() => facturarCobros(seleccionFacturables)}>
                     {facturando ? "Facturando..." : `🧾 Facturar seleccionados (${seleccionFacturables.length})`}
+                  </button>
+                )}
+                {puedoCancelar && seleccionComplementables.length > 0 && (
+                  <button className="btn-exportar" onClick={() => abrirComplemento(seleccionComplementables)}>
+                    💵 Emitir complemento de pago ({seleccionComplementables.length})
                   </button>
                 )}
                 {puedoCancelar && seleccionCancelables.length > 0 && (
@@ -727,13 +858,107 @@ export default function FacturasAdminPage() {
               </div>
             )}
 
+            {modalComplemento && (
+              <div
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                onClick={() => !emitiendoComp && setModalComplemento(null)}
+              >
+                <div className="form-card" style={{ maxWidth: 480, width: "100%", maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+                  <p className="contrato-cliente-nombre">Complemento de pago</p>
+                  <p style={{ fontSize: 12, color: "#666", margin: "4px 0 10px" }}>
+                    Un solo complemento cubre las facturas de abajo. El importe de cada una viene con su saldo; si el cliente pagó menos, cámbialo (queda como parcialidad).
+                  </p>
+                  {modalComplemento.ids.map((id) => {
+                    const f = facturas.find((x) => x.id === id);
+                    if (!f) return null;
+                    return (
+                      <div key={id} style={{ marginBottom: 8 }}>
+                        <p className="sub-label">
+                          {f.cliente_nombre} · {f.folio} · saldo {"$"}{saldoDe(id).toLocaleString("es-MX")}
+                        </p>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={importesComp[id] ?? ""}
+                          onChange={(e) => setImportesComp((m) => ({ ...m, [id]: e.target.value }))}
+                        />
+                      </div>
+                    );
+                  })}
+                  <p className="sub-label">Forma de pago</p>
+                  <select value={formaPagoComp} onChange={(e) => setFormaPagoComp(e.target.value)}>
+                    {FORMAS_PAGO_COMPLEMENTO.map((fp) => (
+                      <option key={fp.clave} value={fp.clave}>
+                        {fp.texto}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="sub-label" style={{ marginTop: 8 }}>Fecha en que el cliente pagó</p>
+                  <input type="date" max={hoyMexicoISO()} value={fechaPagoComp} onChange={(e) => setFechaPagoComp(e.target.value)} />
+                  {errorComp && <p style={{ fontSize: 12, color: "#A32D2D", marginTop: 8 }}>{errorComp}</p>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 700 }} disabled={emitiendoComp} onClick={emitirComplemento}>
+                      {emitiendoComp ? "Emitiendo..." : "Emitir complemento"}
+                    </button>
+                    <button className="tel-borrar-btn" disabled={emitiendoComp} onClick={() => setModalComplemento(null)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {complementos.length > 0 && (
+              <details className="form-card" style={{ marginTop: 8 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Complementos de pago emitidos ({complementos.length})</summary>
+                {complementos.map((c) => {
+                  const cubre = filasComplemento.filter((r) => r.complemento_id === c.id);
+                  const etiqueta = c.cancelacion_estatus ? CANCELACION_LABEL[c.cancelacion_estatus] : null;
+                  return (
+                    <div key={c.id} style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8 }}>
+                      <p className="contrato-detalle">
+                        <strong>{c.cliente_nombre}</strong> · {c.serie || ""}
+                        {c.folio_fiscal || ""} · {c.fecha_pago} · {"$"}{Number(c.monto).toLocaleString("es-MX")} · forma {c.forma_pago}
+                      </p>
+                      <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
+                        Cubre {cubre.length} factura(s) · {c.uuid_cfdi}
+                      </p>
+                      {etiqueta && (
+                        <p className="contrato-detalle" style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: etiqueta.bg, color: etiqueta.color }}>
+                          {etiqueta.label}
+                        </p>
+                      )}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                        {c.archivo_url && (
+                          <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=pdf"}>
+                            ⬇ PDF
+                          </a>
+                        )}
+                        {c.xml_url && (
+                          <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=xml"}>
+                            ⬇ XML
+                          </a>
+                        )}
+                        {puedoCancelar && (!c.cancelacion_estatus || c.cancelacion_estatus === "rechazada") && (
+                          <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelarComplemento(c.id)}>
+                            ✕ Cancelar complemento
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </details>
+            )}
+
             {modalCancelar && (
               <div
                 style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
                 onClick={() => !cancelando && setModalCancelar(null)}
               >
                 <div className="form-card" style={{ maxWidth: 460, width: "100%", maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
-                  <p className="contrato-cliente-nombre">Cancelar {modalCancelar.length === 1 ? "factura" : modalCancelar.length + " facturas"} ante el SAT</p>
+                  <p className="contrato-cliente-nombre">Cancelar {tipoCancelar === "complemento" ? "complemento de pago" : modalCancelar.length === 1 ? "factura" : modalCancelar.length + " facturas"} ante el SAT</p>
                   <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 10px" }}>
                     Esta acción no se puede deshacer. Si el cliente tiene que aceptarla, quedará "en proceso" hasta que responda.
                   </p>
@@ -793,6 +1018,13 @@ export default function FacturasAdminPage() {
                             🧾 CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.rfc_receptor} · {f.uuid_cfdi}
                           </p>
                         )}
+                        {f.metodo_pago === "PPD" && f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && (
+                          <p className="contrato-detalle" style={{ fontSize: 12, fontWeight: 600, color: saldoDe(f.id) > 0 ? "#854F0B" : "#0F6E56" }}>
+                            {saldoDe(f.id) > 0
+                              ? "Saldo sin complemento: $" + saldoDe(f.id).toLocaleString("es-MX") + " de $" + Number(f.monto).toLocaleString("es-MX")
+                              : "✓ Cubierta por complementos de pago"}
+                          </p>
+                        )}
                         {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] && (
                           <p
                             className="contrato-detalle"
@@ -832,7 +1064,7 @@ export default function FacturasAdminPage() {
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {puedoCancelar && (sePuedeCancelar(f) || sePuedeFacturar(f)) && (
+                      {puedoCancelar && (sePuedeCancelar(f) || sePuedeFacturar(f) || sePuedeComplementar(f)) && (
                         <input
                           type="checkbox"
                           aria-label="Seleccionar"
@@ -843,6 +1075,11 @@ export default function FacturasAdminPage() {
                       <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
                         {facturaExpandidaId === f.id ? "Ocultar pagos" : "Ver pagos vinculados"}
                       </button>
+                      {puedoCancelar && sePuedeComplementar(f) && (
+                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
+                          💵 Complemento de pago
+                        </button>
+                      )}
                       {puedoCancelar && sePuedeFacturar(f) && (
                         <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
                           🧾 Facturar (CFDI)
