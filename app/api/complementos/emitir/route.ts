@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { userId, items, formaPago, fecha } = await req.json();
+  const { userId, items, formaPago, fecha, numeroOperacion, notas, comprobanteUrl } = await req.json();
   if (
     typeof userId !== "string" ||
     !Array.isArray(items) ||
@@ -31,6 +31,17 @@ export async function POST(req: NextRequest) {
   }
   if (typeof formaPago !== "string" || typeof fecha !== "string") {
     return NextResponse.json({ error: "Falta la forma o la fecha de pago" }, { status: 400 });
+  }
+
+  // El comprobante se sube desde la pantalla al almacenamiento de este proyecto; solo se acepta esa ruta.
+  if (comprobanteUrl != null && comprobanteUrl !== "") {
+    const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/`;
+    if (typeof comprobanteUrl !== "string" || !comprobanteUrl.startsWith(base)) {
+      return NextResponse.json({ error: "Comprobante no válido" }, { status: 400 });
+    }
+  }
+  if ((numeroOperacion != null && typeof numeroOperacion !== "string") || (notas != null && typeof notas !== "string")) {
+    return NextResponse.json({ error: "Datos del pago no válidos" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -50,6 +61,9 @@ export async function POST(req: NextRequest) {
     formaPago,
     fecha,
     usuarioId: session.user.id,
+    numeroOperacion: numeroOperacion || null,
+    notas: notas || null,
+    comprobanteUrl: comprobanteUrl || null,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
   return NextResponse.json({ ok: true, complementoId: r.complementoId, uuid: r.uuid });

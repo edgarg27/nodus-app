@@ -42,6 +42,7 @@ type Complemento = {
   forma_pago: string;
   archivo_url: string | null;
   xml_url: string | null;
+  numero_operacion?: string | null;
   cancelacion_estatus: "en_proceso" | "cancelada" | "rechazada" | null;
 };
 
@@ -149,7 +150,7 @@ export default function FacturasPorClientePage() {
 
     const { data: comps } = await supabase
       .from("complementos_pago")
-      .select("id, serie, folio_fiscal, fecha_pago, monto, forma_pago, archivo_url, xml_url, cancelacion_estatus")
+      .select("id, serie, folio_fiscal, fecha_pago, monto, forma_pago, archivo_url, xml_url, numero_operacion, cancelacion_estatus")
       .eq("user_id", id)
       .order("fecha_pago", { ascending: false });
     setComplementos((comps as Complemento[]) || []);
@@ -411,6 +412,7 @@ export default function FacturasPorClientePage() {
                     </p>
                     <p className="contrato-detalle">
                       Pago del {fechaCorta(c.fecha_pago)} · forma {c.forma_pago}
+                      {c.numero_operacion ? " · operación " + c.numero_operacion : ""}
                       {c.cancelacion_estatus === "cancelada" ? " · ✕ cancelado" : c.cancelacion_estatus === "en_proceso" ? " · ⏳ cancelación en proceso" : ""}
                     </p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>

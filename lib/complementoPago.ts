@@ -60,12 +60,20 @@ export async function emitirComplementoPago(
     pagoId?: string | null;
     // true: si el importe supera el saldo, se recorta al saldo (lo usa el pago automático).
     topeSaldo?: boolean;
+    // Datos opcionales del pago: referencia bancaria (va en el CFDI), notas internas y comprobante.
+    numeroOperacion?: string | null;
+    notas?: string | null;
+    comprobanteUrl?: string | null;
   }
 ): Promise<ResultadoComplemento> {
   try {
     if (!FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === p.formaPago)) throw new ErrorFacturacion("Forma de pago no válida");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(p.fecha)) throw new ErrorFacturacion("Fecha de pago no válida");
     if (p.fecha > hoyMexicoISO()) throw new ErrorFacturacion("La fecha de pago no puede ser futura");
+    const numeroOperacion = (p.numeroOperacion || "").trim();
+    const notas = (p.notas || "").trim();
+    if (numeroOperacion.length > 100) throw new ErrorFacturacion("El número de operación admite máximo 100 caracteres");
+    if (notas.length > 500) throw new ErrorFacturacion("Las notas admiten máximo 500 caracteres");
     // Un mismo pago puede confirmarse dos veces (webhook + verificación): si ya tiene su
     // complemento vigente, no se emite otro.
     if (p.pagoId) {
@@ -142,6 +150,7 @@ export async function emitirComplementoPago(
           type: "pago",
           data: {
             payment_form: p.formaPago,
+            ...(numeroOperacion ? { numOperacion: numeroOperacion } : {}),
             date: new Date(`${p.fecha}T12:00:00`),
             related_documents: docs.map((d) => ({
               uuid: d.f.uuid_cfdi,
@@ -180,6 +189,9 @@ export async function emitirComplementoPago(
         fecha_pago: p.fecha,
         monto,
         pago_id: p.pagoId || null,
+        numero_operacion: numeroOperacion || null,
+        notas: notas || null,
+        comprobante_url: p.comprobanteUrl || null,
         xml_url: xmlUrl,
         archivo_url: archivoUrl,
         creado_por: p.usuarioId,

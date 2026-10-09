@@ -77,6 +77,9 @@ type Complemento = {
   monto: number;
   archivo_url: string | null;
   xml_url: string | null;
+  numero_operacion?: string | null;
+  notas?: string | null;
+  comprobante_url?: string | null;
   cancelacion_estatus: "en_proceso" | "cancelada" | "rechazada" | null;
 };
 type FilaComplemento = { complemento_id: string; factura_id: string; importe: number };
@@ -173,7 +176,7 @@ export default function FacturasAdminPage() {
     // Complementos de pago del centro y qué facturas cubre cada uno (para calcular saldos).
     const { data: comps } = await supabase
       .from("complementos_pago")
-      .select("id, user_id, serie, folio_fiscal, uuid_cfdi, forma_pago, fecha_pago, monto, archivo_url, xml_url, cancelacion_estatus")
+      .select("id, user_id, serie, folio_fiscal, uuid_cfdi, forma_pago, fecha_pago, monto, archivo_url, xml_url, numero_operacion, notas, comprobante_url, cancelacion_estatus")
       .eq("centro", c)
       .order("created_at", { ascending: false })
       .limit(300);
@@ -383,6 +386,9 @@ export default function FacturasAdminPage() {
   const [fechaPagoComp, setFechaPagoComp] = useState("");
   const [importesComp, setImportesComp] = useState<Record<string, string>>({});
   const [emitiendoComp, setEmitiendoComp] = useState(false);
+  const [numeroOpComp, setNumeroOpComp] = useState("");
+  const [notasComp, setNotasComp] = useState("");
+  const [comprobanteComp, setComprobanteComp] = useState<File | null>(null);
   const [errorComp, setErrorComp] = useState("");
 
   // Lo cubierto por complementos no cancelados; el saldo es lo que falta.
@@ -417,6 +423,9 @@ export default function FacturasAdminPage() {
     setFormaPagoComp("03");
     setFechaPagoComp(hoyMexicoISO());
     setImportesComp(Object.fromEntries(ids.map((id) => [id, String(saldoDe(id))])));
+    setNumeroOpComp("");
+    setNotasComp("");
+    setComprobanteComp(null);
     setErrorComp("");
   }
 
@@ -429,10 +438,31 @@ export default function FacturasAdminPage() {
     }
     setEmitiendoComp(true);
     setErrorComp("");
+    // El comprobante (opcional) se sube primero al almacenamiento privado.
+    let comprobanteUrl: string | null = null;
+    if (comprobanteComp) {
+      const ext = comprobanteComp.name.split(".").pop() || "pdf";
+      const nombre = "comprobante-pago-" + modalComplemento.userId + "-" + Date.now() + "." + ext;
+      const { error: errSubida } = await supabase.storage.from("facturas").upload(nombre, comprobanteComp, { contentType: comprobanteComp.type, upsert: true });
+      if (errSubida) {
+        setEmitiendoComp(false);
+        setErrorComp("No se pudo subir el comprobante: " + errSubida.message);
+        return;
+      }
+      comprobanteUrl = supabase.storage.from("facturas").getPublicUrl(nombre).data.publicUrl;
+    }
     const res = await fetch("/api/complementos/emitir", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: modalComplemento.userId, items, formaPago: formaPagoComp, fecha: fechaPagoComp }),
+      body: JSON.stringify({
+        userId: modalComplemento.userId,
+        items,
+        formaPago: formaPagoComp,
+        fecha: fechaPagoComp,
+        numeroOperacion: numeroOpComp,
+        notas: notasComp,
+        comprobanteUrl,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setEmitiendoComp(false);
@@ -942,6 +972,12 @@ export default function FacturasAdminPage() {
                   </select>
                   <p className="sub-label" style={{ marginTop: 8 }}>Fecha en que el cliente pagó</p>
                   <input type="date" max={hoyMexicoISO()} value={fechaPagoComp} onChange={(e) => setFechaPagoComp(e.target.value)} />
+                  <p className="sub-label" style={{ marginTop: 8 }}>Número de operación o referencia (opcional)</p>
+                  <input maxLength={100} value={numeroOpComp} onChange={(e) => setNumeroOpComp(e.target.value)} placeholder="Referencia de la transferencia, folio del voucher..." />
+                  <p className="sub-label" style={{ marginTop: 8 }}>Notas internas (opcional)</p>
+                  <textarea maxLength={500} rows={2} value={notasComp} onChange={(e) => setNotasComp(e.target.value)} placeholder="No aparecen en el CFDI" />
+                  <p className="sub-label" style={{ marginTop: 8 }}>Comprobante de pago (opcional, PDF o imagen)</p>
+                  <input type="file" accept="application/pdf,image/*" onChange={(e) => setComprobanteComp(e.target.files?.[0] || null)} />
                   {errorComp && <p style={{ fontSize: 12, color: "#A32D2D", marginTop: 8 }}>{errorComp}</p>}
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                     <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 700 }} disabled={emitiendoComp} onClick={emitirComplemento}>
@@ -1014,6 +1050,8 @@ export default function FacturasAdminPage() {
                       <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
                         Cubre {cubre.length} factura(s) · {c.uuid_cfdi}
                       </p>
+                      {c.numero_operacion && <p className="contrato-detalle">Operación: {c.numero_operacion}</p>}
+                      {c.notas && <p className="contrato-detalle" style={{ color: "#666" }}>Notas: {c.notas}</p>}
                       {etiqueta && (
                         <p className="contrato-detalle" style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: etiqueta.bg, color: etiqueta.color }}>
                           {etiqueta.label}
@@ -1029,6 +1067,11 @@ export default function FacturasAdminPage() {
                           <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=xml"}>
                             Descargar XML
                           </a>
+                        )}
+                        {c.comprobante_url && (
+                          <BotonArchivo url={c.comprobante_url} bucket="facturas">
+                            Ver comprobante
+                          </BotonArchivo>
                         )}
                         {puedoCancelar && (!c.cancelacion_estatus || c.cancelacion_estatus === "rechazada") && (
                           <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelarComplemento(c.id)}>
