@@ -33,6 +33,9 @@ export default function ImportarCfdiPage() {
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
   const [archivos, setArchivos] = useState<File[]>([]);
+  // Sin valor por omisión a propósito: importar facturas ya cobradas como
+  // "pendientes" inflaría la cartera, así que hay que elegir.
+  const [estadoImportado, setEstadoImportado] = useState<"" | "pendiente" | "pagada">("");
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState({ hecho: 0, total: 0 });
   const [resumen, setResumen] = useState<Resumen | null>(null);
@@ -96,7 +99,7 @@ export default function ImportarCfdiPage() {
   }
 
   async function procesar() {
-    if (!centro) return;
+    if (!centro || !estadoImportado) return;
     const xmls = archivos.filter((f) => f.name.toLowerCase().endsWith(".xml"));
     const pdfs = archivos.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
     const pdfPorNombreBase = new Map<string, File>();
@@ -127,6 +130,16 @@ export default function ImportarCfdiPage() {
         return;
       }
 
+      // Se revisa el UUID antes de subir los archivos, para no dejar XML/PDF huérfanos
+      // en el almacenamiento cuando la factura ya existe. (La restricción única de la
+      // base sigue siendo la protección final, por si existe en un centro que no vemos.)
+      const { data: existente } = await supabase.from("facturas").select("id").eq("uuid_cfdi", data.uuidCfdi).limit(1);
+      if (existente && existente.length > 0) {
+        filas.push({ archivo: xml.name, problema: "UUID duplicado", accion: "No importar" });
+        duplicadas++;
+        return;
+      }
+
       const pdf = pdfPorNombreBase.get(nombreBase(xml.name));
       const xmlUrl = await subirArchivo("facturas", `cfdi-${data.uuidCfdi.slice(0, 8)}`, xml, "text/xml", "xml");
       let archivoUrl: string | null = null;
@@ -146,7 +159,7 @@ export default function ImportarCfdiPage() {
         monto: data.total,
         fecha_emision: fecha,
         fecha_vencimiento: fecha,
-        estado: "pendiente",
+        estado: estadoImportado,
         centro: cliente?.centro || centro,
         archivo_url: archivoUrl,
         uuid_cfdi: data.uuidCfdi,
@@ -254,10 +267,24 @@ export default function ImportarCfdiPage() {
             </p>
           )}
 
+          <p className="sub-label" style={{ marginTop: 12 }}>¿Cómo entran estas facturas?</p>
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, marginTop: 4 }}>
+            <input type="radio" name="estadoImportado" checked={estadoImportado === "pagada"} onChange={() => setEstadoImportado("pagada")} />
+            <span>
+              <strong>Ya pagadas</strong> (históricas o ya cobradas): no cuentan como saldo por cobrar.
+            </span>
+          </label>
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, marginTop: 4 }}>
+            <input type="radio" name="estadoImportado" checked={estadoImportado === "pendiente"} onChange={() => setEstadoImportado("pendiente")} />
+            <span>
+              <strong>Pendientes de cobro</strong>: entran como saldo por cobrar del cliente.
+            </span>
+          </label>
+
           <button
             className="tel-borrar-btn"
             style={{ color: "#0d1b3e", fontWeight: 600, marginTop: 12 }}
-            disabled={archivos.length === 0 || procesando || !centro}
+            disabled={archivos.length === 0 || procesando || !centro || !estadoImportado}
             onClick={procesar}
           >
             {procesando ? `Procesando ${progreso.hecho}/${progreso.total}...` : "Procesar"}
