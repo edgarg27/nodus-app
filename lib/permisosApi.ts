@@ -16,6 +16,7 @@ export type AccionApi =
   | "pagosMarcarPagado"
   | "pagosVincular"
   | "facturaDescargar"
+  | "facturaCancelar"
   | "cotizacionAceptar"
   | "cotizarPptx"
   | "crearCliente"
@@ -38,6 +39,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   pagosMarcarPagado: ["admin", "gerente", "cobranza", "gerente_ventas"],
   pagosVincular: ["admin", "gerente", "cobranza", "gerente_ventas"],
   facturaDescargar: ["admin", "gerente", "cobranza", "gerente_ventas"],
+  // Cancelar un CFDI ante el SAT (Facturas): acción sensible y sin vuelta atrás.
+  facturaCancelar: ["admin", "gerente", "cobranza"],
   cotizacionAceptar: ["admin", "gerente", "gerente_ventas"],
   cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
   crearCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],

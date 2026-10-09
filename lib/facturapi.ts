@@ -177,6 +177,7 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
     }));
 
     const datosFactura = {
+      facturapi_id: invoice.id,
       uuid_cfdi: invoice.uuid,
       serie: invoice.series || null,
       folio_fiscal: String(invoice.folio_number ?? ""),
