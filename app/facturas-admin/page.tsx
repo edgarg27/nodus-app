@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { TIPOS_COBRO_ADICIONAL, tipoCobroAdicional } from "@/lib/adicionales";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
@@ -80,7 +81,7 @@ type Complemento = {
 };
 type FilaComplemento = { complemento_id: string; factura_id: string; importe: number };
 
-type Pago = { id: string; monto: number; concepto: string | null; estado: string; factura_id: string | null; created_at: string };
+type Pago = { id: string; monto: number; concepto: string | null; estado: string; factura_id: string | null; created_at: string; adicional_tipo?: string | null };
 type PagoSuelto = Pago & { user_id: string };
 
 export default function FacturasAdminPage() {
@@ -162,7 +163,7 @@ export default function FacturasAdminPage() {
       clienteIds.length > 0
         ? await supabase
             .from("pagos")
-            .select("id, user_id, monto, concepto, estado, factura_id, created_at")
+            .select("id, user_id, monto, concepto, estado, factura_id, created_at, adicional_tipo")
             .in("user_id", clienteIds)
             .is("factura_id", null)
             .order("created_at", { ascending: false })
@@ -195,6 +196,7 @@ export default function FacturasAdminPage() {
     fecha_emision: new Date().toISOString().split("T")[0],
     fecha_vencimiento: "",
     estado: "pendiente",
+    adicional_tipo: "",
   });
   const [archivo, setArchivo] = useState<File | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -250,6 +252,8 @@ export default function FacturasAdminPage() {
         estado: form.estado,
         centro,
         archivo_url: archivoUrl,
+        // Clave del SAT con la que se facturará (vacío = renta de espacio).
+        ...(form.adicional_tipo ? { adicional_tipo: form.adicional_tipo } : {}),
       })
       .select("id")
       .single();
@@ -277,6 +281,7 @@ export default function FacturasAdminPage() {
       fecha_emision: new Date().toISOString().split("T")[0],
       fecha_vencimiento: "",
       estado: "pendiente",
+      adicional_tipo: "",
     });
     setArchivo(null);
     setPagosAVincular(new Set());
@@ -479,6 +484,34 @@ export default function FacturasAdminPage() {
         (fallidas.length > 0
           ? "✗ " + fallidas.length + " no se pudo(ieron): " + fallidas.slice(0, 3).map((r) => (r.folio || "") + " — " + r.error).join(" · ") + (fallidas.length > 3 ? " …" : "")
           : "")
+    );
+    if (centro) fetchTodo(centro);
+  }
+
+  // Cobros sueltos pendientes (adicionales, depósitos…): se les crea su cobro con factura y se timbra.
+  const [seleccionPagos, setSeleccionPagos] = useState<string[]>([]);
+  async function facturarPagosSueltos(ids: string[]) {
+    if (ids.length === 0) return;
+    if (!confirm("¿Emitir la factura (CFDI) de " + (ids.length === 1 ? "este cobro" : ids.length + " cobros") + "? Se timbra a pago diferido (PPD); al pagarse se emite su complemento de pago.")) return;
+    setFacturando(true);
+    const res = await fetch("/api/facturas/facturar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pagoIds: ids }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setFacturando(false);
+    if (!res.ok && !data.resultados) {
+      setAvisoCancelar(data.error || "No se pudo facturar");
+      return;
+    }
+    const resultados: { id: string; folio?: string; ok: boolean; error?: string }[] = data.resultados || [];
+    const fallidas = resultados.filter((r) => !r.ok);
+    const hechas = resultados.length - fallidas.length;
+    setSeleccionPagos((s) => s.filter((i) => !resultados.some((r) => r.id === i && r.ok)));
+    setAvisoCancelar(
+      (hechas > 0 ? "✓ " + hechas + " factura(s) emitida(s). " : "") +
+        (fallidas.length > 0 ? "✗ " + fallidas.length + " no se pudo(ieron): " + fallidas.slice(0, 3).map((r) => (r.folio || "") + " — " + r.error).join(" · ") : "")
     );
     if (centro) fetchTodo(centro);
   }
@@ -809,6 +842,16 @@ export default function FacturasAdminPage() {
                 <p className="sub-label">Concepto</p>
                 <input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} />
 
+                <p className="sub-label">Tipo de servicio (clave del SAT para facturar)</p>
+                <select value={form.adicional_tipo} onChange={(e) => setForm({ ...form, adicional_tipo: e.target.value })}>
+                  <option value="">Renta de espacio (por omisión)</option>
+                  {TIPOS_COBRO_ADICIONAL.map((t) => (
+                    <option key={t.clave} value={t.clave}>
+                      {t.etiqueta}
+                    </option>
+                  ))}
+                </select>
+
                 <p className="sub-label">Subir factura (PDF, opcional)</p>
                 <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
 
@@ -910,6 +953,50 @@ export default function FacturasAdminPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {puedoCancelar && pagosSueltos.some((p) => p.estado === "pendiente") && (
+              <details className="form-card" style={{ marginTop: 8 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+                  Cobros sueltos por facturar ({pagosSueltos.filter((p) => p.estado === "pendiente").length})
+                </summary>
+                <p style={{ fontSize: 12, color: "#666", margin: "6px 0" }}>
+                  Adicionales, depósitos y demás cobros pendientes que todavía no tienen factura. Se pueden facturar antes de que se paguen.
+                </p>
+                {seleccionPagos.length > 0 && (
+                  <button className="btn-exportar" disabled={facturando} onClick={() => facturarPagosSueltos(seleccionPagos)}>
+                    {facturando ? "Facturando..." : "🧾 Facturar seleccionados (" + seleccionPagos.length + ")"}
+                  </button>
+                )}
+                {pagosSueltos
+                  .filter((p) => p.estado === "pendiente")
+                  .map((p) => {
+                    const cli = clientes.find((c) => c.id === p.user_id);
+                    const tipo = tipoCobroAdicional(p.adicional_tipo);
+                    return (
+                      <div key={p.id} style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="checkbox"
+                          aria-label="Seleccionar cobro"
+                          checked={seleccionPagos.includes(p.id)}
+                          onChange={(e) => setSeleccionPagos((s) => (e.target.checked ? [...s, p.id] : s.filter((i) => i !== p.id)))}
+                        />
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                          <p className="contrato-detalle">
+                            <strong>{cli?.nombre || "Cliente"}</strong> · {p.concepto || "Cobro"}
+                          </p>
+                          <p className="contrato-detalle" style={{ fontSize: 12, color: "#666" }}>
+                            {"$"}{Number(p.monto).toLocaleString("es-MX")}
+                            {tipo ? " · " + tipo.etiqueta : ""}
+                          </p>
+                        </div>
+                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarPagosSueltos([p.id])}>
+                          🧾 Facturar (CFDI)
+                        </button>
+                      </div>
+                    );
+                  })}
+              </details>
             )}
 
             {complementos.length > 0 && (
