@@ -1,8 +1,12 @@
-// Generación automática de CFDI (factura real) vía Facturapi cuando se
-// confirma un pago. Usa el mismo formato que la importación manual de CFDI
-// (ver app/facturas-admin/importar) para que el resto de la app (estado de
-// cuenta, reportes) no necesite cambios. Nunca truena: si algo falla, el
-// pago sigue su curso y se deja un aviso para facturar a mano.
+// Generación de CFDI (factura real) vía Facturapi. Hay dos caminos:
+//   - Automático al confirmarse un pago (generarFacturaAutomatica): PUE, la
+//     factura nace ya pagada.
+//   - Desde un cobro pendiente (lib/facturarCobro.ts): PPD, la factura se emite
+//     antes del pago y después se cubre con un complemento de pago.
+// Ambos usan timbrarCfdi() y guardan el resultado con el mismo formato que la
+// importación manual de CFDI (ver app/facturas-admin/importar) para que el
+// resto de la app (estado de cuenta, reportes) no necesite cambios. Nunca
+// truena el pago: si algo falla, el pago sigue su curso y se deja un aviso.
 
 import Facturapi from "facturapi";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -55,6 +59,167 @@ async function avisarFacturaFallida(admin: Admin, pagoId: string, centro: string
   });
 }
 
+export type DatosFiscalesCliente = {
+  email?: string | null;
+  rfc?: string | null;
+  nombre_fiscal?: string | null;
+  regimen_fiscal?: string | null;
+  cp_fiscal?: string | null;
+  uso_cfdi?: string | null;
+};
+
+export type ParametrosCfdi = {
+  cliente: DatosFiscalesCliente;
+  concepto: string | null;
+  monto: number;
+  adicionalTipo?: string | null;
+  // PUE: se paga en el momento (factura ya pagada). PPD: pago diferido, se emite
+  // antes del pago y se cubre después con un complemento de pago.
+  metodo: "PUE" | "PPD";
+  formaPago: string;
+  // Para los registros de error.
+  etiqueta: string;
+  // Facturapi no emite dos veces con la misma llave: evita facturas dobles si dos
+  // personas (o dos clics) piden lo mismo a la vez.
+  idempotencyKey?: string;
+};
+
+// Error con mensaje pensado para mostrarse tal cual al personal.
+export class ErrorFacturacion extends Error {}
+
+// Emite el CFDI en Facturapi, guarda XML/PDF y devuelve los datos listos para
+// la tabla `facturas`. No toca la base de datos de facturas ni de pagos.
+export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
+  const { cliente } = p;
+  if (!cliente.rfc || !cliente.nombre_fiscal || !cliente.regimen_fiscal || !cliente.cp_fiscal) {
+    throw new ErrorFacturacion("el cliente no tiene datos fiscales completos");
+  }
+
+  const datos = normalizarDatosFiscales({
+    rfc: cliente.rfc,
+    nombre_fiscal: cliente.nombre_fiscal,
+    regimen_fiscal: cliente.regimen_fiscal,
+    cp_fiscal: cliente.cp_fiscal,
+    uso_cfdi: cliente.uso_cfdi || "G03",
+  });
+
+  const hoy = new Date();
+  const publicoGeneral = esPublicoGeneral(datos.rfc);
+  if (publicoGeneral && p.metodo === "PPD") {
+    throw new ErrorFacturacion("a público en general solo se le factura al cobrar (no admite pago diferido)");
+  }
+  // Un uso que ya no existe en CFDI 4.0 (p. ej. "P01") o que no aplica al tipo de persona haría
+  // que el SAT rechace la factura: se cae a G03 en vez de dejar al cliente sin factura.
+  const usoCfdi = usosParaTipo(datos.rfc.length === 12 ? "moral" : "fisica").some((u) => u.clave === datos.uso_cfdi) ? datos.uso_cfdi : "G03";
+  // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
+  const claveSat = tipoCobroAdicional(p.adicionalTipo);
+  const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
+  const unidad = claveSat?.satUnidad || CLAVE_UNIDAD;
+
+  const invoice: any = await facturapi.invoices.create({
+    customer: {
+      legal_name: datos.nombre_fiscal,
+      tax_id: datos.rfc,
+      tax_system: datos.regimen_fiscal,
+      email: cliente.email || undefined,
+      address: { zip: datos.cp_fiscal },
+    },
+    items: [
+      {
+        quantity: 1,
+        product: {
+          description: p.concepto || "Servicios Nodus Flex Center",
+          product_key: prodServ,
+          unit_key: unidad,
+          price: Number(p.monto),
+          tax_included: true,
+          taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }],
+        },
+      },
+    ],
+    payment_form: p.formaPago,
+    payment_method: p.metodo,
+    use: usoCfdi,
+    ...(p.idempotencyKey ? { idempotency_key: p.idempotencyKey } : {}),
+    // El SAT exige el nodo "Información Global" cuando el receptor es
+    // público en general (XAXX010101000): se factura como resumen diario.
+    ...(publicoGeneral
+      ? { global: { periodicity: "day", months: String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
+      : {}),
+  });
+
+  const [xmlBuf, pdfBuf] = await Promise.all([
+    facturapi.invoices
+      .downloadXmlUrl(invoice.id)
+      .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
+      .catch((err: any) => {
+        console.error(`[facturapi] ${p.etiqueta}: no se pudo descargar el XML:`, err?.message || err);
+        return null;
+      }),
+    facturapi.invoices
+      .downloadPdfUrl(invoice.id)
+      .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
+      .catch((err: any) => {
+        console.error(`[facturapi] ${p.etiqueta}: no se pudo descargar el PDF:`, err?.message || err);
+        return null;
+      }),
+  ]);
+  const base = String(invoice.uuid || invoice.id).slice(0, 8);
+  const [xmlUrl, archivoUrl] = await Promise.all([
+    xmlBuf ? subirArchivoFactura(admin, base, xmlBuf, "xml") : Promise.resolve(null),
+    pdfBuf ? subirArchivoFactura(admin, base, pdfBuf, "pdf") : Promise.resolve(null),
+  ]);
+
+  const item = invoice.items?.[0];
+  const importeConcepto = item?.product?.price ? item.product.price * (item.quantity || 1) : Number(p.monto);
+  const conceptos: CfdiConcepto[] = [
+    {
+      descripcion: item?.product?.description || p.concepto || "",
+      cantidad: item?.quantity || 1,
+      valorUnitario: item?.product?.price || Number(p.monto),
+      importe: importeConcepto,
+    },
+  ];
+  // Facturapi no regresa el importe ya calculado por impuesto (solo la tasa),
+  // así que se calcula a partir del precio con IVA incluido.
+  const impuestosItem = item?.product?.taxes || [];
+  const tasaIva = impuestosItem.find((t: any) => t.type === "IVA" && !t.withholding)?.rate ?? 0.16;
+  const subtotalCalc = Math.round((importeConcepto / (1 + tasaIva)) * 100) / 100;
+  const ivaTotal = Math.round((importeConcepto - subtotalCalc) * 100) / 100;
+  const impuestos: CfdiImpuesto[] = impuestosItem.map((t: any) => ({
+    tipo: t.withholding ? "retencion" : "traslado",
+    impuesto: t.type,
+    tasaOCuota: String(t.rate),
+    importe: t.withholding ? 0 : ivaTotal,
+  }));
+
+  const datosFactura = {
+    facturapi_id: invoice.id,
+    uuid_cfdi: invoice.uuid,
+    serie: invoice.series || null,
+    folio_fiscal: String(invoice.folio_number ?? ""),
+    rfc_emisor: invoice.issuer_info?.tax_id || null,
+    nombre_emisor: invoice.issuer_info?.legal_name || null,
+    rfc_receptor: datos.rfc,
+    nombre_receptor: datos.nombre_fiscal,
+    subtotal: subtotalCalc,
+    iva: ivaTotal,
+    retenciones: 0,
+    moneda: invoice.currency || "MXN",
+    tipo_comprobante: invoice.type || "I",
+    forma_pago: invoice.payment_form,
+    metodo_pago: invoice.payment_method,
+    uso_cfdi: invoice.use,
+    conceptos,
+    impuestos,
+    xml_url: xmlUrl,
+    archivo_url: archivoUrl,
+    fuente: "facturapi_auto",
+  };
+
+  return { invoice, datosFactura };
+}
+
 export async function generarFacturaAutomatica(admin: Admin, pagoId: string, metodoOpenpay?: string | null): Promise<void> {
   const { data: pago } = await admin
     .from("pagos")
@@ -70,11 +235,22 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
     .maybeSingle();
 
   try {
-    let facturaExistente: { id: string; uuid_cfdi: string | null } | null = null;
+    let facturaExistente: { id: string; uuid_cfdi: string | null; metodo_pago: string | null; folio: string | null } | null = null;
     if (pago.factura_id) {
-      const { data } = await admin.from("facturas").select("id, uuid_cfdi").eq("id", pago.factura_id).maybeSingle();
+      const { data } = await admin.from("facturas").select("id, uuid_cfdi, metodo_pago, folio").eq("id", pago.factura_id).maybeSingle();
       facturaExistente = data;
-      if (facturaExistente?.uuid_cfdi) return; // ya facturado, evita duplicar (webhook + verificación pueden coincidir)
+      if (facturaExistente?.uuid_cfdi) {
+        // Ya facturado (webhook + verificación pueden coincidir): no se duplica. Si la factura
+        // se emitió a pago diferido (PPD), este pago todavía necesita su complemento de pago.
+        if (facturaExistente.metodo_pago === "PPD" && cliente?.centro) {
+          await admin.from("notificaciones").insert({
+            centro: cliente.centro,
+            tipo: "complemento_pago_pendiente",
+            mensaje: `El cliente ${cliente.nombre || ""} pagó la factura ${facturaExistente.folio || ""} (pago diferido): falta emitir su complemento de pago.`,
+          });
+        }
+        return;
+      }
     }
 
     if (!cliente?.rfc || !cliente.nombre_fiscal || !cliente.regimen_fiscal || !cliente.cp_fiscal) {
@@ -82,123 +258,15 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       return;
     }
 
-    const datos = normalizarDatosFiscales({
-      rfc: cliente.rfc,
-      nombre_fiscal: cliente.nombre_fiscal,
-      regimen_fiscal: cliente.regimen_fiscal,
-      cp_fiscal: cliente.cp_fiscal,
-      uso_cfdi: cliente.uso_cfdi || "G03",
+    const { invoice, datosFactura } = await timbrarCfdi(admin, {
+      cliente,
+      concepto: pago.concepto,
+      monto: Number(pago.monto),
+      adicionalTipo: pago.adicional_tipo,
+      metodo: "PUE",
+      formaPago: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
+      etiqueta: `pago ${pagoId}`,
     });
-
-    const hoy = new Date();
-    const publicoGeneral = esPublicoGeneral(datos.rfc);
-    // Un uso que ya no existe en CFDI 4.0 (p. ej. "P01") o que no aplica al tipo de persona haría
-    // que el SAT rechace la factura: se cae a G03 en vez de dejar al cliente sin factura.
-    const usoCfdi = usosParaTipo(datos.rfc.length === 12 ? "moral" : "fisica").some((u) => u.clave === datos.uso_cfdi) ? datos.uso_cfdi : "G03";
-    // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
-    const claveSat = tipoCobroAdicional(pago.adicional_tipo);
-    const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
-    const unidad = claveSat?.satUnidad || CLAVE_UNIDAD;
-
-    const invoice: any = await facturapi.invoices.create({
-      customer: {
-        legal_name: datos.nombre_fiscal,
-        tax_id: datos.rfc,
-        tax_system: datos.regimen_fiscal,
-        email: cliente.email || undefined,
-        address: { zip: datos.cp_fiscal },
-      },
-      items: [
-        {
-          quantity: 1,
-          product: {
-            description: pago.concepto || "Servicios Nodus Flex Center",
-            product_key: prodServ,
-            unit_key: unidad,
-            price: Number(pago.monto),
-            tax_included: true,
-            taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }],
-          },
-        },
-      ],
-      payment_form: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
-      payment_method: "PUE",
-      use: usoCfdi,
-      // El SAT exige el nodo "Información Global" cuando el receptor es
-      // público en general (XAXX010101000): se factura como resumen diario.
-      ...(publicoGeneral
-        ? { global: { periodicity: "day", months: String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
-        : {}),
-    });
-
-    const [xmlBuf, pdfBuf] = await Promise.all([
-      facturapi.invoices
-        .downloadXmlUrl(invoice.id)
-        .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
-        .catch((err: any) => {
-          console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el XML:`, err?.message || err);
-          return null;
-        }),
-      facturapi.invoices
-        .downloadPdfUrl(invoice.id)
-        .then((firmada: any) => bufferDesdeUrlFirmada(firmada.url))
-        .catch((err: any) => {
-          console.error(`[facturapi] pago ${pagoId}: no se pudo descargar el PDF:`, err?.message || err);
-          return null;
-        }),
-    ]);
-    const base = String(invoice.uuid || invoice.id).slice(0, 8);
-    const [xmlUrl, archivoUrl] = await Promise.all([
-      xmlBuf ? subirArchivoFactura(admin, base, xmlBuf, "xml") : Promise.resolve(null),
-      pdfBuf ? subirArchivoFactura(admin, base, pdfBuf, "pdf") : Promise.resolve(null),
-    ]);
-
-    const item = invoice.items?.[0];
-    const importeConcepto = item?.product?.price ? item.product.price * (item.quantity || 1) : Number(pago.monto);
-    const conceptos: CfdiConcepto[] = [
-      {
-        descripcion: item?.product?.description || pago.concepto || "",
-        cantidad: item?.quantity || 1,
-        valorUnitario: item?.product?.price || Number(pago.monto),
-        importe: importeConcepto,
-      },
-    ];
-    // Facturapi no regresa el importe ya calculado por impuesto (solo la tasa),
-    // así que se calcula a partir del precio con IVA incluido.
-    const impuestosItem = item?.product?.taxes || [];
-    const tasaIva = impuestosItem.find((t: any) => t.type === "IVA" && !t.withholding)?.rate ?? 0.16;
-    const subtotalCalc = Math.round((importeConcepto / (1 + tasaIva)) * 100) / 100;
-    const ivaTotal = Math.round((importeConcepto - subtotalCalc) * 100) / 100;
-    const impuestos: CfdiImpuesto[] = impuestosItem.map((t: any) => ({
-      tipo: t.withholding ? "retencion" : "traslado",
-      impuesto: t.type,
-      tasaOCuota: String(t.rate),
-      importe: t.withholding ? 0 : ivaTotal,
-    }));
-
-    const datosFactura = {
-      facturapi_id: invoice.id,
-      uuid_cfdi: invoice.uuid,
-      serie: invoice.series || null,
-      folio_fiscal: String(invoice.folio_number ?? ""),
-      rfc_emisor: invoice.issuer_info?.tax_id || null,
-      nombre_emisor: invoice.issuer_info?.legal_name || null,
-      rfc_receptor: datos.rfc,
-      nombre_receptor: datos.nombre_fiscal,
-      subtotal: subtotalCalc,
-      iva: ivaTotal,
-      retenciones: 0,
-      moneda: invoice.currency || "MXN",
-      tipo_comprobante: invoice.type || "I",
-      forma_pago: invoice.payment_form,
-      metodo_pago: invoice.payment_method,
-      uso_cfdi: invoice.use,
-      conceptos,
-      impuestos,
-      xml_url: xmlUrl,
-      archivo_url: archivoUrl,
-      fuente: "facturapi_auto",
-    };
 
     if (facturaExistente) {
       await admin.from("facturas").update(datosFactura).eq("id", facturaExistente.id);
