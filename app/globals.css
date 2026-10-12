@@ -7400,3 +7400,70 @@ a.stat-card {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- App instalable (PWA): aviso para instalar ---------- */
+.pwa-aviso {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #0d1b3e;
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 28px rgba(13, 27, 62, 0.35);
+}
+
+.pwa-aviso-logo {
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.pwa-aviso-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-aviso-titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pwa-aviso-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #c9d1e3;
+}
+
+.pwa-aviso-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pwa-aviso-instalar {
+  background: #f07e3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pwa-aviso-cerrar {
+  background: transparent;
+  color: #c9d1e3;
+  border: none;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px;
+}
