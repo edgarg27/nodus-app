@@ -4,7 +4,8 @@
 // solo se le agregan los datos del CFDI.
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { timbrarCfdi, ErrorFacturacion } from "@/lib/facturapi";
+import { timbrarCfdi, tipoPorOmision, ErrorFacturacion } from "@/lib/facturapi";
+import { serieCentro } from "@/lib/centros";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -48,7 +49,8 @@ export async function facturarCobro(admin: Admin, facturaId: string): Promise<Re
       cliente: cliente || {},
       concepto: f.concepto,
       monto: Number(f.monto),
-      adicionalTipo: f.adicional_tipo || pagoAdicional?.adicional_tipo || null,
+      adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
+      serie: serieCentro(f.centro),
       metodo: "PPD",
       formaPago: "99", // "Por definir": el SAT lo exige en PPD; la forma real va en el complemento
       etiqueta: `cobro ${f.id}`,

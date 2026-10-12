@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, ErrorFacturacion, cpLugarExpedicion } from "@/lib/facturapi";
 import { DATOS_PUBLICO_GENERAL } from "@/lib/datosFiscales";
+import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
@@ -33,6 +34,7 @@ export async function facturarPublicoGeneral(
       concepto,
       monto,
       adicionalTipo: p.adicionalTipo || null,
+      serie: serieCentro(p.centro),
       metodo: "PUE",
       formaPago: p.formaPago,
       etiqueta: `público en general ${p.centro}`,

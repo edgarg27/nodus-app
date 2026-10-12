@@ -46,15 +46,30 @@ export function totalAdicionalesMensuales(items: { concepto: string; monto: numb
   return round2(total);
 }
 
-// Cobros adicionales sueltos (/adicionales): lo que el admin le cobra a un
-// cliente fuera de su contrato. Cada tipo trae la clave del SAT con la que se
-// factura (lib/facturapi.ts). Las de copias y frituras y la genérica de "Otro"
-// están por confirmar con el contador. El monto que se captura y se cobra ya
-// lleva IVA incluido, igual que el resto de los cobros.
+// Productos y servicios que se cobran y se facturan: es el listado de claves del SAT que dio el
+// área de facturación (con su descripción oficial). Sirve para los cobros adicionales
+// (/adicionales) y para el tipo de servicio al facturar (Facturas > + Nueva factura); cada uno trae
+// la clave y la unidad del SAT con las que se timbra (lib/facturapi.ts). La unidad no venía en el
+// listado: servicios = E48, piezas (copias, impresiones, llaves, tarjetas) = H87; por confirmar
+// con el contador. El monto que se captura y se cobra ya lleva IVA incluido.
 export const TIPOS_COBRO_ADICIONAL = [
-  { clave: "sala_juntas", etiqueta: "Hora extra de sala de juntas", concepto: "Hora extra de sala de juntas", satProdServ: "80131500", satUnidad: "E48" },
-  { clave: "copias", etiqueta: "Copias / impresiones", concepto: "Copias e impresiones", satProdServ: "82121700", satUnidad: "H87" },
-  { clave: "botanas", etiqueta: "Frituras y botanas", concepto: "Frituras y botanas", satProdServ: "50192100", satUnidad: "H87" },
+  { clave: "acabados_remodelacion", etiqueta: "Acabados interiores y remodelación", concepto: "Acabados interiores y remodelación", satProdServ: "72153600", satUnidad: "E48" },
+  { clave: "alimentos", etiqueta: "Alimentos", concepto: "Alimentos", satProdServ: "90101700", satUnidad: "E48" },
+  { clave: "coffee_break", etiqueta: "Coffee break", concepto: "Coffee break", satProdServ: "90101700", satUnidad: "E48" },
+  { clave: "copias", etiqueta: "Copias", concepto: "Copias", satProdServ: "82121700", satUnidad: "H87" },
+  { clave: "duplicado_llaves", etiqueta: "Duplicado de llaves", concepto: "Duplicado de llaves", satProdServ: "72101505", satUnidad: "H87" },
+  { clave: "estacionamiento", etiqueta: "Estacionamiento", concepto: "Estacionamiento", satProdServ: "95121644", satUnidad: "E48" },
+  { clave: "impresiones", etiqueta: "Impresiones", concepto: "Impresiones", satProdServ: "82121500", satUnidad: "H87" },
+  { clave: "internet", etiqueta: "Internet", concepto: "Internet", satProdServ: "81112100", satUnidad: "E48" },
+  { clave: "mantenimiento", etiqueta: "Mantenimiento", concepto: "Mantenimiento", satProdServ: "72102900", satUnidad: "E48" },
+  { clave: "paqueteria", etiqueta: "Paquetería", concepto: "Paquetería", satProdServ: "78102205", satUnidad: "E48" },
+  { clave: "penalizacion_mora", etiqueta: "Penalización por mora", concepto: "Penalización por mora", satProdServ: "84101702", satUnidad: "E48" },
+  { clave: "renta_oficina_privada", etiqueta: "Renta de oficina privada", concepto: "Renta de oficina privada", satProdServ: "80131502", satUnidad: "E48" },
+  { clave: "coworking", etiqueta: "Coworking", concepto: "Coworking", satProdServ: "80161504", satUnidad: "E48" },
+  { clave: "reparacion_oficinas", etiqueta: "Reparación y renovación de oficinas", concepto: "Reparación y renovación de oficinas", satProdServ: "72121103", satUnidad: "E48" },
+  { clave: "sala_juntas", etiqueta: "Sala de juntas", concepto: "Hora extra de sala de juntas", satProdServ: "90111603", satUnidad: "E48" },
+  { clave: "tarjeta_acceso", etiqueta: "Tarjeta de acceso", concepto: "Tarjeta de acceso", satProdServ: "46171619", satUnidad: "H87" },
+  { clave: "telefonia", etiqueta: "Telefonía", concepto: "Telefonía", satProdServ: "83111501", satUnidad: "E48" },
   { clave: "otro", etiqueta: "Otro", concepto: "", satProdServ: "01010101", satUnidad: "E48" },
 ] as const;
 
@@ -64,26 +79,24 @@ export function tipoCobroAdicional(clave: string | null | undefined) {
   return TIPOS_COBRO_ADICIONAL.find((t) => t.clave === clave) || null;
 }
 
-// Tipos de servicio al facturar un cobro (Facturas > + Nueva factura). Los primeros
-// son las categorías de ZORA (Coworking, Oficina privada, Working desk, Membresías,
-// Sala de juntas, Mostrador); después, los adicionales de Nodus. Todos traen la
-// clave del SAT con la que se timbra (lib/facturapi.ts). Sin tipo = renta de
-// espacio (80131500 / E48). Las de Membresías y Mostrador están por confirmar con
-// el contador. En la base se guarda la clave en facturas.adicional_tipo.
-export const TIPOS_SERVICIO_FACTURA: readonly { clave: string; etiqueta: string; satProdServ: string; satUnidad: string }[] = [
-  { clave: "coworking", etiqueta: "Coworking", satProdServ: "80131500", satUnidad: "E48" },
-  { clave: "oficina_privada", etiqueta: "Oficina privada", satProdServ: "80131500", satUnidad: "E48" },
-  { clave: "working_desk", etiqueta: "Working desk", satProdServ: "80131500", satUnidad: "E48" },
-  { clave: "membresias", etiqueta: "Membresías", satProdServ: "80131500", satUnidad: "E48" },
-  { clave: "sala_juntas", etiqueta: "Sala de juntas", satProdServ: "80131500", satUnidad: "E48" },
+// Claves que ya se guardaron en cobros anteriores y que ya no se ofrecen: se siguen entendiendo
+// (para timbrar y mostrar el nombre) pero no salen en las listas.
+const TIPOS_ANTERIORES: readonly { clave: string; etiqueta: string; satProdServ: string; satUnidad: string }[] = [
+  { clave: "botanas", etiqueta: "Frituras y botanas", satProdServ: "90101700", satUnidad: "E48" },
+  { clave: "oficina_privada", etiqueta: "Oficina privada", satProdServ: "80131502", satUnidad: "E48" },
+  { clave: "working_desk", etiqueta: "Working desk", satProdServ: "80161504", satUnidad: "E48" },
+  { clave: "membresias", etiqueta: "Membresías", satProdServ: "80161504", satUnidad: "E48" },
   { clave: "mostrador", etiqueta: "Mostrador", satProdServ: "01010101", satUnidad: "H87" },
-  { clave: "copias", etiqueta: "Copias / impresiones", satProdServ: "82121700", satUnidad: "H87" },
-  { clave: "botanas", etiqueta: "Frituras y botanas", satProdServ: "50192100", satUnidad: "H87" },
-  { clave: "otro", etiqueta: "Otro", satProdServ: "01010101", satUnidad: "E48" },
 ];
 
+// Tipos de servicio al facturar un cobro: los mismos del listado, sin el concepto sugerido.
+// Sin tipo = renta del espacio del cliente (Coworking u oficina privada, ver lib/facturapi.ts).
+export const TIPOS_SERVICIO_FACTURA: readonly { clave: string; etiqueta: string; satProdServ: string; satUnidad: string }[] = TIPOS_COBRO_ADICIONAL.map(
+  ({ clave, etiqueta, satProdServ, satUnidad }) => ({ clave, etiqueta, satProdServ, satUnidad })
+);
+
 export function tipoServicioFactura(clave: string | null | undefined) {
-  return TIPOS_SERVICIO_FACTURA.find((t) => t.clave === clave) || null;
+  return TIPOS_SERVICIO_FACTURA.find((t) => t.clave === clave) || TIPOS_ANTERIORES.find((t) => t.clave === clave) || null;
 }
 
 // Concepto que se guarda en el cobro: "Copias e impresiones (x50)".
