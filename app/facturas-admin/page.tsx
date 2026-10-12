@@ -205,6 +205,8 @@ export default function FacturasAdminPage() {
   const [busquedaForm, setBusquedaForm] = useState("");
   // Venta de mostrador: se factura a público en general (sin cliente), ya pagada.
   const [publicoGeneral, setPublicoGeneral] = useState(false);
+  // Centro de la venta de mostrador (Público en general · Bosques / San Telmo / ...).
+  const [centroPG, setCentroPG] = useState("");
   const [formaPagoPG, setFormaPagoPG] = useState("01");
   const clienteForm = clientes.find((c) => c.id === form.cliente_id) || null;
   const coincidenciasForm = useMemo(() => {
@@ -236,7 +238,7 @@ export default function FacturasAdminPage() {
     const res = await fetch("/api/facturas/publico-general", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ centro, concepto: form.concepto, monto: Number(form.monto), formaPago: formaPagoPG, adicionalTipo: form.adicional_tipo || null }),
+      body: JSON.stringify({ centro: centroPG || centro, concepto: form.concepto, monto: Number(form.monto), formaPago: formaPagoPG, adicionalTipo: form.adicional_tipo || null }),
     });
     const data = await res.json().catch(() => ({}));
     setGuardando(false);
@@ -249,7 +251,7 @@ export default function FacturasAdminPage() {
     setMostrarForm(false);
     setEnviado(true);
     setTimeout(() => setEnviado(false), 1800);
-    setAvisoCancelar("Factura " + data.folio + " emitida a público en general.");
+    setAvisoCancelar("Factura " + data.folio + " emitida a público en general (" + (centroPG || centro) + ").");
     fetchTodo(centro);
   }
 
@@ -849,7 +851,7 @@ export default function FacturasAdminPage() {
                   <p className="sub-label" style={{ marginBottom: 6 }}>Cliente</p>
                   {publicoGeneral ? (
                     <div className="adicional-cliente-elegido">
-                      <span>Público en general · {centro}</span>
+                      <span>Público en general · {centroPG || centro}</span>
                       <button type="button" className="tel-borrar-btn" onClick={() => setPublicoGeneral(false)}>
                         Cambiar
                       </button>
@@ -873,19 +875,24 @@ export default function FacturasAdminPage() {
                     </div>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        className="filtro-chip"
-                        style={{ marginBottom: 8 }}
-                        onClick={() => {
-                          setPublicoGeneral(true);
-                          setBusquedaForm("");
-                          setForm({ ...form, cliente_id: "" });
-                          setPagosAVincular(new Set());
-                        }}
-                      >
-                        Público en general ({centro})
-                      </button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                        {(esGlobal && centrosDisponibles.length > 0 ? centrosDisponibles : centro ? [centro] : []).map((c) => (
+                          <button
+                            type="button"
+                            key={c}
+                            className="filtro-chip"
+                            onClick={() => {
+                              setPublicoGeneral(true);
+                              setCentroPG(c);
+                              setBusquedaForm("");
+                              setForm({ ...form, cliente_id: "" });
+                              setPagosAVincular(new Set());
+                            }}
+                          >
+                            Público en general · {c}
+                          </button>
+                        ))}
+                      </div>
                       <input
                         type="text"
                         placeholder="Buscar por nombre, empresa o correo"
