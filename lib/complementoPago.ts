@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales } from "@/lib/datosFiscales";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { estatusDesdeFacturapi } from "@/lib/facturapiCancelacion";
 import { clienteFacturapi, bufferDesdeUrlFirmada, subirArchivoFactura, ErrorFacturacion } from "@/lib/facturapi";
@@ -162,6 +163,7 @@ export async function emitirComplementoPago(
           },
         },
       ],
+      ...(serieCentro(docs[0].f.centro || cliente.centro) ? { series: serieCentro(docs[0].f.centro || cliente.centro) } : {}),
       idempotency_key: `comp-${huella}`,
     } as any);
 

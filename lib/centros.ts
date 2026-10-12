@@ -31,3 +31,19 @@ export function cpCentro(centro: string | null | undefined): string {
 export function ubicacionCentro(centro: string): string {
   return UBICACION_POR_CENTRO[centro] || `Centro ${centro}`;
 }
+
+// Serie de las facturas de cada centro (la lleva el CFDI junto con el folio: A12, SNT3…).
+// El folio cuenta por separado en cada serie. Definidas por el área de facturación.
+export const SERIE_POR_CENTRO: Record<string, string> = {
+  Bosques: "A",
+  "Punto 45": "P45",
+  "San Telmo": "SNT",
+  "Puerta Bajío Piso 2": "PB2",
+  "Puerta Bajío Piso 8": "PB8",
+  Stadium: "STA",
+  ILEVA: "ILE",
+};
+
+export function serieCentro(centro: string | null | undefined): string | null {
+  return (centro && SERIE_POR_CENTRO[centro]) || null;
+}

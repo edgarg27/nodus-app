@@ -60,6 +60,8 @@ type Factura = {
   cancelacion_estatus?: "en_proceso" | "cancelada" | "rechazada" | null;
   cancelacion_motivo?: string | null;
   metodo_pago?: string | null;
+  serie?: string | null;
+  folio_fiscal?: string | null;
   rfc_receptor?: string | null;
   cliente_nombre?: string;
   cliente_email?: string;
@@ -1302,7 +1304,7 @@ export default function FacturasAdminPage() {
                         </p>
                         {f.uuid_cfdi && (
                           <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                            CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.rfc_receptor} · {f.uuid_cfdi}
+                            CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.serie ? f.serie + (f.folio_fiscal || "") + " · " : ""}{f.rfc_receptor} · {f.uuid_cfdi}
                           </p>
                         )}
                         {f.metodo_pago === "PPD" && f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && (

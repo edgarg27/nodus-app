@@ -29,6 +29,8 @@ type Factura = {
   xml_url: string | null;
   uuid_cfdi: string | null;
   metodo_pago: string | null;
+  serie?: string | null;
+  folio_fiscal?: string | null;
   cancelacion_estatus: "en_proceso" | "cancelada" | "rechazada" | null;
   fuente: string | null;
 };
@@ -143,7 +145,7 @@ export default function FacturasPorClientePage() {
     setCargandoCliente(true);
     const { data: facts } = await supabase
       .from("facturas")
-      .select("id, folio, concepto, monto, fecha_emision, fecha_vencimiento, estado, archivo_url, xml_url, uuid_cfdi, metodo_pago, cancelacion_estatus, fuente")
+      .select("id, folio, concepto, monto, fecha_emision, fecha_vencimiento, estado, archivo_url, xml_url, uuid_cfdi, metodo_pago, serie, folio_fiscal, cancelacion_estatus, fuente")
       .eq("user_id", id)
       .order("fecha_emision", { ascending: false });
     setFacturas((facts as Factura[]) || []);
@@ -359,7 +361,7 @@ export default function FacturasPorClientePage() {
                             </p>
                             {f.uuid_cfdi && (
                               <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                                CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.uuid_cfdi}
+                                CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.serie ? f.serie + (f.folio_fiscal || "") + " · " : ""}{f.uuid_cfdi}
                               </p>
                             )}
                             {ppd && (

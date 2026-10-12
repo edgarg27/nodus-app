@@ -13,14 +13,17 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
 import { tipoServicioFactura } from "@/lib/adicionales";
+import { serieCentro } from "@/lib/centros";
+import { esClienteCoworking } from "@/lib/coworking";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
 const facturapi = new Facturapi(process.env.FACTURAPI_API_KEY || "");
 export const clienteFacturapi = facturapi;
 
-// SAT c_ClaveProdServ / c_ClaveUnidad para renta de espacio de oficina/coworking.
-const CLAVE_PROD_SERV = "80131500";
+// SAT c_ClaveProdServ / c_ClaveUnidad por omisión: arrendamiento de oficina privada (cuando el cobro
+// no trae un tipo de servicio; la renta de un cliente de Coworking usa la de Coworking, ver tipoPorOmision).
+const CLAVE_PROD_SERV = "80131502";
 const CLAVE_UNIDAD = "E48";
 
 // Código postal del domicilio del emisor en Facturapi: es el "lugar de expedición" y, en CFDI 4.0,
@@ -72,6 +75,18 @@ async function avisarFacturaFallida(admin: Admin, pagoId: string, centro: string
   });
 }
 
+// Tipo de servicio con el que se timbra un cobro: el que trae, o, si no trae (la renta mensual),
+// el del espacio del cliente: Coworking si tiene un contrato vigente de Coworking; si no, oficina privada.
+export async function tipoPorOmision(admin: Admin, userId: string | null | undefined, tipo: string | null | undefined): Promise<string | null> {
+  if (tipo) return tipo;
+  if (!userId) return null;
+  try {
+    return (await esClienteCoworking(admin as any, userId)) ? "coworking" : null;
+  } catch {
+    return null;
+  }
+}
+
 export type DatosFiscalesCliente = {
   email?: string | null;
   rfc?: string | null;
@@ -95,6 +110,8 @@ export type ParametrosCfdi = {
   // Facturapi no emite dos veces con la misma llave: evita facturas dobles si dos
   // personas (o dos clics) piden lo mismo a la vez.
   idempotencyKey?: string;
+  // Serie de la factura (cada centro tiene la suya, ver lib/centros.ts); el folio cuenta por serie.
+  serie?: string | null;
 };
 
 // Error con mensaje pensado para mostrarse tal cual al personal.
@@ -153,6 +170,7 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
     payment_form: p.formaPago,
     payment_method: p.metodo,
     use: usoCfdi,
+    ...(p.serie ? { series: p.serie } : {}),
     ...(p.idempotencyKey ? { idempotency_key: p.idempotencyKey } : {}),
     // El SAT exige el nodo "Información Global" cuando el receptor es
     // público en general (XAXX010101000): se factura como resumen diario.
@@ -288,7 +306,8 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       cliente,
       concepto: pago.concepto,
       monto: Number(pago.monto),
-      adicionalTipo: pago.adicional_tipo,
+      adicionalTipo: await tipoPorOmision(admin, pago.user_id, pago.adicional_tipo),
+      serie: serieCentro(cliente.centro),
       metodo: "PUE",
       formaPago: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
       etiqueta: `pago ${pagoId}`,
