@@ -202,6 +202,13 @@ export default function FacturasAdminPage() {
     adicional_tipo: "",
   });
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [busquedaForm, setBusquedaForm] = useState("");
+  const clienteForm = clientes.find((c) => c.id === form.cliente_id) || null;
+  const coincidenciasForm = useMemo(() => {
+    const q = busquedaForm.trim().toLowerCase();
+    if (!q) return [];
+    return clientes.filter((c) => [c.nombre, c.empresa, c.email].filter(Boolean).join(" ").toLowerCase().includes(q)).slice(0, 8);
+  }, [clientes, busquedaForm]);
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
@@ -802,25 +809,65 @@ export default function FacturasAdminPage() {
 
             {mostrarForm && (
               <form className="form-card" onSubmit={crearFactura}>
-                <p className="sub-label">Cliente</p>
-                <select
-                  value={form.cliente_id}
-                  onChange={(e) => {
-                    setForm({ ...form, cliente_id: e.target.value });
-                    setPagosAVincular(new Set());
-                  }}
-                >
-                  <option value="">Selecciona un cliente</option>
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre} {c.empresa ? `(${c.empresa})` : ""} — {c.email}
-                    </option>
-                  ))}
-                </select>
+                <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>Nueva factura</p>
+
+                <div>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>Cliente</p>
+                  {clienteForm ? (
+                    <div className="adicional-cliente-elegido">
+                      <span>
+                        {clienteForm.nombre}
+                        {clienteForm.empresa ? " · " + clienteForm.empresa : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="tel-borrar-btn"
+                        onClick={() => {
+                          setForm({ ...form, cliente_id: "" });
+                          setPagosAVincular(new Set());
+                        }}
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre, empresa o correo"
+                        value={busquedaForm}
+                        onChange={(e) => setBusquedaForm(e.target.value)}
+                      />
+                      {busquedaForm.trim() && (
+                        <div className="adicional-resultados">
+                          {coincidenciasForm.length === 0 ? (
+                            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Ningún cliente coincide</p>
+                          ) : (
+                            coincidenciasForm.map((c) => (
+                              <button
+                                type="button"
+                                key={c.id}
+                                className="adicional-resultado"
+                                onClick={() => {
+                                  setForm({ ...form, cliente_id: c.id });
+                                  setPagosAVincular(new Set());
+                                  setBusquedaForm("");
+                                }}
+                              >
+                                {c.nombre}
+                                {c.empresa ? " · " + c.empresa : ""} — {c.email}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
 
                 {form.cliente_id && pagosSueltosDelCliente(form.cliente_id).length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <p className="sub-label">Vincular pagos sueltos de este cliente (opcional)</p>
+                  <div>
+                    <p className="sub-label" style={{ marginBottom: 6 }}>Vincular pagos sueltos de este cliente (opcional)</p>
                     {pagosSueltosDelCliente(form.cliente_id).map((p) => (
                       <label
                         key={p.id}
@@ -831,36 +878,80 @@ export default function FacturasAdminPage() {
                           checked={pagosAVincular.has(p.id)}
                           onChange={() => togglePagoAVincular(p.id)}
                         />
-                        {p.concepto || "Pago"} · ${Number(p.monto).toLocaleString("es-MX")} · {p.estado}
+                        {p.concepto || "Pago"} · {"$"}{Number(p.monto).toLocaleString("es-MX")} · {p.estado}
                       </label>
                     ))}
                   </div>
                 )}
 
-                <div className="tel-form-grid">
-                  <div>
-                    <p className="sub-label">Folio (opcional, se autogenera)</p>
-                    <input value={form.folio} onChange={(e) => setForm({ ...form, folio: e.target.value })} />
+                <div>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>¿Qué se factura?</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className={"filtro-chip" + (form.adicional_tipo === "" ? " active" : "")}
+                      onClick={() => setForm({ ...form, adicional_tipo: "" })}
+                    >
+                      Renta de espacio
+                    </button>
+                    {TIPOS_COBRO_ADICIONAL.map((t) => (
+                      <button
+                        type="button"
+                        key={t.clave}
+                        className={"filtro-chip" + (form.adicional_tipo === t.clave ? " active" : "")}
+                        onClick={() => setForm({ ...form, adicional_tipo: t.clave })}
+                      >
+                        {t.etiqueta}
+                      </button>
+                    ))}
                   </div>
-                  <div>
-                    <p className="sub-label">Monto</p>
+                  <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>De aquí sale la clave del SAT con la que se factura.</p>
+                </div>
+
+                <div>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>Concepto</p>
+                  <input
+                    type="text"
+                    placeholder="Ej. Renta de oficina de octubre"
+                    maxLength={120}
+                    value={form.concepto}
+                    onChange={(e) => setForm({ ...form, concepto: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <p className="sub-label" style={{ marginBottom: 6 }}>Monto (con IVA)</p>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="$0.00"
                       value={form.monto}
-                      onChange={(e) => setForm({ ...form, monto: e.target.value })}
+                      onChange={(e) => setForm({ ...form, monto: e.target.value.replace(/[^0-9.]/g, "") })}
                     />
                   </div>
-                  <div>
-                    <p className="sub-label">Fecha de emisión</p>
+                  <div style={{ flex: 1 }}>
+                    <p className="sub-label" style={{ marginBottom: 6 }}>Folio (opcional)</p>
+                    <input
+                      type="text"
+                      placeholder="Se genera solo"
+                      value={form.folio}
+                      onChange={(e) => setForm({ ...form, folio: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <p className="sub-label" style={{ marginBottom: 6 }}>Fecha de emisión</p>
                     <input
                       type="date"
                       value={form.fecha_emision}
                       onChange={(e) => setForm({ ...form, fecha_emision: e.target.value })}
                     />
                   </div>
-                  <div>
-                    <p className="sub-label">Fecha de vencimiento</p>
+                  <div style={{ flex: 1 }}>
+                    <p className="sub-label" style={{ marginBottom: 6 }}>Fecha de vencimiento</p>
                     <input
                       type="date"
                       value={form.fecha_vencimiento}
@@ -869,21 +960,10 @@ export default function FacturasAdminPage() {
                   </div>
                 </div>
 
-                <p className="sub-label">Concepto</p>
-                <input value={form.concepto} onChange={(e) => setForm({ ...form, concepto: e.target.value })} />
-
-                <p className="sub-label">Tipo de servicio (clave del SAT para facturar)</p>
-                <select value={form.adicional_tipo} onChange={(e) => setForm({ ...form, adicional_tipo: e.target.value })}>
-                  <option value="">Renta de espacio (por omisión)</option>
-                  {TIPOS_COBRO_ADICIONAL.map((t) => (
-                    <option key={t.clave} value={t.clave}>
-                      {t.etiqueta}
-                    </option>
-                  ))}
-                </select>
-
-                <p className="sub-label">Subir factura (PDF, opcional)</p>
-                <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+                <div>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>Subir factura (PDF, opcional)</p>
+                  <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
+                </div>
 
                 {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
