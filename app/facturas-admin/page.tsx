@@ -949,25 +949,14 @@ export default function FacturasAdminPage() {
 
                 <div>
                   <p className="sub-label" style={{ marginBottom: 6 }}>¿Qué se factura?</p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      className={"filtro-chip" + (form.adicional_tipo === "" ? " active" : "")}
-                      onClick={() => setForm({ ...form, adicional_tipo: "" })}
-                    >
-                      Renta de espacio
-                    </button>
+                  <select value={form.adicional_tipo} onChange={(e) => setForm({ ...form, adicional_tipo: e.target.value })}>
+                    <option value="">Renta de espacio</option>
                     {TIPOS_SERVICIO_FACTURA.map((t) => (
-                      <button
-                        type="button"
-                        key={t.clave}
-                        className={"filtro-chip" + (form.adicional_tipo === t.clave ? " active" : "")}
-                        onClick={() => setForm({ ...form, adicional_tipo: t.clave })}
-                      >
+                      <option key={t.clave} value={t.clave}>
                         {t.etiqueta}
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                  </select>
                   <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>De aquí sale la clave del SAT con la que se factura.</p>
                 </div>
 
