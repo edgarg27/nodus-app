@@ -3,8 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { facturarPublicoGeneral } from "@/lib/facturaPublicoGeneral";
-
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+import { UBICACION_POR_CENTRO } from "@/lib/centros";
 
 // Factura a público en general (venta de mostrador): se timbra al momento, ya pagada.
 export async function POST(req: NextRequest) {
@@ -23,9 +22,10 @@ export async function POST(req: NextRequest) {
   if (typeof centro !== "string" || !centro || typeof concepto !== "string" || typeof formaPago !== "string" || typeof monto !== "number") {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
-  // Admin y cobranza solo facturan en su centro.
-  if (!ROLES_GLOBALES.includes(miProfile!.rol) && centro !== miProfile!.centro) {
-    return NextResponse.json({ error: "No puedes facturar en otro centro" }, { status: 403 });
+  // Cualquier persona autorizada para facturar puede elegir el centro de la venta de mostrador,
+  // pero tiene que ser uno de los centros de Nodus.
+  if (!Object.keys(UBICACION_POR_CENTRO).includes(centro)) {
+    return NextResponse.json({ error: "Centro no válido" }, { status: 400 });
   }
 
   const r = await facturarPublicoGeneral(createAdminClient(), {

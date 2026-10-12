@@ -889,7 +889,7 @@ export default function FacturasAdminPage() {
                         }}
                       >
                         <option value="">Público en general: elige el centro</option>
-                        {(esGlobal && centrosDisponibles.length > 0 ? centrosDisponibles : centro ? [centro] : []).map((c) => (
+                        {CENTROS_SUGERIDOS.map((c) => (
                           <option key={c} value={c}>
                             Público en general · {c}
                           </option>
