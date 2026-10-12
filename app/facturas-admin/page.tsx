@@ -875,24 +875,26 @@ export default function FacturasAdminPage() {
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                      <select
+                        value=""
+                        style={{ marginBottom: 8 }}
+                        onChange={(e) => {
+                          const c = e.target.value;
+                          if (!c) return;
+                          setPublicoGeneral(true);
+                          setCentroPG(c);
+                          setBusquedaForm("");
+                          setForm({ ...form, cliente_id: "" });
+                          setPagosAVincular(new Set());
+                        }}
+                      >
+                        <option value="">Público en general: elige el centro</option>
                         {(esGlobal && centrosDisponibles.length > 0 ? centrosDisponibles : centro ? [centro] : []).map((c) => (
-                          <button
-                            type="button"
-                            key={c}
-                            className="filtro-chip"
-                            onClick={() => {
-                              setPublicoGeneral(true);
-                              setCentroPG(c);
-                              setBusquedaForm("");
-                              setForm({ ...form, cliente_id: "" });
-                              setPagosAVincular(new Set());
-                            }}
-                          >
+                          <option key={c} value={c}>
                             Público en general · {c}
-                          </button>
+                          </option>
                         ))}
-                      </div>
+                      </select>
                       <input
                         type="text"
                         placeholder="Buscar por nombre, empresa o correo"
