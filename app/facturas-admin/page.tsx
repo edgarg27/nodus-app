@@ -156,7 +156,7 @@ export default function FacturasAdminPage() {
     setFacturas(
       (facts || []).map((f) => ({
         ...f,
-        cliente_nombre: f.user_id ? nombrePorId[f.user_id] || "Cliente" : "Cliente no identificado",
+        cliente_nombre: f.user_id ? nombrePorId[f.user_id] || "Cliente" : f.rfc_receptor === "XAXX010101000" ? "Público en general" : "Cliente no identificado",
         cliente_email: f.user_id ? emailPorId[f.user_id] || "" : "",
       }))
     );
@@ -203,6 +203,9 @@ export default function FacturasAdminPage() {
   });
   const [archivo, setArchivo] = useState<File | null>(null);
   const [busquedaForm, setBusquedaForm] = useState("");
+  // Venta de mostrador: se factura a público en general (sin cliente), ya pagada.
+  const [publicoGeneral, setPublicoGeneral] = useState(false);
+  const [formaPagoPG, setFormaPagoPG] = useState("01");
   const clienteForm = clientes.find((c) => c.id === form.cliente_id) || null;
   const coincidenciasForm = useMemo(() => {
     const q = busquedaForm.trim().toLowerCase();
@@ -223,9 +226,40 @@ export default function FacturasAdminPage() {
     });
   }
 
+  async function facturarAPublicoGeneral() {
+    if (!centro) return;
+    if (!form.concepto.trim() || !(Number(form.monto) > 0)) {
+      setError("Completa el concepto y el monto");
+      return;
+    }
+    setGuardando(true);
+    const res = await fetch("/api/facturas/publico-general", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ centro, concepto: form.concepto, monto: Number(form.monto), formaPago: formaPagoPG, adicionalTipo: form.adicional_tipo || null }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setGuardando(false);
+    if (!res.ok) {
+      setError(data.error || "No se pudo facturar");
+      return;
+    }
+    setForm({ ...form, concepto: "", monto: "", adicional_tipo: "" });
+    setPublicoGeneral(false);
+    setMostrarForm(false);
+    setEnviado(true);
+    setTimeout(() => setEnviado(false), 1800);
+    setAvisoCancelar("Factura " + data.folio + " emitida a público en general.");
+    fetchTodo(centro);
+  }
+
   async function crearFactura(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (publicoGeneral) {
+      await facturarAPublicoGeneral();
+      return;
+    }
     if (!form.cliente_id || !form.concepto.trim() || !form.monto || !form.fecha_vencimiento) {
       setError("Completa cliente, concepto, monto y fecha de vencimiento");
       return;
@@ -379,7 +413,7 @@ export default function FacturasAdminPage() {
       if (filtroFuente && (f.fuente || "manual") !== filtroFuente) return false;
       if (filtroDesde && f.fecha_emision < filtroDesde) return false;
       if (filtroHasta && f.fecha_emision > filtroHasta) return false;
-      if (soloSinCliente && f.user_id) return false;
+      if (soloSinCliente && (f.user_id || f.rfc_receptor === "XAXX010101000")) return false;
       return true;
     });
   }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente]);
@@ -813,7 +847,14 @@ export default function FacturasAdminPage() {
 
                 <div>
                   <p className="sub-label" style={{ marginBottom: 6 }}>Cliente</p>
-                  {clienteForm ? (
+                  {publicoGeneral ? (
+                    <div className="adicional-cliente-elegido">
+                      <span>Público en general · {centro}</span>
+                      <button type="button" className="tel-borrar-btn" onClick={() => setPublicoGeneral(false)}>
+                        Cambiar
+                      </button>
+                    </div>
+                  ) : clienteForm ? (
                     <div className="adicional-cliente-elegido">
                       <span>
                         {clienteForm.nombre}
@@ -832,6 +873,19 @@ export default function FacturasAdminPage() {
                     </div>
                   ) : (
                     <>
+                      <button
+                        type="button"
+                        className="filtro-chip"
+                        style={{ marginBottom: 8 }}
+                        onClick={() => {
+                          setPublicoGeneral(true);
+                          setBusquedaForm("");
+                          setForm({ ...form, cliente_id: "" });
+                          setPagosAVincular(new Set());
+                        }}
+                      >
+                        Público en general ({centro})
+                      </button>
                       <input
                         type="text"
                         placeholder="Buscar por nombre, empresa o correo"
@@ -930,18 +984,37 @@ export default function FacturasAdminPage() {
                       onChange={(e) => setForm({ ...form, monto: e.target.value.replace(/[^0-9.]/g, "") })}
                     />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <p className="sub-label" style={{ marginBottom: 6 }}>Folio (opcional)</p>
-                    <input
-                      type="text"
-                      placeholder="Se genera solo"
-                      value={form.folio}
-                      onChange={(e) => setForm({ ...form, folio: e.target.value })}
-                    />
-                  </div>
+                  {publicoGeneral ? (
+                    <div style={{ flex: 1 }}>
+                      <p className="sub-label" style={{ marginBottom: 6 }}>Forma de pago</p>
+                      <select value={formaPagoPG} onChange={(e) => setFormaPagoPG(e.target.value)}>
+                        {FORMAS_PAGO_COMPLEMENTO.map((fp) => (
+                          <option key={fp.clave} value={fp.clave}>
+                            {fp.texto}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1 }}>
+                      <p className="sub-label" style={{ marginBottom: 6 }}>Folio (opcional)</p>
+                      <input
+                        type="text"
+                        placeholder="Se genera solo"
+                        value={form.folio}
+                        onChange={(e) => setForm({ ...form, folio: e.target.value })}
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
+                {publicoGeneral ? (
+                  <p style={{ fontSize: 12, color: "#666", margin: 0 }}>
+                    Se timbra ahora mismo, ya pagada, con el RFC genérico de público en general y la fecha de hoy. Esa factura no es deducible para quien compra.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <p className="sub-label" style={{ marginBottom: 6 }}>Fecha de emisión</p>
                     <input
@@ -964,6 +1037,8 @@ export default function FacturasAdminPage() {
                   <p className="sub-label" style={{ marginBottom: 6 }}>Subir factura (PDF, opcional)</p>
                   <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
                 </div>
+                  </>
+                )}
 
                 {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
@@ -1000,7 +1075,7 @@ export default function FacturasAdminPage() {
                     </svg>
                     <span>¡Listo!</span>
                   </span>
-                  <span className="btn-enviar-text">+ Guardar factura</span>
+                  <span className="btn-enviar-text">{publicoGeneral ? "Facturar a público en general" : "+ Guardar factura"}</span>
                 </button>
               </form>
             )}
@@ -1247,7 +1322,7 @@ export default function FacturasAdminPage() {
                             {f.cancelacion_motivo ? " · motivo " + f.cancelacion_motivo : ""}
                           </p>
                         )}
-                        {!f.user_id && (
+                        {!f.user_id && f.rfc_receptor !== "XAXX010101000" && (
                           <div style={{ marginTop: 6 }}>
                             <p style={{ fontSize: 12, color: "#A32D2D", margin: "0 0 4px" }}>⚠️ Cliente no identificado</p>
                             <select
