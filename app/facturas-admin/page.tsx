@@ -209,10 +209,18 @@ export default function FacturasAdminPage() {
   const [centroPG, setCentroPG] = useState("");
   const [formaPagoPG, setFormaPagoPG] = useState("01");
   const clienteForm = clientes.find((c) => c.id === form.cliente_id) || null;
-  const coincidenciasForm = useMemo(() => {
-    const q = busquedaForm.trim().toLowerCase();
+  // Un solo buscador: salen los clientes y, si se escribe "público" o el nombre de un centro,
+  // las opciones de público en general de cada centro.
+  const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const opcionesBusqueda = useMemo(() => {
+    const q = sinAcentos(busquedaForm.trim());
     if (!q) return [];
-    return clientes.filter((c) => [c.nombre, c.empresa, c.email].filter(Boolean).join(" ").toLowerCase().includes(q)).slice(0, 8);
+    const pg = CENTROS_SUGERIDOS.map((c) => ({ tipo: "pg" as const, id: c, etiqueta: "Público en general · " + c })).filter((o) => sinAcentos(o.etiqueta).includes(q));
+    const cl = clientes
+      .filter((c) => sinAcentos([c.nombre, c.empresa, c.email].filter(Boolean).join(" ")).includes(q))
+      .slice(0, 8)
+      .map((c) => ({ tipo: "cliente" as const, id: c.id, etiqueta: c.nombre + (c.empresa ? " · " + c.empresa : "") + " — " + c.email }));
+    return [...pg, ...cl];
   }, [clientes, busquedaForm]);
   const [guardando, setGuardando] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -711,7 +719,7 @@ export default function FacturasAdminPage() {
         )}
       </div>
 
-      <div className="rep-content">
+      <div className="rep-content rep-content-completo">
         {!centro ? (
           <div className="empty-card">Tu cuenta no tiene un centro asignado</div>
         ) : loading ? (
@@ -788,6 +796,8 @@ export default function FacturasAdminPage() {
               </div>
             </div>
 
+            {!mostrarForm && (
+              <>
             <div className="form-card" style={{ marginTop: 8 }}>
               <div className="tel-form-grid">
                 <div>
@@ -842,12 +852,14 @@ export default function FacturasAdminPage() {
                 </button>
               )}
             </div>
+              </>
+            )}
 
             {mostrarForm && (
-              <form className="form-card" onSubmit={crearFactura}>
-                <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>Nueva factura</p>
+              <form className="form-card form-factura-ancho" onSubmit={crearFactura}>
+                <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e", gridColumn: "1 / -1" }}>Nueva factura</p>
 
-                <div>
+                <div style={{ gridColumn: "1 / -1" }}>
                   <p className="sub-label" style={{ marginBottom: 6 }}>Cliente</p>
                   {publicoGeneral ? (
                     <div className="adicional-cliente-elegido">
@@ -875,50 +887,35 @@ export default function FacturasAdminPage() {
                     </div>
                   ) : (
                     <>
-                      <select
-                        value=""
-                        style={{ marginBottom: 8 }}
-                        onChange={(e) => {
-                          const c = e.target.value;
-                          if (!c) return;
-                          setPublicoGeneral(true);
-                          setCentroPG(c);
-                          setBusquedaForm("");
-                          setForm({ ...form, cliente_id: "" });
-                          setPagosAVincular(new Set());
-                        }}
-                      >
-                        <option value="">Público en general: elige el centro</option>
-                        {CENTROS_SUGERIDOS.map((c) => (
-                          <option key={c} value={c}>
-                            Público en general · {c}
-                          </option>
-                        ))}
-                      </select>
                       <input
                         type="text"
-                        placeholder="Buscar por nombre, empresa o correo"
+                        placeholder='Busca un cliente por nombre, empresa o correo; para una venta de mostrador escribe "público en general"'
                         value={busquedaForm}
                         onChange={(e) => setBusquedaForm(e.target.value)}
                       />
                       {busquedaForm.trim() && (
                         <div className="adicional-resultados">
-                          {coincidenciasForm.length === 0 ? (
-                            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Ningún cliente coincide</p>
+                          {opcionesBusqueda.length === 0 ? (
+                            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Nada coincide</p>
                           ) : (
-                            coincidenciasForm.map((c) => (
+                            opcionesBusqueda.map((o) => (
                               <button
                                 type="button"
-                                key={c.id}
+                                key={o.tipo + o.id}
                                 className="adicional-resultado"
                                 onClick={() => {
-                                  setForm({ ...form, cliente_id: c.id });
-                                  setPagosAVincular(new Set());
                                   setBusquedaForm("");
+                                  setPagosAVincular(new Set());
+                                  if (o.tipo === "pg") {
+                                    setPublicoGeneral(true);
+                                    setCentroPG(o.id);
+                                    setForm({ ...form, cliente_id: "" });
+                                  } else {
+                                    setForm({ ...form, cliente_id: o.id });
+                                  }
                                 }}
                               >
-                                {c.nombre}
-                                {c.empresa ? " · " + c.empresa : ""} — {c.email}
+                                {o.etiqueta}
                               </button>
                             ))
                           )}
@@ -929,7 +926,7 @@ export default function FacturasAdminPage() {
                 </div>
 
                 {form.cliente_id && pagosSueltosDelCliente(form.cliente_id).length > 0 && (
-                  <div>
+                  <div style={{ gridColumn: "1 / -1" }}>
                     <p className="sub-label" style={{ marginBottom: 6 }}>Vincular pagos sueltos de este cliente (opcional)</p>
                     {pagosSueltosDelCliente(form.cliente_id).map((p) => (
                       <label
@@ -1007,7 +1004,7 @@ export default function FacturasAdminPage() {
                 </div>
 
                 {publicoGeneral ? (
-                  <p style={{ fontSize: 12, color: "#666", margin: 0 }}>
+                  <p style={{ fontSize: 12, color: "#666", margin: 0, gridColumn: "1 / -1" }}>
                     Se timbra ahora mismo, ya pagada, con el RFC genérico de público en general y la fecha de hoy. Esa factura no es deducible para quien compra.
                   </p>
                 ) : (
@@ -1038,10 +1035,11 @@ export default function FacturasAdminPage() {
                   </>
                 )}
 
-                {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
+                {error && <p style={{ color: "#A32D2D", fontSize: 13, gridColumn: "1 / -1" }}>{error}</p>}
 
                 <button
                   className={"btn-enviar" + (guardando ? " sending" : "") + (enviado ? " sent" : "")}
+                  style={{ gridColumn: "1 / -1" }}
                   type="submit"
                   disabled={guardando}
                 >
@@ -1144,6 +1142,8 @@ export default function FacturasAdminPage() {
               </div>
             )}
 
+            {!mostrarForm && (
+              <>
             {puedoCancelar && pagosSueltos.some((p) => p.estado === "pendiente") && (
               <details className="form-card" style={{ marginTop: 8 }}>
                 <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
@@ -1284,7 +1284,8 @@ export default function FacturasAdminPage() {
             ) : facturasFiltradas.length === 0 ? (
               <div className="empty-card">Ninguna factura coincide con los filtros</div>
             ) : (
-              facturasFiltradas.map((f) => {
+              <div className="facturas-grid">
+              {facturasFiltradas.map((f) => {
                 const badge = ESTATUS_LABEL[f.estado] || { label: f.estado, bg: "#F0F0F0", color: "#555" };
                 const sueltosDelCliente = f.user_id ? pagosSueltosDelCliente(f.user_id) : [];
                 return (
@@ -1424,7 +1425,10 @@ export default function FacturasAdminPage() {
                     )}
                   </div>
                 );
-              })
+              })}
+              </div>
+            )}
+              </>
             )}
           </>
         )}

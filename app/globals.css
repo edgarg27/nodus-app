@@ -7366,3 +7366,37 @@ a.stat-card {
   color: #0d1b3e;
   white-space: nowrap;
 }
+
+/* ---------- Facturas: pantalla completa ---------- */
+/* La persona que factura trabaja con toda la pantalla: sin el ancho máximo de 700px. */
+.rep-content.rep-content-completo {
+  max-width: none;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+/* Lista de facturas en columnas (una sola en pantallas angostas). */
+.facturas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* Formulario Nueva factura en columnas; los bloques largos ocupan todo el ancho. */
+.form-card.form-factura-ancho {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px 24px;
+  align-items: start;
+}
+
+@media (max-width: 700px) {
+  .rep-content.rep-content-completo {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .facturas-grid {
+    grid-template-columns: 1fr;
+  }
+}

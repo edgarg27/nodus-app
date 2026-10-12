@@ -264,7 +264,7 @@ export default function FacturasPorClientePage() {
         )}
       </div>
 
-      <div className="rep-content">
+      <div className="rep-content rep-content-completo">
         <div className="form-card">
           <p className="sub-label">Cliente</p>
           <input
