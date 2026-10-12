@@ -14,7 +14,7 @@ const PERSONAL = {
   mantenimiento: ["proximo_mantenimiento"],
   telefonia: ["nuevo_did", "baja_extension"],
   vouchers: ["nuevo_voucher"],
-  cobros: ["pago_confirmado", "factura_automatica_fallida"],
+  cobros: ["pago_confirmado", "factura_automatica_fallida", "complemento_pago_pendiente", "cancelacion_factura"],
   gastos: ["nuevo_gasto"],
   tours: ["nuevo_tour"],
   contratosAFirma: ["contrato_a_firma"],

@@ -20,6 +20,8 @@ cat > /etc/crontabs/root <<'EOF'
 */10 * * * * /bin/sh /llamar.sh recordatorio-tours-hora
 # Resumen por correo del seguimiento de prospectos: actividades de hoy y atrasadas.
 0 9 * * * /bin/sh /llamar.sh recordatorio-seguimiento
+# Avisos al celular (notificaciones push): manda los avisos nuevos de la campana (cada 2 min).
+*/2 * * * * /bin/sh /llamar.sh push-avisos
 EOF
 
 echo "[cron] listo: $(date)"

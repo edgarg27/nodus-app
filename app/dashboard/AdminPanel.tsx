@@ -1,6 +1,7 @@
 "use client";
 
 import AvisoContratoVentas from "./AvisoContratoVentas";
+import AvisosPush from "@/app/components/AvisosPush";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -461,6 +462,8 @@ export default function AdminPanel({
       n.tipo === "cuenta_pausada"
     ) {
       router.push("/cobranza");
+    } else if (n.tipo === "factura_automatica_fallida" || n.tipo === "complemento_pago_pendiente" || n.tipo === "cancelacion_factura") {
+      router.push("/facturas-admin");
     } else if (n.tipo === "nueva_solicitud_invitado") {
       // Day Pass y demás solicitudes de invitados: ahí mismo se genera el pase.
       router.push("/centro/invitados");
@@ -927,6 +930,7 @@ export default function AdminPanel({
                       </div>
                     ))
                   )}
+                  <AvisosPush />
                 </div>
               </>
             )}

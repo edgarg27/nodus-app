@@ -7467,3 +7467,51 @@ a.stat-card {
   cursor: pointer;
   padding: 2px;
 }
+
+/* ---------- Avisos al celular (push): fila dentro del menú de la campana ---------- */
+.notif-push {
+  border-top: 1px solid #eef0f4;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notif-push-texto {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #555;
+}
+
+.notif-push-acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notif-push-btn {
+  align-self: flex-start;
+  background: #0d1b3e;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notif-push-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.notif-push-enlace {
+  background: transparent;
+  border: none;
+  color: #a32d2d;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}

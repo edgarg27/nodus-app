@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import AvisosPush from "@/app/components/AvisosPush";
 import { esEspacioCowork, fmtHoras, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { esClienteCoworking } from "@/lib/coworking";
 import { esPublicoGeneral } from "@/lib/datosFiscales";
@@ -357,6 +358,7 @@ export default function ClientePanel({
                       </div>
                     ))
                   )}
+                  <AvisosPush />
                 </div>
               </>
             )}
