@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
-import { TIPOS_COBRO_ADICIONAL, tipoCobroAdicional } from "@/lib/adicionales";
+import { TIPOS_SERVICIO_FACTURA, tipoServicioFactura } from "@/lib/adicionales";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
@@ -948,7 +948,7 @@ export default function FacturasAdminPage() {
                     >
                       Renta de espacio
                     </button>
-                    {TIPOS_COBRO_ADICIONAL.map((t) => (
+                    {TIPOS_SERVICIO_FACTURA.map((t) => (
                       <button
                         type="button"
                         key={t.clave}
@@ -1163,7 +1163,7 @@ export default function FacturasAdminPage() {
                   .filter((p) => p.estado === "pendiente")
                   .map((p) => {
                     const cli = clientes.find((c) => c.id === p.user_id);
-                    const tipo = tipoCobroAdicional(p.adicional_tipo);
+                    const tipo = tipoServicioFactura(p.adicional_tipo);
                     return (
                       <div key={p.id} style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <input

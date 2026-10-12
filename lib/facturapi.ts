@@ -12,7 +12,7 @@ import Facturapi from "facturapi";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
-import { tipoCobroAdicional } from "@/lib/adicionales";
+import { tipoServicioFactura } from "@/lib/adicionales";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -125,7 +125,7 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
   // que el SAT rechace la factura: se cae a G03 en vez de dejar al cliente sin factura.
   const usoCfdi = usosParaTipo(datos.rfc.length === 12 ? "moral" : "fisica").some((u) => u.clave === datos.uso_cfdi) ? datos.uso_cfdi : "G03";
   // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
-  const claveSat = tipoCobroAdicional(p.adicionalTipo);
+  const claveSat = tipoServicioFactura(p.adicionalTipo);
   const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
   const unidad = claveSat?.satUnidad || CLAVE_UNIDAD;
 

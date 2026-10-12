@@ -64,6 +64,28 @@ export function tipoCobroAdicional(clave: string | null | undefined) {
   return TIPOS_COBRO_ADICIONAL.find((t) => t.clave === clave) || null;
 }
 
+// Tipos de servicio al facturar un cobro (Facturas > + Nueva factura). Los primeros
+// son las categorías de ZORA (Coworking, Oficina privada, Working desk, Membresías,
+// Sala de juntas, Mostrador); después, los adicionales de Nodus. Todos traen la
+// clave del SAT con la que se timbra (lib/facturapi.ts). Sin tipo = renta de
+// espacio (80131500 / E48). Las de Membresías y Mostrador están por confirmar con
+// el contador. En la base se guarda la clave en facturas.adicional_tipo.
+export const TIPOS_SERVICIO_FACTURA: readonly { clave: string; etiqueta: string; satProdServ: string; satUnidad: string }[] = [
+  { clave: "coworking", etiqueta: "Coworking", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "oficina_privada", etiqueta: "Oficina privada", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "working_desk", etiqueta: "Working desk", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "membresias", etiqueta: "Membresías", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "sala_juntas", etiqueta: "Sala de juntas", satProdServ: "80131500", satUnidad: "E48" },
+  { clave: "mostrador", etiqueta: "Mostrador", satProdServ: "01010101", satUnidad: "H87" },
+  { clave: "copias", etiqueta: "Copias / impresiones", satProdServ: "82121700", satUnidad: "H87" },
+  { clave: "botanas", etiqueta: "Frituras y botanas", satProdServ: "50192100", satUnidad: "H87" },
+  { clave: "otro", etiqueta: "Otro", satProdServ: "01010101", satUnidad: "E48" },
+];
+
+export function tipoServicioFactura(clave: string | null | undefined) {
+  return TIPOS_SERVICIO_FACTURA.find((t) => t.clave === clave) || null;
+}
+
 // Concepto que se guarda en el cobro: "Copias e impresiones (x50)".
 export function conceptoCobroAdicional(concepto: string, cantidad: number) {
   const base = concepto.trim();
