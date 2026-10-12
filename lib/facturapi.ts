@@ -23,6 +23,18 @@ export const clienteFacturapi = facturapi;
 const CLAVE_PROD_SERV = "80131500";
 const CLAVE_UNIDAD = "E48";
 
+// Código postal del domicilio del emisor en Facturapi: es el "lugar de expedición" y, en CFDI 4.0,
+// el código postal que debe llevar el receptor "público en general".
+let cpExpedicion: string | null = null;
+export async function cpLugarExpedicion(): Promise<string> {
+  if (cpExpedicion) return cpExpedicion;
+  const org: any = await facturapi.organizations.me();
+  const zip = org?.legal?.address?.zip;
+  if (!zip) throw new ErrorFacturacion("No se pudo leer el código postal del emisor en Facturapi");
+  cpExpedicion = String(zip);
+  return cpExpedicion;
+}
+
 // Openpay no distingue crédito/débito en `method`, solo "card" o "bank_account".
 // "cash" lo usa el marcado manual de staff sin comprobante (pago en efectivo).
 export function formaPagoDesdeMetodoOpenpay(metodo?: string | null): string {
