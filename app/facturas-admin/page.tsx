@@ -6,6 +6,7 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import FormularioNuevaFactura from "./FormularioNuevaFactura";
+import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
@@ -101,6 +102,7 @@ export default function FacturasAdminPage() {
   const [pagosSueltos, setPagosSueltos] = useState<PagoSuelto[]>([]);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
+  const { puedeEditar: puedeEditarServicios } = useCatalogoServicios();
 
   useEffect(() => {
     init();
@@ -571,6 +573,11 @@ export default function FacturasAdminPage() {
                   <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
                     Cancelar seleccionadas ({seleccionCancelables.length})
                   </button>
+                )}
+                {puedeEditarServicios && (
+                  <a className="btn-exportar" href="/catalogo-servicios">
+                    Servicios y precios
+                  </a>
                 )}
                 <a className="btn-exportar" href="/facturas-admin/importar">
                   Importar CFDI

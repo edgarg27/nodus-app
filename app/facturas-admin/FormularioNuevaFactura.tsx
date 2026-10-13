@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
-import { TIPOS_SERVICIO_FACTURA, tipoServicioFactura, conceptoParaCliente } from "@/lib/adicionales";
+import { conceptoParaCliente } from "@/lib/adicionales";
+import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { DATOS_PUBLICO_GENERAL } from "@/lib/datosFiscales";
 
@@ -65,6 +66,10 @@ export default function FormularioNuevaFactura({
   onListo: (mensaje: string) => void;
 }) {
   const supabase = createClient();
+  const { servicios } = useCatalogoServicios();
+  // Si la persona ya escribió el concepto o el monto, elegir un servicio no los pisa.
+  const conceptoTocado = useRef(false);
+  const montoTocado = useRef(false);
   const [centro, setCentro] = useState(CENTROS.includes(centroInicial) ? centroInicial : CENTROS[0]);
   const [clientes, setClientes] = useState<ClienteForm[]>([]);
   const [cargandoClientes, setCargandoClientes] = useState(false);
@@ -158,8 +163,19 @@ export default function FormularioNuevaFactura({
     if (elegidos.length === 0) return;
     setConcepto(elegidos.map((p) => etiquetaPago(p.concepto)).join(" + ").slice(0, 120));
     setMonto(String(Math.round(elegidos.reduce((s, p) => s + Number(p.monto), 0) * 100) / 100));
-    const conTipo = elegidos.find((p) => p.adicional_tipo && tipoServicioFactura(p.adicional_tipo));
+    conceptoTocado.current = false;
+    montoTocado.current = false;
+    const conTipo = elegidos.find((p) => p.adicional_tipo && servicios.some((s) => s.clave === p.adicional_tipo));
     if (conTipo) setTipo(conTipo.adicional_tipo as string);
+  }
+
+  // Al elegir un servicio se sugieren su concepto y su precio del catálogo.
+  function elegirServicio(clave: string) {
+    setTipo(clave);
+    const s = servicios.find((x) => x.clave === clave);
+    if (!s) return;
+    if (!conceptoTocado.current && s.concepto) setConcepto(s.concepto);
+    if (!montoTocado.current && s.precio != null) setMonto(String(s.precio));
   }
 
   function validar(): string {
@@ -254,7 +270,7 @@ export default function FormularioNuevaFactura({
   // ---- Vista previa ----
   const subtotal = montoNum > 0 ? Math.round((montoNum / 1.16) * 100) / 100 : 0;
   const iva = montoNum > 0 ? Math.round((montoNum - subtotal) * 100) / 100 : 0;
-  const tipoInfo = tipoServicioFactura(tipo);
+  const tipoInfo = servicios.find((s) => s.clave === tipo) || null;
   const faltanDatosFiscales = !publicoGeneral && !!cliente && !(cliente.rfc && cliente.nombre_fiscal && cliente.regimen_fiscal && cliente.cp_fiscal);
   const forma = FORMAS_PAGO_COMPLEMENTO.find((f) => f.clave === formaPago);
 
@@ -365,9 +381,9 @@ export default function FormularioNuevaFactura({
 
       <div>
         <Etiqueta texto="Tipo de servicio" />
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+        <select value={tipo} onChange={(e) => elegirServicio(e.target.value)}>
           <option value="">Renta del espacio</option>
-          {TIPOS_SERVICIO_FACTURA.map((t) => (
+          {servicios.map((t) => (
             <option key={t.clave} value={t.clave}>
               {t.etiqueta}
             </option>
@@ -378,12 +394,30 @@ export default function FormularioNuevaFactura({
 
       <div style={{ gridColumn: "span 2" }}>
         <Etiqueta texto="Concepto" obligatorio />
-        <input type="text" placeholder="Ej. Renta de oficina de octubre" maxLength={120} value={concepto} onChange={(e) => setConcepto(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Ej. Renta de oficina de octubre"
+          maxLength={120}
+          value={concepto}
+          onChange={(e) => {
+            conceptoTocado.current = true;
+            setConcepto(e.target.value);
+          }}
+        />
       </div>
 
       <div>
         <Etiqueta texto="Monto (con IVA)" obligatorio />
-        <input type="text" inputMode="decimal" placeholder="$0.00" value={monto} onChange={(e) => setMonto(e.target.value.replace(/[^0-9.]/g, ""))} />
+        <input
+          type="text"
+          inputMode="decimal"
+          placeholder="$0.00"
+          value={monto}
+          onChange={(e) => {
+            montoTocado.current = true;
+            setMonto(e.target.value.replace(/[^0-9.]/g, ""));
+          }}
+        />
       </div>
 
       {!publicoGeneral && (

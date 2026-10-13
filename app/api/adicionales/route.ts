@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
-import { conceptoCobroAdicional, tipoCobroAdicional } from "@/lib/adicionales";
+import { conceptoCobroAdicional } from "@/lib/adicionales";
+import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
 // Cobros adicionales sueltos (pantalla /adicionales): una hora extra de sala,
 // copias, frituras… Cada uno es un registro de `pagos` pendiente y sin factura
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const { clienteId, tipo, concepto, cantidad, precioUnitario } = await req.json();
 
-  const tipoInfo = tipoCobroAdicional(tipo);
+  const tipoInfo = await servicioActivoPorClave(createAdminClient(), tipo);
   if (!tipoInfo) return NextResponse.json({ error: "Elige el tipo de cobro" }, { status: 400 });
 
   const conceptoLimpio = String(concepto || "").trim();
