@@ -51,6 +51,7 @@ export async function middleware(req: NextRequest) {
   const isRegistrarPlan = path.startsWith("/registrar-plan");
   const isPaquetes = path.startsWith("/paquetes");
   const isFacturasAdmin = path.startsWith("/facturas-admin");
+  const isCatalogoServicios = path.startsWith("/catalogo-servicios");
   const isExperienciaCliente = path.startsWith("/experiencia-cliente");
   const isIngresosCentro = path.startsWith("/ingresos-centro");
   const isGastos = path.startsWith("/gastos");
@@ -94,7 +95,7 @@ export async function middleware(req: NextRequest) {
     // "Cargando..." sin fin en vez de que lo mandara a /login.
     "/paqueteria",
   ].some((p) => path === p || path.startsWith(p + "/"));
-  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes;
+  const isProtected = isDashboardAdmin || isDashboardCliente || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isCatalogoServicios || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isClienteSubpage || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes;
 
   if (!session && isProtected) {
     // A diferencia de las demás secciones (que se abren desde dentro de la
@@ -142,7 +143,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     // panel admin, reportes y telefonía son solo para staff (no clientes)
-    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes) && role === "cliente") {
+    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isCatalogoServicios || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes) && role === "cliente") {
       return NextResponse.redirect(new URL("/dashboard-cliente", req.url));
     }
     // el dashboard de cliente es solo para clientes
@@ -218,6 +219,7 @@ export const config = {
     "/paqueteria/:path*",
     "/ingresos-centro/:path*",
     "/day-pass/:id/checkin",
+    "/catalogo-servicios/:path*",
     "/login",
   ],
 };

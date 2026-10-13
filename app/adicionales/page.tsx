@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
-import { TIPOS_COBRO_ADICIONAL, tipoCobroAdicional } from "@/lib/adicionales";
+import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import AvisoExito from "@/app/components/AvisoExito";
 
 // Adicionales: cobros sueltos que el admin le pone a un cliente fuera de su
@@ -71,6 +71,7 @@ export default function AdicionalesPage() {
 
   const [busqueda, setBusqueda] = useState("");
   const [clienteSel, setClienteSel] = useState<Cliente | null>(null);
+  const { servicios, puedeEditar: puedeEditarServicios } = useCatalogoServicios();
   const [tipo, setTipo] = useState<string>("");
   const [concepto, setConcepto] = useState("");
   const [cantidad, setCantidad] = useState("1");
@@ -146,9 +147,11 @@ export default function AdicionalesPage() {
 
   function elegirTipo(clave: string) {
     setTipo(clave);
-    const t = tipoCobroAdicional(clave);
+    const t = servicios.find((x) => x.clave === clave);
     // "Otro" deja el concepto como esté; los demás lo rellenan (se puede editar).
     if (t && t.concepto) setConcepto(t.concepto);
+    // Si el servicio tiene precio en el catálogo, se llena (se puede cambiar).
+    if (t && t.precio != null) setPrecio(String(t.precio));
   }
 
   async function cobrar() {
@@ -256,6 +259,13 @@ export default function AdicionalesPage() {
               cuenta y lo puede pagar con tarjeta, o lo marcas pagado aquí si te lo pagó en efectivo.
             </p>
 
+            {puedeEditarServicios && (
+              <p style={{ margin: "0 0 10px" }}>
+                <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href="/catalogo-servicios">
+                  Servicios y precios
+                </a>
+              </p>
+            )}
             <div className="form-card" style={{ marginBottom: 16 }}>
               <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>Nuevo cobro</p>
 
@@ -306,7 +316,7 @@ export default function AdicionalesPage() {
               <div>
                 <p className="sub-label" style={{ marginBottom: 6 }}>¿Qué se cobra?</p>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {TIPOS_COBRO_ADICIONAL.map((t) => (
+                  {servicios.map((t) => (
                     <button
                       type="button"
                       key={t.clave}

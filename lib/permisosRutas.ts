@@ -66,6 +66,8 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/cobranza", roles: ["admin", "gerente", "cobranza", "gerente_ventas"] },
   { prefijo: "/pagos", roles: ["admin", "gerente", "cobranza", "gerente_ventas"] },
   { prefijo: "/facturas-admin", roles: ["admin", "gerente", "cobranza", "gerente_ventas"] },
+  // Servicios y precios: la pantalla además exige ser ventasit@, finanzas@ o superadmin (lib/catalogoServicios.ts).
+  { prefijo: "/catalogo-servicios", roles: ["cobranza", "gerente_ventas"] },
   { prefijo: "/ingresos-centro", roles: ["admin", "gerente", "cobranza", "gerente_ventas"] },
   { prefijo: "/gastos", roles: ["admin", "gerente", "cobranza"] },
   { prefijo: "/proveedores", roles: ["admin", "gerente", "cobranza", "sistemas"] },
