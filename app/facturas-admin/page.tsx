@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
-import { TIPOS_SERVICIO_FACTURA, tipoServicioFactura } from "@/lib/adicionales";
+import FormularioNuevaFactura from "./FormularioNuevaFactura";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
@@ -43,7 +43,7 @@ function sePuedeFacturar(f: { user_id?: string | null; uuid_cfdi?: string | null
   return !!f.user_id && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada";
 }
 
-type Cliente = { id: string; nombre: string; email: string; empresa: string | null };
+type Cliente = { id: string; nombre: string; email: string; empresa: string | null; nombre_fiscal?: string | null };
 
 type Factura = {
   id: string;
@@ -133,7 +133,7 @@ export default function FacturasAdminPage() {
     setLoading(true);
     const { data: clis } = await supabase
       .from("profiles")
-      .select("id, nombre, email, empresa")
+      .select("id, nombre, email, empresa, nombre_fiscal")
       .eq("rol", "cliente")
       .eq("centro", c)
       .order("nombre");
@@ -191,161 +191,8 @@ export default function FacturasAdminPage() {
     setLoading(false);
   }
 
-  // ---- Formulario Nueva factura ----
+  // ---- Formulario Nueva factura (componente aparte) ----
   const [mostrarForm, setMostrarForm] = useState(false);
-  const [form, setForm] = useState({
-    cliente_id: "",
-    folio: "",
-    concepto: "",
-    monto: "",
-    fecha_emision: new Date().toISOString().split("T")[0],
-    fecha_vencimiento: "",
-    estado: "pendiente",
-    adicional_tipo: "",
-  });
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [busquedaForm, setBusquedaForm] = useState("");
-  // Venta de mostrador: se factura a público en general (sin cliente), ya pagada.
-  const [publicoGeneral, setPublicoGeneral] = useState(false);
-  // Centro de la venta de mostrador (Público en general · Bosques / San Telmo / ...).
-  const [centroPG, setCentroPG] = useState("");
-  const [formaPagoPG, setFormaPagoPG] = useState("01");
-  const clienteForm = clientes.find((c) => c.id === form.cliente_id) || null;
-  // Un solo buscador: salen los clientes y, si se escribe "público" o el nombre de un centro,
-  // las opciones de público en general de cada centro.
-  const sinAcentos = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const opcionesBusqueda = useMemo(() => {
-    const q = sinAcentos(busquedaForm.trim());
-    if (!q) return [];
-    const pg = CENTROS_SUGERIDOS.map((c) => ({ tipo: "pg" as const, id: c, etiqueta: "Público en general · " + c })).filter((o) => sinAcentos(o.etiqueta).includes(q));
-    const cl = clientes
-      .filter((c) => sinAcentos([c.nombre, c.empresa, c.email].filter(Boolean).join(" ")).includes(q))
-      .slice(0, 8)
-      .map((c) => ({ tipo: "cliente" as const, id: c.id, etiqueta: c.nombre + (c.empresa ? " · " + c.empresa : "") + " — " + c.email }));
-    return [...pg, ...cl];
-  }, [clientes, busquedaForm]);
-  const [guardando, setGuardando] = useState(false);
-  const [enviado, setEnviado] = useState(false);
-  const [error, setError] = useState("");
-  const [pagosAVincular, setPagosAVincular] = useState<Set<string>>(new Set());
-
-  function togglePagoAVincular(id: string) {
-    setPagosAVincular((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function facturarAPublicoGeneral() {
-    if (!centro) return;
-    if (!form.concepto.trim() || !(Number(form.monto) > 0)) {
-      setError("Completa el concepto y el monto");
-      return;
-    }
-    setGuardando(true);
-    const res = await fetch("/api/facturas/publico-general", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ centro: centroPG || centro, concepto: form.concepto, monto: Number(form.monto), formaPago: formaPagoPG, adicionalTipo: form.adicional_tipo || null }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setGuardando(false);
-    if (!res.ok) {
-      setError(data.error || "No se pudo facturar");
-      return;
-    }
-    setForm({ ...form, concepto: "", monto: "", adicional_tipo: "" });
-    setPublicoGeneral(false);
-    setMostrarForm(false);
-    setEnviado(true);
-    setTimeout(() => setEnviado(false), 1800);
-    setAvisoCancelar("Factura " + data.folio + " emitida a público en general (" + (centroPG || centro) + ").");
-    fetchTodo(centro);
-  }
-
-  async function crearFactura(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (publicoGeneral) {
-      await facturarAPublicoGeneral();
-      return;
-    }
-    if (!form.cliente_id || !form.concepto.trim() || !form.monto || !form.fecha_vencimiento) {
-      setError("Completa cliente, concepto, monto y fecha de vencimiento");
-      return;
-    }
-    if (!centro) return;
-    setGuardando(true);
-
-    let archivoUrl: string | null = null;
-    if (archivo) {
-      const fileName = `${form.cliente_id}-${Date.now()}.${archivo.name.split(".").pop() || "pdf"}`;
-      const { error: uploadError } = await supabase.storage
-        .from("facturas")
-        .upload(fileName, archivo, { contentType: archivo.type, upsert: true });
-      if (uploadError) {
-        setError("No se pudo subir el PDF: " + uploadError.message);
-        setGuardando(false);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from("facturas").getPublicUrl(fileName);
-      archivoUrl = urlData.publicUrl;
-    }
-
-    const folio = form.folio.trim() || `FAC-MAN-${Date.now().toString().slice(-6)}`;
-
-    const { data: nuevaFactura, error: insertError } = await supabase
-      .from("facturas")
-      .insert({
-        user_id: form.cliente_id,
-        folio,
-        concepto: form.concepto.trim(),
-        monto: Number(form.monto),
-        fecha_emision: form.fecha_emision,
-        fecha_vencimiento: form.fecha_vencimiento,
-        estado: form.estado,
-        centro,
-        archivo_url: archivoUrl,
-        // Clave del SAT con la que se facturará (vacío = renta de espacio).
-        ...(form.adicional_tipo ? { adicional_tipo: form.adicional_tipo } : {}),
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !nuevaFactura) {
-      setGuardando(false);
-      setError("No se pudo guardar la factura. Intenta de nuevo.");
-      return;
-    }
-
-    if (pagosAVincular.size > 0) {
-      await fetch("/api/pagos/vincular", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagoIds: Array.from(pagosAVincular), facturaId: nuevaFactura.id }),
-      });
-    }
-
-    setGuardando(false);
-    setForm({
-      cliente_id: "",
-      folio: "",
-      concepto: "",
-      monto: "",
-      fecha_emision: new Date().toISOString().split("T")[0],
-      fecha_vencimiento: "",
-      estado: "pendiente",
-      adicional_tipo: "",
-    });
-    setArchivo(null);
-    setPagosAVincular(new Set());
-    setMostrarForm(false);
-    setEnviado(true);
-    setTimeout(() => setEnviado(false), 1800);
-    fetchTodo(centro);
-  }
 
   // ---- Ver / vincular pagos de una factura ----
   const [facturaExpandidaId, setFacturaExpandidaId] = useState<string | null>(null);
@@ -396,9 +243,10 @@ export default function FacturasAdminPage() {
   const [filtroDesde, setFiltroDesde] = useState("");
   const [filtroHasta, setFiltroHasta] = useState("");
   const [soloSinCliente, setSoloSinCliente] = useState(false);
+  const [filtroCliente, setFiltroCliente] = useState("");
 
   const hayFiltrosActivos =
-    !!busqueda || !!filtroEstado || !!filtroFuente || !!filtroDesde || !!filtroHasta || soloSinCliente;
+    !!busqueda || !!filtroEstado || !!filtroFuente || !!filtroDesde || !!filtroHasta || soloSinCliente || !!filtroCliente;
 
   function limpiarFiltros() {
     setBusqueda("");
@@ -407,6 +255,7 @@ export default function FacturasAdminPage() {
     setFiltroDesde("");
     setFiltroHasta("");
     setSoloSinCliente(false);
+    setFiltroCliente("");
   }
 
   const facturasFiltradas = useMemo(() => {
@@ -426,9 +275,10 @@ export default function FacturasAdminPage() {
       if (filtroDesde && f.fecha_emision < filtroDesde) return false;
       if (filtroHasta && f.fecha_emision > filtroHasta) return false;
       if (soloSinCliente && (f.user_id || f.rfc_receptor === "XAXX010101000")) return false;
+      if (filtroCliente && f.user_id !== filtroCliente) return false;
       return true;
     });
-  }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente]);
+  }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente, filtroCliente]);
 
   // ---- Complementos de pago (facturas a pago diferido) ----
   const [complementos, setComplementos] = useState<Complemento[]>([]);
@@ -571,34 +421,6 @@ export default function FacturasAdminPage() {
     if (centro) fetchTodo(centro);
   }
 
-  // Cobros sueltos pendientes (adicionales, depósitos…): se les crea su cobro con factura y se timbra.
-  const [seleccionPagos, setSeleccionPagos] = useState<string[]>([]);
-  async function facturarPagosSueltos(ids: string[]) {
-    if (ids.length === 0) return;
-    if (!confirm("¿Emitir la factura (CFDI) de " + (ids.length === 1 ? "este cobro" : ids.length + " cobros") + "? Se timbra a pago diferido (PPD); al pagarse se emite su complemento de pago.")) return;
-    setFacturando(true);
-    const res = await fetch("/api/facturas/facturar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pagoIds: ids }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setFacturando(false);
-    if (!res.ok && !data.resultados) {
-      setAvisoCancelar(data.error || "No se pudo facturar");
-      return;
-    }
-    const resultados: { id: string; folio?: string; ok: boolean; error?: string }[] = data.resultados || [];
-    const fallidas = resultados.filter((r) => !r.ok);
-    const hechas = resultados.length - fallidas.length;
-    setSeleccionPagos((s) => s.filter((i) => !resultados.some((r) => r.id === i && r.ok)));
-    setAvisoCancelar(
-      (hechas > 0 ? "✓ " + hechas + " factura(s) emitida(s). " : "") +
-        (fallidas.length > 0 ? "✗ " + fallidas.length + " no se pudo(ieron): " + fallidas.slice(0, 3).map((r) => (r.folio || "") + " — " + r.error).join(" · ") : "")
-    );
-    if (centro) fetchTodo(centro);
-  }
-
   // ---- Cancelación de CFDI ----
   const puedoCancelar = ROLES_CANCELAR.includes(miRol);
   const [seleccion, setSeleccion] = useState<string[]>([]);
@@ -708,17 +530,6 @@ export default function FacturasAdminPage() {
         </a>
         <p className="rep-title">Facturas</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
-        {esGlobal && centrosDisponibles.length > 1 && (
-          <div className="centro-selector">
-            <select value={centro || ""} onChange={(e) => setCentro(e.target.value)}>
-              {centrosDisponibles.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       <div className="rep-content rep-content-completo">
@@ -761,9 +572,6 @@ export default function FacturasAdminPage() {
                     Cancelar seleccionadas ({seleccionCancelables.length})
                   </button>
                 )}
-                <a className="btn-exportar" href="/facturas-admin/por-cliente">
-                  Por cliente
-                </a>
                 <a className="btn-exportar" href="/facturas-admin/importar">
                   Importar CFDI
                 </a>
@@ -802,6 +610,35 @@ export default function FacturasAdminPage() {
               <>
             <div className="form-card" style={{ marginTop: 8 }}>
               <div className="tel-form-grid">
+                {esGlobal && centrosDisponibles.length > 1 && (
+                  <div>
+                    <p className="sub-label">Centro</p>
+                    <select
+                      value={centro || ""}
+                      onChange={(e) => {
+                        setFiltroCliente("");
+                        setCentro(e.target.value);
+                      }}
+                    >
+                      {centrosDisponibles.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <p className="sub-label">Cliente</p>
+                  <select value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)}>
+                    <option value="">Todos</option>
+                    {clientes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre_fiscal || c.empresa || c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <p className="sub-label">Buscar</p>
                   <input
@@ -857,225 +694,16 @@ export default function FacturasAdminPage() {
               </>
             )}
 
-            {mostrarForm && (
-              <form className="form-card form-factura-ancho" onSubmit={crearFactura}>
-                <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e", gridColumn: "1 / -1" }}>Nueva factura</p>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>Cliente</p>
-                  {publicoGeneral ? (
-                    <div className="adicional-cliente-elegido">
-                      <span>Público en general · {centroPG || centro}</span>
-                      <button type="button" className="tel-borrar-btn" onClick={() => setPublicoGeneral(false)}>
-                        Cambiar
-                      </button>
-                    </div>
-                  ) : clienteForm ? (
-                    <div className="adicional-cliente-elegido">
-                      <span>
-                        {clienteForm.nombre}
-                        {clienteForm.empresa ? " · " + clienteForm.empresa : ""}
-                      </span>
-                      <button
-                        type="button"
-                        className="tel-borrar-btn"
-                        onClick={() => {
-                          setForm({ ...form, cliente_id: "" });
-                          setPagosAVincular(new Set());
-                        }}
-                      >
-                        Cambiar
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <input
-                        type="text"
-                        placeholder='Busca un cliente por nombre, empresa o correo; para una venta de mostrador escribe "público en general"'
-                        value={busquedaForm}
-                        onChange={(e) => setBusquedaForm(e.target.value)}
-                      />
-                      {busquedaForm.trim() && (
-                        <div className="adicional-resultados">
-                          {opcionesBusqueda.length === 0 ? (
-                            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Nada coincide</p>
-                          ) : (
-                            opcionesBusqueda.map((o) => (
-                              <button
-                                type="button"
-                                key={o.tipo + o.id}
-                                className="adicional-resultado"
-                                onClick={() => {
-                                  setBusquedaForm("");
-                                  setPagosAVincular(new Set());
-                                  if (o.tipo === "pg") {
-                                    setPublicoGeneral(true);
-                                    setCentroPG(o.id);
-                                    setForm({ ...form, cliente_id: "" });
-                                  } else {
-                                    setForm({ ...form, cliente_id: o.id });
-                                  }
-                                }}
-                              >
-                                {o.etiqueta}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {form.cliente_id && pagosSueltosDelCliente(form.cliente_id).length > 0 && (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <p className="sub-label" style={{ marginBottom: 6 }}>Vincular pagos sueltos de este cliente (opcional)</p>
-                    {pagosSueltosDelCliente(form.cliente_id).map((p) => (
-                      <label
-                        key={p.id}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13, color: "#333" }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={pagosAVincular.has(p.id)}
-                          onChange={() => togglePagoAVincular(p.id)}
-                        />
-                        {p.concepto || "Pago"} · {"$"}{Number(p.monto).toLocaleString("es-MX")} · {p.estado}
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                <div>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>¿Qué se factura?</p>
-                  <select value={form.adicional_tipo} onChange={(e) => setForm({ ...form, adicional_tipo: e.target.value })}>
-                    <option value="">Renta de espacio</option>
-                    {TIPOS_SERVICIO_FACTURA.map((t) => (
-                      <option key={t.clave} value={t.clave}>
-                        {t.etiqueta}
-                      </option>
-                    ))}
-                  </select>
-                  <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>De aquí sale la clave del SAT con la que se factura.</p>
-                </div>
-
-                <div>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>Concepto</p>
-                  <input
-                    type="text"
-                    placeholder="Ej. Renta de oficina de octubre"
-                    maxLength={120}
-                    value={form.concepto}
-                    onChange={(e) => setForm({ ...form, concepto: e.target.value })}
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <p className="sub-label" style={{ marginBottom: 6 }}>Monto (con IVA)</p>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="$0.00"
-                      value={form.monto}
-                      onChange={(e) => setForm({ ...form, monto: e.target.value.replace(/[^0-9.]/g, "") })}
-                    />
-                  </div>
-                  {publicoGeneral ? (
-                    <div style={{ flex: 1 }}>
-                      <p className="sub-label" style={{ marginBottom: 6 }}>Forma de pago</p>
-                      <select value={formaPagoPG} onChange={(e) => setFormaPagoPG(e.target.value)}>
-                        {FORMAS_PAGO_COMPLEMENTO.map((fp) => (
-                          <option key={fp.clave} value={fp.clave}>
-                            {fp.texto}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div style={{ flex: 1 }}>
-                      <p className="sub-label" style={{ marginBottom: 6 }}>Folio (opcional)</p>
-                      <input
-                        type="text"
-                        placeholder="Se genera solo"
-                        value={form.folio}
-                        onChange={(e) => setForm({ ...form, folio: e.target.value })}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {publicoGeneral ? (
-                  <p style={{ fontSize: 12, color: "#666", margin: 0, gridColumn: "1 / -1" }}>
-                    Se timbra ahora mismo, ya pagada, con el RFC genérico de público en general y la fecha de hoy. Esa factura no es deducible para quien compra.
-                  </p>
-                ) : (
-                  <>
-                    <div style={{ display: "flex", gap: 10 }}>
-                  <div style={{ flex: 1 }}>
-                    <p className="sub-label" style={{ marginBottom: 6 }}>Fecha de emisión</p>
-                    <input
-                      type="date"
-                      value={form.fecha_emision}
-                      onChange={(e) => setForm({ ...form, fecha_emision: e.target.value })}
-                    />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <p className="sub-label" style={{ marginBottom: 6 }}>Fecha de vencimiento</p>
-                    <input
-                      type="date"
-                      value={form.fecha_vencimiento}
-                      onChange={(e) => setForm({ ...form, fecha_vencimiento: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>Subir factura (PDF, opcional)</p>
-                  <input type="file" accept="application/pdf,image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} />
-                </div>
-                  </>
-                )}
-
-                {error && <p style={{ color: "#A32D2D", fontSize: 13, gridColumn: "1 / -1" }}>{error}</p>}
-
-                <button
-                  className={"btn-enviar" + (guardando ? " sending" : "") + (enviado ? " sent" : "")}
-                  style={{ gridColumn: "1 / -1" }}
-                  type="submit"
-                  disabled={guardando}
-                >
-                  <span className="btn-enviar-icon-wrapper">
-                    <svg
-                      className="btn-enviar-icon"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path fill="none" d="M0 0h24v24H0z"></path>
-                      <path
-                        fill="currentColor"
-                        d="M1.101 21.757 23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z"
-                      ></path>
-                    </svg>
-                  </span>
-                  <span className="btn-enviar-check-wrapper">
-                    <svg
-                      className="btn-enviar-check"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    <span>¡Listo!</span>
-                  </span>
-                  <span className="btn-enviar-text">{publicoGeneral ? "Facturar a público en general" : "+ Guardar factura"}</span>
-                </button>
-              </form>
+            {mostrarForm && centro && (
+              <FormularioNuevaFactura
+                centroInicial={centro}
+                onCancelar={() => setMostrarForm(false)}
+                onListo={(mensaje) => {
+                  setMostrarForm(false);
+                  setAvisoCancelar(mensaje);
+                  fetchTodo(centro);
+                }}
+              />
             )}
 
             {avisoCancelar && (
@@ -1146,50 +774,6 @@ export default function FacturasAdminPage() {
 
             {!mostrarForm && (
               <>
-            {puedoCancelar && pagosSueltos.some((p) => p.estado === "pendiente") && (
-              <details className="form-card" style={{ marginTop: 8 }}>
-                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
-                  Cobros sueltos por facturar ({pagosSueltos.filter((p) => p.estado === "pendiente").length})
-                </summary>
-                <p style={{ fontSize: 12, color: "#666", margin: "6px 0" }}>
-                  Adicionales, depósitos y demás cobros pendientes que todavía no tienen factura. Se pueden facturar antes de que se paguen.
-                </p>
-                {seleccionPagos.length > 0 && (
-                  <button className="btn-exportar" disabled={facturando} onClick={() => facturarPagosSueltos(seleccionPagos)}>
-                    {facturando ? "Facturando..." : "Facturar seleccionados (" + seleccionPagos.length + ")"}
-                  </button>
-                )}
-                {pagosSueltos
-                  .filter((p) => p.estado === "pendiente")
-                  .map((p) => {
-                    const cli = clientes.find((c) => c.id === p.user_id);
-                    const tipo = tipoServicioFactura(p.adicional_tipo);
-                    return (
-                      <div key={p.id} style={{ borderTop: "1px solid #eee", marginTop: 8, paddingTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <input
-                          type="checkbox"
-                          aria-label="Seleccionar cobro"
-                          checked={seleccionPagos.includes(p.id)}
-                          onChange={(e) => setSeleccionPagos((s) => (e.target.checked ? [...s, p.id] : s.filter((i) => i !== p.id)))}
-                        />
-                        <div style={{ flex: 1, minWidth: 180 }}>
-                          <p className="contrato-detalle">
-                            <strong>{cli?.nombre || "Cliente"}</strong> · {p.concepto || "Cobro"}
-                          </p>
-                          <p className="contrato-detalle" style={{ fontSize: 12, color: "#666" }}>
-                            {"$"}{Number(p.monto).toLocaleString("es-MX")}
-                            {tipo ? " · " + tipo.etiqueta : ""}
-                          </p>
-                        </div>
-                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarPagosSueltos([p.id])}>
-                          Facturar (CFDI)
-                        </button>
-                      </div>
-                    );
-                  })}
-              </details>
-            )}
-
             {complementos.length > 0 && (
               <details className="form-card" style={{ marginTop: 8 }}>
                 <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Complementos de pago emitidos ({complementos.length})</summary>

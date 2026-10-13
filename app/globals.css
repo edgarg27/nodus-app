@@ -7515,3 +7515,69 @@ a.stat-card {
   cursor: pointer;
   padding: 0;
 }
+
+/* ---------- Nueva factura: botones y vista previa ---------- */
+.fac-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.fac-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fac-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.fac-btn-naranja {
+  background: #f07e3a;
+  color: #fff;
+}
+
+.fac-btn-verde {
+  background: #0f6e56;
+  color: #fff;
+}
+
+.fac-btn-sec {
+  background: #fff;
+  color: #0d1b3e;
+  border: 1px solid #0d1b3e;
+}
+
+.fac-btn-texto {
+  background: transparent;
+  color: #555;
+  font-weight: 600;
+}
+
+.prev-bloque {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.prev-titulo {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.prev-dato {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1a1a1a;
+}

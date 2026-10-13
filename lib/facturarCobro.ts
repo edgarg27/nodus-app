@@ -15,7 +15,14 @@ export type ResultadoFacturar = { id: string; folio?: string; ok: boolean; uuid?
 // Facturas que ya no se pueden facturar a pago diferido porque no hay nada que cobrar después.
 const ESTADOS_NO_FACTURABLES = ["pagada", "cancelada"];
 
-export async function facturarCobro(admin: Admin, facturaId: string): Promise<ResultadoFacturar> {
+// metodo PPD (por omisión): pago diferido, forma 99 y complemento al pagar. PUE: pago en una sola exhibición,
+// con la forma de pago real (transferencia, tarjeta…).
+export async function facturarCobro(
+  admin: Admin,
+  facturaId: string,
+  opts: { metodo?: "PUE" | "PPD"; formaPago?: string } = {}
+): Promise<ResultadoFacturar> {
+  const metodo = opts.metodo === "PUE" ? "PUE" : "PPD";
   const { data: f } = await admin
     .from("facturas")
     .select("id, folio, user_id, concepto, monto, estado, uuid_cfdi, centro, adicional_tipo")
@@ -23,7 +30,7 @@ export async function facturarCobro(admin: Admin, facturaId: string): Promise<Re
     .maybeSingle();
   if (!f) return { id: facturaId, ok: false, error: "Cobro no encontrado" };
   if (f.uuid_cfdi) return { id: facturaId, folio: f.folio, ok: false, error: "Ya tiene factura (CFDI)" };
-  if (ESTADOS_NO_FACTURABLES.includes(f.estado)) {
+  if (metodo === "PPD" && ESTADOS_NO_FACTURABLES.includes(f.estado)) {
     return { id: facturaId, folio: f.folio, ok: false, error: "Ya está pagado: se factura al cobrar, no a pago diferido" };
   }
   if (!f.user_id) return { id: facturaId, folio: f.folio, ok: false, error: "No tiene cliente asignado" };
@@ -51,8 +58,8 @@ export async function facturarCobro(admin: Admin, facturaId: string): Promise<Re
       monto: Number(f.monto),
       adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
       serie: serieCentro(f.centro),
-      metodo: "PPD",
-      formaPago: "99", // "Por definir": el SAT lo exige en PPD; la forma real va en el complemento
+      metodo,
+      formaPago: metodo === "PUE" ? opts.formaPago || "03" : "99", // PPD: "Por definir"; la forma real va en el complemento
       etiqueta: `cobro ${f.id}`,
       idempotencyKey: `cobro-${f.id}`,
     });

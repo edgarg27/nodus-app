@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { facturarCobro, facturarPagoSuelto } from "@/lib/facturarCobro";
+import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const MAXIMO_POR_LLAMADA = 50;
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Máximo ${MAXIMO_POR_LLAMADA} cobros por vez` }, { status: 400 });
   }
 
+  // Por omisión se factura a pago diferido (PPD). En PUE (pago en una sola exhibición) hay que decir cómo se pagó.
+  const metodo: "PUE" | "PPD" = cuerpo.metodo === "PUE" ? "PUE" : "PPD";
+  const formaPago: string | undefined = typeof cuerpo.formaPago === "string" ? cuerpo.formaPago : undefined;
+  if (metodo === "PUE" && !FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === formaPago)) {
+    return NextResponse.json({ error: "Elige la forma de pago" }, { status: 400 });
+  }
+
   const admin = createAdminClient();
 
   if (!ROLES_GLOBALES.includes(miProfile!.rol)) {
@@ -49,7 +57,7 @@ export async function POST(req: NextRequest) {
   // Uno por uno: Facturapi y el SAT limitan el ritmo, y un error en uno no frena los demás.
   const resultados = [];
   for (const id of facturaIds) {
-    resultados.push(await facturarCobro(admin, id));
+    resultados.push(await facturarCobro(admin, id, { metodo, formaPago }));
   }
   for (const id of pagoIds) {
     resultados.push(await facturarPagoSuelto(admin, id));
