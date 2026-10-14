@@ -7711,3 +7711,23 @@ a.stat-card {
     grid-template-columns: 1fr;
   }
 }
+
+.fac-pestanas {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.fac-pestanas button {
+  border: none;
+  background: #e6e8ee;
+  color: #445;
+  padding: 10px 18px;
+  border-radius: 10px 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fac-pestanas button.activa {
+  background: #fff;
+  color: #0d1b3e;
+}
