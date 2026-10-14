@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FormularioNuevaFactura from "../FormularioNuevaFactura";
+import IntegrarPorCliente from "../IntegrarPorCliente";
 
 export default function IntegrarClientePage() {
   const supabase = createClient();
@@ -10,6 +11,8 @@ export default function IntegrarClientePage() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [vuelta, setVuelta] = useState(0);
+  // "cliente": integrar con contrato y periodo (como ZORA). "libre": factura libre o venta a público en general.
+  const [modo, setModo] = useState<"cliente" | "libre">("cliente");
 
   useEffect(() => {
     (async () => {
@@ -31,7 +34,7 @@ export default function IntegrarClientePage() {
           ← Facturación
         </a>
         <p className="rep-title">Integrar por cliente</p>
-        <p className="rep-sub">Elige al cliente, marca lo que se le cobra y timbra o deja integrada la factura</p>
+        <p className="rep-sub">Elige al cliente y el periodo, revisa lo que se le cobra y deja integrada o timbra la factura</p>
       </div>
 
       <div className="rep-content rep-content-completo">
@@ -59,17 +62,32 @@ export default function IntegrarClientePage() {
           </div>
         )}
 
+        {!mensaje && (
+          <div className="fac-pestanas" role="tablist">
+            <button role="tab" aria-selected={modo === "cliente"} className={modo === "cliente" ? "activa" : ""} onClick={() => setModo("cliente")}>
+              Por cliente y periodo
+            </button>
+            <button role="tab" aria-selected={modo === "libre"} className={modo === "libre" ? "activa" : ""} onClick={() => setModo("libre")}>
+              Factura libre / Público en general
+            </button>
+          </div>
+        )}
+
         {cargando ? (
           <div className="empty-card">Cargando...</div>
         ) : !mensaje && centro ? (
-          <FormularioNuevaFactura
-            key={vuelta}
-            centroInicial={centro}
-            onCancelar={() => {
-              window.location.href = "/facturas-admin";
-            }}
-            onListo={(m) => setMensaje(m)}
-          />
+          modo === "cliente" ? (
+            <IntegrarPorCliente key={"c" + vuelta} centroInicial={centro} onListo={(m) => setMensaje(m)} />
+          ) : (
+            <FormularioNuevaFactura
+              key={"l" + vuelta}
+              centroInicial={centro}
+              onCancelar={() => {
+                window.location.href = "/facturas-admin";
+              }}
+              onListo={(m) => setMensaje(m)}
+            />
+          )
         ) : null}
       </div>
     </div>
