@@ -24,8 +24,8 @@ type ClienteForm = {
   regimen_fiscal: string | null;
   cp_fiscal: string | null;
 };
-type ContratoOpc = { id: string; estatus: string; renta: number; etiqueta: string };
-type Linea = { key: string; tipo: string; contrato: string; descripcion: string; total: number; pagoId?: string; contratoId?: string };
+type ContratoOpc = { id: string; folio: string | null; centro: string; estatus: string; renta: number; tipo: string; etiqueta: string };
+type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string };
 
 const razonSocial = (c: ClienteForm) => c.nombre_fiscal || c.empresa || c.nombre;
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -56,8 +56,6 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
   const [fecha, setFecha] = useState(hoy);
   const [mes, setMes] = useState(Number(hoy.slice(5, 7)));
   const [anio, setAnio] = useState(Number(hoy.slice(0, 4)));
-  const [recurrentes, setRecurrentes] = useState(true);
-  const [adicionales, setAdicionales] = useState(true);
   const [concepto, setConcepto] = useState("");
   const [conceptoTocado, setConceptoTocado] = useState(false);
 
@@ -75,7 +73,16 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
   const [cobroIntegrado, setCobroIntegrado] = useState<string | null>(null);
 
   const cliente = clientes.find((c) => c.id === clienteId) || null;
-  const conceptoSugerido = `Prestación de servicios de ${MESES[mes - 1]} de ${anio}`;
+  // El concepto se arma con los servicios que van en la factura (como en ZORA: "Prestación de servicios de sala de juntas septiembre 2026").
+  const elegidasParaConcepto = (lineas || []).filter((l) => marcadas.includes(l.key));
+  const nombresServicio = Array.from(new Set(elegidasParaConcepto.map((l) => l.servicio).filter(Boolean)));
+  const periodo = `${MESES[mes - 1].toLowerCase()} ${anio}`;
+  const conceptoSugerido =
+    nombresServicio.length === 0
+      ? `Prestación de servicios ${periodo}`
+      : nombresServicio.length <= 3
+        ? `Prestación de servicios de ${nombresServicio.length > 1 ? nombresServicio.slice(0, -1).join(", ") + " y " + nombresServicio[nombresServicio.length - 1] : nombresServicio[0]} ${periodo}`
+        : `Prestación de servicios varios ${periodo}`;
 
   useEffect(() => {
     if (!conceptoTocado) setConcepto(conceptoSugerido);
@@ -141,8 +148,6 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
       estatus,
       mes: String(mes),
       anio: String(anio),
-      recurrentes: recurrentes ? "si" : "no",
-      adicionales: adicionales ? "si" : "no",
     });
     if (contratoId) params.set("contratoId", contratoId);
     const res = await fetch("/api/facturas/previa?" + params.toString());
@@ -153,11 +158,15 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     setLineas(nuevas);
     setRentaYa(data.rentaYaIntegrada || null);
     setPuedeTimbrar(data.puedeTimbrar !== false);
+    setConceptoTocado(false);
     // Si la renta del mes ya está integrada, no se marca otra vez (evita cobrarla doble).
     setMarcadas(nuevas.filter((l) => !(data.rentaYaIntegrada && (l.tipo === "Renta" || l.tipo === "Adicional mensual"))).map((l) => l.key));
   }
 
   const elegidas = (lineas || []).filter((l) => marcadas.includes(l.key));
+  // Centro de la factura: el del contrato (un cliente puede tener contratos en varios centros).
+  const centrosDeLasLineas = Array.from(new Set(elegidas.map((l) => l.centro).filter(Boolean))) as string[];
+  const centroFactura = centrosDeLasLineas.length === 1 ? centrosDeLasLineas[0] : centro;
   const total = redondear(elegidas.reduce((s, l) => s + l.total, 0));
   const faltanDatosFiscales = !!cliente && !(cliente.rfc && cliente.nombre_fiscal && cliente.regimen_fiscal && cliente.cp_fiscal);
   const avisosFiscales = cliente ? avisosDatosFiscales(cliente) : [];
@@ -167,6 +176,7 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     if (!concepto.trim()) return "Escribe el concepto";
     if (!fecha) return "Elige la fecha";
     if (elegidas.length === 0) return "Marca al menos una línea para facturar";
+    if (centrosDeLasLineas.length > 1) return "Las líneas marcadas son de contratos de distintos centros: elige un solo contrato para facturar";
     if (metodo === "PUE" && !FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === formaPago)) return "Elige la forma de pago";
     return "";
   }
@@ -180,6 +190,7 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
         userId: clienteId,
         concepto: concepto.trim(),
         fecha,
+        centro: centroFactura,
         lineas: elegidas.map((l) => (l.pagoId ? { pagoId: l.pagoId } : { descripcion: l.descripcion, monto: l.total })),
       }),
     });
@@ -302,7 +313,7 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
             {contratos.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.etiqueta}
-                {c.renta > 0 ? ` · ${dinero(c.renta)}` : ""}
+                {c.renta > 0 ? ` · ${dinero(c.renta)}/mes` : ""}
               </option>
             ))}
           </select>
@@ -335,24 +346,6 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
           </select>
         </div>
 
-        <div>
-          <Etiqueta texto="Recurrentes" />
-          <select value={recurrentes ? "si" : "no"} onChange={(e) => setRecurrentes(e.target.value === "si")}>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-          <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>La renta mensual y los adicionales mensuales de su contrato.</p>
-        </div>
-
-        <div>
-          <Etiqueta texto="Adicionales" />
-          <select value={adicionales ? "si" : "no"} onChange={(e) => setAdicionales(e.target.value === "si")}>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-          <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>Sus pagos y cobros sueltos que todavía no tienen factura.</p>
-        </div>
-
         <div style={{ gridColumn: "span 2" }}>
           <Etiqueta texto="Concepto" obligatorio />
           <textarea
@@ -378,7 +371,7 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
       {lineas && (
         <div className="form-card" style={{ marginTop: 12 }}>
           <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>
-            Lo que se le cobra a {cliente ? razonSocial(cliente) : "el cliente"} · serie {serieCentro(centro) || "—"}
+            Lo que se le cobra a {cliente ? razonSocial(cliente) : "el cliente"} · serie {serieCentro(centroFactura) || "—"}
           </p>
           {rentaYa && (
             <p style={{ fontSize: 13, color: "#854F0B", background: "#FAEEDA", borderRadius: 8, padding: "8px 10px", margin: "8px 0" }}>

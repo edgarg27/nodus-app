@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
-import { serieCentro } from "@/lib/centros";
+import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const DIAS_PARA_PAGAR = 10;
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   const concepto: string = typeof cuerpo.concepto === "string" ? cuerpo.concepto.trim().slice(0, 200) : "";
   const fecha: string = typeof cuerpo.fecha === "string" ? cuerpo.fecha : "";
   const lineas: { pagoId?: string; descripcion?: string; monto?: number }[] = Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [];
+  const centroPedido: string = typeof cuerpo.centro === "string" ? cuerpo.centro : "";
   if (!userId || !concepto || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || lineas.length === 0) {
     return NextResponse.json({ error: "Faltan datos: cliente, concepto, fecha y al menos una línea" }, { status: 400 });
   }
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
   if (!cliente || !cliente.centro) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
   if (!ROLES_GLOBALES.includes(miProfile!.rol) && cliente.centro !== miProfile!.centro) {
     return NextResponse.json({ error: "No puedes facturar a clientes de otro centro" }, { status: 403 });
+  }
+  // El centro de la factura es el del contrato (un cliente puede tener contratos en varios centros); por omisión, el del cliente.
+  const centro: string = centroPedido && SERIE_POR_CENTRO[centroPedido] ? centroPedido : cliente.centro;
+  if (!ROLES_GLOBALES.includes(miProfile!.rol) && centro !== miProfile!.centro) {
+    return NextResponse.json({ error: "No puedes facturar en otro centro" }, { status: 403 });
   }
 
   // Líneas que ya son un pago del cliente, sin factura.
@@ -62,7 +68,7 @@ export async function POST(req: NextRequest) {
     Math.round(((pagosExistentes || []).reduce((s, p) => s + Number(p.monto), 0) + nuevas.reduce((s, l) => s + Number(l.monto), 0)) * 100) / 100;
   if (!(total > 0)) return NextResponse.json({ error: "El total debe ser mayor a cero" }, { status: 400 });
 
-  const serie = serieCentro(cliente.centro);
+  const serie = serieCentro(centro);
   const folio = `${serie || "FAC"}-${Date.now().toString().slice(-6)}`;
   const { data: factura, error: errFactura } = await admin
     .from("facturas")
@@ -74,7 +80,7 @@ export async function POST(req: NextRequest) {
       fecha_emision: fecha,
       fecha_vencimiento: sumarDias(fecha, DIAS_PARA_PAGAR),
       estado: "pendiente",
-      centro: cliente.centro,
+      centro,
     })
     .select("id, folio")
     .single();
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
       .insert(
         nuevas.map((l) => ({
           user_id: userId,
-          centro: cliente.centro,
+          centro,
           estado: "pendiente",
           concepto: String(l.descripcion).trim().slice(0, 200),
           monto: Number(l.monto),

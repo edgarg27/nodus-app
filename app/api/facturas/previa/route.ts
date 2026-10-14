@@ -3,14 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
+import { cargarCatalogo } from "@/lib/catalogoServicios";
 
 export const dynamic = "force-dynamic";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
-// Integrar por cliente: contratos del cliente y, con "previa", las líneas que se le pueden cobrar en el mes
-// (renta y adicionales mensuales del contrato, más sus pagos sueltos sin factura).
+// Integrar por cliente: contratos del cliente (con su folio) y, con "previa", lo que se le puede cobrar en el mes:
+// renta y adicionales mensuales de cada contrato, más sus pagos sueltos sin factura.
 export async function GET(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -33,7 +34,8 @@ export async function GET(req: NextRequest) {
   }
 
   const todos = q.get("estatus") === "todos";
-  let consulta = admin.from("contratos").select("id, estatus, renta_mensual, fecha_inicio, fecha_vencimiento, oficina_id, paquete_id").eq("user_id", userId);
+  // select("*"): el folio del contrato es una columna nueva (migracion_contratos_folio.sql); así no falla si aún no existe.
+  let consulta = admin.from("contratos").select("*").eq("user_id", userId);
   if (!todos) consulta = consulta.eq("estatus", "vigente");
   const { data: contratos } = await consulta.order("fecha_inicio", { ascending: false });
 
@@ -49,8 +51,18 @@ export async function GET(req: NextRequest) {
   const contratosOut = (contratos || []).map((c) => {
     const o = c.oficina_id ? oficinaPorId.get(c.oficina_id) : undefined;
     const p = c.paquete_id ? paquetePorId.get(c.paquete_id) : undefined;
-    const espacio = [o?.tipo || p?.tipo_espacio, o?.numero ? "Oficina " + o.numero : null, p?.nombre].filter(Boolean).join(" · ") || "Contrato";
-    return { id: c.id, estatus: c.estatus, renta: Number(c.renta_mensual) || 0, etiqueta: espacio };
+    const tipo: string = o?.tipo || p?.tipo_espacio || "";
+    const espacio = [tipo, o?.numero ? "Oficina " + o.numero : null, p?.nombre].filter(Boolean).join(" · ") || "Contrato";
+    const centroContrato: string = c.centro || cliente.centro || "";
+    return {
+      id: c.id as string,
+      folio: (c.folio as string | null) || null,
+      centro: centroContrato,
+      estatus: c.estatus as string,
+      renta: Number(c.renta_mensual) || 0,
+      tipo,
+      etiqueta: [c.folio, centroContrato, espacio].filter(Boolean).join(" · "),
+    };
   });
 
   if (q.get("accion") !== "previa") return NextResponse.json({ contratos: contratosOut });
@@ -60,37 +72,48 @@ export async function GET(req: NextRequest) {
   if (!(mes >= 1 && mes <= 12) || !(anio >= 2020 && anio <= 2100)) return NextResponse.json({ error: "Mes o año no válidos" }, { status: 400 });
   const nombreMes = `${MESES[mes - 1]} de ${anio}`;
   const contratoId = q.get("contratoId") || "";
-  const recurrentes = q.get("recurrentes") !== "no";
-  const adicionales = q.get("adicionales") !== "no";
 
-  type Linea = { key: string; tipo: string; contrato: string; descripcion: string; total: number; pagoId?: string; contratoId?: string };
+  type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string };
   const lineas: Linea[] = [];
 
-  if (recurrentes) {
-    const elegidos = contratosOut.filter((c) => !contratoId || c.id === contratoId);
-    const { data: extras } = elegidos.length
-      ? await admin.from("contrato_adicionales").select("contrato_id, concepto, monto").in("contrato_id", elegidos.map((c) => c.id))
-      : { data: [] as { contrato_id: string; concepto: string; monto: number }[] };
-    for (const c of elegidos) {
-      if (c.renta > 0) lineas.push({ key: "renta-" + c.id, tipo: "Renta", contrato: c.etiqueta, descripcion: `Renta mensual ${nombreMes}`, total: c.renta, contratoId: c.id });
-      for (const [i, e] of (extras || []).filter((x) => x.contrato_id === c.id).entries()) {
-        if (Number(e.monto) > 0) lineas.push({ key: `extra-${c.id}-${i}`, tipo: "Adicional mensual", contrato: c.etiqueta, descripcion: `${e.concepto} ${nombreMes}`, total: Number(e.monto), contratoId: c.id });
-      }
+  // Recurrentes: renta mensual y adicionales mensuales (estacionamiento…) de cada contrato.
+  const elegidos = contratosOut.filter((c) => !contratoId || c.id === contratoId);
+  const { data: extras } = elegidos.length
+    ? await admin.from("contrato_adicionales").select("contrato_id, concepto, monto").in("contrato_id", elegidos.map((c) => c.id))
+    : { data: [] as { contrato_id: string; concepto: string; monto: number }[] };
+  for (const c of elegidos) {
+    const quien = c.folio || c.etiqueta;
+    const servicio = (c.tipo || "renta de espacio").toLowerCase();
+    if (c.renta > 0) lineas.push({ key: "renta-" + c.id, tipo: "Renta", contrato: quien, descripcion: `Renta mensual ${nombreMes}`, servicio, total: c.renta, contratoId: c.id, centro: c.centro });
+    for (const [i, e] of (extras || []).filter((x) => x.contrato_id === c.id).entries()) {
+      if (Number(e.monto) > 0)
+        lineas.push({ key: `extra-${c.id}-${i}`, tipo: "Adicional mensual", contrato: quien, descripcion: `${e.concepto} ${nombreMes}`, servicio: String(e.concepto).toLowerCase(), total: Number(e.monto), contratoId: c.id, centro: c.centro });
     }
   }
 
-  if (adicionales) {
-    const { data: pagos } = await admin
-      .from("pagos")
-      .select("id, concepto, monto, estado, adicional_tipo")
-      .eq("user_id", userId)
-      .is("factura_id", null)
-      .order("created_at", { ascending: false });
-    for (const p of pagos || []) {
-      const nombre = etiquetaPagoSuelto(p.concepto);
-      const tipo = p.adicional_tipo ? "Adicional" : /dep[oó]sito/i.test(nombre) ? "Depósito" : /mensualidad/i.test(nombre) ? "Mensualidad" : "Pago";
-      lineas.push({ key: "pago-" + p.id, tipo, contrato: "—", descripcion: `${nombre}${p.estado === "pagado" ? " (ya pagado)" : ""}`, total: Number(p.monto), pagoId: p.id });
-    }
+  // Adicionales: pagos y cobros sueltos del cliente que todavía no tienen factura.
+  const { servicios: catalogo } = await cargarCatalogo(admin);
+  const etiquetaServicio = new Map(catalogo.map((s) => [s.clave, s.etiqueta]));
+  const tipoUnico = elegidos.length === 1 ? (elegidos[0].tipo || "").toLowerCase() : "";
+  const { data: pagos } = await admin
+    .from("pagos")
+    .select("id, concepto, monto, estado, adicional_tipo")
+    .eq("user_id", userId)
+    .is("factura_id", null)
+    .order("created_at", { ascending: false });
+  for (const p of pagos || []) {
+    const nombre = etiquetaPagoSuelto(p.concepto);
+    const esDeposito = /dep[oó]sito/i.test(nombre);
+    const esMensualidad = /mensualidad/i.test(nombre);
+    const tipo = p.adicional_tipo ? "Adicional" : esDeposito ? "Depósito" : esMensualidad ? "Mensualidad" : "Pago";
+    const servicio = p.adicional_tipo
+      ? (etiquetaServicio.get(p.adicional_tipo) || nombre).toLowerCase()
+      : esDeposito
+        ? "depósito en garantía"
+        : esMensualidad
+          ? tipoUnico || "renta de espacio"
+          : nombre.toLowerCase();
+    lineas.push({ key: "pago-" + p.id, tipo, contrato: "—", descripcion: `${nombre}${p.estado === "pagado" ? " (ya pagado)" : ""}`, servicio, total: Number(p.monto), pagoId: p.id });
   }
 
   // ¿Ya existe el cobro de renta de ese mes? (el sistema lo genera solo en los primeros días del mes)
