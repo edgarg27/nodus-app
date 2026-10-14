@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { rolPuede } from "@/lib/permisosApi";
 import { serieCentro } from "@/lib/centros";
-import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
+import { FORMAS_PAGO_SAT, PERIODICIDADES, TIPOS_RELACION, REGEX_UUID, separarUuids } from "@/lib/formasPagoSat";
+import { EMISOR } from "@/lib/emisor";
+import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 
 // Estado de cuenta (como en ZORA): lo que se integró para un cliente, sus pagos y su historial. Desde "Acciones" se
@@ -66,6 +68,12 @@ export default function EstadoDeCuentaPage() {
   const [formaPago, setFormaPago] = useState("03");
   const [timbrando, setTimbrando] = useState(false);
   const [errorTimbrar, setErrorTimbrar] = useState("");
+  const [condiciones, setCondiciones] = useState("Contado");
+  const [tipoRelacion, setTipoRelacion] = useState("");
+  const [uuidsRelacion, setUuidsRelacion] = useState("");
+  const [periodicidad, setPeriodicidad] = useState("day");
+  const [previa, setPrevia] = useState<{ previa: PreviaFactura; avisos: string[] } | null>(null);
+  const [cargandoPrevia, setCargandoPrevia] = useState(false);
   const [aviso, setAviso] = useState("");
   const [accionando, setAccionando] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
@@ -124,17 +132,49 @@ export default function EstadoDeCuentaPage() {
   const timbrada = !!factura?.uuid_cfdi;
   const sePuedeTimbrar = !!factura && !timbrada && !!factura.user_id && factura.estado !== "cancelada";
   const avisos = cliente ? avisosDatosFiscales(cliente) : [];
+  const esPublicoGeneral = cliente?.rfc === "XAXX010101000";
   const faltanDatos = !!cliente && !(cliente.rfc && cliente.nombre_fiscal && cliente.regimen_fiscal && cliente.cp_fiscal);
+
+  // Valida lo del cuadro Facturar; devuelve el mensaje de error o "".
+  function validarFacturar(): string {
+    if (!condiciones.trim()) return "Escribe las condiciones de pago";
+    if (metodo === "PUE" && !FORMAS_PAGO_SAT.some((f) => f.clave === formaPago)) return "Elige la forma de pago";
+    if (tipoRelacion) {
+      const uuids = separarUuids(uuidsRelacion);
+      if (uuids.length === 0) return "Escribe el UUID del CFDI relacionado";
+      if (uuids.some((u) => !REGEX_UUID.test(u))) return "Algún UUID del CFDI relacionado no es válido (formato xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)";
+    }
+    return "";
+  }
+
+  async function verPrevia() {
+    if (!factura) return;
+    setErrorTimbrar("");
+    setCargandoPrevia(true);
+    const res = await fetch("/api/facturas/vista-previa?facturaId=" + factura.id);
+    const data = await res.json().catch(() => ({}));
+    setCargandoPrevia(false);
+    if (!res.ok) return setErrorTimbrar(data.error || "No se pudo armar la vista previa");
+    setPrevia({ previa: data.previa, avisos: data.avisos || [] });
+  }
 
   async function timbrar() {
     if (!factura) return;
+    const e = validarFacturar();
+    if (e) return setErrorTimbrar(e);
     setErrorTimbrar("");
-    if (metodo === "PUE" && !FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === formaPago)) return setErrorTimbrar("Elige la forma de pago");
     setTimbrando(true);
     const res = await fetch("/api/facturas/facturar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facturaIds: [factura.id], metodo, formaPago: metodo === "PUE" ? formaPago : undefined }),
+      body: JSON.stringify({
+        facturaIds: [factura.id],
+        metodo,
+        formaPago: metodo === "PUE" ? formaPago : undefined,
+        condicionesPago: condiciones.trim(),
+        periodicidad: esPublicoGeneral ? periodicidad : undefined,
+        relacion: tipoRelacion ? { tipo: tipoRelacion, uuids: separarUuids(uuidsRelacion) } : undefined,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     setTimbrando(false);
@@ -209,6 +249,11 @@ export default function EstadoDeCuentaPage() {
 
   function abrirTimbrar() {
     setMetodo(factura?.estado === "pagada" ? "PUE" : "PPD");
+    setFormaPago("03");
+    setCondiciones("Contado");
+    setTipoRelacion("");
+    setUuidsRelacion("");
+    setPeriodicidad("day");
     setErrorTimbrar("");
     setModalTimbrar(true);
   }
@@ -520,42 +565,244 @@ export default function EstadoDeCuentaPage() {
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={() => !timbrando && setModalTimbrar(false)}
         >
-          <div className="form-card" style={{ maxWidth: 460, width: "100%", maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
-            <p className="contrato-cliente-nombre">Timbrar factura {factura.folio}</p>
-            <p style={{ fontSize: 13, color: "#555", margin: "4px 0 10px" }}>
-              {cliente ? cliente.nombre_fiscal || cliente.empresa || cliente.nombre : ""} · {dinero(total)}
+          <div className="form-card fac-facturar" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" disabled={timbrando} onClick={() => setModalTimbrar(false)}>
+              ×
+            </button>
+            <h2 className="fac-facturar-titulo">Facturar</h2>
+            <p className="fac-facturar-sub">
+              Se genera factura a {(cliente ? cliente.nombre_fiscal || cliente.empresa || cliente.nombre : "").toUpperCase()} · {dinero(total)}
             </p>
-            <p className="sub-label">Método de pago</p>
-            <select value={metodo} onChange={(e) => setMetodo(e.target.value as "PUE" | "PPD")}>
-              <option value="PPD">PPD · pago diferido (se paga después)</option>
-              <option value="PUE">PUE · pago en una sola exhibición (ya se pagó)</option>
-            </select>
-            {metodo === "PUE" && (
-              <>
-                <p className="sub-label" style={{ marginTop: 8 }}>
-                  Forma de pago
-                </p>
-                <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)}>
-                  {FORMAS_PAGO_COMPLEMENTO.map((f) => (
-                    <option key={f.clave} value={f.clave}>
-                      {f.texto}
-                    </option>
-                  ))}
-                </select>
-              </>
+                <div className="fac-facturar-fila">
+                  <label>
+                    Cond. pago <span style={{ color: "#A32D2D" }}>*</span>
+                  </label>
+                  <div>
+                    <input type="text" maxLength={100} value={condiciones} onChange={(e) => setCondiciones(e.target.value)} />
+                  </div>
+                </div>
+                <div className="fac-facturar-fila">
+                  <label>
+                    Método de pago <span style={{ color: "#A32D2D" }}>*</span>
+                  </label>
+                  <div>
+                    <select
+                      value={metodo}
+                      onChange={(e) => {
+                        const m = e.target.value as "PUE" | "PPD";
+                        setMetodo(m);
+                        if (m === "PUE" && formaPago === "99") setFormaPago("03");
+                      }}
+                    >
+                      <option value="PUE">Pago en una sola exhibición</option>
+                      <option value="PPD">Pago en parcialidades o diferido</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="fac-facturar-fila">
+                  <label>
+                    Forma de pago <span style={{ color: "#A32D2D" }}>*</span>
+                  </label>
+                  <div>
+                    {metodo === "PPD" ? (
+                      <select value="99" disabled>
+                        <option value="99">Por definir</option>
+                      </select>
+                    ) : (
+                      <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)}>
+                        {FORMAS_PAGO_SAT.map((f) => (
+                          <option key={f.clave} value={f.clave}>
+                            {f.texto}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {metodo === "PPD" && <p className="fac-facturar-nota">Con pago diferido la forma queda "Por definir"; cuando el cliente pague se emite su complemento de pago.</p>}
+                  </div>
+                </div>
+            {esPublicoGeneral && (
+                <div className="fac-facturar-fila">
+                  <label>
+                    Periodicidad
+                  </label>
+                  <div>
+                    <select value={periodicidad} onChange={(e) => setPeriodicidad(e.target.value)}>
+                      {PERIODICIDADES.map((p) => (
+                        <option key={p.clave} value={p.clave}>
+                          {p.texto}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
             )}
+
+            <p className="fac-facturar-seccion">Información adicional de CFDI RELACIONADO</p>
+                <div className="fac-facturar-fila">
+                  <label>
+                    Tipo relación
+                  </label>
+                  <div>
+                    <select value={tipoRelacion} onChange={(e) => setTipoRelacion(e.target.value)}>
+                      <option value=""></option>
+                      {TIPOS_RELACION.map((t) => (
+                        <option key={t.clave} value={t.clave}>
+                          {t.texto}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="fac-facturar-fila">
+                  <label>
+                    CFDI relacionado
+                  </label>
+                  <div>
+                    <textarea rows={3} disabled={!tipoRelacion} placeholder="UUID de la factura relacionada (uno por renglón)" value={uuidsRelacion} onChange={(e) => setUuidsRelacion(e.target.value)} />
+                  </div>
+                </div>
             {(faltanDatos || avisos.length > 0) && (
               <p style={{ fontSize: 12, color: "#A32D2D", margin: "10px 0 0" }}>
                 {faltanDatos ? "Al cliente le faltan datos fiscales (RFC, razón social, régimen o código postal): no se podrá timbrar." : avisos[0]}
               </p>
             )}
             {errorTimbrar && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorTimbrar}</p>}
-            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button className="btn-exportar" disabled={timbrando || faltanDatos} onClick={timbrar}>
+            <div className="fac-facturar-botones">
+              <button type="button" className="fac-facturar-previa" disabled={timbrando || cargandoPrevia} onClick={verPrevia}>
+                {cargandoPrevia ? "Armando..." : "Vista previa"}
+              </button>
+              <button type="button" className="btn-exportar" disabled={timbrando || faltanDatos} onClick={timbrar}>
                 {timbrando ? "Timbrando..." : "Timbrar"}
               </button>
-              <button className="tel-borrar-btn" disabled={timbrando} onClick={() => setModalTimbrar(false)}>
-                Cancelar
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previa && factura && (
+        <div
+          className="no-imprimir"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, overflow: "auto" }}
+          onClick={() => setPrevia(null)}
+        >
+          <div className="form-card fac-previa-doc" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" onClick={() => setPrevia(null)}>
+              ×
+            </button>
+            <h2 className="fac-facturar-titulo">Previa</h2>
+            <div className="fac-previa-hoja">
+              <div className="fac-previa-cab">
+                <div className="fac-previa-logo">
+                  NODUS
+                  <small>FLEX CENTER</small>
+                </div>
+                <table className="fac-previa-datos">
+                  <tbody>
+                    <tr>
+                      <th>Factura</th>
+                      <td>{previa.previa.serie ? previa.previa.serie + "-(se asigna al timbrar)" : "(se asigna al timbrar)"}</td>
+                    </tr>
+                    <tr>
+                      <th>Método de pago</th>
+                      <td>{metodo === "PUE" ? "PUE-Pago en una sola exhibición" : "PPD-Pago en parcialidades o diferido"}</td>
+                    </tr>
+                    <tr>
+                      <th>Tipo de comprobante</th>
+                      <td>I-Ingreso</td>
+                    </tr>
+                    <tr>
+                      <th>Forma de pago</th>
+                      <td>{metodo === "PPD" ? "99-Por definir" : formaPago + "-" + (FORMAS_PAGO_SAT.find((f) => f.clave === formaPago)?.texto || "")}</td>
+                    </tr>
+                    <tr>
+                      <th>Condiciones de pago</th>
+                      <td>{condiciones}</td>
+                    </tr>
+                    <tr>
+                      <th>Lugar de expedición</th>
+                      <td>{EMISOR.cp}</td>
+                    </tr>
+                    <tr>
+                      <th>Fecha factura</th>
+                      <td>{factura.fecha_emision}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="fac-previa-centro">Centro: {previa.previa.centro ? "NODUS " + previa.previa.centro.toUpperCase() : "—"}</p>
+
+              <p className="fac-previa-banda">Emisor</p>
+              <p className="fac-previa-linea">
+                <b>Razón social:</b> {EMISOR.razonSocial} &nbsp;·&nbsp; <b>RFC:</b> {EMISOR.rfc}
+              </p>
+              <p className="fac-previa-linea">
+                <b>Dirección:</b> {EMISOR.direccion}, Col. {EMISOR.colonia}, CP {EMISOR.cp}, {EMISOR.ciudad}, {EMISOR.estado}, {EMISOR.pais}
+              </p>
+              <p className="fac-previa-linea">
+                <b>Régimen:</b> {EMISOR.regimen}
+              </p>
+
+              <p className="fac-previa-banda">Receptor</p>
+              <p className="fac-previa-linea">
+                <b>Razón social:</b> {previa.previa.receptor.nombre || "—"} &nbsp;·&nbsp; <b>RFC:</b> {previa.previa.receptor.rfc || "—"}
+              </p>
+              <p className="fac-previa-linea">
+                <b>CP:</b> {previa.previa.receptor.cp || "—"} &nbsp;·&nbsp; <b>Régimen:</b> {previa.previa.receptor.regimen || "—"} &nbsp;·&nbsp; <b>Uso CFDI:</b> {previa.previa.receptor.uso}
+              </p>
+
+              <table className="fac-previa-tabla">
+                <thead>
+                  <tr>
+                    <th>Cant.</th>
+                    <th>U.M.</th>
+                    <th>C.Producto</th>
+                    <th>Descripción</th>
+                    <th className="fac-num">P.Unitario</th>
+                    <th className="fac-num">Imp.Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previa.previa.lineas.map((l, i) => (
+                    <tr key={i}>
+                      <td>{l.cantidad}</td>
+                      <td>{l.unidad}</td>
+                      <td>{l.claveProd}</td>
+                      <td>{l.descripcion}</td>
+                      <td className="fac-num">{l.precioUnitario.toFixed(2)}</td>
+                      <td className="fac-num">{l.importe.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <table className="fac-previa-totales">
+                <tbody>
+                  <tr>
+                    <th>Sub-Total:</th>
+                    <td>{dinero(previa.previa.subtotal)}</td>
+                  </tr>
+                  <tr>
+                    <th>IVA (16%):</th>
+                    <td>{dinero(previa.previa.iva)}</td>
+                  </tr>
+                  <tr>
+                    <th>Total:</th>
+                    <td>
+                      <b>{dinero(previa.previa.total)}</b>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              {tipoRelacion && (
+                <p className="fac-previa-linea">
+                  <b>CFDI relacionado:</b> {TIPOS_RELACION.find((t) => t.clave === tipoRelacion)?.texto} · {separarUuids(uuidsRelacion).join(", ") || "—"}
+                </p>
+              )}
+              {previa.avisos.length > 0 && <p style={{ fontSize: 12, color: "#A32D2D", margin: "8px 0 0" }}>{previa.avisos[0]}</p>}
+              <p style={{ fontSize: 11, color: "#888", margin: "10px 0 0" }}>Vista previa sin valor fiscal: el folio, el UUID y los sellos se generan al timbrar.</p>
+            </div>
+            <div className="fac-facturar-botones">
+              <button type="button" className="fac-facturar-previa" onClick={() => setPrevia(null)}>
+                Cerrar
               </button>
             </div>
           </div>

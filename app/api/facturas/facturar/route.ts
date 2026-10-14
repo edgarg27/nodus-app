@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { facturarCobro, facturarPagoSuelto } from "@/lib/facturarCobro";
-import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
+import { FORMAS_PAGO_SAT, PERIODICIDADES, REGEX_UUID, TIPOS_RELACION } from "@/lib/formasPagoSat";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const MAXIMO_POR_LLAMADA = 50;
@@ -36,8 +36,19 @@ export async function POST(req: NextRequest) {
   // Por omisión se factura a pago diferido (PPD). En PUE (pago en una sola exhibición) hay que decir cómo se pagó.
   const metodo: "PUE" | "PPD" = cuerpo.metodo === "PUE" ? "PUE" : "PPD";
   const formaPago: string | undefined = typeof cuerpo.formaPago === "string" ? cuerpo.formaPago : undefined;
-  if (metodo === "PUE" && !FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === formaPago)) {
+  if (metodo === "PUE" && !FORMAS_PAGO_SAT.some((f) => f.clave === formaPago)) {
     return NextResponse.json({ error: "Elige la forma de pago" }, { status: 400 });
+  }
+  const condiciones: string | undefined = typeof cuerpo.condicionesPago === "string" && cuerpo.condicionesPago.trim() ? cuerpo.condicionesPago.trim().slice(0, 100) : undefined;
+  const periodicidad: string | undefined = PERIODICIDADES.some((p) => p.clave === cuerpo.periodicidad) ? cuerpo.periodicidad : undefined;
+  let relacion: { tipo: string; uuids: string[] } | undefined;
+  if (cuerpo.relacion && cuerpo.relacion.tipo) {
+    const uuids: string[] = Array.isArray(cuerpo.relacion.uuids) ? cuerpo.relacion.uuids.map((u: unknown) => String(u).trim().toLowerCase()) : [];
+    if (!TIPOS_RELACION.some((t) => t.clave === cuerpo.relacion.tipo)) return NextResponse.json({ error: "Tipo de relación no válido" }, { status: 400 });
+    if (uuids.length === 0 || uuids.length > 20 || uuids.some((u) => !REGEX_UUID.test(u))) {
+      return NextResponse.json({ error: "Escribe el UUID de cada CFDI relacionado (uno por renglón o separados por coma)" }, { status: 400 });
+    }
+    relacion = { tipo: cuerpo.relacion.tipo, uuids };
   }
 
   const admin = createAdminClient();
@@ -57,7 +68,7 @@ export async function POST(req: NextRequest) {
   // Uno por uno: Facturapi y el SAT limitan el ritmo, y un error en uno no frena los demás.
   const resultados = [];
   for (const id of facturaIds) {
-    resultados.push(await facturarCobro(admin, id, { metodo, formaPago }));
+    resultados.push(await facturarCobro(admin, id, { metodo, formaPago, condiciones, relacion, periodicidad }));
   }
   for (const id of pagoIds) {
     resultados.push(await facturarPagoSuelto(admin, id));

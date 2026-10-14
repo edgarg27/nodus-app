@@ -7842,3 +7842,178 @@ a.stat-card {
     border: none !important;
   }
 }
+
+/* ---------- Cuadro Facturar (como en ZORA) y su vista previa ---------- */
+.fac-facturar {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 92vh;
+  overflow: auto;
+  padding: 24px 28px;
+}
+.fac-facturar-cerrar {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  color: #667;
+  cursor: pointer;
+}
+.fac-facturar-titulo {
+  text-align: center;
+  color: #12b284;
+  font-size: 26px;
+  margin: 4px 0 6px;
+}
+.fac-facturar-sub {
+  font-style: italic;
+  font-size: 15px;
+  color: #222;
+  margin: 0 0 14px;
+}
+.fac-facturar-seccion {
+  font-style: italic;
+  font-size: 15px;
+  color: #222;
+  margin: 18px 0 8px;
+}
+.fac-facturar-fila {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+.fac-facturar-fila > label {
+  color: #667;
+  font-size: 15px;
+  padding-top: 9px;
+}
+.fac-facturar-nota {
+  font-size: 12px;
+  color: #888;
+  margin: 6px 0 0;
+}
+.fac-facturar-botones {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.fac-facturar-previa {
+  background: #96a8c2;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 9px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fac-facturar-previa:disabled {
+  opacity: 0.6;
+}
+.fac-previa-doc {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  padding: 24px 28px;
+}
+.fac-previa-hoja {
+  border: 1px solid #d9dce4;
+  border-radius: 6px;
+  padding: 18px 20px;
+  background: #fff;
+  font-size: 12px;
+  color: #111;
+}
+.fac-previa-cab {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.fac-previa-logo {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #0d1b3e;
+  line-height: 1;
+}
+.fac-previa-logo small {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 6px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+.fac-previa-datos {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.fac-previa-datos th {
+  text-align: left;
+  background: #e6e6e6;
+  padding: 2px 8px;
+  font-weight: 700;
+}
+.fac-previa-datos td {
+  padding: 2px 8px;
+}
+.fac-previa-centro {
+  margin: 12px 0 6px;
+  font-weight: 600;
+}
+.fac-previa-banda {
+  margin: 12px 0 4px;
+  background: #e6e6e6;
+  padding: 3px 8px;
+  font-weight: 800;
+  font-size: 14px;
+}
+.fac-previa-linea {
+  margin: 3px 0;
+  line-height: 1.5;
+}
+.fac-previa-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+.fac-previa-tabla th,
+.fac-previa-tabla td {
+  border: 1px solid #111;
+  padding: 4px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.fac-previa-tabla th.fac-num,
+.fac-previa-tabla td.fac-num {
+  text-align: right;
+}
+.fac-previa-totales {
+  margin: 10px 0 0 auto;
+  border-collapse: collapse;
+}
+.fac-previa-totales th {
+  text-align: right;
+  padding: 2px 10px;
+}
+.fac-previa-totales td {
+  text-align: right;
+  padding: 2px 6px;
+  min-width: 90px;
+}
+@media (max-width: 560px) {
+  .fac-facturar-fila {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .fac-facturar-fila > label {
+    padding-top: 0;
+  }
+}
