@@ -23,10 +23,10 @@ const dinero = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionD
 const ROLES_CANCELAR = ["admin", "gerente", "cobranza", "superadmin"];
 
 const MOTIVOS_CANCELACION: { clave: string; texto: string }[] = [
-  { clave: "02", texto: "02 · Comprobante emitido con errores sin relación" },
-  { clave: "01", texto: "01 · Comprobante emitido con errores con relación (lleva factura sustituta)" },
-  { clave: "03", texto: "03 · No se llevó a cabo la operación" },
-  { clave: "04", texto: "04 · Operación nominativa en una factura global" },
+  { clave: "02", texto: "Comprobante emitido con errores sin relación" },
+  { clave: "01", texto: "Comprobante emitido con errores con relación" },
+  { clave: "03", texto: "No se llevó a cabo la operación" },
+  { clave: "04", texto: "Operación nominativa relacionada en una factura global" },
 ];
 
 const CANCELACION_LABEL: Record<string, { label: string; bg: string; color: string }> = {
@@ -861,9 +861,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                   </select>
                   {motivoCancelar === "01" && (
                     <>
-                      <p className="sub-label" style={{ marginTop: 8 }}>UUID de la factura que la sustituye</p>
+                      <p className="sub-label" style={{ marginTop: 8 }}>Folio de sustitución</p>
                       <input
-                        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                        placeholder="Folio de la factura que la sustituye (ej. A-9779)"
                         value={sustitutaUuid}
                         onChange={(e) => setSustitutaUuid(e.target.value)}
                       />

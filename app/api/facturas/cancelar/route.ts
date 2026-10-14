@@ -4,6 +4,23 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { cancelarFactura, MOTIVOS_CANCELACION } from "@/lib/facturapiCancelacion";
 
+const REGEX_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// El folio de sustitución se puede escribir como serie-folio (A-9779), como el folio interno del estado de cuenta
+// (A-914791) o como UUID. Devuelve el UUID de la factura que sustituye, o null si no la encuentra.
+async function resolverSustituta(admin: ReturnType<typeof createAdminClient>, texto: string): Promise<string | null> {
+  const t = texto.trim();
+  if (REGEX_UUID.test(t)) return t.toLowerCase();
+  const { data: porFolio } = await admin.from("facturas").select("uuid_cfdi").eq("folio", t).not("uuid_cfdi", "is", null).limit(1).maybeSingle();
+  if (porFolio?.uuid_cfdi) return porFolio.uuid_cfdi;
+  const m = t.match(/^([A-Za-z0-9]+)-(\d+)$/);
+  if (m) {
+    const { data: porSerie } = await admin.from("facturas").select("uuid_cfdi").eq("serie", m[1].toUpperCase()).eq("folio_fiscal", m[2]).not("uuid_cfdi", "is", null).limit(1).maybeSingle();
+    if (porSerie?.uuid_cfdi) return porSerie.uuid_cfdi;
+  }
+  return null;
+}
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const MAXIMO_POR_LLAMADA = 50;
 
@@ -37,12 +54,20 @@ export async function POST(req: NextRequest) {
     if (facturaIds.length > 1) {
       return NextResponse.json({ error: "El motivo 01 se cancela de una en una (cada una lleva su sustituta)" }, { status: 400 });
     }
-    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(sustituta)) {
-      return NextResponse.json({ error: "Con el motivo 01 hay que indicar el UUID de la factura que la sustituye" }, { status: 400 });
+    if (!sustituta) {
+      return NextResponse.json({ error: "Con ese motivo hay que indicar el folio de la factura que la sustituye" }, { status: 400 });
     }
   }
 
   const admin = createAdminClient();
+  let sustitutaUuidFinal = sustituta;
+  if (motivo === "01") {
+    const uuid = await resolverSustituta(admin, sustituta);
+    if (!uuid) {
+      return NextResponse.json({ error: "No encontré la factura de sustitución con ese folio. Escribe su serie y folio (por ejemplo A-9779) o su UUID." }, { status: 400 });
+    }
+    sustitutaUuidFinal = uuid;
+  }
 
   if (!ROLES_GLOBALES.includes(miProfile!.rol)) {
     const { data: filas } = await admin.from("facturas").select("id, centro").in("id", facturaIds);
@@ -55,7 +80,7 @@ export async function POST(req: NextRequest) {
   // Una por una (el SAT y Facturapi limitan el ritmo); un error en una no frena las demás.
   const resultados = [];
   for (const id of facturaIds) {
-    resultados.push(await cancelarFactura(admin, id, { motivo, sustitutaUuid: sustituta || null, usuarioId: session.user.id }));
+    resultados.push(await cancelarFactura(admin, id, { motivo, sustitutaUuid: sustitutaUuidFinal || null, usuarioId: session.user.id }));
   }
 
   const fallidas = resultados.filter((r) => !r.ok);

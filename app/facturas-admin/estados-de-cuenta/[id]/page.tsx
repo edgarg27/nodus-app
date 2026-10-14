@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
@@ -36,13 +36,24 @@ type Factura = {
   folio_fiscal: string | null;
   metodo_pago: string | null;
   cancelacion_estatus: string | null;
+  cancelacion_motivo?: string | null;
   forma_pago?: string | null;
+  subtotal?: number | null;
+  iva?: number | null;
+  envios_estado?: number | null;
 };
 type Pago = { id: string; concepto: string | null; monto: number; estado: string; adicional_tipo: string | null; created_at: string };
-type Cliente = { nombre: string; email: string; empresa: string | null; nombre_fiscal: string | null; rfc: string | null; regimen_fiscal: string | null; cp_fiscal: string | null };
+type Cliente = { numero_usuario?: string | number | null; nombre: string; email: string; empresa: string | null; nombre_fiscal: string | null; rfc: string | null; regimen_fiscal: string | null; cp_fiscal: string | null };
 type Complemento = { id: string; serie: string | null; folio_fiscal: string | null; fecha_pago: string; monto: number; uuid_cfdi: string | null; cancelacion_estatus: string | null; importe: number };
 
 const ESTADO_PAGO: Record<string, string> = { pendiente: "Pendiente", pagado: "Pagado", cancelado: "Cancelado" };
+
+const MOTIVOS_NOMBRE: Record<string, string> = {
+  "01": "Comprobante emitido con errores con relación",
+  "02": "Comprobante emitido con errores sin relación",
+  "03": "No se llevó a cabo la operación",
+  "04": "Operación nominativa relacionada en una factura global",
+};
 
 function tipoDeLinea(p: Pago) {
   const nombre = etiquetaPagoSuelto(p.concepto);
@@ -81,6 +92,27 @@ export default function EstadoDeCuentaPage() {
   const [previa, setPrevia] = useState<{ previa: PreviaFactura; avisos: string[] } | null>(null);
   const [cargandoPrevia, setCargandoPrevia] = useState(false);
   const [aviso, setAviso] = useState("");
+  // Historial: todos los estados de cuenta del cliente (como "Detalles" de ZORA).
+  const [historial, setHistorial] = useState<Factura[]>([]);
+  const [pagosHist, setPagosHist] = useState<{ factura_id: string; estado: string; monto: number }[]>([]);
+  const [menuFila, setMenuFila] = useState<{ f: Factura; x: number; y: number } | null>(null);
+  const [exito, setExito] = useState(false);
+  const [cancelar, setCancelar] = useState<Factura | null>(null);
+  const [motivoCan, setMotivoCan] = useState("");
+  const [folioSust, setFolioSust] = useState("");
+  const [cancelando, setCancelando] = useState(false);
+  const [errorCan, setErrorCan] = useState("");
+  const accionInicial = useRef(false);
+  const confeti = useMemo(
+    () =>
+      Array.from({ length: 26 }).map((_, i) => ({
+        left: Math.random() * 100,
+        dur: 1 + Math.random() * 0.8,
+        delay: Math.random() * 0.4,
+        color: ["#ff915c", "#0d1b3e", "#0f6e56", "#185fa5", "#f4c542"][i % 5],
+      })),
+    []
+  );
   const [accionando, setAccionando] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [conceptoEdit, setConceptoEdit] = useState("");
@@ -108,7 +140,7 @@ export default function EstadoDeCuentaPage() {
     setFactura(f as Factura);
     const [{ data: ps }, { data: cl }, { data: filas }] = await Promise.all([
       supabase.from("pagos").select("id, concepto, monto, estado, adicional_tipo, created_at").eq("factura_id", id).order("created_at", { ascending: true }),
-      f.user_id ? supabase.from("profiles").select("nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal").eq("id", f.user_id).maybeSingle() : Promise.resolve({ data: null }),
+      f.user_id ? supabase.from("profiles").select("numero_usuario, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal").eq("id", f.user_id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from("complemento_pago_facturas").select("complemento_id, importe").eq("factura_id", id),
     ]);
     setPagos((ps as Pago[]) || []);
@@ -118,6 +150,17 @@ export default function EstadoDeCuentaPage() {
       const { data: cs } = await supabase.from("complementos_pago").select("id, serie, folio_fiscal, fecha_pago, monto, uuid_cfdi, cancelacion_estatus").in("id", compIds);
       setComplementos(((cs as Omit<Complemento, "importe">[]) || []).map((c) => ({ ...c, importe: Number((filas || []).find((x) => x.complemento_id === c.id)?.importe || 0) })));
     } else setComplementos([]);
+    if (f.user_id) {
+      const { data: hs } = await supabase.from("facturas").select("*").eq("user_id", f.user_id).order("fecha_emision", { ascending: false }).order("created_at", { ascending: false }).limit(100);
+      const lista = (hs as Factura[]) || [];
+      setHistorial(lista);
+      const ids = lista.map((x) => x.id);
+      const { data: ph } = ids.length ? await supabase.from("pagos").select("factura_id, estado, monto").in("factura_id", ids) : { data: [] as { factura_id: string; estado: string; monto: number }[] };
+      setPagosHist((ph as { factura_id: string; estado: string; monto: number }[]) || []);
+    } else {
+      setHistorial([f as Factura]);
+      setPagosHist([]);
+    }
     setCargando(false);
   }
 
@@ -227,9 +270,68 @@ export default function EstadoDeCuentaPage() {
     const r = (data.resultados || [])[0];
     if (!res.ok || (r && !r.ok)) return setErrorTimbrar(r?.error || data.error || "No se pudo timbrar");
     setModalTimbrar(false);
-    setAviso(r?.simulada ? `✓ Timbrado SIMULADO (${metodo}): Facturapi no está disponible y este es un cliente de prueba. No tiene valor fiscal.` : `✓ Factura timbrada (${metodo}).`);
+    setExito(true);
     cargar();
   }
+
+  function abrirCancelar(f: Factura) {
+    setCancelar(f);
+    setMotivoCan("");
+    setFolioSust("");
+    setErrorCan("");
+  }
+
+  async function confirmarCancelacion() {
+    if (!cancelar) return;
+    setErrorCan("");
+    if (!motivoCan) return setErrorCan("Elige el motivo");
+    if (motivoCan === "01" && !folioSust.trim()) return setErrorCan("Escribe el folio de la factura que la sustituye");
+    setCancelando(true);
+    const res = await fetch("/api/facturas/cancelar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facturaIds: [cancelar.id], motivo: motivoCan, sustitutaUuid: folioSust.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setCancelando(false);
+    const r = (data.resultados || [])[0];
+    if (!res.ok || (r && !r.ok)) return setErrorCan(r?.error || data.error || "No se pudo cancelar");
+    setCancelar(null);
+    setAviso(r?.estatus === "en_proceso" ? "✓ Cancelación enviada al SAT: queda en proceso hasta que el cliente la acepte." : "✓ Factura cancelada.");
+    cargar();
+  }
+
+  // Datos de una fila del historial.
+  function datosFila(h: Factura) {
+    const cancelada = h.cancelacion_estatus === "cancelada" || h.estado === "cancelada";
+    const totalH = Number(h.monto);
+    const subtotalH = h.subtotal != null ? Number(h.subtotal) : redondear(totalH / 1.16);
+    const ps = pagosHist.filter((p) => p.factura_id === h.id);
+    const saldo = cancelada ? 0 : ps.length > 0 ? redondear(ps.filter((p) => p.estado !== "pagado").reduce((s, p) => s + Number(p.monto), 0)) : h.estado === "pagada" ? 0 : totalH;
+    const simuladaH = esFacturaSimulada(h.uuid_cfdi);
+    return {
+      cancelada,
+      total: totalH,
+      subtotal: subtotalH,
+      iva: h.iva != null ? Number(h.iva) : redondear(totalH - subtotalH),
+      saldo,
+      pendientes: ps.filter((p) => p.estado !== "pagado").length,
+      estatusTimbre: !h.uuid_cfdi ? "Sin timbrar" : cancelada ? "Cancelada" : h.cancelacion_estatus === "en_proceso" ? "Cancelación en proceso" : simuladaH ? "Timbrada (simulada)" : "Timbrada",
+      facturaElectronica: h.uuid_cfdi ? (h.serie ? h.serie + "-" : "") + (h.folio_fiscal || "") + (simuladaH ? " (simulada)" : "") : "",
+      simulada: simuladaH,
+    };
+  }
+
+  // Acciones que llegan en la dirección (?imprimir=1, ?pago=1, ?formato=1) desde el menú de una fila del historial.
+  useEffect(() => {
+    if (cargando || !factura || accionInicial.current) return;
+    accionInicial.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("imprimir")) setTimeout(() => window.print(), 400);
+    else if (params.get("pago") && pagos.some((p) => p.estado !== "pagado")) abrirPago();
+    else if (params.get("formato")) verFormatoSimulado();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando, factura]);
 
   const pagosPendientes = pagos.filter((p) => p.estado !== "pagado");
   const editable = !!factura && !timbrada && factura.estado !== "cancelada";
@@ -347,18 +449,18 @@ export default function EstadoDeCuentaPage() {
                 </p>
                 <div className="no-imprimir" style={{ position: "relative" }}>
                   <button type="button" className="btn-exportar fac-naranja" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
-                    ☰ Acciones ▾
+                    Acciones ▾
                   </button>
                   {menu && (
                     <div className="fac-acciones-menu" role="menu" onClick={() => setMenu(false)}>
                       <button type="button" role="menuitem" disabled={!cliente?.email || accionando} onClick={enviar}>
-                        ✉ Enviar estado de cuenta
+                        Enviar estado de cuenta
                       </button>
                       <button type="button" role="menuitem" onClick={imprimir}>
-                        🖨 Imprimir estado de cuenta
+                        Imprimir estado de cuenta
                       </button>
                       <button type="button" role="menuitem" disabled={!editable} title={editable ? "" : "Ya está timbrada o cancelada"} onClick={abrirEditar}>
-                        ✎ Editar concepto y fecha de estado de cuenta
+                        Editar concepto y fecha de estado de cuenta
                       </button>
                       <a role="menuitem" href="/facturas-admin/integrar-cliente">
                         Crear estado de cuenta
@@ -390,13 +492,22 @@ export default function EstadoDeCuentaPage() {
                           Descargar XML
                         </a>
                       )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!timbrada || factura.cancelacion_estatus === "cancelada" || factura.cancelacion_estatus === "en_proceso" || !rolPuede(rol, "facturaCancelar")}
+                        title={!timbrada ? "Todavía no está timbrada" : !rolPuede(rol, "facturaCancelar") ? "Solo cobranza y administración pueden cancelar" : ""}
+                        onClick={() => abrirCancelar(factura)}
+                      >
+                        Cancelar timbrado
+                      </button>
                       {timbrada && (
                         <a role="menuitem" href="/facturas-admin/timbradas">
-                          Complemento o cancelación (Facturas timbradas)
+                          Complemento de pago (Facturas timbradas)
                         </a>
                       )}
                       <button type="button" role="menuitem" disabled={!(puedeTimbrar && sePuedeTimbrar)} title={timbrada ? "Ya está timbrada" : !puedeTimbrar ? "Solo cobranza y administración pueden timbrar" : ""} onClick={abrirTimbrar}>
-                        🔔 Generar factura electrónica
+                        Generar factura electrónica
                       </button>
                     </div>
                   )}
@@ -563,45 +674,96 @@ export default function EstadoDeCuentaPage() {
 
               {pestana === "historial" && (
                 <div className="fac-tabla-wrap" style={{ marginTop: 12 }}>
-                  {!timbrada ? (
-                    <p style={{ fontSize: 13, color: "#888", padding: 12, margin: 0 }}>Todavía no se ha timbrado. Usa Acciones → Timbrar factura.</p>
-                  ) : (
-                    <table className="fac-tabla" style={{ minWidth: 640 }}>
-                      <thead>
-                        <tr>
-                          <th>Serie-Folio</th>
-                          <th>Tipo</th>
-                          <th>Fecha</th>
-                          <th className="fac-num">Total</th>
-                          <th>UUID</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td className="fac-nowrap">
-                            <b>{factura.serie ? factura.serie + "-" + (factura.folio_fiscal || "") : factura.folio}</b>
-                          </td>
-                          <td>Ingreso {factura.metodo_pago || ""}</td>
-                          <td className="fac-nowrap">{factura.fecha_emision}</td>
-                          <td className="fac-num fac-nowrap">{dinero(total)}</td>
-                          <td style={{ wordBreak: "break-all", fontSize: 12 }}>{factura.uuid_cfdi}</td>
-                          <td>{factura.cancelacion_estatus === "cancelada" ? "Cancelada" : factura.cancelacion_estatus === "en_proceso" ? "Cancelación en proceso" : "Emitida"}</td>
-                        </tr>
-                        {complementos.map((c) => (
-                          <tr key={c.id}>
-                            <td className="fac-nowrap">
-                              <b>{c.serie ? c.serie + "-" + (c.folio_fiscal || "") : c.folio_fiscal || "—"}</b>
+                  <table className="fac-tabla" style={{ minWidth: 1500 }}>
+                    <thead>
+                      <tr>
+                        <th>Acciones</th>
+                        <th>No. Cliente</th>
+                        <th>Estado de cuenta</th>
+                        <th>Fecha</th>
+                        <th>Centro</th>
+                        <th>Nombre</th>
+                        <th>Concepto</th>
+                        <th className="fac-num">Subtotal</th>
+                        <th className="fac-num">IVA</th>
+                        <th className="fac-num">Total</th>
+                        <th>Estatus</th>
+                        <th>Motivo cancelación</th>
+                        <th>Envíos</th>
+                        <th>Estatus timbre</th>
+                        <th className="fac-num">Saldo</th>
+                        <th>Factura electrónica</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historial.map((h) => {
+                        const d = datosFila(h);
+                        return (
+                          <tr key={h.id} className={d.cancelada ? "fac-fila-cancelada" : h.id === factura.id ? "fac-fila-actual" : undefined}>
+                            <td>
+                              <button
+                                type="button"
+                                className="fac-fila-acciones"
+                                aria-label="Acciones de esta fila"
+                                onClick={(e) => {
+                                  const b = e.currentTarget.getBoundingClientRect();
+                                  setMenuFila({ f: h, x: Math.max(8, Math.min(b.left, window.innerWidth - 300)), y: Math.min(b.bottom + 4, window.innerHeight - 360) });
+                                }}
+                              >
+                                ▾
+                              </button>
                             </td>
-                            <td>Pago (complemento)</td>
-                            <td className="fac-nowrap">{c.fecha_pago}</td>
-                            <td className="fac-num fac-nowrap">{dinero(c.importe)}</td>
-                            <td style={{ wordBreak: "break-all", fontSize: 12 }}>{c.uuid_cfdi}</td>
-                            <td>{c.cancelacion_estatus === "cancelada" ? "Cancelado" : "Emitido"}</td>
+                            <td className="fac-nowrap">{cliente?.numero_usuario != null ? (String(cliente.numero_usuario).startsWith("N-") ? String(cliente.numero_usuario) : "N-" + cliente.numero_usuario) : "—"}</td>
+                            <td className="fac-nowrap">
+                              <a href={"/facturas-admin/estados-de-cuenta/" + h.id} style={{ color: "#0d1b3e", textDecoration: "underline" }}>
+                                <b>{h.folio}</b>
+                              </a>
+                            </td>
+                            <td className="fac-nowrap">{h.fecha_emision}</td>
+                            <td>{h.centro || "—"}</td>
+                            <td>{cliente ? cliente.nombre_fiscal || cliente.empresa || cliente.nombre : "—"}</td>
+                            <td>{h.concepto}</td>
+                            <td className="fac-num fac-nowrap">{dinero(d.subtotal)}</td>
+                            <td className="fac-num fac-nowrap">{dinero(d.iva)}</td>
+                            <td className="fac-num fac-nowrap">{dinero(d.total)}</td>
+                            <td>{d.cancelada ? "Cancelada" : "Activa"}</td>
+                            <td>{h.cancelacion_motivo ? MOTIVOS_NOMBRE[h.cancelacion_motivo] || h.cancelacion_motivo : ""}</td>
+                            <td className="fac-num">{h.envios_estado ?? 0}</td>
+                            <td>{d.estatusTimbre}</td>
+                            <td className="fac-num fac-nowrap">{dinero(d.saldo)}</td>
+                            <td className="fac-nowrap" style={d.simulada ? { color: "#A32D2D" } : undefined}>
+                              {d.facturaElectronica}
+                            </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={7} style={{ padding: "10px 12px", fontWeight: 600, textAlign: "right" }}>
+                          Totales (sin canceladas)
+                        </td>
+                        <td className="fac-num fac-nowrap" style={{ padding: "10px 12px" }}>
+                          <b>{dinero(redondear(historial.filter((h) => !datosFila(h).cancelada).reduce((s, h) => s + datosFila(h).subtotal, 0)))}</b>
+                        </td>
+                        <td className="fac-num fac-nowrap" style={{ padding: "10px 12px" }}>
+                          <b>{dinero(redondear(historial.filter((h) => !datosFila(h).cancelada).reduce((s, h) => s + datosFila(h).iva, 0)))}</b>
+                        </td>
+                        <td className="fac-num fac-nowrap" style={{ padding: "10px 12px" }}>
+                          <b>{dinero(redondear(historial.filter((h) => !datosFila(h).cancelada).reduce((s, h) => s + datosFila(h).total, 0)))}</b>
+                        </td>
+                        <td colSpan={4}></td>
+                        <td className="fac-num fac-nowrap" style={{ padding: "10px 12px" }}>
+                          <b>{dinero(redondear(historial.reduce((s, h) => s + datosFila(h).saldo, 0)))}</b>
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  {complementos.length > 0 && (
+                    <p style={{ fontSize: 12, color: "#667", padding: "8px 12px", margin: 0 }}>
+                      Complementos de pago de este estado de cuenta: {complementos.map((c) => (c.serie ? c.serie + "-" : "") + (c.folio_fiscal || "") + (c.cancelacion_estatus === "cancelada" ? " (cancelado)" : "")).join(", ")}
+                    </p>
                   )}
                 </div>
               )}
@@ -893,6 +1055,154 @@ export default function EstadoDeCuentaPage() {
                 Cerrar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {menuFila && (() => {
+        const h = menuFila.f;
+        const d = datosFila(h);
+        const base = "/facturas-admin/estados-de-cuenta/" + h.id;
+        const puedeCancelarH = !!h.uuid_cfdi && !d.cancelada && h.cancelacion_estatus !== "en_proceso" && rolPuede(rol, "facturaCancelar");
+        return (
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 1190 }} onClick={() => setMenuFila(null)} />
+            <div className="fac-acciones-menu no-imprimir" role="menu" style={{ position: "fixed", left: menuFila.x, top: menuFila.y, right: "auto", zIndex: 1200 }} onClick={() => setMenuFila(null)}>
+              <a role="menuitem" href={base}>
+                Ver
+              </a>
+              <a role="menuitem" href={base + "?imprimir=1"}>
+                Imprimir
+              </a>
+              {d.pendientes > 0 && !d.cancelada && rolPuede(rol, "pagosMarcarPagado") ? (
+                <a role="menuitem" href={base + "?pago=1"}>
+                  Generar pago
+                </a>
+              ) : (
+                <button type="button" role="menuitem" disabled title="No hay pagos pendientes">
+                  Generar pago
+                </button>
+              )}
+              {h.archivo_url ? (
+                <a role="menuitem" href={"/api/facturas/descargar?id=" + h.id + "&tipo=pdf"}>
+                  Descarga PDF
+                </a>
+              ) : (
+                <button type="button" role="menuitem" disabled title="Sin PDF">
+                  Descarga PDF
+                </button>
+              )}
+              {h.xml_url ? (
+                <a role="menuitem" href={"/api/facturas/descargar?id=" + h.id + "&tipo=xml"}>
+                  Descarga XML
+                </a>
+              ) : (
+                <button type="button" role="menuitem" disabled title="Sin XML">
+                  Descarga XML
+                </button>
+              )}
+              <button type="button" role="menuitem" disabled={!puedeCancelarH} title={!h.uuid_cfdi ? "Todavía no está timbrada" : !rolPuede(rol, "facturaCancelar") ? "Solo cobranza y administración pueden cancelar" : ""} onClick={() => abrirCancelar(h)}>
+                Cancelar timbrado
+              </button>
+              <button type="button" role="menuitem" disabled title="Disponible cuando Facturapi esté activo">
+                Refacturar cancelando la anterior
+              </button>
+              {d.simulada ? (
+                <a role="menuitem" href={base + "?formato=1"}>
+                  Reimprime (formato simulado)
+                </a>
+              ) : h.archivo_url ? (
+                <a role="menuitem" href={"/api/facturas/descargar?id=" + h.id + "&tipo=pdf"}>
+                  Reimprime
+                </a>
+              ) : (
+                <button type="button" role="menuitem" disabled title="Todavía no hay factura timbrada">
+                  Reimprime
+                </button>
+              )}
+              <a role="menuitem" href={"/facturas-admin/timbradas?cliente=" + (h.user_id || "") + "&centro=" + encodeURIComponent(h.centro || "")}>
+                Facturas generadas
+              </a>
+            </div>
+          </>
+        );
+      })()}
+
+      {cancelar && (
+        <div
+          className="no-imprimir"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => !cancelando && setCancelar(null)}
+        >
+          <div className="form-card fac-facturar" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" disabled={cancelando} onClick={() => setCancelar(null)}>
+              ×
+            </button>
+            <h2 className="fac-facturar-titulo">Cancelar factura</h2>
+            <p className="fac-facturar-sub">
+              {cancelar.serie ? cancelar.serie + "-" : ""}
+              {cancelar.folio_fiscal || cancelar.folio} · {dinero(Number(cancelar.monto))}
+            </p>
+            <div className="fac-facturar-fila">
+              <label>Motivo</label>
+              <div>
+                <select value={motivoCan} onChange={(e) => setMotivoCan(e.target.value)}>
+                  <option value=""></option>
+                  <option value="01">{MOTIVOS_NOMBRE["01"]}</option>
+                  <option value="02">{MOTIVOS_NOMBRE["02"]}</option>
+                  <option value="03">{MOTIVOS_NOMBRE["03"]}</option>
+                  <option value="04">{MOTIVOS_NOMBRE["04"]}</option>
+                </select>
+              </div>
+            </div>
+            {motivoCan === "01" && (
+              <div className="fac-facturar-fila">
+                <label>Folio de sustitución</label>
+                <div>
+                  <input type="text" placeholder="Folio de la factura que la sustituye (ej. A-9779)" value={folioSust} onChange={(e) => setFolioSust(e.target.value)} />
+                  <p className="fac-facturar-nota">La factura nueva que la reemplaza: escribe su serie y folio (o su UUID).</p>
+                </div>
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: "#A32D2D", margin: "6px 0 0" }}>Esta acción no se puede deshacer. Si el cliente tiene que aceptarla, queda "en proceso" hasta que responda.</p>
+            {errorCan && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorCan}</p>}
+            <div className="fac-facturar-botones">
+              <button type="button" className="btn-exportar fac-naranja" disabled={cancelando || !motivoCan} onClick={confirmarCancelacion}>
+                {cancelando ? "Cancelando..." : "Cancelar factura"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {exito && (
+        <div className="modal-overlay no-imprimir" onClick={() => setExito(false)}>
+          <div className="invitado-exito-card" onClick={(e) => e.stopPropagation()}>
+            <div className="invitado-confetti">
+              {confeti.map((c, i) => (
+                <span key={i} className="invitado-confetti-pieza" style={{ left: c.left + "%", animationDuration: c.dur + "s", animationDelay: c.delay + "s", background: c.color }} />
+              ))}
+            </div>
+            <div className="invitado-exito-icono">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <p className="invitado-exito-titulo">¡Factura generada con éxito!</p>
+            <p className="invitado-exito-mensaje">
+              {factura?.serie ? factura.serie + "-" : ""}
+              {factura?.folio_fiscal || factura?.folio}
+              {simulada ? " · SIMULADA de prueba, sin valor fiscal" : ""}
+            </p>
+            <button
+              className="invitado-exito-btn"
+              onClick={() => {
+                setExito(false);
+                setPestana("historial");
+              }}
+            >
+              Ir a factura generada
+            </button>
           </div>
         </div>
       )}
