@@ -257,7 +257,11 @@ export default function FacturasAdminPage() {
   const hayFiltrosActivos =
     !!busqueda || !!filtroEstado || !!filtroFuente || !!filtroDesde || !!filtroHasta || soloSinCliente || !!filtroCliente;
 
+  // La lista no se muestra completa de entrada: primero se busca un cliente (o se pide ver todas).
+  const [verTodas, setVerTodas] = useState(false);
+
   function limpiarFiltros() {
+    setVerTodas(false);
     setBusqueda("");
     setFiltroEstado("");
     setFiltroFuente("");
@@ -904,10 +908,25 @@ export default function FacturasAdminPage() {
 
             {facturas.length === 0 ? (
               <div className="empty-card">Sin facturas registradas en {centro}</div>
+            ) : !hayFiltrosActivos && !verTodas ? (
+              <div className="empty-card" style={{ padding: "28px 16px" }}>
+                <p style={{ margin: "0 0 4px", fontWeight: 600, color: "#0d1b3e" }}>Busca un cliente para ver sus facturas</p>
+                <p style={{ margin: "0 0 12px", fontSize: 13 }}>Escribe su nombre, razón social, RFC o folio arriba, o elige al cliente en la lista.</p>
+                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => setVerTodas(true)}>
+                  Ver todas las facturas de {centro} ({facturas.length})
+                </button>
+              </div>
             ) : facturasFiltradas.length === 0 ? (
               <div className="empty-card">Ninguna factura coincide con los filtros</div>
             ) : (
               <>
+                {verTodas && !hayFiltrosActivos && (
+                  <p style={{ margin: "8px 0 0" }}>
+                    <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600, padding: 0 }} onClick={() => setVerTodas(false)}>
+                      ← Ocultar la lista
+                    </button>
+                  </p>
+                )}
                 {resumenCliente && (
                   <div className="form-card fac-resumen">
                     <div className="fac-resumen-quien">
