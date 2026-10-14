@@ -77,7 +77,13 @@ export default function IntegrarClientePage() {
           <div className="empty-card">Cargando...</div>
         ) : !mensaje && centro ? (
           modo === "cliente" ? (
-            <IntegrarPorCliente key={"c" + vuelta} centroInicial={centro} onListo={(m) => setMensaje(m)} />
+            <IntegrarPorCliente
+              key={"c" + vuelta}
+              centroInicial={centro}
+              onIntegrada={(id) => {
+                window.location.href = "/facturas-admin/estados-de-cuenta/" + id;
+              }}
+            />
           ) : (
             <FormularioNuevaFactura
               key={"l" + vuelta}

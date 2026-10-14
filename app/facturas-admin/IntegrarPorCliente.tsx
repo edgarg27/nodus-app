@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
-import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 
 // Integrar por cliente (como en ZORA): centro, cliente, contrato, fecha y periodo, qué incluir (recurrentes y
 // adicionales) y el concepto. "Previa" trae lo que se le puede cobrar ese mes; se marca lo que va en la factura
-// y se integra (queda por timbrar) o se timbra de una vez.
+// y se integra: queda como estado de cuenta, desde donde se timbra.
 
 const CENTROS = Object.keys(UBICACION_POR_CENTRO);
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -41,7 +40,7 @@ function Etiqueta({ texto, obligatorio }: { texto: string; obligatorio?: boolean
   );
 }
 
-export default function IntegrarPorCliente({ centroInicial, onListo }: { centroInicial: string; onListo: (mensaje: string) => void }) {
+export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { centroInicial: string; onIntegrada: (id: string) => void }) {
   const hoy = hoyMexicoISO();
   const [centro, setCentro] = useState(CENTROS.includes(centroInicial) ? centroInicial : CENTROS[0]);
   const [clientes, setClientes] = useState<ClienteForm[]>([]);
@@ -61,14 +60,11 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
   const [lineas, setLineas] = useState<Linea[] | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
   const [rentaYa, setRentaYa] = useState<{ folio: string; estado: string; timbrada: boolean } | null>(null);
-  const [puedeTimbrar, setPuedeTimbrar] = useState(true);
   const [cargandoPrevia, setCargandoPrevia] = useState(false);
 
-  const [metodo, setMetodo] = useState<"PUE" | "PPD">("PPD");
-  const [formaPago, setFormaPago] = useState("03");
   const [error, setError] = useState("");
-  const [trabajando, setTrabajando] = useState<"" | "integrar" | "timbrar">("");
-  // Si ya se integró pero falló el timbrado, reintentar solo timbra (no duplica el cobro).
+  const [trabajando, setTrabajando] = useState(false);
+  // Evita integrar dos veces si se pulsa de nuevo mientras se abre el estado de cuenta.
   const [cobroIntegrado, setCobroIntegrado] = useState<string | null>(null);
 
   const cliente = clientes.find((c) => c.id === clienteId) || null;
@@ -155,7 +151,6 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     const nuevas: Linea[] = data.lineas || [];
     setLineas(nuevas);
     setRentaYa(data.rentaYaIntegrada || null);
-    setPuedeTimbrar(data.puedeTimbrar !== false);
     setConceptoTocado(false);
     // Si la renta del mes ya está integrada, no se marca otra vez (evita cobrarla doble).
     setMarcadas(nuevas.filter((l) => !(data.rentaYaIntegrada && (l.tipo === "Renta" || l.tipo === "Adicional mensual"))).map((l) => l.key));
@@ -175,7 +170,6 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     if (!fecha) return "Elige la fecha";
     if (elegidas.length === 0) return "Marca al menos una línea para facturar";
     if (centrosDeLasLineas.length > 1) return "Las líneas marcadas son de contratos de distintos centros: elige un solo contrato para facturar";
-    if (metodo === "PUE" && !FORMAS_PAGO_COMPLEMENTO.some((f) => f.clave === formaPago)) return "Elige la forma de pago";
     return "";
   }
 
@@ -205,34 +199,10 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     setError("");
     const e = validar();
     if (e) return setError(e);
-    setTrabajando("integrar");
+    setTrabajando(true);
     const id = await integrarCobro();
-    setTrabajando("");
-    if (id) onListo(`Factura integrada para ${cliente ? razonSocial(cliente) : "el cliente"} por ${dinero(total)}. Puedes timbrarla desde Estados de cuenta.`);
-  }
-
-  async function timbrar() {
-    setError("");
-    const e = validar();
-    if (e) return setError(e);
-    setTrabajando("timbrar");
-    try {
-      const id = await integrarCobro();
-      if (!id) return;
-      const res = await fetch("/api/facturas/facturar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facturaIds: [id], metodo, formaPago: metodo === "PUE" ? formaPago : undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-      const r = (data.resultados || [])[0];
-      if (!res.ok || (r && !r.ok)) {
-        return setError(`La factura quedó integrada, pero no se pudo timbrar: ${r?.error || data.error || "error desconocido"}. Corrígelo y pulsa Timbrar otra vez.`);
-      }
-      onListo(`Factura timbrada (${metodo}) para ${cliente ? razonSocial(cliente) : "el cliente"} por ${dinero(total)}.`);
-    } finally {
-      setTrabajando("");
-    }
+    if (id) onIntegrada(id);
+    else setTrabajando(false);
   }
 
   return (
@@ -450,34 +420,11 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
           )}
 
           {lineas.length > 0 && (
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
-              <div>
-                <Etiqueta texto="Método de pago" />
-                <select value={metodo} onChange={(e) => setMetodo(e.target.value as "PUE" | "PPD")}>
-                  <option value="PPD">PPD · pago diferido (se paga después)</option>
-                  <option value="PUE">PUE · pago en una sola exhibición (ya se pagó)</option>
-                </select>
-              </div>
-              {metodo === "PUE" && (
-                <div>
-                  <Etiqueta texto="Forma de pago" />
-                  <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)}>
-                    {FORMAS_PAGO_COMPLEMENTO.map((f) => (
-                      <option key={f.clave} value={f.clave}>
-                        {f.texto}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button type="button" className="btn-exportar" style={{ background: "#F2833B" }} disabled={!!trabajando || elegidas.length === 0} onClick={integrar}>
-                {trabajando === "integrar" ? "Integrando..." : "Integrar factura"}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+              <button type="button" className="btn-exportar" style={{ background: "#F2833B" }} disabled={trabajando || elegidas.length === 0} onClick={integrar}>
+                {trabajando ? "Integrando..." : "Integrar factura"}
               </button>
-              {puedeTimbrar && (
-                <button type="button" className="btn-exportar" disabled={!!trabajando || elegidas.length === 0 || faltanDatosFiscales} onClick={timbrar}>
-                  {trabajando === "timbrar" ? "Timbrando..." : "Timbrar"}
-                </button>
-              )}
+              <span style={{ fontSize: 12, color: "#888" }}>Después de integrar se abre el estado de cuenta; ahí se timbra y se elige el método de pago.</span>
             </div>
           )}
           {error && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{error}</p>}
