@@ -1045,7 +1045,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                   )}
                                 </td>
                                 <td className="fac-nowrap">
-                                  <b>{f.serie ? f.serie + "-" + (f.folio_fiscal || "") : f.folio}</b>
+                                  <a href={"/facturas-admin/estados-de-cuenta/" + f.id} style={{ color: "#0d1b3e", textDecoration: "underline" }}>
+                                    <b>{f.serie ? f.serie + "-" + (f.folio_fiscal || "") : f.folio}</b>
+                                  </a>
                                   {f.serie && <span className="fac-sub">{f.folio}</span>}
                                 </td>
                                 <td>
@@ -1206,7 +1208,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                 )}
                               </td>
                               <td className="fac-nowrap">
-                                <b>{f.folio}</b>
+                                <a href={"/facturas-admin/estados-de-cuenta/" + f.id} style={{ color: "#0d1b3e", textDecoration: "underline" }}>
+                                  <b>{f.folio}</b>
+                                </a>
                                 {f.uuid_cfdi && (
                                   <span className="fac-sub" title={f.uuid_cfdi}>
                                     CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.serie ? f.serie + (f.folio_fiscal || "") : f.uuid_cfdi.slice(0, 8) + "…"}
