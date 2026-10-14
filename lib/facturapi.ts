@@ -101,6 +101,9 @@ export type ParametrosCfdi = {
   concepto: string | null;
   monto: number;
   adicionalTipo?: string | null;
+  // Varios conceptos en una sola factura (p. ej. dos adicionales distintos): una línea por concepto, cada una con
+  // la clave del SAT de su servicio. Si no se manda, es una sola línea con `concepto`, `monto` y `adicionalTipo`.
+  lineas?: { concepto: string; monto: number; adicionalTipo?: string | null }[];
   // PUE: se paga en el momento (factura ya pagada). PPD: pago diferido, se emite
   // antes del pago y se cubre después con un complemento de pago.
   metodo: "PUE" | "PPD";
@@ -142,9 +145,22 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
   // que el SAT rechace la factura: se cae a G03 en vez de dejar al cliente sin factura.
   const usoCfdi = usosParaTipo(datos.rfc.length === 12 ? "moral" : "fisica").some((u) => u.clave === datos.uso_cfdi) ? datos.uso_cfdi : "G03";
   // Los cobros adicionales (copias, frituras…) llevan su propia clave del SAT.
-  const claveSat = await servicioPorClave(admin, p.adicionalTipo);
-  const prodServ = claveSat?.satProdServ || CLAVE_PROD_SERV;
-  const unidad = claveSat?.satUnidad || CLAVE_UNIDAD;
+  const lineas = p.lineas && p.lineas.length > 0 ? p.lineas : [{ concepto: p.concepto || "", monto: Number(p.monto), adicionalTipo: p.adicionalTipo }];
+  const itemsNuevos = [];
+  for (const l of lineas) {
+    const claveSat = await servicioPorClave(admin, l.adicionalTipo);
+    itemsNuevos.push({
+      quantity: 1,
+      product: {
+        description: l.concepto || "Servicios Nodus Flex Center",
+        product_key: claveSat?.satProdServ || CLAVE_PROD_SERV,
+        unit_key: claveSat?.satUnidad || CLAVE_UNIDAD,
+        price: Number(l.monto),
+        tax_included: true,
+        taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }],
+      },
+    });
+  }
 
   const invoice: any = await facturapi.invoices.create({
     customer: {
@@ -154,19 +170,7 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
       email: cliente.email || undefined,
       address: { zip: datos.cp_fiscal },
     },
-    items: [
-      {
-        quantity: 1,
-        product: {
-          description: p.concepto || "Servicios Nodus Flex Center",
-          product_key: prodServ,
-          unit_key: unidad,
-          price: Number(p.monto),
-          tax_included: true,
-          taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }],
-        },
-      },
-    ],
+    items: itemsNuevos,
     payment_form: p.formaPago,
     payment_method: p.metodo,
     use: usoCfdi,
@@ -201,21 +205,18 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
     pdfBuf ? subirArchivoFactura(admin, base, pdfBuf, "pdf") : Promise.resolve(null),
   ]);
 
-  const item = invoice.items?.[0];
-  const importeConcepto = item?.product?.price ? item.product.price * (item.quantity || 1) : Number(p.monto);
-  const conceptos: CfdiConcepto[] = [
-    {
-      descripcion: item?.product?.description || p.concepto || "",
-      cantidad: item?.quantity || 1,
-      valorUnitario: item?.product?.price || Number(p.monto),
-      importe: importeConcepto,
-    },
-  ];
-  // Facturapi no regresa el importe ya calculado por impuesto (solo la tasa),
-  // así que se calcula a partir del precio con IVA incluido.
-  const impuestosItem = item?.product?.taxes || [];
+  const itemsEmitidos: any[] = invoice.items && invoice.items.length > 0 ? invoice.items : [null];
+  const conceptos: CfdiConcepto[] = itemsEmitidos.map((it: any, i: number) => {
+    const precio = it?.product?.price ?? Number(lineas[i]?.monto ?? p.monto);
+    const cantidad = it?.quantity || 1;
+    return { descripcion: it?.product?.description || lineas[i]?.concepto || "", cantidad, valorUnitario: precio, importe: precio * cantidad };
+  });
+  const importeConcepto = Math.round(conceptos.reduce((s, c) => s + c.importe, 0) * 100) / 100;
+  // Facturapi no regresa el importe ya calculado por impuesto (solo la tasa), así que se calcula a
+  // partir del precio con IVA incluido, línea por línea (como el CFDI).
+  const impuestosItem = itemsEmitidos[0]?.product?.taxes || [];
   const tasaIva = impuestosItem.find((t: any) => t.type === "IVA" && !t.withholding)?.rate ?? 0.16;
-  const subtotalCalc = Math.round((importeConcepto / (1 + tasaIva)) * 100) / 100;
+  const subtotalCalc = Math.round(conceptos.reduce((s, c) => s + Math.round((c.importe / (1 + tasaIva)) * 100) / 100, 0) * 100) / 100;
   const ivaTotal = Math.round((importeConcepto - subtotalCalc) * 100) / 100;
   const impuestos: CfdiImpuesto[] = impuestosItem.map((t: any) => ({
     tipo: t.withholding ? "retencion" : "traslado",

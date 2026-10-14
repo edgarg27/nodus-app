@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
-import { conceptoParaCliente } from "@/lib/adicionales";
+import { etiquetaPagoSuelto as etiquetaPago } from "@/lib/adicionales";
 import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { DATOS_PUBLICO_GENERAL, avisosDatosFiscales } from "@/lib/datosFiscales";
@@ -34,12 +34,6 @@ type PagoSuelto = { id: string; monto: number; concepto: string | null; estado: 
 const razonSocial = (c: ClienteForm) => c.nombre_fiscal || c.empresa || c.nombre;
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const dinero = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
-
-// El primer pago de un contrato se guarda con el concepto "Contrato": es el pago de la mensualidad.
-function etiquetaPago(concepto: string | null) {
-  const c = conceptoParaCliente(concepto, "Pago");
-  return c.trim().toLowerCase() === "contrato" ? "Pago de mensualidad" : c;
-}
 
 function sumarDias(iso: string, dias: number) {
   const d = new Date(iso + "T12:00:00");
@@ -95,6 +89,8 @@ export default function FormularioNuevaFactura({
   const [cobroIntegrado, setCobroIntegrado] = useState<string | null>(null);
 
   const serie = serieCentro(centro);
+  // Con varios cobros marcados, la factura lleva un concepto por cada uno (con la clave de su servicio).
+  const variasLineas = pagosSel.length >= 2;
   const cliente = clientes.find((c) => c.id === clienteId) || null;
   const metodoEfectivo = publicoGeneral ? "PUE" : metodo;
   const montoNum = Number(monto);
@@ -382,7 +378,7 @@ export default function FormularioNuevaFactura({
 
       <div>
         <Etiqueta texto="Tipo de servicio" />
-        <select value={tipo} onChange={(e) => elegirServicio(e.target.value)}>
+        <select value={tipo} disabled={variasLineas} onChange={(e) => elegirServicio(e.target.value)}>
           <option value="">Renta del espacio</option>
           {servicios.map((t) => (
             <option key={t.clave} value={t.clave}>
@@ -390,7 +386,9 @@ export default function FormularioNuevaFactura({
             </option>
           ))}
         </select>
-        <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>De aquí sale la clave del SAT.</p>
+        <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>
+          {variasLineas ? "Con varios cobros, cada uno se factura con la clave de su servicio." : "De aquí sale la clave del SAT."}
+        </p>
       </div>
 
       <div style={{ gridColumn: "span 2" }}>
@@ -527,11 +525,27 @@ export default function FormularioNuevaFactura({
             </div>
 
             <div className="prev-bloque">
-              <p className="prev-titulo">Concepto</p>
-              <p className="prev-dato">{concepto}</p>
-              <p className="prev-dato">
-                {tipoInfo ? `${tipoInfo.etiqueta} · clave SAT ${tipoInfo.satProdServ} · unidad ${tipoInfo.satUnidad}` : "Renta del espacio · clave SAT 80161504 (Coworking) u 80131502 (oficina privada), según su contrato"}
-              </p>
+              <p className="prev-titulo">{variasLineas ? "Conceptos" : "Concepto"}</p>
+              {variasLineas ? (
+                pagosSueltos
+                  .filter((p) => pagosSel.includes(p.id))
+                  .map((p) => {
+                    const s = servicios.find((x) => x.clave === p.adicional_tipo);
+                    return (
+                      <p className="prev-dato" key={p.id}>
+                        {etiquetaPago(p.concepto)} · {dinero(Number(p.monto))} ·{" "}
+                        {s ? `${s.etiqueta}, clave SAT ${s.satProdServ}, unidad ${s.satUnidad}` : "renta del espacio (clave según su contrato)"}
+                      </p>
+                    );
+                  })
+              ) : (
+                <>
+                  <p className="prev-dato">{concepto}</p>
+                  <p className="prev-dato">
+                    {tipoInfo ? `${tipoInfo.etiqueta} · clave SAT ${tipoInfo.satProdServ} · unidad ${tipoInfo.satUnidad}` : "Renta del espacio · clave SAT 80161504 (Coworking) u 80131502 (oficina privada), según su contrato"}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="prev-bloque">

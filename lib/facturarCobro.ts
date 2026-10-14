@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, tipoPorOmision, ErrorFacturacion } from "@/lib/facturapi";
 import { serieCentro } from "@/lib/centros";
+import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
@@ -44,19 +45,29 @@ export async function facturarCobro(
     .maybeSingle();
 
   // Si el cobro es de un tipo con clave del SAT propia (copias, frituras…), la usa; si no, la del pago ligado.
-  const { data: pagoAdicional } = await admin
-    .from("pagos")
-    .select("adicional_tipo")
-    .eq("factura_id", f.id)
-    .not("adicional_tipo", "is", null)
-    .limit(1)
-    .maybeSingle();
+  const { data: ligados } = await admin.from("pagos").select("concepto, monto, adicional_tipo").eq("factura_id", f.id);
+  const pagosLigados = ligados || [];
+  const pagoAdicional = pagosLigados.find((l) => l.adicional_tipo) || null;
+  // Un cobro que junta varios pagos (adicionales, depósito, mensualidad…) se factura con un concepto por pago,
+  // cada uno con la clave del SAT de su servicio. Solo si los pagos suman justo el monto del cobro.
+  const sumaLigados = pagosLigados.reduce((s, l) => s + Number(l.monto), 0);
+  const variasLineas = pagosLigados.length >= 2 && Math.abs(sumaLigados - Number(f.monto)) <= 0.01;
+  const lineas = variasLineas
+    ? await Promise.all(
+        pagosLigados.map(async (l) => ({
+          concepto: etiquetaPagoSuelto(l.concepto),
+          monto: Number(l.monto),
+          adicionalTipo: await tipoPorOmision(admin, f.user_id, l.adicional_tipo),
+        }))
+      )
+    : undefined;
 
   try {
     const { datosFactura } = await timbrarCfdi(admin, {
       cliente: cliente || {},
       concepto: f.concepto,
       monto: Number(f.monto),
+      lineas,
       adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
       serie: serieCentro(f.centro),
       metodo,
