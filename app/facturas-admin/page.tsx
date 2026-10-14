@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
@@ -18,6 +18,8 @@ const ESTATUS_LABEL: Record<string, { label: string; bg: string; color: string }
   pagada: { label: "✓ Pagada", bg: "#E1F5EE", color: "#0F6E56" },
   vencida: { label: "⚠️ Vencida", bg: "#FCEBEB", color: "#A32D2D" },
 };
+
+const dinero = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const ROLES_CANCELAR = ["admin", "gerente", "cobranza", "superadmin"];
 
@@ -65,6 +67,8 @@ type Factura = {
   folio_fiscal?: string | null;
   rfc_receptor?: string | null;
   cliente_nombre?: string;
+  // Razón social (o empresa) del cliente: es lo que busca contabilidad.
+  cliente_fiscal?: string;
   cliente_email?: string;
 };
 
@@ -144,9 +148,11 @@ export default function FacturasAdminPage() {
     const clienteIds = (clis || []).map((cl) => cl.id);
     const nombrePorId: Record<string, string> = {};
     const emailPorId: Record<string, string> = {};
+    const fiscalPorId: Record<string, string> = {};
     (clis || []).forEach((cl) => {
       nombrePorId[cl.id] = cl.nombre;
       emailPorId[cl.id] = cl.email;
+      fiscalPorId[cl.id] = cl.nombre_fiscal || cl.empresa || "";
     });
 
     // Se filtra por `centro` (no por user_id in clienteIds) para que las
@@ -162,6 +168,7 @@ export default function FacturasAdminPage() {
         ...f,
         cliente_nombre: f.user_id ? nombrePorId[f.user_id] || "Cliente" : f.rfc_receptor === "XAXX010101000" ? "Público en general" : "Cliente no identificado",
         cliente_email: f.user_id ? emailPorId[f.user_id] || "" : "",
+        cliente_fiscal: f.user_id ? fiscalPorId[f.user_id] || "" : "",
       }))
     );
 
@@ -264,7 +271,7 @@ export default function FacturasAdminPage() {
     const q = busqueda.trim().toLowerCase();
     return facturas.filter((f) => {
       if (q) {
-        const enTexto = [f.folio, f.concepto, f.uuid_cfdi, f.rfc_receptor, f.cliente_nombre, f.cliente_email]
+        const enTexto = [f.folio, f.concepto, f.uuid_cfdi, f.rfc_receptor, f.cliente_nombre, f.cliente_fiscal, f.cliente_email]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -523,6 +530,29 @@ export default function FacturasAdminPage() {
     setAsignando(null);
     if (centro) fetchTodo(centro);
   }
+
+  // Si se busca a un cliente (o se elige en el filtro) y todo lo que se ve es suyo, se muestra su resumen arriba.
+  const resumenCliente = (() => {
+    if (!busqueda.trim() && !filtroCliente) return null;
+    const ids = new Set(facturasFiltradas.map((f) => f.user_id));
+    const id = ids.size === 1 ? [...ids][0] : null;
+    if (!id) return null;
+    const cli = clientes.find((c) => c.id === id);
+    if (!cli) return null;
+    const vigentes = facturasFiltradas.filter((f) => f.cancelacion_estatus !== "cancelada");
+    const suma = (lista: Factura[]) => Math.round(lista.reduce((s, f) => s + Number(f.monto), 0) * 100) / 100;
+    return {
+      id,
+      nombre: cli.nombre_fiscal || cli.empresa || cli.nombre,
+      email: cli.email,
+      rfc: facturasFiltradas.find((f) => f.rfc_receptor)?.rfc_receptor || "",
+      vigentes: vigentes.length,
+      canceladas: facturasFiltradas.length - vigentes.length,
+      facturado: suma(vigentes),
+      pagado: suma(vigentes.filter((f) => f.estado === "pagada")),
+      porCobrar: suma(vigentes.filter((f) => f.estado !== "pagada")),
+    };
+  })();
 
   return (
     <div className="panel">
@@ -877,149 +907,194 @@ export default function FacturasAdminPage() {
             ) : facturasFiltradas.length === 0 ? (
               <div className="empty-card">Ninguna factura coincide con los filtros</div>
             ) : (
-              <div className="facturas-grid">
-              {facturasFiltradas.map((f) => {
-                const badge = ESTATUS_LABEL[f.estado] || { label: f.estado, bg: "#F0F0F0", color: "#555" };
-                const sueltosDelCliente = f.user_id ? pagosSueltosDelCliente(f.user_id) : [];
-                return (
-                  <div className="contrato-card-admin" key={f.id}>
-                    <div className="contrato-card-top">
+              <>
+                {resumenCliente && (
+                  <div className="form-card fac-resumen">
+                    <div className="fac-resumen-quien">
+                      <p className="contrato-cliente-nombre">{resumenCliente.nombre}</p>
+                      <p className="contrato-detalle">
+                        {resumenCliente.email}
+                        {resumenCliente.rfc ? " · RFC " + resumenCliente.rfc : ""}
+                      </p>
+                      <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600, padding: 0 }} href={"/facturas-admin/por-cliente?cliente=" + resumenCliente.id}>
+                        Ver su historial por mes →
+                      </a>
+                    </div>
+                    <div className="fac-resumen-cifras">
                       <div>
-                        <p className="contrato-cliente-nombre">
-                          {f.cliente_nombre} · {f.folio}
-                        </p>
-                        <p className="contrato-detalle">{f.cliente_email}</p>
-                        <p className="contrato-detalle">{f.concepto}</p>
-                        <p className="contrato-detalle">
-                          ${Number(f.monto).toLocaleString("es-MX")} · vence {f.fecha_vencimiento}
-                        </p>
-                        {f.uuid_cfdi && (
-                          <p className="contrato-detalle" style={{ fontSize: 11, color: "#888" }}>
-                            CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.serie ? f.serie + (f.folio_fiscal || "") + " · " : ""}{f.rfc_receptor} · {f.uuid_cfdi}
-                          </p>
-                        )}
-                        {f.metodo_pago === "PPD" && f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && (
-                          <p className="contrato-detalle" style={{ fontSize: 12, fontWeight: 600, color: saldoDe(f.id) > 0 ? "#854F0B" : "#0F6E56" }}>
-                            {saldoDe(f.id) > 0
-                              ? "Saldo sin complemento: $" + saldoDe(f.id).toLocaleString("es-MX") + " de $" + Number(f.monto).toLocaleString("es-MX")
-                              : "✓ Cubierta por complementos de pago"}
-                          </p>
-                        )}
-                        {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] && (
-                          <p
-                            className="contrato-detalle"
-                            style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 8, background: CANCELACION_LABEL[f.cancelacion_estatus].bg, color: CANCELACION_LABEL[f.cancelacion_estatus].color }}
-                          >
-                            {CANCELACION_LABEL[f.cancelacion_estatus].label}
-                            {f.cancelacion_motivo ? " · motivo " + f.cancelacion_motivo : ""}
-                          </p>
-                        )}
-                        {!f.user_id && f.rfc_receptor !== "XAXX010101000" && (
-                          <div style={{ marginTop: 6 }}>
-                            <p style={{ fontSize: 12, color: "#A32D2D", margin: "0 0 4px" }}>⚠️ Cliente no identificado</p>
-                            <select
-                              defaultValue=""
-                              disabled={asignando === f.id}
-                              onChange={(e) => asignarCliente(f.id, e.target.value)}
-                            >
-                              <option value="">Asignar cliente...</option>
-                              {clientes.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.nombre} — {c.email}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        {f.archivo_url && (
-                          <BotonArchivo url={f.archivo_url} bucket="facturas">
-                            Ver PDF
-                          </BotonArchivo>
-                        )}
+                        <span>Facturas</span>
+                        <b>{resumenCliente.vigentes}</b>
                       </div>
-                      <span className="factura-badge" style={{ background: badge.bg }}>
-                        <span className="factura-badge-text" style={{ color: badge.color }}>
-                          {badge.label}
-                        </span>
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {puedoCancelar && (sePuedeCancelar(f) || sePuedeFacturar(f) || sePuedeComplementar(f)) && (
-                        <input
-                          type="checkbox"
-                          aria-label="Seleccionar"
-                          checked={seleccion.includes(f.id)}
-                          onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, f.id] : s.filter((i) => i !== f.id)))}
-                        />
-                      )}
-                      <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
-                        {facturaExpandidaId === f.id ? "Ocultar pagos" : "Ver pagos vinculados"}
-                      </button>
-                      {f.user_id && (
-                        <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href={"/facturas-admin/por-cliente?cliente=" + f.user_id}>
-                          Historial del cliente
-                        </a>
-                      )}
-                      {puedoCancelar && sePuedeComplementar(f) && (
-                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
-                          Complemento de pago
-                        </button>
-                      )}
-                      {puedoCancelar && sePuedeFacturar(f) && (
-                        <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
-                          Facturar (CFDI)
-                        </button>
-                      )}
-                      {puedoCancelar && sePuedeCancelar(f) && (
-                        <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
-                          Cancelar factura
-                        </button>
-                      )}
-                    </div>
-
-                    {facturaExpandidaId === f.id && (
-                      <div style={{ marginTop: 8, borderTop: "1px solid #eee", paddingTop: 8 }}>
-                        {cargandoPagos ? (
-                          <p style={{ fontSize: 12, color: "#888" }}>Cargando pagos...</p>
-                        ) : pagosDeFactura.length === 0 ? (
-                          <p style={{ fontSize: 12, color: "#aaa" }}>Sin pagos vinculados todavía.</p>
-                        ) : (
-                          pagosDeFactura.map((p) => (
-                            <p className="contrato-detalle" key={p.id}>
-                              {p.concepto || "Pago"} · ${Number(p.monto).toLocaleString("es-MX")} · {p.estado}
-                            </p>
-                          ))
-                        )}
-
-                        {sueltosDelCliente.length > 0 && (
-                          <div style={{ marginTop: 8 }}>
-                            <p className="sub-label">Vincular pago suelto de este cliente</p>
-                            {sueltosDelCliente.map((p) => (
-                              <div
-                                key={p.id}
-                                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0" }}
-                              >
-                                <span style={{ fontSize: 12, color: "#555" }}>
-                                  {p.concepto || "Pago"} · ${Number(p.monto).toLocaleString("es-MX")} · {p.estado}
-                                </span>
-                                <button
-                                  className="tel-borrar-btn"
-                                  style={{ color: "#0d1b3e", fontWeight: 600 }}
-                                  disabled={vinculando === p.id}
-                                  onClick={() => vincularPago(p.id, f.id)}
-                                >
-                                  Vincular
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div>
+                        <span>Facturado</span>
+                        <b>{dinero(resumenCliente.facturado)}</b>
                       </div>
+                      <div>
+                        <span>Pagado</span>
+                        <b style={{ color: "#0F6E56" }}>{dinero(resumenCliente.pagado)}</b>
+                      </div>
+                      <div>
+                        <span>Por cobrar</span>
+                        <b style={{ color: resumenCliente.porCobrar > 0 ? "#854F0B" : undefined }}>{dinero(resumenCliente.porCobrar)}</b>
+                      </div>
+                    </div>
+                    {resumenCliente.canceladas > 0 && (
+                      <p className="contrato-detalle" style={{ gridColumn: "1 / -1", fontSize: 12, color: "#888" }}>
+                        {resumenCliente.canceladas} factura(s) cancelada(s) no suman en estos totales.
+                      </p>
                     )}
                   </div>
-                );
-              })}
-              </div>
+                )}
+
+                <div className="fac-tabla-wrap">
+                  <table className="fac-tabla">
+                    <thead>
+                      <tr>
+                        <th aria-label="Seleccionar"></th>
+                        <th>Folio</th>
+                        <th>Cliente</th>
+                        <th>Concepto</th>
+                        <th>Emisión</th>
+                        <th>Vence</th>
+                        <th className="fac-num">Monto</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {facturasFiltradas.map((f) => {
+                        const badge = ESTATUS_LABEL[f.estado] || { label: f.estado, bg: "#F0F0F0", color: "#555" };
+                        const sueltosDelCliente = f.user_id ? pagosSueltosDelCliente(f.user_id) : [];
+                        const seleccionable = puedoCancelar && (sePuedeCancelar(f) || sePuedeFacturar(f) || sePuedeComplementar(f));
+                        const abierta = facturaExpandidaId === f.id;
+                        return (
+                          <Fragment key={f.id}>
+                            <tr className={f.cancelacion_estatus === "cancelada" ? "fac-fila-cancelada" : undefined}>
+                              <td className="fac-col-sel">
+                                {seleccionable && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label="Seleccionar"
+                                    checked={seleccion.includes(f.id)}
+                                    onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, f.id] : s.filter((i) => i !== f.id)))}
+                                  />
+                                )}
+                              </td>
+                              <td className="fac-nowrap">
+                                <b>{f.folio}</b>
+                                {f.uuid_cfdi && (
+                                  <span className="fac-sub" title={f.uuid_cfdi}>
+                                    CFDI{f.metodo_pago ? " " + f.metodo_pago : ""} · {f.serie ? f.serie + (f.folio_fiscal || "") : f.uuid_cfdi.slice(0, 8) + "…"}
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <b>{f.cliente_fiscal || f.cliente_nombre}</b>
+                                {f.cliente_fiscal && f.cliente_fiscal !== f.cliente_nombre && <span className="fac-sub">{f.cliente_nombre}</span>}
+                                {f.rfc_receptor && <span className="fac-sub">{f.rfc_receptor}</span>}
+                                {!f.user_id && f.rfc_receptor !== "XAXX010101000" && (
+                                  <select defaultValue="" disabled={asignando === f.id} onChange={(e) => asignarCliente(f.id, e.target.value)} style={{ marginTop: 4 }}>
+                                    <option value="">Asignar cliente...</option>
+                                    {clientes.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.nombre} — {c.email}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </td>
+                              <td>{f.concepto}</td>
+                              <td className="fac-nowrap">{f.fecha_emision}</td>
+                              <td className="fac-nowrap">{f.fecha_vencimiento}</td>
+                              <td className="fac-num fac-nowrap">{dinero(Number(f.monto))}</td>
+                              <td>
+                                <span className="factura-badge" style={{ background: badge.bg }}>
+                                  <span className="factura-badge-text" style={{ color: badge.color }}>
+                                    {badge.label}
+                                  </span>
+                                </span>
+                                {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] && (
+                                  <span className="fac-sub" style={{ color: CANCELACION_LABEL[f.cancelacion_estatus].color, fontWeight: 600 }}>
+                                    {CANCELACION_LABEL[f.cancelacion_estatus].label}
+                                    {f.cancelacion_motivo ? " · motivo " + f.cancelacion_motivo : ""}
+                                  </span>
+                                )}
+                                {f.metodo_pago === "PPD" && f.uuid_cfdi && f.cancelacion_estatus !== "cancelada" && (
+                                  <span className="fac-sub" style={{ fontWeight: 600, color: saldoDe(f.id) > 0 ? "#854F0B" : "#0F6E56" }}>
+                                    {saldoDe(f.id) > 0 ? "Saldo sin complemento: " + dinero(saldoDe(f.id)) : "✓ Cubierta por complementos"}
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                <div className="fac-acciones">
+                                  {f.archivo_url && (
+                                    <BotonArchivo url={f.archivo_url} bucket="facturas">
+                                      Ver PDF
+                                    </BotonArchivo>
+                                  )}
+                                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
+                                    {abierta ? "Ocultar pagos" : "Pagos"}
+                                  </button>
+                                  {puedoCancelar && sePuedeComplementar(f) && (
+                                    <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
+                                      Complemento
+                                    </button>
+                                  )}
+                                  {puedoCancelar && sePuedeFacturar(f) && (
+                                    <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
+                                      Facturar (CFDI)
+                                    </button>
+                                  )}
+                                  {puedoCancelar && sePuedeCancelar(f) && (
+                                    <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
+                                      Cancelar
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+
+                            {abierta && (
+                              <tr className="fac-fila-detalle">
+                                <td></td>
+                                <td colSpan={8}>
+                                  {cargandoPagos ? (
+                                    <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Cargando pagos...</p>
+                                  ) : pagosDeFactura.length === 0 ? (
+                                    <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin pagos vinculados todavía.</p>
+                                  ) : (
+                                    pagosDeFactura.map((p) => (
+                                      <p className="contrato-detalle" key={p.id}>
+                                        {p.concepto || "Pago"} · {dinero(Number(p.monto))} · {p.estado}
+                                      </p>
+                                    ))
+                                  )}
+
+                                  {sueltosDelCliente.length > 0 && (
+                                    <div style={{ marginTop: 8 }}>
+                                      <p className="sub-label">Vincular pago suelto de este cliente</p>
+                                      {sueltosDelCliente.map((p) => (
+                                        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", maxWidth: 520 }}>
+                                          <span style={{ fontSize: 12, color: "#555" }}>
+                                            {p.concepto || "Pago"} · {dinero(Number(p.monto))} · {p.estado}
+                                          </span>
+                                          <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} disabled={vinculando === p.id} onClick={() => vincularPago(p.id, f.id)}>
+                                            Vincular
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
               </>
             )}
