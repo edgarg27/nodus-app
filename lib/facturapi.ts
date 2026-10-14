@@ -108,6 +108,12 @@ export type ParametrosCfdi = {
   // antes del pago y se cubre después con un complemento de pago.
   metodo: "PUE" | "PPD";
   formaPago: string;
+  // Condiciones de pago que se imprimen en la factura (p. ej. "Contado").
+  condiciones?: string;
+  // CFDI relacionados (tipo de relación del SAT y los UUID de las facturas relacionadas).
+  relacion?: { tipo: string; uuids: string[] };
+  // Periodicidad de la información global (solo público en general): day, week, fortnight, month o two_months.
+  periodicidad?: string;
   // Para los registros de error.
   etiqueta: string;
   // Facturapi no emite dos veces con la misma llave: evita facturas dobles si dos
@@ -175,11 +181,13 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
     payment_method: p.metodo,
     use: usoCfdi,
     ...(p.serie ? { series: p.serie } : {}),
+    ...(p.condiciones ? { conditions: p.condiciones } : {}),
+    ...(p.relacion && p.relacion.uuids.length > 0 ? { related_documents: p.relacion.uuids.map((uuid) => ({ relationship: p.relacion!.tipo, uuid })) } : {}),
     ...(p.idempotencyKey ? { idempotency_key: p.idempotencyKey } : {}),
     // El SAT exige el nodo "Información Global" cuando el receptor es
     // público en general (XAXX010101000): se factura como resumen diario.
     ...(publicoGeneral
-      ? { global: { periodicity: "day", months: String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
+      ? { global: { periodicity: p.periodicidad || "day", months: p.periodicidad === "two_months" ? String(12 + Math.ceil((hoy.getMonth() + 1) / 2)) : String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
       : {}),
   });
 
