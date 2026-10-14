@@ -291,7 +291,7 @@ export default function IntegrarLotePage() {
                       </select>
                     </div>
                   )}
-                  <button className="btn-exportar" disabled={timbrando || seleccion.length === 0} onClick={timbrar}>
+                  <button className="btn-exportar fac-naranja" disabled={timbrando || seleccion.length === 0} onClick={timbrar}>
                     {timbrando ? progreso || "Timbrando..." : `Timbrar elegidos (${seleccion.length})`}
                   </button>
                 </>
