@@ -13,9 +13,9 @@ import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-// admin solo toca clientes de su propio centro; superadmin, gerente y gerente_ventas, de todos.
+// admin solo toca clientes de su propio centro; superadmin, gerente, gerente_ventas y cobranza, de todos.
 function puedeTocarCentro(rol: string, miCentro: string | null | undefined, centroCliente: string | null | undefined) {
-  if (rol === "superadmin" || rol === "gerente" || rol === "gerente_ventas") return true;
+  if (rol === "superadmin" || rol === "gerente" || rol === "gerente_ventas" || rol === "cobranza") return true;
   return !!miCentro && miCentro === centroCliente;
 }
 

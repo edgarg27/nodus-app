@@ -63,7 +63,7 @@ function etiquetaCliente(c: Cliente) {
 
 export default function AdicionalesPage() {
   const supabase = createClient();
-  const { cargando, centro, setCentro, esGlobal, permitido } = useCentroAdmin(["gerente", "gerente_ventas"], ["gerente", "gerente_ventas"]);
+  const { cargando, centro, setCentro, esGlobal, permitido } = useCentroAdmin(["gerente", "gerente_ventas", "cobranza"], ["gerente", "gerente_ventas", "cobranza"]);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cobros, setCobros] = useState<Cobro[]>([]);
