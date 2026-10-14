@@ -115,3 +115,9 @@ export function conceptoParaCliente(concepto: string | null | undefined, porDefe
     .trim();
   return limpio || porDefecto;
 }
+
+// El primer pago de un contrato se guarda con el concepto "Contrato": es el pago de la mensualidad.
+export function etiquetaPagoSuelto(concepto: string | null | undefined) {
+  const c = conceptoParaCliente(concepto, "Pago");
+  return c.trim().toLowerCase() === "contrato" ? "Pago de mensualidad" : c;
+}
