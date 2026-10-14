@@ -576,7 +576,7 @@ export default function FacturasAdminPage() {
                 )}
                 {puedeEditarServicios && (
                   <a className="btn-exportar" href="/catalogo-servicios">
-                    Servicios y precios
+                    + Agregar o editar servicios y precios
                   </a>
                 )}
                 <a className="btn-exportar" href="/facturas-admin/importar">
