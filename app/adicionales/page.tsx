@@ -261,8 +261,8 @@ export default function AdicionalesPage() {
 
             {puedeEditarServicios && (
               <p style={{ margin: "0 0 10px" }}>
-                <a className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} href="/catalogo-servicios">
-                  Servicios y precios
+                <a className="btn-exportar" href="/catalogo-servicios">
+                  + Agregar o editar servicios y precios
                 </a>
               </p>
             )}
