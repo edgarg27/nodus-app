@@ -8,6 +8,7 @@ import { timbrarCfdi, previaPdfCfdi, tipoPorOmision, ErrorFacturacion, type Para
 import { serieCentro } from "@/lib/centros";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
+import { servicioPorClave } from "@/lib/catalogoServicios";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -120,6 +121,72 @@ export async function facturarCobro(admin: Admin, facturaId: string, opts: Opcio
   }
 }
 
+
+// Respaldo mientras Facturapi no responde (suscripción vencida): una vista previa con los mismos datos, dibujada en la
+// pantalla. La vista previa de verdad es el PDF de Facturapi (previaPdfCobro).
+// Vista previa de la factura de un cobro (sin timbrar): las mismas líneas y claves del SAT con las que se emitiría.
+export type PreviaFactura = {
+  serie: string | null;
+  centro: string | null;
+  receptor: { nombre: string; rfc: string; regimen: string; cp: string; uso: string };
+  lineas: { cantidad: number; unidad: string; claveProd: string; descripcion: string; precioUnitario: number; importe: number }[];
+  subtotal: number;
+  iva: number;
+  total: number;
+};
+
+const NOMBRE_UNIDAD: Record<string, string> = { E48: "Unidad de servicio", H87: "Pieza", HUR: "Hora", DAY: "Día", MON: "Mes" };
+
+export async function previaCobro(admin: Admin, facturaId: string): Promise<{ ok: true; previa: PreviaFactura } | { ok: false; error: string }> {
+  const { data: f } = await admin.from("facturas").select("id, user_id, concepto, monto, centro, adicional_tipo").eq("id", facturaId).maybeSingle();
+  if (!f) return { ok: false, error: "Cobro no encontrado" };
+  if (!f.user_id) return { ok: false, error: "No tiene cliente asignado" };
+  const { data: cliente } = await admin.from("profiles").select("rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi").eq("id", f.user_id).maybeSingle();
+  const { data: ligados } = await admin.from("pagos").select("concepto, monto, adicional_tipo").eq("factura_id", f.id);
+  const pagosLigados = ligados || [];
+  const pagoAdicional = pagosLigados.find((l) => l.adicional_tipo) || null;
+  const suma = pagosLigados.reduce((s, l) => s + Number(l.monto), 0);
+  const varias = pagosLigados.length >= 2 && Math.abs(suma - Number(f.monto)) <= 0.01;
+  const base = varias
+    ? await Promise.all(pagosLigados.map(async (l) => ({ concepto: etiquetaPagoSuelto(l.concepto), monto: Number(l.monto), tipo: await tipoPorOmision(admin, f.user_id, l.adicional_tipo) })))
+    : [{ concepto: f.concepto as string, monto: Number(f.monto), tipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null) }];
+
+  const lineas = [];
+  let subtotal = 0;
+  for (const l of base) {
+    const clave = await servicioPorClave(admin, l.tipo);
+    const unitario = Math.round((l.monto / 1.16) * 100) / 100;
+    subtotal += unitario;
+    lineas.push({
+      cantidad: 1,
+      unidad: (clave?.satUnidad || "E48") + " - " + (NOMBRE_UNIDAD[clave?.satUnidad || "E48"] || ""),
+      claveProd: clave?.satProdServ || "80131502",
+      descripcion: l.concepto || "Servicios Nodus Flex Center",
+      precioUnitario: unitario,
+      importe: unitario,
+    });
+  }
+  subtotal = Math.round(subtotal * 100) / 100;
+  const total = Math.round(Number(f.monto) * 100) / 100;
+  return {
+    ok: true,
+    previa: {
+      serie: serieCentro(f.centro),
+      centro: f.centro,
+      receptor: {
+        nombre: cliente?.nombre_fiscal || "",
+        rfc: cliente?.rfc || "",
+        regimen: cliente?.regimen_fiscal || "",
+        cp: cliente?.cp_fiscal || "",
+        uso: cliente?.uso_cfdi || "G03",
+      },
+      lineas,
+      subtotal,
+      iva: Math.round((total - subtotal) * 100) / 100,
+      total,
+    },
+  };
+}
 
 // Un cobro suelto (adicional, depósito, pago de Cotizar…) es un registro de pago sin
 // factura. Para facturarlo antes de que se pague se crea su cobro con factura, se liga el
