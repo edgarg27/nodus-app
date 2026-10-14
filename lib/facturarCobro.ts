@@ -4,8 +4,7 @@
 // solo se le agregan los datos del CFDI.
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { timbrarCfdi, tipoPorOmision, ErrorFacturacion } from "@/lib/facturapi";
-import { servicioPorClave } from "@/lib/catalogoServicios";
+import { timbrarCfdi, previaPdfCfdi, tipoPorOmision, ErrorFacturacion, type ParametrosCfdi } from "@/lib/facturapi";
 import { serieCentro } from "@/lib/centros";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
@@ -20,24 +19,27 @@ const ESTADOS_NO_FACTURABLES = ["pagada", "cancelada"];
 
 // metodo PPD (por omisión): pago diferido, forma 99 y complemento al pagar. PUE: pago en una sola exhibición,
 // con la forma de pago real (transferencia, tarjeta…).
-export async function facturarCobro(
+export type OpcionesFactura = { metodo?: "PUE" | "PPD"; formaPago?: string; condiciones?: string; relacion?: { tipo: string; uuids: string[] }; periodicidad?: string; cuentaPago?: string };
+
+// Valida el cobro y arma los parámetros del CFDI (los mismos para timbrar y para la vista previa en PDF).
+async function parametrosDeCobro(
   admin: Admin,
   facturaId: string,
-  opts: { metodo?: "PUE" | "PPD"; formaPago?: string; condiciones?: string; relacion?: { tipo: string; uuids: string[] }; periodicidad?: string } = {}
-): Promise<ResultadoFacturar> {
+  opts: OpcionesFactura
+): Promise<{ ok: true; f: { id: string; folio: string }; params: ParametrosCfdi } | { ok: false; resultado: ResultadoFacturar }> {
   const metodo = opts.metodo === "PUE" ? "PUE" : "PPD";
   const { data: f } = await admin
     .from("facturas")
     .select("id, folio, user_id, concepto, monto, estado, uuid_cfdi, centro, adicional_tipo")
     .eq("id", facturaId)
     .maybeSingle();
-  if (!f) return { id: facturaId, ok: false, error: "Cobro no encontrado" };
-  if (f.uuid_cfdi) return { id: facturaId, folio: f.folio, ok: false, error: "Ya tiene factura (CFDI)" };
+  if (!f) return { ok: false, resultado: { id: facturaId, ok: false, error: "Cobro no encontrado" } };
+  if (f.uuid_cfdi) return { ok: false, resultado: { id: facturaId, folio: f.folio, ok: false, error: "Ya tiene factura (CFDI)" } };
   if (metodo === "PPD" && ESTADOS_NO_FACTURABLES.includes(f.estado)) {
-    return { id: facturaId, folio: f.folio, ok: false, error: "Ya está pagado: se factura al cobrar, no a pago diferido" };
+    return { ok: false, resultado: { id: facturaId, folio: f.folio, ok: false, error: "Ya está pagado: se factura al cobrar, no a pago diferido" } };
   }
-  if (!f.user_id) return { id: facturaId, folio: f.folio, ok: false, error: "No tiene cliente asignado" };
-  if (!(Number(f.monto) > 0)) return { id: facturaId, folio: f.folio, ok: false, error: "El monto debe ser mayor a cero" };
+  if (!f.user_id) return { ok: false, resultado: { id: facturaId, folio: f.folio, ok: false, error: "No tiene cliente asignado" } };
+  if (!(Number(f.monto) > 0)) return { ok: false, resultado: { id: facturaId, folio: f.folio, ok: false, error: "El monto debe ser mayor a cero" } };
 
   const { data: cliente } = await admin
     .from("profiles")
@@ -63,22 +65,44 @@ export async function facturarCobro(
       )
     : undefined;
 
+  const params: ParametrosCfdi = {
+    cliente: cliente || {},
+    concepto: f.concepto,
+    monto: Number(f.monto),
+    lineas,
+    adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
+    serie: serieCentro(f.centro),
+    metodo,
+    formaPago: metodo === "PUE" ? opts.formaPago || "03" : "99", // PPD: "Por definir"; la forma real va en el complemento
+    condiciones: opts.condiciones,
+    relacion: opts.relacion,
+    periodicidad: opts.periodicidad,
+    cuentaPago: metodo === "PUE" ? opts.cuentaPago : undefined,
+    etiqueta: `cobro ${f.id}`,
+    idempotencyKey: `cobro-${f.id}`,
+  };
+  return { ok: true, f: { id: f.id, folio: f.folio }, params };
+}
+
+// PDF de vista previa de la factura de un cobro (sin timbrar).
+export async function previaPdfCobro(admin: Admin, facturaId: string, opts: OpcionesFactura = {}): Promise<{ ok: true; pdf: Buffer } | { ok: false; error: string }> {
+  const prep = await parametrosDeCobro(admin, facturaId, opts);
+  if (!("params" in prep)) return { ok: false, error: prep.resultado.error || "No se pudo armar la vista previa" };
   try {
-    const { datosFactura } = await timbrarCfdi(admin, {
-      cliente: cliente || {},
-      concepto: f.concepto,
-      monto: Number(f.monto),
-      lineas,
-      adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
-      serie: serieCentro(f.centro),
-      metodo,
-      formaPago: metodo === "PUE" ? opts.formaPago || "03" : "99", // PPD: "Por definir"; la forma real va en el complemento
-      condiciones: opts.condiciones,
-      relacion: opts.relacion,
-      periodicidad: opts.periodicidad,
-      etiqueta: `cobro ${f.id}`,
-      idempotencyKey: `cobro-${f.id}`,
-    });
+    return { ok: true, pdf: await previaPdfCfdi(admin, prep.params) };
+  } catch (err: any) {
+    if (!(err instanceof ErrorFacturacion)) console.error(`[vista-previa] ${facturaId}:`, err?.message || err);
+    return { ok: false, error: err instanceof ErrorFacturacion ? err.message : explicarErrorFacturapi(err?.message) };
+  }
+}
+
+export async function facturarCobro(admin: Admin, facturaId: string, opts: OpcionesFactura = {}): Promise<ResultadoFacturar> {
+  const prep = await parametrosDeCobro(admin, facturaId, opts);
+  if (!("params" in prep)) return prep.resultado;
+  const f = prep.f;
+
+  try {
+    const { datosFactura } = await timbrarCfdi(admin, prep.params);
     // Solo si sigue sin CFDI: evita pisar el de otra persona que facturó al mismo tiempo.
     const { error } = await admin.from("facturas").update(datosFactura).eq("id", f.id).is("uuid_cfdi", null);
     if (error) {
@@ -96,70 +120,6 @@ export async function facturarCobro(
   }
 }
 
-
-// Vista previa de la factura de un cobro (sin timbrar): las mismas líneas y claves del SAT con las que se emitiría.
-export type PreviaFactura = {
-  serie: string | null;
-  centro: string | null;
-  receptor: { nombre: string; rfc: string; regimen: string; cp: string; uso: string };
-  lineas: { cantidad: number; unidad: string; claveProd: string; descripcion: string; precioUnitario: number; importe: number }[];
-  subtotal: number;
-  iva: number;
-  total: number;
-};
-
-const NOMBRE_UNIDAD: Record<string, string> = { E48: "Unidad de servicio", H87: "Pieza", HUR: "Hora", DAY: "Día", MON: "Mes" };
-
-export async function previaCobro(admin: Admin, facturaId: string): Promise<{ ok: true; previa: PreviaFactura } | { ok: false; error: string }> {
-  const { data: f } = await admin.from("facturas").select("id, user_id, concepto, monto, centro, adicional_tipo").eq("id", facturaId).maybeSingle();
-  if (!f) return { ok: false, error: "Cobro no encontrado" };
-  if (!f.user_id) return { ok: false, error: "No tiene cliente asignado" };
-  const { data: cliente } = await admin.from("profiles").select("rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi").eq("id", f.user_id).maybeSingle();
-  const { data: ligados } = await admin.from("pagos").select("concepto, monto, adicional_tipo").eq("factura_id", f.id);
-  const pagosLigados = ligados || [];
-  const pagoAdicional = pagosLigados.find((l) => l.adicional_tipo) || null;
-  const suma = pagosLigados.reduce((s, l) => s + Number(l.monto), 0);
-  const varias = pagosLigados.length >= 2 && Math.abs(suma - Number(f.monto)) <= 0.01;
-  const base = varias
-    ? await Promise.all(pagosLigados.map(async (l) => ({ concepto: etiquetaPagoSuelto(l.concepto), monto: Number(l.monto), tipo: await tipoPorOmision(admin, f.user_id, l.adicional_tipo) })))
-    : [{ concepto: f.concepto as string, monto: Number(f.monto), tipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null) }];
-
-  const lineas = [];
-  let subtotal = 0;
-  for (const l of base) {
-    const clave = await servicioPorClave(admin, l.tipo);
-    const unitario = Math.round((l.monto / 1.16) * 100) / 100;
-    subtotal += unitario;
-    lineas.push({
-      cantidad: 1,
-      unidad: (clave?.satUnidad || "E48") + " - " + (NOMBRE_UNIDAD[clave?.satUnidad || "E48"] || ""),
-      claveProd: clave?.satProdServ || "80131502",
-      descripcion: l.concepto || "Servicios Nodus Flex Center",
-      precioUnitario: unitario,
-      importe: unitario,
-    });
-  }
-  subtotal = Math.round(subtotal * 100) / 100;
-  const total = Math.round(Number(f.monto) * 100) / 100;
-  return {
-    ok: true,
-    previa: {
-      serie: serieCentro(f.centro),
-      centro: f.centro,
-      receptor: {
-        nombre: cliente?.nombre_fiscal || "",
-        rfc: cliente?.rfc || "",
-        regimen: cliente?.regimen_fiscal || "",
-        cp: cliente?.cp_fiscal || "",
-        uso: cliente?.uso_cfdi || "G03",
-      },
-      lineas,
-      subtotal,
-      iva: Math.round((total - subtotal) * 100) / 100,
-      total,
-    },
-  };
-}
 
 // Un cobro suelto (adicional, depósito, pago de Cotizar…) es un registro de pago sin
 // factura. Para facturarlo antes de que se pague se crea su cobro con factura, se liga el

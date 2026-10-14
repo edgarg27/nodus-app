@@ -114,6 +114,8 @@ export type ParametrosCfdi = {
   relacion?: { tipo: string; uuids: string[] };
   // Periodicidad de la información global (solo público en general): day, week, fortnight, month o two_months.
   periodicidad?: string;
+  // Número de cuenta con el que se pagó (transferencia): se imprime en el PDF de la factura.
+  cuentaPago?: string;
   // Para los registros de error.
   etiqueta: string;
   // Facturapi no emite dos veces con la misma llave: evita facturas dobles si dos
@@ -126,9 +128,9 @@ export type ParametrosCfdi = {
 // Error con mensaje pensado para mostrarse tal cual al personal.
 export class ErrorFacturacion extends Error {}
 
-// Emite el CFDI en Facturapi, guarda XML/PDF y devuelve los datos listos para
-// la tabla `facturas`. No toca la base de datos de facturas ni de pagos.
-export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
+// Valida y arma lo que se manda a Facturapi. Lo usan el timbrado y la vista previa en PDF, para que la previa sea
+// exactamente la factura que se emitiría.
+async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
   const { cliente } = p;
   if (!cliente.rfc || !cliente.nombre_fiscal || !cliente.regimen_fiscal || !cliente.cp_fiscal) {
     throw new ErrorFacturacion("el cliente no tiene datos fiscales completos");
@@ -168,7 +170,7 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
     });
   }
 
-  const invoice: any = await facturapi.invoices.create({
+  const cuerpo = {
     customer: {
       legal_name: datos.nombre_fiscal,
       tax_id: datos.rfc,
@@ -183,13 +185,33 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
     ...(p.serie ? { series: p.serie } : {}),
     ...(p.condiciones ? { conditions: p.condiciones } : {}),
     ...(p.relacion && p.relacion.uuids.length > 0 ? { related_documents: p.relacion.uuids.map((uuid) => ({ relationship: p.relacion!.tipo, uuid })) } : {}),
-    ...(p.idempotencyKey ? { idempotency_key: p.idempotencyKey } : {}),
+    ...(p.cuentaPago ? { pdf_custom_section: `No. cuenta de pago: ${p.cuentaPago.replace(/[<>&]/g, "")}` } : {}),
     // El SAT exige el nodo "Información Global" cuando el receptor es
     // público en general (XAXX010101000): se factura como resumen diario.
     ...(publicoGeneral
       ? { global: { periodicity: p.periodicidad || "day", months: p.periodicidad === "two_months" ? String(12 + Math.ceil((hoy.getMonth() + 1) / 2)) : String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
       : {}),
-  });
+  };
+  return { cuerpo, datos, hoy, publicoGeneral, usoCfdi, lineas, cliente };
+}
+
+// Vista previa en PDF de la factura (la misma que se emitiría, con la marca de que no es válida): Facturapi la
+// genera con su plantilla, sin timbrar nada ni gastar un folio.
+export async function previaPdfCfdi(admin: Admin, p: ParametrosCfdi): Promise<Buffer> {
+  const { cuerpo } = await prepararFactura(admin, p);
+  const descarga: any = await (facturapi.invoices as any).previewPdf(cuerpo);
+  if (Buffer.isBuffer(descarga)) return descarga;
+  if (descarga instanceof ArrayBuffer) return Buffer.from(descarga);
+  const trozos: Buffer[] = [];
+  for await (const t of descarga) trozos.push(Buffer.from(t));
+  return Buffer.concat(trozos);
+}
+
+// Emite el CFDI en Facturapi, guarda XML/PDF y devuelve los datos listos para
+// la tabla `facturas`. No toca la base de datos de facturas ni de pagos.
+export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
+  const { cuerpo, datos, hoy, publicoGeneral, usoCfdi, lineas, cliente } = await prepararFactura(admin, p);
+  const invoice: any = await facturapi.invoices.create({ ...cuerpo, ...(p.idempotencyKey ? { idempotency_key: p.idempotencyKey } : {}) });
 
   const [xmlBuf, pdfBuf] = await Promise.all([
     facturapi.invoices

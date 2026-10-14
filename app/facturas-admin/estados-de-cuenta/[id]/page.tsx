@@ -7,8 +7,6 @@ import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { rolPuede } from "@/lib/permisosApi";
 import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, TIPOS_RELACION, REGEX_UUID, separarUuids } from "@/lib/formasPagoSat";
-import { EMISOR } from "@/lib/emisor";
-import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 
 // Estado de cuenta (como en ZORA): lo que se integró para un cliente, sus pagos y su historial. Desde "Acciones" se
@@ -72,7 +70,9 @@ export default function EstadoDeCuentaPage() {
   const [tipoRelacion, setTipoRelacion] = useState("");
   const [uuidsRelacion, setUuidsRelacion] = useState("");
   const [periodicidad, setPeriodicidad] = useState("day");
-  const [previa, setPrevia] = useState<{ previa: PreviaFactura; avisos: string[] } | null>(null);
+  const [cuentaPago, setCuentaPago] = useState("");
+  // Vista previa: el PDF que genera Facturapi, mostrado con el visor de PDF del navegador.
+  const [previaUrl, setPreviaUrl] = useState<string | null>(null);
   const [cargandoPrevia, setCargandoPrevia] = useState(false);
   const [aviso, setAviso] = useState("");
   const [accionando, setAccionando] = useState(false);
@@ -139,6 +139,7 @@ export default function EstadoDeCuentaPage() {
   function validarFacturar(): string {
     if (!condiciones.trim()) return "Escribe las condiciones de pago";
     if (metodo === "PUE" && !FORMAS_PAGO_SAT.some((f) => f.clave === formaPago)) return "Elige la forma de pago";
+    if (metodo === "PUE" && formaPago === "03" && cuentaPago.trim() && !/^[0-9A-Za-z\- ]{4,30}$/.test(cuentaPago.trim())) return "El número de cuenta solo admite letras, números y guiones (4 a 30 caracteres)";
     if (tipoRelacion) {
       const uuids = separarUuids(uuidsRelacion);
       if (uuids.length === 0) return "Escribe el UUID del CFDI relacionado";
@@ -147,15 +148,41 @@ export default function EstadoDeCuentaPage() {
     return "";
   }
 
+  function cuerpoFactura() {
+    return {
+      metodo,
+      formaPago: metodo === "PUE" ? formaPago : undefined,
+      condicionesPago: condiciones.trim(),
+      cuentaPago: metodo === "PUE" && formaPago === "03" && cuentaPago.trim() ? cuentaPago.trim() : undefined,
+      periodicidad: esPublicoGeneral ? periodicidad : undefined,
+      relacion: tipoRelacion ? { tipo: tipoRelacion, uuids: separarUuids(uuidsRelacion) } : undefined,
+    };
+  }
+
   async function verPrevia() {
     if (!factura) return;
+    const e = validarFacturar();
+    if (e) return setErrorTimbrar(e);
     setErrorTimbrar("");
     setCargandoPrevia(true);
-    const res = await fetch("/api/facturas/vista-previa?facturaId=" + factura.id);
-    const data = await res.json().catch(() => ({}));
+    const res = await fetch("/api/facturas/vista-previa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facturaId: factura.id, ...cuerpoFactura() }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setCargandoPrevia(false);
+      return setErrorTimbrar(data.error || "No se pudo armar la vista previa");
+    }
+    const blob = await res.blob();
     setCargandoPrevia(false);
-    if (!res.ok) return setErrorTimbrar(data.error || "No se pudo armar la vista previa");
-    setPrevia({ previa: data.previa, avisos: data.avisos || [] });
+    setPreviaUrl(URL.createObjectURL(blob));
+  }
+
+  function cerrarPrevia() {
+    if (previaUrl) URL.revokeObjectURL(previaUrl);
+    setPreviaUrl(null);
   }
 
   async function timbrar() {
@@ -167,14 +194,7 @@ export default function EstadoDeCuentaPage() {
     const res = await fetch("/api/facturas/facturar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        facturaIds: [factura.id],
-        metodo,
-        formaPago: metodo === "PUE" ? formaPago : undefined,
-        condicionesPago: condiciones.trim(),
-        periodicidad: esPublicoGeneral ? periodicidad : undefined,
-        relacion: tipoRelacion ? { tipo: tipoRelacion, uuids: separarUuids(uuidsRelacion) } : undefined,
-      }),
+      body: JSON.stringify({ facturaIds: [factura.id], ...cuerpoFactura() }),
     });
     const data = await res.json().catch(() => ({}));
     setTimbrando(false);
@@ -251,6 +271,7 @@ export default function EstadoDeCuentaPage() {
     setMetodo(factura?.estado === "pagada" ? "PUE" : "PPD");
     setFormaPago("03");
     setCondiciones("Contado");
+    setCuentaPago("");
     setTipoRelacion("");
     setUuidsRelacion("");
     setPeriodicidad("day");
@@ -620,6 +641,15 @@ export default function EstadoDeCuentaPage() {
                     {metodo === "PPD" && <p className="fac-facturar-nota">Con pago diferido la forma queda "Por definir"; cuando el cliente pague se emite su complemento de pago.</p>}
                   </div>
                 </div>
+            {metodo === "PUE" && formaPago === "03" && (
+              <div className="fac-facturar-fila">
+                <label>No. cuenta</label>
+                <div>
+                  <input type="text" maxLength={30} placeholder="Cuenta o CLABE con la que pagó" value={cuentaPago} onChange={(e) => setCuentaPago(e.target.value)} />
+                  <p className="fac-facturar-nota">Se imprime en la factura como "No. cuenta de pago".</p>
+                </div>
+              </div>
+            )}
             {esPublicoGeneral && (
                 <div className="fac-facturar-fila">
                   <label>
@@ -679,132 +709,19 @@ export default function EstadoDeCuentaPage() {
         </div>
       )}
 
-      {previa && factura && (
+      {previaUrl && (
         <div
           className="no-imprimir"
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, overflow: "auto" }}
-          onClick={() => setPrevia(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={cerrarPrevia}
         >
           <div className="form-card fac-previa-doc" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" onClick={() => setPrevia(null)}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" onClick={cerrarPrevia}>
               ×
             </button>
             <h2 className="fac-facturar-titulo">Previa</h2>
-            <div className="fac-previa-hoja">
-              <div className="fac-previa-cab">
-                <div className="fac-previa-logo">
-                  NODUS
-                  <small>FLEX CENTER</small>
-                </div>
-                <table className="fac-previa-datos">
-                  <tbody>
-                    <tr>
-                      <th>Factura</th>
-                      <td>{previa.previa.serie ? previa.previa.serie + "-(se asigna al timbrar)" : "(se asigna al timbrar)"}</td>
-                    </tr>
-                    <tr>
-                      <th>Método de pago</th>
-                      <td>{metodo === "PUE" ? "PUE-Pago en una sola exhibición" : "PPD-Pago en parcialidades o diferido"}</td>
-                    </tr>
-                    <tr>
-                      <th>Tipo de comprobante</th>
-                      <td>I-Ingreso</td>
-                    </tr>
-                    <tr>
-                      <th>Forma de pago</th>
-                      <td>{metodo === "PPD" ? "99-Por definir" : formaPago + "-" + (FORMAS_PAGO_SAT.find((f) => f.clave === formaPago)?.texto || "")}</td>
-                    </tr>
-                    <tr>
-                      <th>Condiciones de pago</th>
-                      <td>{condiciones}</td>
-                    </tr>
-                    <tr>
-                      <th>Lugar de expedición</th>
-                      <td>{EMISOR.cp}</td>
-                    </tr>
-                    <tr>
-                      <th>Fecha factura</th>
-                      <td>{factura.fecha_emision}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="fac-previa-centro">Centro: {previa.previa.centro ? "NODUS " + previa.previa.centro.toUpperCase() : "—"}</p>
-
-              <p className="fac-previa-banda">Emisor</p>
-              <p className="fac-previa-linea">
-                <b>Razón social:</b> {EMISOR.razonSocial} &nbsp;·&nbsp; <b>RFC:</b> {EMISOR.rfc}
-              </p>
-              <p className="fac-previa-linea">
-                <b>Dirección:</b> {EMISOR.direccion}, Col. {EMISOR.colonia}, CP {EMISOR.cp}, {EMISOR.ciudad}, {EMISOR.estado}, {EMISOR.pais}
-              </p>
-              <p className="fac-previa-linea">
-                <b>Régimen:</b> {EMISOR.regimen}
-              </p>
-
-              <p className="fac-previa-banda">Receptor</p>
-              <p className="fac-previa-linea">
-                <b>Razón social:</b> {previa.previa.receptor.nombre || "—"} &nbsp;·&nbsp; <b>RFC:</b> {previa.previa.receptor.rfc || "—"}
-              </p>
-              <p className="fac-previa-linea">
-                <b>CP:</b> {previa.previa.receptor.cp || "—"} &nbsp;·&nbsp; <b>Régimen:</b> {previa.previa.receptor.regimen || "—"} &nbsp;·&nbsp; <b>Uso CFDI:</b> {previa.previa.receptor.uso}
-              </p>
-
-              <table className="fac-previa-tabla">
-                <thead>
-                  <tr>
-                    <th>Cant.</th>
-                    <th>U.M.</th>
-                    <th>C.Producto</th>
-                    <th>Descripción</th>
-                    <th className="fac-num">P.Unitario</th>
-                    <th className="fac-num">Imp.Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previa.previa.lineas.map((l, i) => (
-                    <tr key={i}>
-                      <td>{l.cantidad}</td>
-                      <td>{l.unidad}</td>
-                      <td>{l.claveProd}</td>
-                      <td>{l.descripcion}</td>
-                      <td className="fac-num">{l.precioUnitario.toFixed(2)}</td>
-                      <td className="fac-num">{l.importe.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <table className="fac-previa-totales">
-                <tbody>
-                  <tr>
-                    <th>Sub-Total:</th>
-                    <td>{dinero(previa.previa.subtotal)}</td>
-                  </tr>
-                  <tr>
-                    <th>IVA (16%):</th>
-                    <td>{dinero(previa.previa.iva)}</td>
-                  </tr>
-                  <tr>
-                    <th>Total:</th>
-                    <td>
-                      <b>{dinero(previa.previa.total)}</b>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              {tipoRelacion && (
-                <p className="fac-previa-linea">
-                  <b>CFDI relacionado:</b> {TIPOS_RELACION.find((t) => t.clave === tipoRelacion)?.texto} · {separarUuids(uuidsRelacion).join(", ") || "—"}
-                </p>
-              )}
-              {previa.avisos.length > 0 && <p style={{ fontSize: 12, color: "#A32D2D", margin: "8px 0 0" }}>{previa.avisos[0]}</p>}
-              <p style={{ fontSize: 11, color: "#888", margin: "10px 0 0" }}>Vista previa sin valor fiscal: el folio, el UUID y los sellos se generan al timbrar.</p>
-            </div>
-            <div className="fac-facturar-botones">
-              <button type="button" className="fac-facturar-previa" onClick={() => setPrevia(null)}>
-                Cerrar
-              </button>
-            </div>
+            <iframe className="fac-previa-pdf" src={previaUrl} title="Vista previa de la factura" />
+            <p style={{ fontSize: 11, color: "#888", margin: "8px 0 0", textAlign: "center" }}>Vista previa sin valor fiscal: el folio, el UUID y los sellos se generan al timbrar.</p>
           </div>
         </div>
       )}
