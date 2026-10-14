@@ -7821,3 +7821,24 @@ a.stat-card {
 .fac-acciones-menu button:hover {
   background: #f1f3f8;
 }
+.fac-acciones-menu button:disabled {
+  color: #9aa3b5;
+  cursor: not-allowed;
+}
+.fac-acciones-menu button:disabled:hover {
+  background: none;
+}
+@media print {
+  .no-imprimir,
+  .rep-back {
+    display: none !important;
+  }
+  .rep-header {
+    background: none !important;
+    color: #000 !important;
+  }
+  .form-card {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

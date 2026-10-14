@@ -130,9 +130,14 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const rol = profile?.rol || "";
     setMiRol(rol);
+    // Desde "Facturas generadas" del estado de cuenta se llega con el cliente (y su centro) ya elegidos.
+    const params = new URLSearchParams(window.location.search);
+    const clienteParam = params.get("cliente");
+    const centroParam = params.get("centro");
+    if (clienteParam) setFiltroCliente(clienteParam);
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
-      setCentro(profile?.centro || CENTROS_SUGERIDOS[0]);
+      setCentro(centroParam && CENTROS_SUGERIDOS.includes(centroParam) ? centroParam : profile?.centro || CENTROS_SUGERIDOS[0]);
     } else {
       setCentro(profile?.centro || null);
     }
