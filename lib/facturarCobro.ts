@@ -9,11 +9,12 @@ import { serieCentro } from "@/lib/centros";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
+import { esErrorSuscripcion, simularTimbrado } from "@/lib/facturaSimulada";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-export type ResultadoFacturar = { id: string; folio?: string; ok: boolean; uuid?: string; error?: string };
+export type ResultadoFacturar = { id: string; folio?: string; ok: boolean; uuid?: string; error?: string; simulada?: boolean };
 
 // Facturas que ya no se pueden facturar a pago diferido porque no hay nada que cobrar después.
 const ESTADOS_NO_FACTURABLES = ["pagada", "cancelada"];
@@ -27,7 +28,7 @@ async function parametrosDeCobro(
   admin: Admin,
   facturaId: string,
   opts: OpcionesFactura
-): Promise<{ ok: true; f: { id: string; folio: string }; params: ParametrosCfdi } | { ok: false; resultado: ResultadoFacturar }> {
+): Promise<{ ok: true; f: { id: string; folio: string; user_id: string }; params: ParametrosCfdi } | { ok: false; resultado: ResultadoFacturar }> {
   const metodo = opts.metodo === "PUE" ? "PUE" : "PPD";
   const { data: f } = await admin
     .from("facturas")
@@ -82,7 +83,7 @@ async function parametrosDeCobro(
     etiqueta: `cobro ${f.id}`,
     idempotencyKey: `cobro-${f.id}`,
   };
-  return { ok: true, f: { id: f.id, folio: f.folio }, params };
+  return { ok: true, f: { id: f.id, folio: f.folio, user_id: f.user_id }, params };
 }
 
 // PDF de vista previa de la factura de un cobro (sin timbrar).
@@ -113,6 +114,19 @@ export async function facturarCobro(admin: Admin, facturaId: string, opts: Opcio
     return { id: f.id, folio: f.folio, ok: true, uuid: datosFactura.uuid_cfdi };
   } catch (err: any) {
     if (!(err instanceof ErrorFacturacion)) console.error(`[facturar-cobro] ${f.id}:`, err?.message || err);
+    // Facturapi sin suscripción: a los clientes de prueba se les simula el timbrado para poder probar el flujo.
+    if (esErrorSuscripcion(err?.message)) {
+      const sim = await simularTimbrado(admin, f.id, f.user_id, {
+        cliente: prep.params.cliente,
+        concepto: prep.params.concepto,
+        monto: prep.params.monto,
+        lineas: prep.params.lineas,
+        serie: prep.params.serie,
+        metodo: prep.params.metodo,
+        formaPago: prep.params.formaPago,
+      });
+      if (sim) return { id: f.id, folio: f.folio, ok: true, uuid: sim.uuid, simulada: true };
+    }
     // La llave de idempotencia ya usada significa que este cobro ya se facturó (o se está facturando).
     if (/idempotencia|idempotency/i.test(err?.message || "")) {
       return { id: f.id, folio: f.folio, ok: false, error: "Este cobro ya se facturó o se está facturando; actualiza la pantalla" };

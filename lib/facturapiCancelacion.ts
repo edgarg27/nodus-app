@@ -4,6 +4,7 @@
 
 import Facturapi from "facturapi";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { esFacturaSimulada } from "@/lib/facturaSimulada";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -62,6 +63,15 @@ export async function cancelarFactura(
   }
   if (f.cancelacion_estatus === "cancelada") return { id: facturaId, ok: false, error: "Ya está cancelada" };
   if (f.cancelacion_estatus === "en_proceso") return { id: facturaId, ok: false, error: "Ya tiene una cancelación en proceso" };
+
+  // Factura simulada (cliente de prueba, sin Facturapi): se cancela solo en Nodus.
+  if (esFacturaSimulada(f.uuid_cfdi)) {
+    await admin
+      .from("facturas")
+      .update({ cancelacion_estatus: "cancelada", cancelacion_motivo: opts.motivo, cancelacion_solicitada_en: new Date().toISOString(), cancelacion_solicitada_por: opts.usuarioId })
+      .eq("id", facturaId);
+    return { id: facturaId, ok: true, estatus: "cancelada" };
+  }
 
   try {
     const idFp = await idFacturapi(admin, f);

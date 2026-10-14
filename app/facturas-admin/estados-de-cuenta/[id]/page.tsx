@@ -8,6 +8,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, TIPOS_RELACION, REGEX_UUID, separarUuids } from "@/lib/formasPagoSat";
 import { EMISOR } from "@/lib/emisor";
+import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 
@@ -35,6 +36,7 @@ type Factura = {
   folio_fiscal: string | null;
   metodo_pago: string | null;
   cancelacion_estatus: string | null;
+  forma_pago?: string | null;
 };
 type Pago = { id: string; concepto: string | null; monto: number; estado: string; adicional_tipo: string | null; created_at: string };
 type Cliente = { nombre: string; email: string; empresa: string | null; nombre_fiscal: string | null; rfc: string | null; regimen_fiscal: string | null; cp_fiscal: string | null };
@@ -134,6 +136,7 @@ export default function EstadoDeCuentaPage() {
 
   const puedeTimbrar = rolPuede(rol, "facturaEmitir");
   const timbrada = !!factura?.uuid_cfdi;
+  const simulada = esFacturaSimulada(factura?.uuid_cfdi);
   const sePuedeTimbrar = !!factura && !timbrada && !!factura.user_id && factura.estado !== "cancelada";
   const avisos = cliente ? avisosDatosFiscales(cliente) : [];
   const esPublicoGeneral = cliente?.rfc === "XAXX010101000";
@@ -192,6 +195,17 @@ export default function EstadoDeCuentaPage() {
     setPreviaUrl(URL.createObjectURL(blob));
   }
 
+  // Factura simulada: no hay PDF del SAT; se muestra su formato con los mismos datos.
+  async function verFormatoSimulado() {
+    if (!factura) return;
+    setMetodo(factura.metodo_pago === "PUE" ? "PUE" : "PPD");
+    setFormaPago(factura.forma_pago || "03");
+    const res = await fetch("/api/facturas/vista-previa?facturaId=" + factura.id);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setAviso("✗ " + (data.error || "No se pudo armar el formato"));
+    setPrevia({ previa: data.previa, avisos: data.avisos || [] });
+  }
+
   function cerrarPrevia() {
     if (previaUrl) URL.revokeObjectURL(previaUrl);
     setPreviaUrl(null);
@@ -213,7 +227,7 @@ export default function EstadoDeCuentaPage() {
     const r = (data.resultados || [])[0];
     if (!res.ok || (r && !r.ok)) return setErrorTimbrar(r?.error || data.error || "No se pudo timbrar");
     setModalTimbrar(false);
-    setAviso(`✓ Factura timbrada (${metodo}).`);
+    setAviso(r?.simulada ? `✓ Timbrado SIMULADO (${metodo}): Facturapi no está disponible y este es un cliente de prueba. No tiene valor fiscal.` : `✓ Factura timbrada (${metodo}).`);
     cargar();
   }
 
@@ -358,7 +372,11 @@ export default function EstadoDeCuentaPage() {
                       <a role="menuitem" href={"/facturas-admin/timbradas?cliente=" + (factura.user_id || "") + "&centro=" + encodeURIComponent(factura.centro || "")}>
                         Facturas generadas
                       </a>
-                      {factura.archivo_url ? (
+                      {simulada ? (
+                        <button type="button" role="menuitem" onClick={verFormatoSimulado}>
+                          Reimprime (formato simulado)
+                        </button>
+                      ) : factura.archivo_url ? (
                         <a role="menuitem" href={"/api/facturas/descargar?id=" + factura.id + "&tipo=pdf"}>
                           Reimprime (PDF de la factura)
                         </a>
@@ -450,7 +468,7 @@ export default function EstadoDeCuentaPage() {
                         <th>Factura electrónica</th>
                         <td>
                           {timbrada
-                            ? `Timbrada ${factura.metodo_pago || ""} · ${factura.serie ? factura.serie + "-" + (factura.folio_fiscal || "") : ""}`
+                            ? `${simulada ? "Timbrada SIMULADA (prueba)" : "Timbrada"} ${factura.metodo_pago || ""} · ${factura.serie ? factura.serie + "-" + (factura.folio_fiscal || "") : ""}`
                             : factura.estado === "cancelada"
                               ? "Cancelada"
                               : "Por timbrar"}
@@ -750,7 +768,9 @@ export default function EstadoDeCuentaPage() {
             </button>
             <h2 className="fac-facturar-titulo">Previa</h2>
             <p style={{ fontSize: 12, color: "#854F0B", background: "#FAEEDA", borderRadius: 8, padding: "8px 10px", margin: "0 0 10px", textAlign: "center" }}>
-              Vista previa provisional: Facturapi no está disponible (suscripción), así que se arma aquí con los mismos datos. El PDF real se verá cuando se active.
+              {simulada
+                ? "Factura SIMULADA de prueba: no tiene valor fiscal. Es el formato con los mismos datos; el PDF real lo genera Facturapi cuando se active."
+                : "Vista previa provisional: Facturapi no está disponible (suscripción), así que se arma aquí con los mismos datos. El PDF real se verá cuando se active."}
             </p>
             <div className="fac-previa-hoja">
               <div className="fac-previa-cab">
@@ -762,7 +782,7 @@ export default function EstadoDeCuentaPage() {
                   <tbody>
                     <tr>
                       <th>Factura</th>
-                      <td>{previa.previa.serie ? previa.previa.serie + "-(se asigna al timbrar)" : "(se asigna al timbrar)"}</td>
+                      <td>{simulada ? (factura.serie || "") + "-" + (factura.folio_fiscal || "") + " (simulado)" : previa.previa.serie ? previa.previa.serie + "-(se asigna al timbrar)" : "(se asigna al timbrar)"}</td>
                     </tr>
                     <tr>
                       <th>Método de pago</th>

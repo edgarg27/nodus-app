@@ -6,6 +6,7 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
+import { esFacturaSimulada } from "@/lib/facturaSimulada";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -1105,8 +1106,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                   )}
                                 </td>
                                 <td>
-                                  <span className="fac-sub" style={{ marginTop: 0 }} title={f.uuid_cfdi || ""}>
-                                    {f.uuid_cfdi ? f.uuid_cfdi.slice(0, 8) + "…" : "—"}
+                                  <span className="fac-sub" style={{ marginTop: 0, ...(esFacturaSimulada(f.uuid_cfdi) ? { color: "#A32D2D", fontWeight: 700 } : {}) }} title={f.uuid_cfdi || ""}>
+                                    {esFacturaSimulada(f.uuid_cfdi) ? "SIMULADA (prueba)" : f.uuid_cfdi ? f.uuid_cfdi.slice(0, 8) + "…" : "—"}
                                   </span>
                                 </td>
                                 <td>
