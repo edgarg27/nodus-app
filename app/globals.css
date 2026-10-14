@@ -7618,3 +7618,96 @@ a.stat-card {
     display: none;
   }
 }
+
+/* ---------- Facturas: tabla y resumen por cliente ---------- */
+.fac-tabla-wrap {
+  margin-top: 8px;
+  background: #fff;
+  border-radius: 12px;
+  overflow-x: auto;
+}
+.fac-tabla {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #222;
+}
+.fac-tabla th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #667;
+  padding: 10px 12px;
+  border-bottom: 2px solid #e6e8ee;
+  white-space: nowrap;
+}
+.fac-tabla td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef0f4;
+  vertical-align: top;
+}
+.fac-tabla tbody tr:hover td {
+  background: #fafbfd;
+}
+.fac-tabla .fac-num {
+  text-align: right;
+}
+.fac-tabla .fac-nowrap {
+  white-space: nowrap;
+}
+.fac-tabla .fac-col-sel {
+  width: 28px;
+}
+.fac-sub {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+  word-break: break-all;
+}
+.fac-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.fac-fila-cancelada td {
+  opacity: 0.6;
+}
+.fac-fila-detalle td {
+  background: #f7f8fb;
+}
+.fac-resumen {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 24px;
+  align-items: center;
+}
+.fac-resumen-cifras {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.fac-resumen-cifras div {
+  display: flex;
+  flex-direction: column;
+}
+.fac-resumen-cifras span {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fac-resumen-cifras b {
+  font-size: 18px;
+  color: #0d1b3e;
+}
+@media (max-width: 700px) {
+  .fac-resumen {
+    grid-template-columns: 1fr;
+  }
+}
