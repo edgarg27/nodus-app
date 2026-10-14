@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { cargarCatalogo } from "@/lib/catalogoServicios";
+import { accesoCliente } from "@/lib/facturasAcceso";
 
 export const dynamic = "force-dynamic";
 
@@ -27,17 +28,19 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Falta el cliente" }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: cliente } = await admin.from("profiles").select("id, centro").eq("id", userId).maybeSingle();
-  if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-  if (!ROLES_GLOBALES.includes(miProfile!.rol) && cliente.centro !== miProfile!.centro) {
-    return NextResponse.json({ error: "No puedes consultar clientes de otro centro" }, { status: 403 });
-  }
+  const acceso = await accesoCliente(admin, miProfile!.rol, miProfile!.centro, userId);
+  if (!acceso.cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+  if (!acceso.ok) return NextResponse.json({ error: "No puedes consultar clientes de otro centro" }, { status: 403 });
+  const cliente = acceso.cliente;
+  const esGlobal = ROLES_GLOBALES.includes(miProfile!.rol);
 
   const todos = q.get("estatus") === "todos";
   // select("*"): el folio del contrato es una columna nueva (migracion_contratos_folio.sql); así no falla si aún no existe.
   let consulta = admin.from("contratos").select("*").eq("user_id", userId);
   if (!todos) consulta = consulta.eq("estatus", "vigente");
-  const { data: contratos } = await consulta.order("fecha_inicio", { ascending: false });
+  const { data: todosContratos } = await consulta.order("fecha_inicio", { ascending: false });
+  // Quien no es global solo ve los contratos de su centro.
+  const contratos = (todosContratos || []).filter((c) => esGlobal || (c.centro ? c.centro === miProfile!.centro : cliente.centro === miProfile!.centro));
 
   const oficinaIds = Array.from(new Set((contratos || []).map((c) => c.oficina_id).filter(Boolean))) as string[];
   const paqueteIds = Array.from(new Set((contratos || []).map((c) => c.paquete_id).filter(Boolean))) as string[];
@@ -95,12 +98,10 @@ export async function GET(req: NextRequest) {
   const { servicios: catalogo } = await cargarCatalogo(admin);
   const etiquetaServicio = new Map(catalogo.map((s) => [s.clave, s.etiqueta]));
   const tipoUnico = elegidos.length === 1 ? (elegidos[0].tipo || "").toLowerCase() : "";
-  const { data: pagos } = await admin
-    .from("pagos")
-    .select("id, concepto, monto, estado, adicional_tipo")
-    .eq("user_id", userId)
-    .is("factura_id", null)
-    .order("created_at", { ascending: false });
+  let consultaPagos = admin.from("pagos").select("id, concepto, monto, estado, adicional_tipo").eq("user_id", userId).is("factura_id", null);
+  // Un cliente de otro centro con contrato aquí: solo sus pagos de este centro.
+  if (acceso.cruzado) consultaPagos = consultaPagos.eq("centro", miProfile!.centro);
+  const { data: pagos } = await consultaPagos.order("created_at", { ascending: false });
   for (const p of pagos || []) {
     const nombre = etiquetaPagoSuelto(p.concepto);
     const esDeposito = /dep[oó]sito/i.test(nombre);

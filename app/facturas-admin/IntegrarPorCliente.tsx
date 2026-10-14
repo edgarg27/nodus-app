@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
@@ -23,6 +22,7 @@ type ClienteForm = {
   rfc: string | null;
   regimen_fiscal: string | null;
   cp_fiscal: string | null;
+  porContrato?: boolean;
 };
 type ContratoOpc = { id: string; folio: string | null; centro: string; estatus: string; renta: number; tipo: string; etiqueta: string };
 type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string };
@@ -42,7 +42,6 @@ function Etiqueta({ texto, obligatorio }: { texto: string; obligatorio?: boolean
 }
 
 export default function IntegrarPorCliente({ centroInicial, onListo }: { centroInicial: string; onListo: (mensaje: string) => void }) {
-  const supabase = createClient();
   const hoy = hoyMexicoISO();
   const [centro, setCentro] = useState(CENTROS.includes(centroInicial) ? centroInicial : CENTROS[0]);
   const [clientes, setClientes] = useState<ClienteForm[]>([]);
@@ -93,16 +92,15 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
     let vivo = true;
     setCargandoClientes(true);
     setClienteId("");
-    supabase
-      .from("profiles")
-      .select("id, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal")
-      .eq("rol", "cliente")
-      .eq("centro", centro)
-      .order("nombre")
-      .then(({ data }) => {
+    fetch("/api/facturas/clientes?centro=" + encodeURIComponent(centro))
+      .then((r) => r.json())
+      .then((d) => {
         if (!vivo) return;
-        setClientes((data as ClienteForm[]) || []);
+        setClientes((d.clientes as ClienteForm[]) || []);
         setCargandoClientes(false);
+      })
+      .catch(() => {
+        if (vivo) setCargandoClientes(false);
       });
     return () => {
       vivo = false;
@@ -289,6 +287,7 @@ export default function IntegrarPorCliente({ centroInicial, onListo }: { centroI
                       >
                         {razonSocial(c)}
                         {c.rfc ? ` · ${c.rfc}` : ""}
+                        {c.porContrato ? " · contrato en este centro" : ""}
                       </button>
                     ))
                   )}

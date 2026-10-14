@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
+import { accesoCliente } from "@/lib/facturasAcceso";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const DIAS_PARA_PAGAR = 10;
@@ -37,11 +38,10 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: cliente } = await admin.from("profiles").select("id, centro").eq("id", userId).maybeSingle();
+  const acceso = await accesoCliente(admin, miProfile!.rol, miProfile!.centro, userId);
+  const cliente = acceso.cliente;
   if (!cliente || !cliente.centro) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-  if (!ROLES_GLOBALES.includes(miProfile!.rol) && cliente.centro !== miProfile!.centro) {
-    return NextResponse.json({ error: "No puedes facturar a clientes de otro centro" }, { status: 403 });
-  }
+  if (!acceso.ok) return NextResponse.json({ error: "No puedes facturar a clientes de otro centro" }, { status: 403 });
   // El centro de la factura es el del contrato (un cliente puede tener contratos en varios centros); por omisión, el del cliente.
   const centro: string = centroPedido && SERIE_POR_CENTRO[centroPedido] ? centroPedido : cliente.centro;
   if (!ROLES_GLOBALES.includes(miProfile!.rol) && centro !== miProfile!.centro) {
@@ -50,9 +50,12 @@ export async function POST(req: NextRequest) {
 
   // Líneas que ya son un pago del cliente, sin factura.
   const pagoIds = lineas.map((l) => l.pagoId).filter((x): x is string => typeof x === "string");
-  const { data: pagosExistentes } = pagoIds.length
-    ? await admin.from("pagos").select("id, monto, adicional_tipo").in("id", pagoIds).eq("user_id", userId).is("factura_id", null)
-    : { data: [] as { id: string; monto: number; adicional_tipo: string | null }[] };
+  let consultaPagos = pagoIds.length
+    ? admin.from("pagos").select("id, monto, adicional_tipo").in("id", pagoIds).eq("user_id", userId).is("factura_id", null)
+    : null;
+  // Un cliente de otro centro con contrato aquí: solo se pueden ligar sus pagos de este centro.
+  if (consultaPagos && acceso.cruzado) consultaPagos = consultaPagos.eq("centro", miProfile!.centro);
+  const { data: pagosExistentes } = consultaPagos ? await consultaPagos : { data: [] as { id: string; monto: number; adicional_tipo: string | null }[] };
   if ((pagosExistentes || []).length !== pagoIds.length) {
     return NextResponse.json({ error: "Alguno de los pagos ya tiene factura o no es de este cliente. Vuelve a pulsar Previa." }, { status: 409 });
   }
