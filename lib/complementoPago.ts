@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales } from "@/lib/datosFiscales";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { serieCentro } from "@/lib/centros";
+import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { estatusDesdeFacturapi } from "@/lib/facturapiCancelacion";
 import { clienteFacturapi, bufferDesdeUrlFirmada, subirArchivoFactura, ErrorFacturacion } from "@/lib/facturapi";
@@ -225,7 +226,7 @@ export async function emitirComplementoPago(
     if (/idempotencia|idempotency/i.test(err?.message || "")) {
       return { ok: false, error: "Este pago ya tiene su complemento (o se está emitiendo); actualiza la pantalla" };
     }
-    return { ok: false, error: err?.message || "Facturapi rechazó el complemento" };
+    return { ok: false, error: explicarErrorFacturapi(err?.message, "Facturapi rechazó el complemento") };
   }
 }
 

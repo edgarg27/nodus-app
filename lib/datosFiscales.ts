@@ -135,3 +135,37 @@ export function validarDatosFiscales(d: DatosFiscales, tipo: TipoPersonaFiscal):
   if (!usosParaTipo(tipo).some((u) => u.clave === d.uso_cfdi)) return "Elige el uso de la factura";
   return "";
 }
+
+// Avisos (no errores) sobre datos fiscales que probablemente no coinciden con lo que el SAT tiene
+// registrado. Sirven para que quien factura lo revise ANTES de timbrar; el SAT es quien decide.
+const ARTICULOS = new Set(["DE", "DEL", "LA", "LAS", "LOS", "EL", "Y", "E", "EN", "AL", "THE", "A"]);
+const PINTA_DE_EMPRESA = /\b(S\.?A\.? DE C\.?V\.?|SA DE CV|S\.? DE R\.?L\.?|SAPI|S\.?A\.?S\.?|SOCIEDAD|EMPRESA|COMPANY|CORPORATIVO|CONSTRUCTORA|INMOBILIARIA|ASOCIADOS|GRUPO)\b/i;
+const sinAcentosMayus = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+export function avisosDatosFiscales(d: { rfc?: string | null; nombre_fiscal?: string | null; regimen_fiscal?: string | null }): string[] {
+  const avisos: string[] = [];
+  const rfc = normalizarRfc(d.rfc || "");
+  const nombre = (d.nombre_fiscal || "").trim();
+  if (!rfc || !nombre || RFC_GENERICOS.includes(rfc)) return avisos;
+  const moral = rfc.length === 12;
+  const fisica = rfc.length === 13;
+
+  if (nombre !== nombre.toUpperCase()) avisos.push("La razón social lleva minúsculas: el SAT la tiene en MAYÚSCULAS (escríbela como en la Constancia).");
+
+  if (moral) {
+    // El RFC de una empresa empieza con la inicial de su razón social.
+    const primera = sinAcentosMayus(nombre)
+      .split(/\s+/)
+      .find((p) => p && !ARTICULOS.has(p));
+    if (primera && primera[0] !== sinAcentosMayus(rfc)[0]) {
+      avisos.push(`El RFC (de empresa) empieza con «${rfc[0]}» y la razón social con «${primera[0]}»: parece que no corresponden. Revisa ambos en la Constancia.`);
+    }
+  }
+  if (fisica && PINTA_DE_EMPRESA.test(nombre)) avisos.push("El RFC es de persona física, pero la razón social parece de una empresa.");
+
+  const regimen = REGIMENES_FISCALES.find((r) => r.clave === d.regimen_fiscal);
+  if (regimen && (moral || fisica) && !regimen.aplica.includes(moral ? "moral" : "fisica")) {
+    avisos.push(`El régimen ${regimen.clave} es de ${moral ? "personas físicas" : "empresas"}, pero el RFC es de ${moral ? "una empresa" : "una persona física"}.`);
+  }
+  return avisos;
+}

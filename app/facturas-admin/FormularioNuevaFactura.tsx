@@ -7,7 +7,7 @@ import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { conceptoParaCliente } from "@/lib/adicionales";
 import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
-import { DATOS_PUBLICO_GENERAL } from "@/lib/datosFiscales";
+import { DATOS_PUBLICO_GENERAL, avisosDatosFiscales } from "@/lib/datosFiscales";
 
 // Formulario "Nueva factura": centro → cliente (por razón social) → qué se factura y cuánto →
 // cómo se factura (método y forma de pago). Tres acciones: Vista previa, Integrar factura (guarda
@@ -273,6 +273,7 @@ export default function FormularioNuevaFactura({
   const tipoInfo = servicios.find((s) => s.clave === tipo) || null;
   const faltanDatosFiscales = !publicoGeneral && !!cliente && !(cliente.rfc && cliente.nombre_fiscal && cliente.regimen_fiscal && cliente.cp_fiscal);
   const forma = FORMAS_PAGO_COMPLEMENTO.find((f) => f.clave === formaPago);
+  const avisosFiscales = !publicoGeneral && cliente ? avisosDatosFiscales(cliente) : [];
 
   function abrirVistaPrevia() {
     setError("");
@@ -513,6 +514,16 @@ export default function FormularioNuevaFactura({
                 </>
               ) : null}
               {faltanDatosFiscales && <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 0" }}>Faltan datos fiscales de este cliente: se puede integrar, pero no timbrar hasta completarlos.</p>}
+              {avisosFiscales.length > 0 && (
+                <div style={{ marginTop: 6, background: "#FAEEDA", borderRadius: 8, padding: "8px 10px" }}>
+                  <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#854F0B" }}>Revisa estos datos antes de timbrar:</p>
+                  {avisosFiscales.map((a) => (
+                    <p key={a} style={{ margin: "2px 0 0", fontSize: 12, color: "#854F0B" }}>
+                      • {a}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="prev-bloque">

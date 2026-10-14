@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, tipoPorOmision, ErrorFacturacion } from "@/lib/facturapi";
 import { serieCentro } from "@/lib/centros";
+import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -76,7 +77,7 @@ export async function facturarCobro(
     if (/idempotencia|idempotency/i.test(err?.message || "")) {
       return { id: f.id, folio: f.folio, ok: false, error: "Este cobro ya se facturó o se está facturando; actualiza la pantalla" };
     }
-    return { id: f.id, folio: f.folio, ok: false, error: err?.message || "Facturapi rechazó la factura" };
+    return { id: f.id, folio: f.folio, ok: false, error: explicarErrorFacturapi(err?.message) };
   }
 }
 
