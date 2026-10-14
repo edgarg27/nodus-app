@@ -6,6 +6,7 @@ import { enviarCorreo } from "@/lib/email";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { generarFacturaAutomatica } from "@/lib/facturapi";
+import { esFacturaSimulada } from "@/lib/facturaSimulada";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     const { error } = await admin.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).in("id", pendientes.map((p) => p.id));
     if (error) return NextResponse.json({ error: "No se pudo registrar el pago" }, { status: 500 });
     // Si la factura ya se timbró a pago diferido, cada pago se cubre con su complemento de pago.
-    if (factura.uuid_cfdi && factura.metodo_pago === "PPD") {
+    if (factura.uuid_cfdi && factura.metodo_pago === "PPD" && !esFacturaSimulada(factura.uuid_cfdi)) {
       for (const p of pendientes) await generarFacturaAutomatica(admin, p.id, FORMA_A_METODO[formaPago]);
     }
     return NextResponse.json({ ok: true, registrados: pendientes.length, complemento: !!factura.uuid_cfdi && factura.metodo_pago === "PPD" });

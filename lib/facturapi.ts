@@ -9,6 +9,7 @@
 // truena el pago: si algo falla, el pago sigue su curso y se deja un aviso.
 
 import Facturapi from "facturapi";
+import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
@@ -302,6 +303,8 @@ export async function generarFacturaAutomatica(admin: Admin, pagoId: string, met
       const { data } = await admin.from("facturas").select("id, uuid_cfdi, metodo_pago, folio").eq("id", pago.factura_id).maybeSingle();
       facturaExistente = data;
       if (facturaExistente?.uuid_cfdi) {
+        // Una factura simulada (cliente de prueba) no existe en Facturapi: no hay complemento que emitir.
+        if (esFacturaSimulada(facturaExistente.uuid_cfdi)) return;
         // Ya facturado (webhook + verificación pueden coincidir): no se duplica. Si la factura
         // se emitió a pago diferido (PPD), este pago se cubre con su complemento de pago.
         if (facturaExistente.metodo_pago === "PPD") {
