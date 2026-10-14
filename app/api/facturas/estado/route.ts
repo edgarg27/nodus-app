@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: factura } = await admin
     .from("facturas")
-    .select("id, user_id, folio, concepto, monto, fecha_emision, fecha_vencimiento, estado, centro, uuid_cfdi, metodo_pago")
+    .select("*")
     .eq("id", facturaId)
     .maybeSingle();
   if (!factura) return NextResponse.json({ error: "Estado de cuenta no encontrado" }, { status: 404 });
@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
   </div>`;
     const r = await enviarCorreo({ to: cliente.email, subject: `Tu estado de cuenta ${factura.folio} - Nodus`, html });
     if (!r.ok) return NextResponse.json({ error: r.error || "No se pudo enviar el correo" }, { status: 502 });
+    // Cuenta el envío (columna nueva: si todavía no existe, no pasa nada).
+    await admin.from("facturas").update({ envios_estado: Number((factura as any).envios_estado || 0) + 1 }).eq("id", factura.id);
     return NextResponse.json({ ok: true, correo: cliente.email });
   }
 

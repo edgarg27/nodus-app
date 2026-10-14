@@ -8034,3 +8034,20 @@ a.stat-card {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Historial del estado de cuenta (como "Detalles" de ZORA) */
+.fac-fila-acciones {
+  background: #96a8c2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.fac-fila-acciones:hover {
+  background: #0d1b3e;
+}
+.fac-fila-actual td {
+  background: #fff7f2;
+}
