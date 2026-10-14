@@ -299,7 +299,7 @@ export default function EstadoDeCuentaPage() {
                   Estado de cuenta
                 </p>
                 <div className="no-imprimir" style={{ position: "relative" }}>
-                  <button type="button" className="btn-exportar" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
+                  <button type="button" className="btn-exportar fac-naranja" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
                     ☰ Acciones ▾
                   </button>
                   {menu && (
@@ -671,7 +671,7 @@ export default function EstadoDeCuentaPage() {
               <button type="button" className="fac-facturar-previa" disabled={timbrando || cargandoPrevia} onClick={verPrevia}>
                 {cargandoPrevia ? "Armando..." : "Vista previa"}
               </button>
-              <button type="button" className="btn-exportar" disabled={timbrando || faltanDatos} onClick={timbrar}>
+              <button type="button" className="btn-exportar fac-naranja" disabled={timbrando || faltanDatos} onClick={timbrar}>
                 {timbrando ? "Timbrando..." : "Timbrar"}
               </button>
             </div>
@@ -827,7 +827,7 @@ export default function EstadoDeCuentaPage() {
             <input type="date" value={fechaEdit} onChange={(e) => setFechaEdit(e.target.value)} />
             {errorModal && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorModal}</p>}
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button className="btn-exportar" disabled={accionando} onClick={guardarEdicion}>
+              <button className="btn-exportar fac-naranja" disabled={accionando} onClick={guardarEdicion}>
                 {accionando ? "Guardando..." : "Guardar"}
               </button>
               <button className="tel-borrar-btn" disabled={accionando} onClick={() => setModalEditar(false)}>
@@ -865,7 +865,7 @@ export default function EstadoDeCuentaPage() {
             </select>
             {errorModal && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorModal}</p>}
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button className="btn-exportar" disabled={accionando} onClick={guardarPago}>
+              <button className="btn-exportar fac-naranja" disabled={accionando} onClick={guardarPago}>
                 {accionando ? "Registrando..." : "Registrar pago"}
               </button>
               <button className="tel-borrar-btn" disabled={accionando} onClick={() => setModalPago(false)}>

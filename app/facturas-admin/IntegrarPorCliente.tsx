@@ -329,7 +329,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
         </div>
 
         <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center" }}>
-          <button type="button" className="btn-exportar" disabled={!clienteId || cargandoPrevia} onClick={previa}>
+          <button type="button" className="btn-exportar fac-naranja" disabled={!clienteId || cargandoPrevia} onClick={previa}>
             {cargandoPrevia ? "Consultando..." : "Previa"}
           </button>
         </div>
@@ -421,7 +421,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
 
           {lineas.length > 0 && (
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-              <button type="button" className="btn-exportar" style={{ background: "#F2833B" }} disabled={trabajando || elegidas.length === 0} onClick={integrar}>
+              <button type="button" className="btn-exportar fac-naranja" disabled={trabajando || elegidas.length === 0} onClick={integrar}>
                 {trabajando ? "Integrando..." : "Integrar factura"}
               </button>
               <span style={{ fontSize: 12, color: "#888" }}>Después de integrar se abre el estado de cuenta; ahí se timbra y se elige el método de pago.</span>
