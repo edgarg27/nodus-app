@@ -383,6 +383,7 @@ export default function FormularioNuevaFactura({
           {servicios.map((t) => (
             <option key={t.clave} value={t.clave}>
               {t.etiqueta}
+              {t.precio != null ? " · " + dinero(t.precio) : ""}
             </option>
           ))}
         </select>

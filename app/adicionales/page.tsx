@@ -324,6 +324,7 @@ export default function AdicionalesPage() {
                       onClick={() => elegirTipo(t.clave)}
                     >
                       {t.etiqueta}
+                      {t.precio != null ? " · " + fmtMoneda(t.precio) : ""}
                     </button>
                   ))}
                 </div>

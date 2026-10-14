@@ -145,11 +145,11 @@ export default function CatalogoServiciosPage() {
                   </select>
                 </div>
                 <div>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>Precio con IVA</p>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>Precio con IVA <span style={{ color: "#A32D2D" }}>*</span></p>
                   <input type="text" inputMode="decimal" placeholder="$0.00" value={nuevo.precio} onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value.replace(/[^0-9.]/g, "") })} />
                 </div>
                 <div style={{ alignSelf: "end" }}>
-                  <button type="submit" className="fac-btn fac-btn-verde" disabled={agregando || !deBase || nuevo.etiqueta.trim().length < 2 || nuevo.satProdServ.length !== 8}>
+                  <button type="submit" className="fac-btn fac-btn-verde" disabled={agregando || !deBase || nuevo.etiqueta.trim().length < 2 || nuevo.satProdServ.length !== 8 || !(Number(nuevo.precio) > 0)}>
                     {agregando ? "Agregando..." : "Agregar"}
                   </button>
                 </div>
@@ -157,7 +157,15 @@ export default function CatalogoServiciosPage() {
             </form>
 
             <div className="form-card">
-              <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>Servicios ({servicios.filter((s) => s.activo).length} activos)</p>
+              <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>
+                Servicios ({servicios.filter((s) => s.activo).length} activos)
+                {servicios.filter((s) => s.activo && s.precio == null && s.clave !== "otro").length > 0 && (
+                  <span style={{ fontWeight: 400, color: "#A32D2D" }}>
+                    {" "}
+                    · {servicios.filter((s) => s.activo && s.precio == null && s.clave !== "otro").length} sin precio: al elegirlos no se rellena el precio
+                  </span>
+                )}
+              </p>
               <div className="servicios-fila servicios-encabezado">
                 <span>Nombre</span>
                 <span>Clave del SAT</span>
@@ -172,7 +180,7 @@ export default function CatalogoServiciosPage() {
                     <input type="text" maxLength={80} value={e.etiqueta} onChange={(ev) => poner(s.clave, "etiqueta", ev.target.value)} />
                     <input type="text" inputMode="numeric" maxLength={8} value={e.satProdServ} onChange={(ev) => poner(s.clave, "satProdServ", ev.target.value.replace(/\D/g, ""))} />
                     <input type="text" maxLength={3} value={e.satUnidad} onChange={(ev) => poner(s.clave, "satUnidad", ev.target.value.toUpperCase())} />
-                    <input type="text" inputMode="decimal" placeholder={s.precio == null ? "Sin precio fijo" : ""} value={e.precio} onChange={(ev) => poner(s.clave, "precio", ev.target.value.replace(/[^0-9.]/g, ""))} />
+                    <input type="text" inputMode="decimal" placeholder={s.precio == null ? (s.clave === "otro" ? "Se captura a mano" : "Falta el precio") : ""} style={s.activo && s.precio == null && e.precio === "" && s.clave !== "otro" ? { borderColor: "#A32D2D" } : undefined} value={e.precio} onChange={(ev) => poner(s.clave, "precio", ev.target.value.replace(/[^0-9.]/g, ""))} />
                     <div className="servicios-acciones">
                       <button type="button" className="fac-btn fac-btn-verde" disabled={!cambiado(s) || guardando === s.clave || !deBase} onClick={() => guardar(s)}>
                         {guardando === s.clave ? "..." : "Guardar"}
