@@ -33,7 +33,7 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   // Cotizar y aprobar contratos (Centro, Alta de cliente, Contratos): generan cobros sueltos.
   pagosCrear: ["admin", "gerente", "ventas", "sistemas", "operaciones", "gerente_ventas"],
   // Cobros adicionales sueltos (/adicionales): hora extra de sala, copias, frituras…
-  adicionalesCobrar: ["admin", "gerente", "gerente_ventas"],
+  adicionalesCobrar: ["admin", "gerente", "gerente_ventas", "cobranza"],
   // Crear una tarjeta de fidelidad desde /fidelidad-admin (mismos roles que esa pantalla).
   fidelidadCrear: ["admin", "gerente"],
   // Dinero: marcar pagado, ligar pagos a facturas, bajar facturas de cualquier cliente.
