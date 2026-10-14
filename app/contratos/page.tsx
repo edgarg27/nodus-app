@@ -42,6 +42,7 @@ type OficinaOpcion = { id: string; numero: string; tipo: string; estado: string 
 
 export type Contrato = {
   id: string;
+  folio?: string | null;
   user_id: string | null;
   centro: string;
   fecha_inicio: string;
@@ -264,6 +265,7 @@ export default function ContratosPage() {
       (c.cliente_empresa || "").toLowerCase().includes(q) ||
       (c.cliente_telefono || "").toLowerCase().includes(q) ||
       (c.cliente_email || "").toLowerCase().includes(q) ||
+      (c.folio || "").toLowerCase().includes(q) ||
       c.id.toLowerCase().includes(q)
     );
   }
@@ -664,6 +666,7 @@ export default function ContratosPage() {
                         <p className="contrato-cliente-nombre">
                           {c.cliente_nombre || "Cliente"} {c.cliente_empresa ? `· ${c.cliente_empresa}` : ""}
                         </p>
+                        {c.folio && <p className="contrato-detalle" style={{ fontWeight: 600 }}>Folio {c.folio}</p>}
                         <p className="contrato-detalle">{c.cliente_email}</p>
                         <p className="contrato-detalle">
                           ${c.renta_mensual.toLocaleString("es-MX")}/mes {c.plan_nombre ? `· ${c.plan_nombre}` : ""}
@@ -989,6 +992,7 @@ export default function ContratosPage() {
                         <p className="contrato-cliente-nombre">
                           {c.cliente_nombre || "Cliente"} {c.cliente_empresa ? `· ${c.cliente_empresa}` : ""}
                         </p>
+                        {c.folio && <p className="contrato-detalle" style={{ fontWeight: 600 }}>Folio {c.folio}</p>}
                         <p className="contrato-detalle">{c.cliente_email}</p>
                         <p className="contrato-detalle">
                           Ocupó del {c.fecha_inicio} al {fechaFin}
