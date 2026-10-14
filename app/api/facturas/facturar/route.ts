@@ -40,6 +40,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Elige la forma de pago" }, { status: 400 });
   }
   const condiciones: string | undefined = typeof cuerpo.condicionesPago === "string" && cuerpo.condicionesPago.trim() ? cuerpo.condicionesPago.trim().slice(0, 100) : undefined;
+  const cuentaPago: string | undefined = typeof cuerpo.cuentaPago === "string" && /^[0-9A-Za-z\- ]{4,30}$/.test(cuerpo.cuentaPago.trim()) ? cuerpo.cuentaPago.trim() : undefined;
+  if (typeof cuerpo.cuentaPago === "string" && cuerpo.cuentaPago.trim() && !cuentaPago) {
+    return NextResponse.json({ error: "El número de cuenta solo admite letras, números y guiones (4 a 30 caracteres)" }, { status: 400 });
+  }
   const periodicidad: string | undefined = PERIODICIDADES.some((p) => p.clave === cuerpo.periodicidad) ? cuerpo.periodicidad : undefined;
   let relacion: { tipo: string; uuids: string[] } | undefined;
   if (cuerpo.relacion && cuerpo.relacion.tipo) {
@@ -68,7 +72,7 @@ export async function POST(req: NextRequest) {
   // Uno por uno: Facturapi y el SAT limitan el ritmo, y un error en uno no frena los demás.
   const resultados = [];
   for (const id of facturaIds) {
-    resultados.push(await facturarCobro(admin, id, { metodo, formaPago, condiciones, relacion, periodicidad }));
+    resultados.push(await facturarCobro(admin, id, { metodo, formaPago, condiciones, relacion, periodicidad, cuentaPago }));
   }
   for (const id of pagoIds) {
     resultados.push(await facturarPagoSuelto(admin, id));
