@@ -7731,3 +7731,42 @@ a.stat-card {
   background: #fff;
   color: #0d1b3e;
 }
+
+/* ---------- Facturación: menú de módulos ---------- */
+.fac-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.fac-menu-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  text-decoration: none;
+  color: #0d1b3e;
+  border: 1px solid #e6e8ee;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.fac-menu-card:hover {
+  box-shadow: 0 6px 18px rgba(13, 27, 62, 0.1);
+  transform: translateY(-1px);
+}
+.fac-menu-titulo {
+  font-size: 17px;
+  font-weight: 700;
+}
+.fac-menu-texto {
+  font-size: 13px;
+  color: #667;
+  line-height: 1.4;
+}
+.fac-menu-chico .fac-menu-card {
+  padding: 14px 18px;
+}
+.fac-menu-chico .fac-menu-titulo {
+  font-size: 15px;
+}
