@@ -102,8 +102,8 @@ export default function CatalogoServiciosPage() {
         <a className="rep-back" href="/facturas-admin">
           ← Regresar
         </a>
-        <p className="rep-title">Servicios</p>
-        <p className="rep-sub">Lo que se cobra y se factura · el precio lo pone quien cobra, según el cliente</p>
+        <p className="rep-title">Catálogo de conceptos</p>
+        <p className="rep-sub">Los servicios adicionales que se cobran y se facturan, con su clave del SAT · el precio lo pone quien cobra, según el cliente</p>
       </div>
 
       <div className="rep-content rep-content-completo">
