@@ -150,8 +150,6 @@ export default function AdicionalesPage() {
     const t = servicios.find((x) => x.clave === clave);
     // "Otro" deja el concepto como esté; los demás lo rellenan (se puede editar).
     if (t && t.concepto) setConcepto(t.concepto);
-    // Si el servicio tiene precio en el catálogo, se llena (se puede cambiar).
-    if (t && t.precio != null) setPrecio(String(t.precio));
   }
 
   async function cobrar() {
@@ -262,7 +260,7 @@ export default function AdicionalesPage() {
             {puedeEditarServicios && (
               <p style={{ margin: "0 0 10px" }}>
                 <a className="btn-exportar" href="/catalogo-servicios">
-                  + Agregar o editar servicios y precios
+                  + Agregar o editar servicios
                 </a>
               </p>
             )}
@@ -324,7 +322,6 @@ export default function AdicionalesPage() {
                       onClick={() => elegirTipo(t.clave)}
                     >
                       {t.etiqueta}
-                      {t.precio != null ? " · " + fmtMoneda(t.precio) : ""}
                     </button>
                   ))}
                 </div>

@@ -165,13 +165,12 @@ export default function FormularioNuevaFactura({
     if (conTipo) setTipo(conTipo.adicional_tipo as string);
   }
 
-  // Al elegir un servicio se sugieren su concepto y su precio del catálogo.
+  // Al elegir un servicio se sugiere su concepto (el precio lo pone quien cobra, según el cliente).
   function elegirServicio(clave: string) {
     setTipo(clave);
     const s = servicios.find((x) => x.clave === clave);
     if (!s) return;
     if (!conceptoTocado.current && s.concepto) setConcepto(s.concepto);
-    if (!montoTocado.current && s.precio != null) setMonto(String(s.precio));
   }
 
   function validar(): string {
@@ -383,7 +382,6 @@ export default function FormularioNuevaFactura({
           {servicios.map((t) => (
             <option key={t.clave} value={t.clave}>
               {t.etiqueta}
-              {t.precio != null ? " · " + dinero(t.precio) : ""}
             </option>
           ))}
         </select>
