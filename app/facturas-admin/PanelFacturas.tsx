@@ -243,6 +243,12 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     const clienteParam = params.get("cliente");
     const centroParam = params.get("centro");
     if (clienteParam) setFiltroCliente(clienteParam);
+    // Desde el buscador de Facturación (?q=): se busca y se muestra la lista.
+    const qParam = params.get("q");
+    if (qParam) {
+      setBusqueda(qParam);
+      setVerTodas(true);
+    }
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(centroParam && CENTROS_SUGERIDOS.includes(centroParam) ? centroParam : profile?.centro || CENTROS_SUGERIDOS[0]);
