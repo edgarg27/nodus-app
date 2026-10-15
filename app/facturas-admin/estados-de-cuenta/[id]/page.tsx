@@ -96,6 +96,8 @@ export default function EstadoDeCuentaPage() {
   const [historial, setHistorial] = useState<Factura[]>([]);
   const [pagosHist, setPagosHist] = useState<{ factura_id: string; estado: string; monto: number }[]>([]);
   const [menuFila, setMenuFila] = useState<{ f: Factura; x: number; y: number } | null>(null);
+  // Vista previa del PDF de la factura de una fila del historial (opción "Ver").
+  const [pdfVisor, setPdfVisor] = useState<{ id: string; titulo: string } | null>(null);
   const [exito, setExito] = useState(false);
   const [cancelar, setCancelar] = useState<Factura | null>(null);
   const [motivoCan, setMotivoCan] = useState("");
@@ -327,7 +329,7 @@ export default function EstadoDeCuentaPage() {
     if (cargando || !factura || accionInicial.current) return;
     accionInicial.current = true;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("imprimir")) setTimeout(() => window.print(), 400);
+    if (params.get("imprimir")) setTimeout(() => window.print(), 800);
     else if (params.get("pago") && pagos.some((p) => p.estado !== "pagado")) abrirPago();
     else if (params.get("formato")) verFormatoSimulado();
     else if (params.get("facturar") && puedeTimbrar && sePuedeTimbrar) abrirTimbrar();
@@ -1069,12 +1071,28 @@ export default function EstadoDeCuentaPage() {
           <>
             <div style={{ position: "fixed", inset: 0, zIndex: 1190 }} onClick={() => setMenuFila(null)} />
             <div className="fac-acciones-menu no-imprimir" role="menu" style={{ position: "fixed", left: menuFila.x, top: menuFila.y, right: "auto", zIndex: 1200 }} onClick={() => setMenuFila(null)}>
-              <a role="menuitem" href={base}>
-                Ver
-              </a>
-              <a role="menuitem" href={base + "?imprimir=1"}>
-                Imprimir
-              </a>
+              {h.archivo_url ? (
+                <button type="button" role="menuitem" onClick={() => setPdfVisor({ id: h.id, titulo: d.facturaElectronica || h.folio })}>
+                  Ver
+                </button>
+              ) : d.simulada ? (
+                <a role="menuitem" href={base + "?formato=1"}>
+                  Ver
+                </a>
+              ) : (
+                <a role="menuitem" href={base} title="Todavía no tiene factura timbrada: abre el estado de cuenta">
+                  Ver
+                </a>
+              )}
+              {h.id === factura.id ? (
+                <button type="button" role="menuitem" onClick={imprimir}>
+                  Imprimir
+                </button>
+              ) : (
+                <a role="menuitem" href={base + "?imprimir=1"}>
+                  Imprimir
+                </a>
+              )}
               {d.pendientes > 0 && !d.cancelada && rolPuede(rol, "pagosMarcarPagado") ? (
                 <a role="menuitem" href={base + "?pago=1"}>
                   Generar pago
@@ -1128,6 +1146,30 @@ export default function EstadoDeCuentaPage() {
           </>
         );
       })()}
+
+      {pdfVisor && (
+        <div
+          className="no-imprimir"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setPdfVisor(null)}
+        >
+          <div className="form-card fac-previa-doc" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" onClick={() => setPdfVisor(null)}>
+              ×
+            </button>
+            <h2 className="fac-facturar-titulo">Factura {pdfVisor.titulo}</h2>
+            <iframe className="fac-previa-pdf" src={"/api/facturas/descargar?id=" + pdfVisor.id + "&tipo=pdf&ver=1"} title={"Factura " + pdfVisor.titulo} />
+            <div className="fac-facturar-botones">
+              <a className="btn-exportar fac-naranja" href={"/api/facturas/descargar?id=" + pdfVisor.id + "&tipo=pdf"}>
+                Descargar PDF
+              </a>
+              <button type="button" className="ft-btn-sec" onClick={() => setPdfVisor(null)}>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cancelar && (
         <div
