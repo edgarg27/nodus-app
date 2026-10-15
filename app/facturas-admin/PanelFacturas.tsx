@@ -6,6 +6,7 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
+import { FORMAS_PAGO_SAT } from "@/lib/formasPagoSat";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 
 // ---- Íconos de Facturas timbradas (trazo simple, toman el color del texto) ----
@@ -690,19 +691,26 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
 
   // ---- Facturar cobros pendientes (CFDI a pago diferido) ----
   const [facturando, setFacturando] = useState(false);
+  // Varios estados de cuenta a la vez: cuadro con las mismas opciones del cuadro Facturar (condiciones, método y forma).
+  const [loteFacturar, setLoteFacturar] = useState<string[] | null>(null);
+  const [condLote, setCondLote] = useState("Contado");
+  const [metodoLote, setMetodoLote] = useState<"PPD" | "PUE">("PPD");
+  const [formaLote, setFormaLote] = useState("03");
+  function abrirFacturarLote(ids: string[]) {
+    setLoteFacturar(ids);
+    setCondLote("Contado");
+    setMetodoLote("PPD");
+    setFormaLote("03");
+  }
   async function facturarCobros(ids: string[]) {
     if (ids.length === 0) return;
-    const aviso =
-      ids.length === 1
-        ? "¿Emitir la factura (CFDI) de este cobro? Se timbra ante el SAT a pago diferido (PPD); cuando el cliente pague habrá que emitir su complemento de pago."
-        : `¿Emitir las ${ids.length} facturas (CFDI) seleccionadas? Se timbran ante el SAT a pago diferido (PPD); cuando los clientes paguen habrá que emitir sus complementos de pago.`;
-    if (!confirm(aviso)) return;
     setFacturando(true);
     const res = await fetch("/api/facturas/facturar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facturaIds: ids }),
+      body: JSON.stringify({ facturaIds: ids, metodo: metodoLote, formaPago: metodoLote === "PUE" ? formaLote : undefined, condicionesPago: condLote.trim() || undefined }),
     });
+    setLoteFacturar(null);
     const data = await res.json().catch(() => ({}));
     setFacturando(false);
     if (!res.ok && !data.resultados) {
@@ -887,7 +895,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                   </button>
                 )}
                 {puedoCancelar && seleccionFacturables.length > 0 && (
-                  <button className="btn-exportar" disabled={facturando} onClick={() => facturarCobros(seleccionFacturables)}>
+                  <button className="btn-exportar" disabled={facturando} onClick={() => abrirFacturarLote(seleccionFacturables)}>
                     {facturando ? "Facturando..." : `Facturar seleccionados (${seleccionFacturables.length})`}
                   </button>
                 )}
@@ -1225,6 +1233,66 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
               </div>
             )}
 
+            {loteFacturar && (
+              <div
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                onClick={() => !facturando && setLoteFacturar(null)}
+              >
+                <div className="form-card fac-facturar" onClick={(e) => e.stopPropagation()}>
+                  <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" disabled={facturando} onClick={() => setLoteFacturar(null)}>
+                    ×
+                  </button>
+                  <h2 className="fac-facturar-titulo">Facturar</h2>
+                  <p className="fac-facturar-sub">Se generan {loteFacturar.length} facturas, una por estado de cuenta</p>
+                  <div className="fac-facturar-fila">
+                    <label>
+                      Cond. pago <span style={{ color: "#A32D2D" }}>*</span>
+                    </label>
+                    <div>
+                      <input type="text" maxLength={100} value={condLote} onChange={(e) => setCondLote(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="fac-facturar-fila">
+                    <label>
+                      Método de pago <span style={{ color: "#A32D2D" }}>*</span>
+                    </label>
+                    <div>
+                      <select value={metodoLote} onChange={(e) => setMetodoLote(e.target.value as "PPD" | "PUE")}>
+                        <option value="PUE">Pago en una sola exhibición</option>
+                        <option value="PPD">Pago en parcialidades o diferido</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="fac-facturar-fila">
+                    <label>
+                      Forma de pago <span style={{ color: "#A32D2D" }}>*</span>
+                    </label>
+                    <div>
+                      {metodoLote === "PPD" ? (
+                        <select value="99" disabled>
+                          <option value="99">Por definir</option>
+                        </select>
+                      ) : (
+                        <select value={formaLote} onChange={(e) => setFormaLote(e.target.value)}>
+                          {FORMAS_PAGO_SAT.map((fp) => (
+                            <option key={fp.clave} value={fp.clave}>
+                              {fp.texto}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                  <p className="fac-facturar-nota">Para revisar la vista previa, agregar CFDI relacionado o número de cuenta, factura cada estado de cuenta por separado.</p>
+                  <div className="fac-facturar-botones">
+                    <button type="button" className="btn-exportar fac-naranja" disabled={facturando || !condLote.trim()} onClick={() => facturarCobros(loteFacturar)}>
+                      {facturando ? "Timbrando..." : `Timbrar ${loteFacturar.length}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {modalCancelar && (
               <div
                 style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
@@ -1424,9 +1492,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                     </button>
                                   )}
                                   {puedoCancelar && sePuedeFacturar(f) && (
-                                    <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} disabled={facturando} onClick={() => facturarCobros([f.id])}>
+                                    <a className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} href={"/facturas-admin/estados-de-cuenta/" + f.id + "?facturar=1"}>
                                       Facturar (CFDI)
-                                    </button>
+                                    </a>
                                   )}
                                   {puedoCancelar && sePuedeCancelar(f) && (
                                     <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>

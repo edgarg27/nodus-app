@@ -322,7 +322,7 @@ export default function EstadoDeCuentaPage() {
     };
   }
 
-  // Acciones que llegan en la dirección (?imprimir=1, ?pago=1, ?formato=1) desde el menú de una fila del historial.
+  // Acciones que llegan en la dirección (?imprimir=1, ?pago=1, ?formato=1, ?facturar=1) desde el menú de una fila del historial.
   useEffect(() => {
     if (cargando || !factura || accionInicial.current) return;
     accionInicial.current = true;
@@ -330,6 +330,7 @@ export default function EstadoDeCuentaPage() {
     if (params.get("imprimir")) setTimeout(() => window.print(), 400);
     else if (params.get("pago") && pagos.some((p) => p.estado !== "pagado")) abrirPago();
     else if (params.get("formato")) verFormatoSimulado();
+    else if (params.get("facturar") && puedeTimbrar && sePuedeTimbrar) abrirTimbrar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cargando, factura]);
 
