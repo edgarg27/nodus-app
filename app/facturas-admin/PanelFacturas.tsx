@@ -451,6 +451,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   const [todoVisible, setTodoVisible] = useState(false);
   const [generandoPdf, setGenerandoPdf] = useState(false);
   const tablaTimbradasRef = useRef<HTMLDivElement>(null);
+  // Vista previa del PDF de una factura (ícono del ojo).
+  const [pdfVisor, setPdfVisor] = useState<{ url: string; descarga: string; titulo: string } | null>(null);
 
   const rfcPorCliente = new Map(clientes.map((c) => [c.id, c.rfc || ""]));
   const situacionDe = (cancel: string | null | undefined, uuid: string | null | undefined): DatoTimbrada["situacion"] =>
@@ -1233,6 +1235,30 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
               </div>
             )}
 
+            {pdfVisor && (
+              <div
+                className="no-imprimir"
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                onClick={() => setPdfVisor(null)}
+              >
+                <div className="form-card fac-previa-doc" onClick={(e) => e.stopPropagation()}>
+                  <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" onClick={() => setPdfVisor(null)}>
+                    ×
+                  </button>
+                  <h2 className="fac-facturar-titulo">Factura {pdfVisor.titulo}</h2>
+                  <iframe className="fac-previa-pdf" src={pdfVisor.url} title={"Factura " + pdfVisor.titulo} />
+                  <div className="fac-facturar-botones">
+                    <a className="btn-exportar fac-naranja" href={pdfVisor.descarga}>
+                      Descargar PDF
+                    </a>
+                    <button type="button" className="ft-btn-sec" onClick={() => setPdfVisor(null)}>
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {loteFacturar && (
               <div
                 style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
@@ -1655,7 +1681,13 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                 )}
                               </td>
                               <td className="ft-nowrap">
-                                <b>{d.serieFolio}</b>
+                                {d.ver ? (
+                                  <a href={d.ver} title="Abrir su estado de cuenta" style={{ color: "#0d1b3e", textDecoration: "underline" }}>
+                                    <b>{d.serieFolio}</b>
+                                  </a>
+                                ) : (
+                                  <b>{d.serieFolio}</b>
+                                )}
                               </td>
                               <td>{d.cliente}</td>
                               <td className="ft-nowrap">{d.rfc || "—"}</td>
@@ -1673,12 +1705,12 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                               <td className="ft-num ft-nowrap">{dinero(d.total)}</td>
                               <td className="no-imprimir">
                                 <div className="ft-iconos">
-                                  {d.ver ? (
-                                    <a href={d.ver} title="Ver estado de cuenta" aria-label="Ver">
+                                  {d.pdf ? (
+                                    <button type="button" className="ft-icono-btn" title="Vista previa del PDF" aria-label="Vista previa del PDF" onClick={() => setPdfVisor({ url: d.pdf + "&ver=1", descarga: d.pdf!, titulo: d.serieFolio })}>
                                       <IconoOjo />
-                                    </a>
+                                    </button>
                                   ) : (
-                                    <span className="ft-icono-off" title="Sin estado de cuenta">
+                                    <span className="ft-icono-off" title={d.simulada ? "Factura simulada: sin PDF del SAT" : "Sin PDF"}>
                                       <IconoOjo />
                                     </span>
                                   )}

@@ -17,6 +17,8 @@ export async function GET(req: NextRequest) {
 
   const id = req.nextUrl.searchParams.get("id") || "";
   const tipo = req.nextUrl.searchParams.get("tipo") === "xml" ? "xml" : "pdf";
+  // ?ver=1: el PDF se abre en el visor (vista previa) en vez de descargarse.
+  const enLinea = tipo === "pdf" && req.nextUrl.searchParams.get("ver") === "1";
   if (!id) return NextResponse.json({ error: "Falta la factura" }, { status: 400 });
 
   const admin = createAdminClient();
@@ -58,7 +60,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(contenido, {
     headers: {
       "Content-Type": tipo === "xml" ? "application/xml" : "application/pdf",
-      "Content-Disposition": `attachment; filename="${esComplemento ? "Complemento" : "Factura"}-${nombre}.${tipo}"`,
+      "Content-Disposition": `${enLinea ? "inline" : "attachment"}; filename="${esComplemento ? "Complemento" : "Factura"}-${nombre}.${tipo}"`,
       "Cache-Control": "private, no-store",
     },
   });
