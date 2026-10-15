@@ -1,12 +1,111 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
+
+// ---- Íconos de Facturas timbradas (trazo simple, toman el color del texto) ----
+const Svg = ({ children }: { children: ReactNode }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {children}
+  </svg>
+);
+const IconoBuscar = () => (
+  <Svg>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5" />
+  </Svg>
+);
+const IconoBorrar = () => (
+  <Svg>
+    <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+  </Svg>
+);
+const IconoDocumento = () => (
+  <Svg>
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6M8 13h8M8 17h5" />
+  </Svg>
+);
+const IconoArchivo = () => (
+  <Svg>
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6M9 13h6M9 17h6" />
+  </Svg>
+);
+const IconoEnlace = () => (
+  <Svg>
+    <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
+    <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />
+  </Svg>
+);
+const IconoOjo = () => (
+  <Svg>
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+);
+const IconoDescargar = () => (
+  <Svg>
+    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+  </Svg>
+);
+const IconoExcel = () => (
+  <Svg>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="m8 8 8 8M16 8l-8 8" />
+  </Svg>
+);
+const IconoPdf = () => (
+  <Svg>
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6M9 15h1.5a1.5 1.5 0 0 0 0-3H9v6" />
+  </Svg>
+);
+const IconoImprimir = () => (
+  <Svg>
+    <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <rect x="6" y="14" width="12" height="7" />
+  </Svg>
+);
+
+const COLUMNAS_TIMBRADAS: { clave: string; titulo: string }[] = [
+  { clave: "folio", titulo: "Serie y folio" },
+  { clave: "cliente", titulo: "Cliente" },
+  { clave: "rfc", titulo: "RFC" },
+  { clave: "concepto", titulo: "Concepto" },
+  { clave: "fecha", titulo: "Fecha de emisión" },
+  { clave: "situacion", titulo: "Situación del CFDI" },
+  { clave: "fuente", titulo: "Fuente" },
+  { clave: "total", titulo: "Total" },
+];
+const POR_PAGINA = 20;
+const fechaCorta = (iso: string) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) : iso || "");
+
+type DatoTimbrada = {
+  key: string;
+  facturaId?: string;
+  complementoId?: string;
+  seleccionable: boolean;
+  serieFolio: string;
+  cliente: string;
+  rfc: string;
+  concepto: string;
+  fecha: string;
+  situacion: { texto: string; tipo: "verde" | "roja" | "ambar" | "gris" };
+  fuente: { texto: string; icono: "archivo" | "enlace" };
+  total: number;
+  ver: string | null;
+  pdf: string | null;
+  xml: string | null;
+  simulada: boolean;
+  metodo: string | null;
+  tipo: "I" | "P";
+};
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -45,7 +144,7 @@ function sePuedeFacturar(f: { user_id?: string | null; uuid_cfdi?: string | null
   return !!f.user_id && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada";
 }
 
-type Cliente = { id: string; nombre: string; email: string; empresa: string | null; nombre_fiscal?: string | null };
+type Cliente = { id: string; nombre: string; email: string; empresa: string | null; nombre_fiscal?: string | null; rfc?: string | null };
 
 type Factura = {
   id: string;
@@ -148,7 +247,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     setLoading(true);
     const { data: clis } = await supabase
       .from("profiles")
-      .select("id, nombre, email, empresa, nombre_fiscal")
+      .select("id, nombre, email, empresa, nombre_fiscal, rfc")
       .eq("rol", "cliente")
       .eq("centro", c)
       .order("nombre");
@@ -259,6 +358,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   const [filtroHasta, setFiltroHasta] = useState("");
   const [soloSinCliente, setSoloSinCliente] = useState(false);
   const [filtroCliente, setFiltroCliente] = useState("");
+  // Filtros avanzados de Facturas timbradas.
+  const [filtroMetodo, setFiltroMetodo] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("");
   const pestana = modo === "timbradas" ? "timbradas" : "por_timbrar";
   const [filtroCfdi, setFiltroCfdi] = useState("");
 
@@ -278,6 +380,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     setSoloSinCliente(false);
     setFiltroCliente("");
     setFiltroCfdi("");
+    setFiltroMetodo("");
+    setFiltroTipo("");
   }
 
   // Lo que coincide con los filtros, de las dos pestañas (de aquí salen los conteos y el resumen del cliente).
@@ -330,6 +434,141 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     ...facturasFiltradas.map((f): FilaTimbrada => ({ tipo: "I", fecha: f.fecha_emision, f })),
     ...complementosFiltrados.map((c): FilaTimbrada => ({ tipo: "P", fecha: c.fecha_pago, c })),
   ].sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
+
+  // ---- Facturas timbradas: tabla con orden, páginas, exportar e imprimir (diseño que pidió contabilidad) ----
+  const [avanzados, setAvanzados] = useState(false);
+  const [orden, setOrden] = useState<{ col: string; dir: "asc" | "desc" }>({ col: "fecha", dir: "desc" });
+  const [pagina, setPagina] = useState(1);
+  const [compSel, setCompSel] = useState<string | null>(null);
+  const [todoVisible, setTodoVisible] = useState(false);
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const tablaTimbradasRef = useRef<HTMLDivElement>(null);
+
+  const rfcPorCliente = new Map(clientes.map((c) => [c.id, c.rfc || ""]));
+  const situacionDe = (cancel: string | null | undefined, uuid: string | null | undefined): DatoTimbrada["situacion"] =>
+    cancel === "cancelada"
+      ? { texto: "Cancelado", tipo: "roja" }
+      : cancel === "en_proceso"
+        ? { texto: "En cancelación", tipo: "ambar" }
+        : esFacturaSimulada(uuid)
+          ? { texto: "Simulada (prueba)", tipo: "gris" }
+          : { texto: "Vigente", tipo: "verde" };
+  const fuenteDe = (fuente: string | null | undefined): DatoTimbrada["fuente"] =>
+    fuente === "cfdi_import" ? { texto: "Importada (ZORA)", icono: "enlace" } : fuente === "facturapi_auto" ? { texto: "Nodus", icono: "archivo" } : { texto: "Manual", icono: "archivo" };
+
+  const filasT: DatoTimbrada[] = filasTimbradas
+    .map((fila): DatoTimbrada => {
+      if (fila.tipo === "P") {
+        const c = fila.c;
+        const cubierta = filasComplemento.find((x) => x.complemento_id === c.id)?.factura_id;
+        return {
+          key: "c" + c.id,
+          complementoId: c.id,
+          seleccionable: false,
+          serieFolio: c.serie ? c.serie + "-" + (c.folio_fiscal || "") : c.folio_fiscal || "—",
+          cliente: c.cliente_fiscal || c.cliente_nombre || "Cliente",
+          rfc: c.user_id ? rfcPorCliente.get(c.user_id) || "" : "",
+          concepto: "Complemento de pago",
+          fecha: c.fecha_pago,
+          situacion: situacionDe(c.cancelacion_estatus, c.uuid_cfdi),
+          fuente: fuenteDe("facturapi_auto"),
+          total: Number(c.monto),
+          ver: cubierta ? "/facturas-admin/estados-de-cuenta/" + cubierta : null,
+          pdf: c.archivo_url ? "/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=pdf" : null,
+          xml: c.xml_url ? "/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=xml" : null,
+          simulada: false,
+          metodo: null,
+          tipo: "P",
+        };
+      }
+      const f = fila.f;
+      return {
+        key: "f" + f.id,
+        facturaId: f.id,
+        seleccionable: ROLES_CANCELAR.includes(miRol) && (sePuedeCancelar(f) || sePuedeComplementar(f)),
+        serieFolio: f.serie ? f.serie + "-" + (f.folio_fiscal || "") : f.folio,
+        cliente: f.cliente_fiscal || f.cliente_nombre || "Cliente",
+        rfc: f.rfc_receptor || "",
+        concepto: f.concepto,
+        fecha: f.fecha_emision,
+        situacion: situacionDe(f.cancelacion_estatus, f.uuid_cfdi),
+        fuente: fuenteDe(f.fuente),
+        total: Number(f.monto),
+        ver: "/facturas-admin/estados-de-cuenta/" + f.id,
+        pdf: f.archivo_url ? "/api/facturas/descargar?id=" + f.id + "&tipo=pdf" : null,
+        xml: f.xml_url ? "/api/facturas/descargar?id=" + f.id + "&tipo=xml" : null,
+        simulada: esFacturaSimulada(f.uuid_cfdi),
+        metodo: f.metodo_pago || null,
+        tipo: "I",
+      };
+    })
+    .filter((d) => (!filtroMetodo || d.metodo === filtroMetodo) && (!filtroTipo || d.tipo === filtroTipo))
+    .sort((a, b) => {
+      const k = orden.col;
+      const va: string | number = k === "total" ? a.total : k === "situacion" ? a.situacion.texto : k === "fuente" ? a.fuente.texto : k === "folio" ? a.serieFolio : (a as any)[k] || "";
+      const vb: string | number = k === "total" ? b.total : k === "situacion" ? b.situacion.texto : k === "fuente" ? b.fuente.texto : k === "folio" ? b.serieFolio : (b as any)[k] || "";
+      const c = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb), "es", { numeric: true });
+      return orden.dir === "asc" ? c : -c;
+    });
+  const totalPaginas = Math.max(1, Math.ceil(filasT.length / POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const filasVisibles = todoVisible ? filasT : filasT.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
+  const idsPaginaSeleccionables = filasVisibles.filter((d) => d.facturaId && d.seleccionable).map((d) => d.facturaId as string);
+
+  function ordenarPor(col: string) {
+    setOrden((o) => (o.col === col ? { col, dir: o.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "fecha" || col === "total" ? "desc" : "asc" }));
+    setPagina(1);
+  }
+
+  function exportarTimbradasExcel() {
+    exportarExcel(
+      `facturas-timbradas-${centro}`,
+      filasT.map((d) => ({
+        "Serie y folio": d.serieFolio,
+        Cliente: d.cliente,
+        RFC: d.rfc,
+        Concepto: d.concepto,
+        "Fecha de emisión": d.fecha,
+        "Situación del CFDI": d.situacion.texto,
+        Fuente: d.fuente.texto,
+        Tipo: d.tipo === "P" ? "Pago" : "Ingreso",
+        Método: d.metodo || "",
+        Total: d.total,
+      }))
+    );
+  }
+
+  async function descargarTimbradasPdf() {
+    setGenerandoPdf(true);
+    setTodoVisible(true);
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    try {
+      // @ts-ignore — html2pdf.js no trae tipos; depende del navegador, por eso se carga aquí.
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: [8, 8, 8, 8],
+          filename: `facturas-timbradas-${centro}.pdf`,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "letter", orientation: "landscape" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(tablaTimbradasRef.current)
+        .save();
+    } finally {
+      setTodoVisible(false);
+      setGenerandoPdf(false);
+    }
+  }
+
+  function imprimirTimbradas() {
+    setTodoVisible(true);
+    setTimeout(() => {
+      window.print();
+      setTodoVisible(false);
+    }, 200);
+  }
 
   // ---- Complementos de pago (facturas a pago diferido) ----
   const [tipoCancelar, setTipoCancelar] = useState<"factura" | "complemento">("factura");
@@ -603,7 +842,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
         <p className="rep-title">{modo === "timbradas" ? "Facturas timbradas" : "Estados de cuenta"}</p>
         <p className="rep-sub">
           {centro || "Selecciona un centro"}
-          {modo === "timbradas" ? " · CFDI emitidos y complementos de pago" : " · lo integrado que falta por timbrar"}
+          {modo === "timbradas" ? " · consulta y descarga tus facturas electrónicas de pago" : " · lo integrado que falta por timbrar"}
         </p>
       </div>
 
@@ -622,6 +861,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
           </div>
         ) : (
           <>
+            {modo !== "timbradas" && (
+              <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
                 Facturas ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturas.length}` : facturas.length})
@@ -775,6 +1016,134 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                 </button>
               )}
             </div>
+              </>
+            )}
+
+            {modo === "timbradas" && (
+              <div className="ft-card no-imprimir">
+                <div className="ft-card-cab">
+                  <div className="ft-cab-titulo">
+                    <span className="ft-cab-icono">
+                      <IconoBuscar />
+                    </span>
+                    <div>
+                      <p className="ft-titulo">Filtros de búsqueda</p>
+                      <p className="ft-sub">Selecciona los criterios para encontrar tus facturas timbradas.</p>
+                    </div>
+                  </div>
+                  <button type="button" className="ft-btn-sec" onClick={limpiarFiltros}>
+                    <IconoBorrar /> Limpiar filtros
+                  </button>
+                </div>
+                <div className="ft-grid">
+                  <label className="ft-campo">
+                    <span>Centro</span>
+                    <select
+                      value={centro || ""}
+                      disabled={!esGlobal || centrosDisponibles.length <= 1}
+                      onChange={(e) => {
+                        setFiltroCliente("");
+                        setCentro(e.target.value);
+                      }}
+                    >
+                      {(esGlobal && centrosDisponibles.length > 1 ? centrosDisponibles : [centro || ""]).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="ft-campo">
+                    <span>Cliente</span>
+                    <select value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)}>
+                      <option value="">Todos</option>
+                      {clientes.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre_fiscal || c.empresa || c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="ft-campo">
+                    <span>Buscar</span>
+                    <input placeholder="Folio, concepto, RFC, cliente..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+                  </label>
+                  <label className="ft-campo">
+                    <span>Estado</span>
+                    <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                      <option value="">Todos</option>
+                      <option value="pendiente">Pendiente de pago</option>
+                      <option value="parcial">Pago parcial</option>
+                      <option value="pagada">Pagada</option>
+                      <option value="vencida">Vencida</option>
+                    </select>
+                  </label>
+                  <label className="ft-campo">
+                    <span>Situación del CFDI</span>
+                    <select value={filtroCfdi} onChange={(e) => setFiltroCfdi(e.target.value)}>
+                      <option value="">Todos</option>
+                      <option value="vigente">Vigente</option>
+                      <option value="cancelada">Cancelado</option>
+                      <option value="en_proceso">Cancelación en proceso</option>
+                      <option value="rechazada">Cancelación rechazada</option>
+                    </select>
+                  </label>
+                  <label className="ft-campo">
+                    <span>Fuente</span>
+                    <select value={filtroFuente} onChange={(e) => setFiltroFuente(e.target.value)}>
+                      <option value="">Todos</option>
+                      <option value="facturapi_auto">Nodus</option>
+                      <option value="cfdi_import">Importada (ZORA)</option>
+                      <option value="manual">Manual</option>
+                    </select>
+                  </label>
+                  <label className="ft-campo">
+                    <span>Emisión desde</span>
+                    <input type="date" value={filtroDesde} onChange={(e) => setFiltroDesde(e.target.value)} />
+                  </label>
+                  <label className="ft-campo">
+                    <span>Emisión hasta</span>
+                    <input type="date" value={filtroHasta} onChange={(e) => setFiltroHasta(e.target.value)} />
+                  </label>
+                </div>
+                {avanzados && (
+                  <div className="ft-grid" style={{ paddingTop: 0 }}>
+                    <label className="ft-campo">
+                      <span>Método de pago</span>
+                      <select value={filtroMetodo} onChange={(e) => setFiltroMetodo(e.target.value)}>
+                        <option value="">Todos</option>
+                        <option value="PUE">PUE · una sola exhibición</option>
+                        <option value="PPD">PPD · pago diferido</option>
+                      </select>
+                    </label>
+                    <label className="ft-campo">
+                      <span>Tipo de comprobante</span>
+                      <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+                        <option value="">Todos</option>
+                        <option value="I">Ingreso (factura)</option>
+                        <option value="P">Pago (complemento)</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
+                <div className="ft-pie">
+                  <button type="button" className="ft-avanzados" onClick={() => setAvanzados((v) => !v)} aria-expanded={avanzados}>
+                    <span style={{ display: "inline-block", transform: avanzados ? "rotate(180deg)" : "none" }}>⌄</span> Filtros avanzados (opcional)
+                  </button>
+                  <button
+                    type="button"
+                    className="ft-btn-buscar"
+                    onClick={() => {
+                      setVerTodas(true);
+                      setPagina(1);
+                    }}
+                  >
+                    <IconoBuscar /> Buscar
+                  </button>
+                </div>
+              </div>
+            )}
+
             {avisoCancelar && (
               <div className="form-card" style={{ marginTop: 8, fontSize: 13 }}>
                 {avisoCancelar}
@@ -882,6 +1251,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
               </div>
             )}
 
+            {modo !== "timbradas" && (
+            <>
             {facturas.length === 0 ? (
               <div className="empty-card">Sin facturas registradas en {centro}</div>
             ) : !hayFiltrosActivos && !verTodas ? (
@@ -941,244 +1312,6 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                   </div>
                 )}
 
-                {pestana === "timbradas" ? (
-                  <div className="fac-tabla-wrap">
-                    <table className="fac-tabla">
-                      <thead>
-                        <tr>
-                          <th aria-label="Seleccionar"></th>
-                          <th>Serie-Folio</th>
-                          <th>Cliente</th>
-                          <th>Concepto</th>
-                          <th>Fecha</th>
-                          <th className="fac-num">Subtotal</th>
-                          <th className="fac-num">Total</th>
-                          <th>Tipo</th>
-                          <th>Estado</th>
-                          <th>UUID</th>
-                          <th>Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filasTimbradas.map((fila) => {
-                          if (fila.tipo === "P") {
-                            const c = fila.c;
-                            const etiqueta = c.cancelacion_estatus ? CANCELACION_LABEL[c.cancelacion_estatus] : null;
-                            const cubre = filasComplemento.filter((r) => r.complemento_id === c.id);
-                            return (
-                              <tr key={"c" + c.id} className={c.cancelacion_estatus === "cancelada" ? "fac-fila-cancelada" : undefined}>
-                                <td></td>
-                                <td className="fac-nowrap">
-                                  <b>{c.serie ? c.serie + "-" + (c.folio_fiscal || "") : c.folio_fiscal || "—"}</b>
-                                </td>
-                                <td>
-                                  <b>{c.cliente_fiscal || c.cliente_nombre}</b>
-                                  {c.cliente_fiscal && c.cliente_fiscal !== c.cliente_nombre && <span className="fac-sub">{c.cliente_nombre}</span>}
-                                </td>
-                                <td>
-                                  Complemento de pago · cubre {cubre.length} factura(s)
-                                  {c.numero_operacion && <span className="fac-sub">Operación: {c.numero_operacion}</span>}
-                                  {c.notas && <span className="fac-sub">Notas: {c.notas}</span>}
-                                </td>
-                                <td className="fac-nowrap">{c.fecha_pago}</td>
-                                <td className="fac-num">—</td>
-                                <td className="fac-num fac-nowrap">{dinero(Number(c.monto))}</td>
-                                <td>
-                                  Pago
-                                  <span className="fac-sub">forma {c.forma_pago}</span>
-                                </td>
-                                <td>
-                                  {etiqueta ? (
-                                    <span className="fac-sub" style={{ color: etiqueta.color, fontWeight: 600, marginTop: 0 }}>
-                                      {etiqueta.label}
-                                    </span>
-                                  ) : (
-                                    <span className="factura-badge" style={{ background: "#E1F5EE" }}>
-                                      <span className="factura-badge-text" style={{ color: "#0F6E56" }}>
-                                        Emitido
-                                      </span>
-                                    </span>
-                                  )}
-                                </td>
-                                <td>
-                                  <span className="fac-sub" style={{ marginTop: 0 }} title={c.uuid_cfdi || ""}>
-                                    {c.uuid_cfdi ? c.uuid_cfdi.slice(0, 8) + "…" : "—"}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div className="fac-acciones">
-                                    {c.archivo_url && (
-                                      <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=pdf"}>
-                                        PDF
-                                      </a>
-                                    )}
-                                    {c.xml_url && (
-                                      <a className="ver-pdf-btn" href={"/api/facturas/descargar?origen=complemento&id=" + c.id + "&tipo=xml"}>
-                                        XML
-                                      </a>
-                                    )}
-                                    {c.comprobante_url && (
-                                      <BotonArchivo url={c.comprobante_url} bucket="facturas">
-                                        Comprobante
-                                      </BotonArchivo>
-                                    )}
-                                    {puedoCancelar && (!c.cancelacion_estatus || c.cancelacion_estatus === "rechazada") && (
-                                      <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelarComplemento(c.id)}>
-                                        Cancelar
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          }
-                          const f = fila.f;
-                          const badge = ESTATUS_LABEL[f.estado] || { label: f.estado, bg: "#F0F0F0", color: "#555" };
-                          const sueltosDelCliente = f.user_id ? pagosSueltosDelCliente(f.user_id) : [];
-                          const seleccionable = puedoCancelar && (sePuedeCancelar(f) || sePuedeComplementar(f));
-                          const abierta = facturaExpandidaId === f.id;
-                          return (
-                            <Fragment key={"f" + f.id}>
-                              <tr className={f.cancelacion_estatus === "cancelada" ? "fac-fila-cancelada" : undefined}>
-                                <td className="fac-col-sel">
-                                  {seleccionable && (
-                                    <input
-                                      type="checkbox"
-                                      aria-label="Seleccionar"
-                                      checked={seleccion.includes(f.id)}
-                                      onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, f.id] : s.filter((i) => i !== f.id)))}
-                                    />
-                                  )}
-                                </td>
-                                <td className="fac-nowrap">
-                                  <a href={"/facturas-admin/estados-de-cuenta/" + f.id} style={{ color: "#0d1b3e", textDecoration: "underline" }}>
-                                    <b>{f.serie ? f.serie + "-" + (f.folio_fiscal || "") : f.folio}</b>
-                                  </a>
-                                  {f.serie && <span className="fac-sub">{f.folio}</span>}
-                                </td>
-                                <td>
-                                  <b>{f.cliente_fiscal || f.cliente_nombre}</b>
-                                  {f.cliente_fiscal && f.cliente_fiscal !== f.cliente_nombre && <span className="fac-sub">{f.cliente_nombre}</span>}
-                                  {f.rfc_receptor && <span className="fac-sub">{f.rfc_receptor}</span>}
-                                  {!f.user_id && f.rfc_receptor !== "XAXX010101000" && (
-                                    <select defaultValue="" disabled={asignando === f.id} onChange={(e) => asignarCliente(f.id, e.target.value)} style={{ marginTop: 4 }}>
-                                      <option value="">Asignar cliente...</option>
-                                      {clientes.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                          {c.nombre} — {c.email}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </td>
-                                <td>{f.concepto}</td>
-                                <td className="fac-nowrap">{f.fecha_emision}</td>
-                                <td className="fac-num fac-nowrap">{f.subtotal != null ? dinero(Number(f.subtotal)) : "—"}</td>
-                                <td className="fac-num fac-nowrap">{dinero(Number(f.monto))}</td>
-                                <td>
-                                  Ingreso
-                                  {f.metodo_pago && <span className="fac-sub">{f.metodo_pago}</span>}
-                                </td>
-                                <td>
-                                  {f.cancelacion_estatus && CANCELACION_LABEL[f.cancelacion_estatus] ? (
-                                    <span className="fac-sub" style={{ color: CANCELACION_LABEL[f.cancelacion_estatus].color, fontWeight: 600, marginTop: 0 }}>
-                                      {CANCELACION_LABEL[f.cancelacion_estatus].label}
-                                      {f.cancelacion_motivo ? " · motivo " + f.cancelacion_motivo : ""}
-                                    </span>
-                                  ) : (
-                                    <span className="factura-badge" style={{ background: "#E1F5EE" }}>
-                                      <span className="factura-badge-text" style={{ color: "#0F6E56" }}>
-                                        Emitida
-                                      </span>
-                                    </span>
-                                  )}
-                                  <span className="fac-sub">
-                                    <span className="factura-badge" style={{ background: badge.bg }}>
-                                      <span className="factura-badge-text" style={{ color: badge.color }}>
-                                        {badge.label}
-                                      </span>
-                                    </span>
-                                  </span>
-                                  {f.metodo_pago === "PPD" && f.cancelacion_estatus !== "cancelada" && (
-                                    <span className="fac-sub" style={{ fontWeight: 600, color: saldoDe(f.id) > 0 ? "#854F0B" : "#0F6E56" }}>
-                                      {saldoDe(f.id) > 0 ? "Saldo sin complemento: " + dinero(saldoDe(f.id)) : "✓ Cubierta por complementos"}
-                                    </span>
-                                  )}
-                                </td>
-                                <td>
-                                  <span className="fac-sub" style={{ marginTop: 0, ...(esFacturaSimulada(f.uuid_cfdi) ? { color: "#A32D2D", fontWeight: 700 } : {}) }} title={f.uuid_cfdi || ""}>
-                                    {esFacturaSimulada(f.uuid_cfdi) ? "SIMULADA (prueba)" : f.uuid_cfdi ? f.uuid_cfdi.slice(0, 8) + "…" : "—"}
-                                  </span>
-                                </td>
-                                <td>
-                                  <div className="fac-acciones">
-                                    {f.archivo_url && (
-                                      <BotonArchivo url={f.archivo_url} bucket="facturas">
-                                        PDF
-                                      </BotonArchivo>
-                                    )}
-                                    {f.xml_url && (
-                                      <a className="ver-pdf-btn" href={"/api/facturas/descargar?id=" + f.id + "&tipo=xml"}>
-                                        XML
-                                      </a>
-                                    )}
-                                    <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
-                                      {abierta ? "Ocultar pagos" : "Pagos"}
-                                    </button>
-                                    {puedoCancelar && sePuedeComplementar(f) && (
-                                      <button className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} onClick={() => abrirComplemento([f.id])}>
-                                        Complemento
-                                      </button>
-                                    )}
-                                    {puedoCancelar && sePuedeCancelar(f) && (
-                                      <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 600 }} onClick={() => abrirCancelar([f.id])}>
-                                        Cancelar
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-
-                              {abierta && (
-                                <tr className="fac-fila-detalle">
-                                  <td></td>
-                                  <td colSpan={10}>
-                                    {cargandoPagos ? (
-                                      <p style={{ fontSize: 12, color: "#888", margin: 0 }}>Cargando pagos...</p>
-                                    ) : pagosDeFactura.length === 0 ? (
-                                      <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin pagos vinculados todavía.</p>
-                                    ) : (
-                                      pagosDeFactura.map((p) => (
-                                        <p className="contrato-detalle" key={p.id}>
-                                          {p.concepto || "Pago"} · {dinero(Number(p.monto))} · {p.estado}
-                                        </p>
-                                      ))
-                                    )}
-                                    {sueltosDelCliente.length > 0 && (
-                                      <div style={{ marginTop: 8 }}>
-                                        <p className="sub-label">Vincular pago suelto de este cliente</p>
-                                        {sueltosDelCliente.map((p) => (
-                                          <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", maxWidth: 520 }}>
-                                            <span style={{ fontSize: 12, color: "#555" }}>
-                                              {p.concepto || "Pago"} · {dinero(Number(p.monto))} · {p.estado}
-                                            </span>
-                                            <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} disabled={vinculando === p.id} onClick={() => vincularPago(p.id, f.id)}>
-                                              Vincular
-                                            </button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
                 <div className="fac-tabla-wrap">
                   <table className="fac-tabla">
                     <thead>
@@ -1329,9 +1462,193 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                     </tbody>
                   </table>
                 </div>
-                )}
               </>
             )}
+            </>
+            )}
+
+            {modo === "timbradas" && (
+              <div className="ft-card ft-resultados">
+                <div className="ft-res-cab">
+                  <div className="ft-cab-titulo">
+                    <span className="ft-cab-icono">
+                      <IconoDocumento />
+                    </span>
+                    <p className="ft-titulo" style={{ margin: 0 }}>
+                      Resultados
+                    </p>
+                    {(hayFiltrosActivos || verTodas) && <span className="ft-badge">Total de facturas: {filasT.length}</span>}
+                  </div>
+                  <div className="ft-res-botones no-imprimir">
+                    {puedoCancelar && hayEnProceso && (
+                      <button type="button" className="ft-btn-sec" disabled={actualizandoEstatus} onClick={() => actualizarEstatusCancelaciones()}>
+                        {actualizandoEstatus ? "Consultando..." : "Actualizar estatus"}
+                      </button>
+                    )}
+                    {puedoCancelar && seleccionComplementables.length > 0 && (
+                      <button type="button" className="ft-btn-sec" onClick={() => abrirComplemento(seleccionComplementables)}>
+                        Emitir complemento de pago ({seleccionComplementables.length})
+                      </button>
+                    )}
+                    {puedoCancelar && seleccionCancelables.length > 0 && (
+                      <button type="button" className="ft-btn-sec" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
+                        Cancelar seleccionadas ({seleccionCancelables.length})
+                      </button>
+                    )}
+                    {puedoCancelar && compSel && (
+                      <button type="button" className="ft-btn-sec" style={{ color: "#A32D2D" }} onClick={() => abrirCancelarComplemento(compSel)}>
+                        Cancelar complemento
+                      </button>
+                    )}
+                    <button type="button" className="ft-btn-sec" disabled={filasT.length === 0} onClick={exportarTimbradasExcel}>
+                      <IconoExcel /> Exportar Excel
+                    </button>
+                    <button type="button" className="ft-btn-sec" disabled={filasT.length === 0 || generandoPdf} onClick={descargarTimbradasPdf}>
+                      <IconoPdf /> {generandoPdf ? "Generando..." : "Descargar PDF"}
+                    </button>
+                    <button type="button" className="ft-btn-sec" disabled={filasT.length === 0} onClick={imprimirTimbradas}>
+                      <IconoImprimir /> Imprimir
+                    </button>
+                  </div>
+                </div>
+
+                {facturas.length === 0 && complementos.length === 0 ? (
+                  <div className="ft-vacio">Sin facturas timbradas en {centro}</div>
+                ) : !hayFiltrosActivos && !verTodas ? (
+                  <div className="ft-vacio">
+                    <p style={{ margin: "0 0 4px", fontWeight: 600, color: "#0d1b3e" }}>Elige los filtros y pulsa Buscar</p>
+                    <p style={{ margin: 0, fontSize: 13 }}>O pulsa Buscar sin filtros para ver todas las de {centro}.</p>
+                  </div>
+                ) : filasT.length === 0 ? (
+                  <div className="ft-vacio">Ninguna factura timbrada coincide con los filtros</div>
+                ) : (
+                  <>
+                    <div className={"ft-tabla-wrap" + (generandoPdf ? " ft-exportando" : "")} ref={tablaTimbradasRef}>
+                      {generandoPdf && <p className="ft-titulo-pdf">Facturas timbradas · {centro} · {filasT.length} factura(s)</p>}
+                      <table className="ft-tabla">
+                        <thead>
+                          <tr>
+                            <th className="ft-col-sel no-imprimir">
+                              <input
+                                type="checkbox"
+                                aria-label="Elegir todas las de esta página"
+                                checked={idsPaginaSeleccionables.length > 0 && idsPaginaSeleccionables.every((id) => seleccion.includes(id))}
+                                onChange={(e) =>
+                                  setSeleccion((s) => (e.target.checked ? Array.from(new Set([...s, ...idsPaginaSeleccionables])) : s.filter((id) => !idsPaginaSeleccionables.includes(id))))
+                                }
+                              />
+                            </th>
+                            {COLUMNAS_TIMBRADAS.map((c) => (
+                              <th key={c.clave} className={c.clave === "total" ? "ft-num" : undefined}>
+                                <button type="button" className="ft-orden" onClick={() => ordenarPor(c.clave)}>
+                                  {c.titulo}
+                                  <span className="ft-orden-flecha">{orden.col === c.clave ? (orden.dir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                                </button>
+                              </th>
+                            ))}
+                            <th className="no-imprimir" style={{ textAlign: "center" }}>
+                              Acciones
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filasVisibles.map((d) => (
+                            <tr key={d.key}>
+                              <td className="ft-col-sel no-imprimir">
+                                {d.facturaId ? (
+                                  d.seleccionable && (
+                                    <input
+                                      type="checkbox"
+                                      aria-label="Elegir"
+                                      checked={seleccion.includes(d.facturaId)}
+                                      onChange={(e) => setSeleccion((s) => (e.target.checked ? [...s, d.facturaId!] : s.filter((i) => i !== d.facturaId)))}
+                                    />
+                                  )
+                                ) : (
+                                  d.complementoId &&
+                                  d.situacion.tipo !== "roja" && (
+                                    <input type="checkbox" aria-label="Elegir complemento" checked={compSel === d.complementoId} onChange={(e) => setCompSel(e.target.checked ? d.complementoId! : null)} />
+                                  )
+                                )}
+                              </td>
+                              <td className="ft-nowrap">
+                                <b>{d.serieFolio}</b>
+                              </td>
+                              <td>{d.cliente}</td>
+                              <td className="ft-nowrap">{d.rfc || "—"}</td>
+                              <td>{d.concepto}</td>
+                              <td className="ft-nowrap">{fechaCorta(d.fecha)}</td>
+                              <td>
+                                <span className={"ft-chip ft-chip-" + d.situacion.tipo}>{d.situacion.texto}</span>
+                              </td>
+                              <td className="ft-nowrap">
+                                <span className="ft-fuente">
+                                  {d.fuente.icono === "enlace" ? <IconoEnlace /> : <IconoArchivo />}
+                                  {d.fuente.texto}
+                                </span>
+                              </td>
+                              <td className="ft-num ft-nowrap">{dinero(d.total)}</td>
+                              <td className="no-imprimir">
+                                <div className="ft-iconos">
+                                  {d.ver ? (
+                                    <a href={d.ver} title="Ver estado de cuenta" aria-label="Ver">
+                                      <IconoOjo />
+                                    </a>
+                                  ) : (
+                                    <span className="ft-icono-off" title="Sin estado de cuenta">
+                                      <IconoOjo />
+                                    </span>
+                                  )}
+                                  {d.pdf ? (
+                                    <a href={d.pdf} title="Descargar PDF" aria-label="Descargar PDF">
+                                      <IconoDescargar />
+                                    </a>
+                                  ) : (
+                                    <span className="ft-icono-off" title={d.simulada ? "Factura simulada: sin PDF del SAT" : "Sin PDF"}>
+                                      <IconoDescargar />
+                                    </span>
+                                  )}
+                                  {d.xml ? (
+                                    <a href={d.xml} title="Descargar XML" aria-label="Descargar XML">
+                                      <IconoArchivo />
+                                    </a>
+                                  ) : (
+                                    <span className="ft-icono-off" title={d.simulada ? "Factura simulada: sin XML del SAT" : "Sin XML"}>
+                                      <IconoArchivo />
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="ft-paginacion no-imprimir">
+                      <span>
+                        Mostrando {(paginaActual - 1) * POR_PAGINA + 1} - {Math.min(paginaActual * POR_PAGINA, filasT.length)} de {filasT.length} registros
+                      </span>
+                      <div className="ft-paginas">
+                        <button type="button" disabled={paginaActual <= 1} onClick={() => setPagina(paginaActual - 1)} aria-label="Página anterior">
+                          ‹
+                        </button>
+                        {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+                          .filter((n) => n === 1 || n === totalPaginas || Math.abs(n - paginaActual) <= 2)
+                          .map((n) => (
+                            <button type="button" key={n} className={n === paginaActual ? "activa" : ""} onClick={() => setPagina(n)}>
+                              {n}
+                            </button>
+                          ))}
+                        <button type="button" disabled={paginaActual >= totalPaginas} onClick={() => setPagina(paginaActual + 1)} aria-label="Página siguiente">
+                          ›
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
           </>
         )}
       </div>
