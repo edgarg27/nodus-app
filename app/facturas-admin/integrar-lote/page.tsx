@@ -11,6 +11,7 @@ const POR_LLAMADA = 10;
 const dinero = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type Fila = {
+  estado: string;
   id: string;
   folio: string;
   concepto: string;
@@ -36,7 +37,8 @@ export default function IntegrarLotePage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [seleccion, setSeleccion] = useState<string[]>([]);
-  const [metodo, setMetodo] = useState<"PPD" | "PUE">("PPD");
+  // "auto": PUE lo que ya está pagado y PPD lo pendiente (como en ZORA).
+  const [metodo, setMetodo] = useState<"auto" | "PPD" | "PUE">("auto");
   const [formaPago, setFormaPago] = useState("03");
   const [timbrando, setTimbrando] = useState(false);
   const [progreso, setProgreso] = useState("");
@@ -78,9 +80,11 @@ export default function IntegrarLotePage() {
     if (
       !confirm(
         `¿Timbrar ${seleccion.length} factura(s) (${dinero(totalSel)})? ` +
-          (metodo === "PPD"
-            ? "Se emiten a pago diferido (PPD); cuando el cliente pague habrá que emitir su complemento de pago."
-            : "Se emiten como pago en una sola exhibición (PUE).")
+          (metodo === "auto"
+            ? "Lo ya pagado sale PUE y lo pendiente PPD (su complemento se emite cuando paguen)."
+            : metodo === "PPD"
+              ? "Se emiten a pago diferido (PPD); cuando el cliente pague se emite su complemento de pago."
+              : "Se emiten como pago en una sola exhibición (PUE).")
       )
     )
       return;
@@ -88,13 +92,25 @@ export default function IntegrarLotePage() {
     setResultado("");
     let hechas = 0;
     const fallos: string[] = [];
-    for (let i = 0; i < seleccion.length; i += POR_LLAMADA) {
-      const lote = seleccion.slice(i, i + POR_LLAMADA);
-      setProgreso(`Timbrando ${Math.min(i + lote.length, seleccion.length)} de ${seleccion.length}...`);
+    // Grupos por método: con "según su estado", lo pagado va PUE y lo pendiente PPD.
+    const pagadas = new Set(filas.filter((f) => f.estado === "pagada").map((f) => f.id));
+    const tareas: { ids: string[]; metodo: "PUE" | "PPD" }[] = [];
+    const agregar = (ids: string[], m: "PUE" | "PPD") => {
+      for (let i = 0; i < ids.length; i += POR_LLAMADA) tareas.push({ ids: ids.slice(i, i + POR_LLAMADA), metodo: m });
+    };
+    if (metodo === "auto") {
+      agregar(seleccion.filter((id) => pagadas.has(id)), "PUE");
+      agregar(seleccion.filter((id) => !pagadas.has(id)), "PPD");
+    } else agregar(seleccion, metodo);
+    let hechasHasta = 0;
+    for (const t of tareas) {
+      const lote = t.ids;
+      hechasHasta += lote.length;
+      setProgreso(`Timbrando ${hechasHasta} de ${seleccion.length}...`);
       const res = await fetch("/api/facturas/facturar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facturaIds: lote, metodo, formaPago: metodo === "PUE" ? formaPago : undefined }),
+        body: JSON.stringify({ facturaIds: lote, metodo: t.metodo, formaPago: t.metodo === "PUE" ? formaPago : undefined, condicionesPago: "Contado" }),
       });
       const data = await res.json().catch(() => ({}));
       const resultados: { id: string; folio?: string; ok: boolean; error?: string }[] = data.resultados || [];
@@ -215,6 +231,7 @@ export default function IntegrarLotePage() {
                     <th>Tipo</th>
                     <th>Concepto</th>
                     <th>Fecha</th>
+                    <th>Pago</th>
                     <th className="fac-num">Total</th>
                     <th>Datos fiscales</th>
                   </tr>
@@ -243,6 +260,7 @@ export default function IntegrarLotePage() {
                         <span className="fac-sub">{f.folio}</span>
                       </td>
                       <td className="fac-nowrap">{f.fechaEmision}</td>
+                      <td className="fac-nowrap">{f.estado === "pagada" ? "Pagado (PUE)" : "Pendiente (PPD)"}</td>
                       <td className="fac-num fac-nowrap">{dinero(f.monto)}</td>
                       <td>
                         {f.completo && f.avisos.length === 0 ? (
@@ -274,14 +292,15 @@ export default function IntegrarLotePage() {
                 <>
                   <div>
                     <p className="sub-label">Método de pago</p>
-                    <select value={metodo} onChange={(e) => setMetodo(e.target.value as "PPD" | "PUE")}>
-                      <option value="PPD">PPD · pago diferido (se paga después)</option>
-                      <option value="PUE">PUE · pago en una sola exhibición (ya se pagó)</option>
+                    <select value={metodo} onChange={(e) => setMetodo(e.target.value as "auto" | "PPD" | "PUE")}>
+                      <option value="auto">Según su estado (pagado PUE · pendiente PPD)</option>
+                      <option value="PPD">Todo PPD · pago diferido</option>
+                      <option value="PUE">Todo PUE · pago en una sola exhibición</option>
                     </select>
                   </div>
-                  {metodo === "PUE" && (
+                  {metodo !== "PPD" && (
                     <div>
-                      <p className="sub-label">Forma de pago</p>
+                      <p className="sub-label">{metodo === "auto" ? "Forma de pago de lo ya pagado" : "Forma de pago"}</p>
                       <select value={formaPago} onChange={(e) => setFormaPago(e.target.value)}>
                         {FORMAS_PAGO_COMPLEMENTO.map((fp) => (
                           <option key={fp.clave} value={fp.clave}>

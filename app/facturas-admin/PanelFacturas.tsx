@@ -147,8 +147,9 @@ function sePuedeCancelar(f: { fuente?: string | null; uuid_cfdi?: string | null;
 }
 
 // Un cobro sin CFDI, con cliente y todavía por cobrar, se puede facturar a pago diferido (PPD).
+// Como en ZORA: lo ya pagado se factura PUE y lo pendiente PPD; solo los cancelados no se facturan.
 function sePuedeFacturar(f: { user_id?: string | null; uuid_cfdi?: string | null; estado: string }) {
-  return !!f.user_id && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada";
+  return !!f.user_id && !f.uuid_cfdi && f.estado !== "cancelada";
 }
 
 type Cliente = { id: string; nombre: string; email: string; empresa: string | null; nombre_fiscal?: string | null; rfc?: string | null };

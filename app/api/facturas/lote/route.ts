@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     .eq("centro", centro)
     .is("uuid_cfdi", null)
     .not("user_id", "is", null)
-    .not("estado", "in", "(pagada,cancelada)")
+    .neq("estado", "cancelada")
     .gte("fecha_emision", inicio)
     .lte("fecha_emision", fin)
     .order("fecha_emision", { ascending: true });
