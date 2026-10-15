@@ -36,6 +36,8 @@ export default function ImportarCfdiPage() {
   // Sin valor por omisión a propósito: importar facturas ya cobradas como
   // "pendientes" inflaría la cartera, así que hay que elegir.
   const [estadoImportado, setEstadoImportado] = useState<"" | "pendiente" | "pagada">("");
+  // De dónde salieron los XML (columna "Fuente" de Facturas timbradas).
+  const [origen, setOrigen] = useState<"cfdi_import" | "contpaq" | "portal_sat">("cfdi_import");
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState({ hecho: 0, total: 0 });
   const [resumen, setResumen] = useState<Resumen | null>(null);
@@ -180,7 +182,7 @@ export default function ImportarCfdiPage() {
         conceptos: data.conceptos,
         impuestos: data.impuestos,
         xml_url: xmlUrl,
-        fuente: "cfdi_import",
+        fuente: origen,
       });
 
       if (insertError) {
@@ -266,6 +268,13 @@ export default function ImportarCfdiPage() {
               {archivos.filter((a) => a.name.toLowerCase().endsWith(".pdf")).length} PDF)
             </p>
           )}
+
+          <p className="sub-label" style={{ marginTop: 12 }}>¿De dónde vienen?</p>
+          <select value={origen} onChange={(e) => setOrigen(e.target.value as "cfdi_import" | "contpaq" | "portal_sat")} style={{ maxWidth: 320 }}>
+            <option value="cfdi_import">ZORA</option>
+            <option value="contpaq">Nómina/Contpaq</option>
+            <option value="portal_sat">Portal SAT</option>
+          </select>
 
           <p className="sub-label" style={{ marginTop: 12 }}>¿Cómo entran estas facturas?</p>
           <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, marginTop: 4 }}>

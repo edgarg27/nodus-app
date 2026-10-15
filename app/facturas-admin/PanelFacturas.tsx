@@ -107,6 +107,12 @@ type DatoTimbrada = {
   tipo: "I" | "P";
 };
 
+// De dónde viene cada factura. Las emitidas desde Nodus cuentan como "Manual" (las hace el personal);
+// las importadas pueden venir de Nómina/Contpaq, del Portal del SAT o de ZORA.
+function grupoFuente(fuente: string | null | undefined): string {
+  return !fuente || fuente === "facturapi_auto" || fuente === "manual" ? "manual" : fuente;
+}
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
@@ -398,7 +404,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
       if (filtroEstado === "cancelacion") {
         if (!f.cancelacion_estatus) return false;
       } else if (filtroEstado && f.estado !== filtroEstado) return false;
-      if (filtroFuente && (f.fuente || "manual") !== filtroFuente) return false;
+      if (filtroFuente && grupoFuente(f.fuente) !== filtroFuente) return false;
       if (filtroDesde && f.fecha_emision < filtroDesde) return false;
       if (filtroHasta && f.fecha_emision > filtroHasta) return false;
       if (soloSinCliente && (f.user_id || f.rfc_receptor === "XAXX010101000")) return false;
@@ -418,7 +424,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   const complementosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return complementos.filter((c) => {
-      if (filtroEstado || filtroFuente || soloSinCliente) return false;
+      // Los complementos los emite Nodus: entran en "Manual".
+      if (filtroEstado || (filtroFuente && filtroFuente !== "manual") || soloSinCliente) return false;
       if (filtroCliente && c.user_id !== filtroCliente) return false;
       if (q && ![c.serie, c.folio_fiscal, c.uuid_cfdi, c.cliente_nombre, c.cliente_fiscal, c.numero_operacion].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
       if (filtroDesde && c.fecha_pago < filtroDesde) return false;
@@ -454,7 +461,13 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
           ? { texto: "Simulada (prueba)", tipo: "gris" }
           : { texto: "Vigente", tipo: "verde" };
   const fuenteDe = (fuente: string | null | undefined): DatoTimbrada["fuente"] =>
-    fuente === "cfdi_import" ? { texto: "Importada (ZORA)", icono: "enlace" } : fuente === "facturapi_auto" ? { texto: "Nodus", icono: "archivo" } : { texto: "Manual", icono: "archivo" };
+    fuente === "cfdi_import"
+      ? { texto: "Importada (ZORA)", icono: "enlace" }
+      : fuente === "contpaq"
+        ? { texto: "Nómina/Contpaq", icono: "enlace" }
+        : fuente === "portal_sat"
+          ? { texto: "Portal SAT", icono: "enlace" }
+          : { texto: "Manual", icono: "archivo" };
 
   const filasT: DatoTimbrada[] = filasTimbradas
     .map((fila): DatoTimbrada => {
@@ -989,8 +1002,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                   <select value={filtroFuente} onChange={(e) => setFiltroFuente(e.target.value)}>
                     <option value="">Todas</option>
                     <option value="manual">Manual</option>
-                    <option value="cfdi_import">Importación CFDI</option>
-                    <option value="facturapi_auto">Emitida con Facturapi</option>
+                    <option value="contpaq">Nómina/Contpaq</option>
+                    <option value="portal_sat">Portal SAT</option>
+                    <option value="cfdi_import">Importada (ZORA)</option>
                   </select>
                 </div>
                 <div>
@@ -1092,9 +1106,10 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                     <span>Fuente</span>
                     <select value={filtroFuente} onChange={(e) => setFiltroFuente(e.target.value)}>
                       <option value="">Todos</option>
-                      <option value="facturapi_auto">Nodus</option>
-                      <option value="cfdi_import">Importada (ZORA)</option>
                       <option value="manual">Manual</option>
+                      <option value="contpaq">Nómina/Contpaq</option>
+                      <option value="portal_sat">Portal SAT</option>
+                      <option value="cfdi_import">Importada (ZORA)</option>
                     </select>
                   </label>
                   <label className="ft-campo">
