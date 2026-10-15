@@ -5,7 +5,7 @@ import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
 
 // Botón "verificar pago" del cliente en /pagar-spei. Usa el mismo camino que
 // el webhook y la verificación de tarjeta (confirmarPagoPorCargo) para no
-// duplicar la lógica de marcar pagado — incluye la factura automática.
+// duplicar la lógica de marcar pagado — incluye el complemento de pago si el cobro ya era PPD.
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {

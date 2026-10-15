@@ -1,9 +1,7 @@
-// Generación de CFDI (factura real) vía Facturapi. Hay dos caminos:
-//   - Automático al confirmarse un pago (generarFacturaAutomatica): PUE, la
-//     factura nace ya pagada.
-//   - Desde un cobro pendiente (lib/facturarCobro.ts): PPD, la factura se emite
-//     antes del pago y después se cubre con un complemento de pago.
-// Ambos usan timbrarCfdi() y guardan el resultado con el mismo formato que la
+// Generación de CFDI (factura real) vía Facturapi. Como en ZORA, la factura la hace finanzas: integra los cobros
+// del cliente en un estado de cuenta y lo timbra (lib/facturarCobro.ts): PUE si ya se pagó, PPD si se paga después.
+// Lo único automático es el complemento de pago de una factura PPD cuando el cliente paga (complementoAlPagar).
+// Todo usa timbrarCfdi() y guarda el resultado con el mismo formato que la
 // importación manual de CFDI (ver app/facturas-admin/importar) para que el
 // resto de la app (estado de cuenta, reportes) no necesite cambios. Nunca
 // truena el pago: si algo falla, el pago sigue su curso y se deja un aviso.
@@ -65,15 +63,6 @@ export async function subirArchivoFactura(admin: Admin, nombreBase: string, buff
   if (error) return null;
   const { data } = admin.storage.from("facturas").getPublicUrl(fileName);
   return data.publicUrl;
-}
-
-async function avisarFacturaFallida(admin: Admin, pagoId: string, centro: string | null, motivo: string) {
-  if (!centro) return;
-  await admin.from("notificaciones").insert({
-    centro,
-    tipo: "factura_automatica_fallida",
-    mensaje: `No se pudo generar la factura automática del pago ${pagoId}: ${motivo}. Factúralo a mano desde Facturas › Importar CFDI.`,
-  });
 }
 
 // Tipo de servicio con el que se timbra un cobro: el que trae, o, si no trae (la renta mensual),
@@ -280,95 +269,38 @@ export async function timbrarCfdi(admin: Admin, p: ParametrosCfdi) {
   return { invoice, datosFactura };
 }
 
-export async function generarFacturaAutomatica(admin: Admin, pagoId: string, metodoOpenpay?: string | null): Promise<void> {
-  const { data: pago } = await admin
-    .from("pagos")
-    .select("id, user_id, monto, concepto, factura_id, adicional_tipo")
-    .eq("id", pagoId)
-    .maybeSingle();
-  if (!pago) return;
-
-  const { data: cliente } = await admin
-    .from("profiles")
-    .select("nombre, email, rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi, centro")
-    .eq("id", pago.user_id)
-    .maybeSingle();
-
+// Al confirmarse un pago (tarjeta, SPEI, comprobante o efectivo). La factura NO se timbra sola: como en ZORA,
+// finanzas integra los cobros y factura (PUE si ya se pagó, PPD si no). Lo único automático es el complemento de pago:
+// si el cobro ya se facturó a pago diferido (PPD), este pago se cubre con su complemento.
+export async function complementoAlPagar(admin: Admin, pagoId: string, metodoOpenpay?: string | null): Promise<void> {
+  const { data: pago } = await admin.from("pagos").select("id, user_id, monto, factura_id").eq("id", pagoId).maybeSingle();
+  if (!pago?.factura_id) return;
+  const { data: factura } = await admin.from("facturas").select("id, uuid_cfdi, metodo_pago, folio").eq("id", pago.factura_id).maybeSingle();
+  // Sin CFDI todavía: finanzas la factura después. Una factura simulada (cliente de prueba) no existe en Facturapi.
+  if (!factura?.uuid_cfdi || factura.metodo_pago !== "PPD" || esFacturaSimulada(factura.uuid_cfdi)) return;
   try {
-    let facturaExistente: { id: string; uuid_cfdi: string | null; metodo_pago: string | null; folio: string | null } | null = null;
-    if (pago.factura_id) {
-      const { data } = await admin.from("facturas").select("id, uuid_cfdi, metodo_pago, folio").eq("id", pago.factura_id).maybeSingle();
-      facturaExistente = data;
-      if (facturaExistente?.uuid_cfdi) {
-        // Una factura simulada (cliente de prueba) no existe en Facturapi: no hay complemento que emitir.
-        if (esFacturaSimulada(facturaExistente.uuid_cfdi)) return;
-        // Ya facturado (webhook + verificación pueden coincidir): no se duplica. Si la factura
-        // se emitió a pago diferido (PPD), este pago se cubre con su complemento de pago.
-        if (facturaExistente.metodo_pago === "PPD") {
-          const { emitirComplementoPago } = await import("@/lib/complementoPago");
-          const { hoyMexicoISO } = await import("@/lib/fechaMexico");
-          const r = await emitirComplementoPago(admin, {
-            userId: pago.user_id,
-            items: [{ facturaId: facturaExistente.id, importe: Number(pago.monto) }],
-            topeSaldo: true,
-            formaPago: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
-            fecha: hoyMexicoISO(),
-            usuarioId: null,
-            pagoId: pago.id,
-          });
-          if (!r.ok && cliente?.centro) {
-            await admin.from("notificaciones").insert({
-              centro: cliente.centro,
-              tipo: "complemento_pago_pendiente",
-              mensaje: `El cliente ${cliente.nombre || ""} pagó la factura ${facturaExistente.folio || ""} (pago diferido) y no se pudo emitir su complemento de pago: ${r.error}. Emítelo desde Facturas.`,
-            });
-          }
-        }
-        return;
-      }
-    }
-
-    if (!cliente?.rfc || !cliente.nombre_fiscal || !cliente.regimen_fiscal || !cliente.cp_fiscal) {
-      await avisarFacturaFallida(admin, pago.id, cliente?.centro || null, "el cliente no tiene datos fiscales completos");
-      return;
-    }
-
-    const { invoice, datosFactura } = await timbrarCfdi(admin, {
-      cliente,
-      concepto: pago.concepto,
-      monto: Number(pago.monto),
-      adicionalTipo: await tipoPorOmision(admin, pago.user_id, pago.adicional_tipo),
-      serie: serieCentro(cliente.centro),
-      metodo: "PUE",
+    const { emitirComplementoPago } = await import("@/lib/complementoPago");
+    const { hoyMexicoISO } = await import("@/lib/fechaMexico");
+    const r = await emitirComplementoPago(admin, {
+      userId: pago.user_id,
+      items: [{ facturaId: factura.id, importe: Number(pago.monto) }],
+      topeSaldo: true,
       formaPago: formaPagoDesdeMetodoOpenpay(metodoOpenpay),
-      etiqueta: `pago ${pagoId}`,
+      fecha: hoyMexicoISO(),
+      usuarioId: null,
+      pagoId: pago.id,
     });
-
-    if (facturaExistente) {
-      await admin.from("facturas").update(datosFactura).eq("id", facturaExistente.id);
-    } else {
-      const hoyISO = new Date().toISOString().split("T")[0];
-      const { data: nuevaFactura } = await admin
-        .from("facturas")
-        .insert({
-          user_id: pago.user_id,
-          folio: `${invoice.series || "F"}${invoice.folio_number ?? ""}`,
-          concepto: pago.concepto || "Pago Nodus",
-          monto: pago.monto,
-          fecha_emision: hoyISO,
-          fecha_vencimiento: hoyISO,
-          estado: "pagada",
-          centro: cliente.centro || null,
-          ...datosFactura,
-        })
-        .select("id")
-        .single();
-      if (nuevaFactura?.id) {
-        await admin.from("pagos").update({ factura_id: nuevaFactura.id }).eq("id", pago.id);
+    if (!r.ok) {
+      const { data: cliente } = await admin.from("profiles").select("nombre, centro").eq("id", pago.user_id).maybeSingle();
+      if (cliente?.centro) {
+        await admin.from("notificaciones").insert({
+          centro: cliente.centro,
+          tipo: "complemento_pago_pendiente",
+          mensaje: `El cliente ${cliente.nombre || ""} pagó la factura ${factura.folio || ""} (pago diferido) y no se pudo emitir su complemento de pago: ${r.error}. Emítelo desde Facturas.`,
+        });
       }
     }
   } catch (err: any) {
-    console.error(`[facturapi] pago ${pagoId}:`, err?.message || err);
-    await avisarFacturaFallida(admin, pago.id, cliente?.centro || null, err?.message || "error desconocido");
+    console.error(`[facturapi] complemento del pago ${pagoId}:`, err?.message || err);
   }
 }

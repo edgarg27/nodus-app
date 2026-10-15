@@ -51,11 +51,11 @@ export async function POST(req: NextRequest) {
   // Líneas que ya son un pago del cliente, sin factura.
   const pagoIds = lineas.map((l) => l.pagoId).filter((x): x is string => typeof x === "string");
   let consultaPagos = pagoIds.length
-    ? admin.from("pagos").select("id, monto, adicional_tipo").in("id", pagoIds).eq("user_id", userId).is("factura_id", null)
+    ? admin.from("pagos").select("id, monto, adicional_tipo, estado").in("id", pagoIds).eq("user_id", userId).is("factura_id", null)
     : null;
   // Un cliente de otro centro con contrato aquí: solo se pueden ligar sus pagos de este centro.
   if (consultaPagos && acceso.cruzado) consultaPagos = consultaPagos.eq("centro", miProfile!.centro);
-  const { data: pagosExistentes } = consultaPagos ? await consultaPagos : { data: [] as { id: string; monto: number; adicional_tipo: string | null }[] };
+  const { data: pagosExistentes } = consultaPagos ? await consultaPagos : { data: [] as { id: string; monto: number; adicional_tipo: string | null; estado: string }[] };
   if ((pagosExistentes || []).length !== pagoIds.length) {
     return NextResponse.json({ error: "Alguno de los pagos ya tiene factura o no es de este cliente. Vuelve a pulsar Previa." }, { status: 409 });
   }
@@ -82,7 +82,8 @@ export async function POST(req: NextRequest) {
       monto: total,
       fecha_emision: fecha,
       fecha_vencimiento: sumarDias(fecha, DIAS_PARA_PAGAR),
-      estado: "pendiente",
+      // Si todo lo que se integra ya está pagado (sin líneas nuevas), el estado de cuenta nace pagado y se factura PUE.
+      estado: nuevas.length === 0 && (pagosExistentes || []).length > 0 && (pagosExistentes || []).every((p) => p.estado === "pagado") ? "pagada" : "pendiente",
       centro,
     })
     .select("id, folio")
