@@ -41,8 +41,6 @@ export async function POST(req: NextRequest) {
   };
   const err = validarCamposServicio(campos);
   if (err) return NextResponse.json({ error: err }, { status: 400 });
-  // Al elegir el servicio se rellena su precio, así que un servicio nuevo no puede quedar sin él.
-  if (!(campos.precio !== null && campos.precio > 0)) return NextResponse.json({ error: "Escribe el precio del servicio (con IVA)" }, { status: 400 });
 
   const admin = createAdminClient();
   const base = claveDesdeEtiqueta(etiqueta);
@@ -60,7 +58,8 @@ export async function POST(req: NextRequest) {
     concepto: campos.concepto,
     sat_prod_serv: campos.satProdServ,
     sat_unidad: campos.satUnidad,
-    precio: campos.precio,
+    // Sin precio fijo: el precio lo pone quien cobra, según el cliente.
+    precio: null,
     orden,
     actualizado_por: s.userId,
   });

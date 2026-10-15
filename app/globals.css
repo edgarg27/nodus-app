@@ -7585,13 +7585,13 @@ a.stat-card {
 /* ---------- Servicios y precios (catálogo) ---------- */
 .servicios-fila {
   display: grid;
-  grid-template-columns: 2.4fr 1.2fr 0.7fr 1.1fr auto;
+  grid-template-columns: 2.4fr 1.2fr 0.7fr auto;
   gap: 10px;
   align-items: center;
 }
 
 .servicios-fila-nueva {
-  grid-template-columns: 2.4fr 1.4fr 1.2fr 1.1fr auto;
+  grid-template-columns: 2.4fr 1.4fr 1.2fr auto;
   align-items: start;
 }
 

@@ -61,8 +61,8 @@ export default function FacturacionPage() {
           </a>
           {puedeEditar && (
             <a className="fac-menu-card" href="/catalogo-servicios">
-              <span className="fac-menu-titulo">+ Servicios y precios</span>
-              <span className="fac-menu-texto">Agrega o edita los servicios que se cobran y su precio.</span>
+              <span className="fac-menu-titulo">+ Servicios</span>
+              <span className="fac-menu-texto">Agrega o edita los servicios que se cobran y su clave del SAT.</span>
             </a>
           )}
         </div>
