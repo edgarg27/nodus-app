@@ -8371,3 +8371,18 @@ a.stat-card {
     font-size: 10px;
   }
 }
+.ft-icono-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #254b8c;
+  display: inline-flex;
+}
+.ft-icono-btn:hover {
+  color: var(--orange);
+}
+.ft-icono-btn svg {
+  width: 19px;
+  height: 19px;
+}
