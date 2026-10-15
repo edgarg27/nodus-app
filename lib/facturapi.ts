@@ -185,7 +185,7 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
     use: usoCfdi,
     ...(p.serie ? { series: p.serie } : {}),
     ...(p.condiciones ? { conditions: p.condiciones } : {}),
-    ...(p.relacion && p.relacion.uuids.length > 0 ? { related_documents: p.relacion.uuids.map((uuid) => ({ relationship: p.relacion!.tipo, uuid })) } : {}),
+    ...(p.relacion && p.relacion.uuids.length > 0 ? { related_documents: [{ relationship: p.relacion.tipo, documents: p.relacion.uuids }] } : {}),
     ...(p.cuentaPago ? { pdf_custom_section: `No. cuenta de pago: ${p.cuentaPago.replace(/[<>&]/g, "")}` } : {}),
     // El SAT exige el nodo "Información Global" cuando el receptor es
     // público en general (XAXX010101000): se factura como resumen diario.
@@ -200,12 +200,9 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
 // genera con su plantilla, sin timbrar nada ni gastar un folio.
 export async function previaPdfCfdi(admin: Admin, p: ParametrosCfdi): Promise<Buffer> {
   const { cuerpo } = await prepararFactura(admin, p);
-  const descarga: any = await (facturapi.invoices as any).previewPdf(cuerpo);
-  if (Buffer.isBuffer(descarga)) return descarga;
-  if (descarga instanceof ArrayBuffer) return Buffer.from(descarga);
-  const trozos: Buffer[] = [];
-  for await (const t of descarga) trozos.push(Buffer.from(t));
-  return Buffer.concat(trozos);
+  // Como las descargas del timbrado: Facturapi da una dirección firmada y de ahí se baja el PDF.
+  const firmada: any = await (facturapi.invoices as any).previewPdfUrl(cuerpo);
+  return bufferDesdeUrlFirmada(firmada.url);
 }
 
 // Emite el CFDI en Facturapi, guarda XML/PDF y devuelve los datos listos para
