@@ -1112,7 +1112,7 @@ export default function AdminPanel({
                   <p className="stat-lbl">Contratos por vencer</p>
                   <p className="stat-delta">En los próximos 30 días</p>
                 </a>
-                <a className="stat-card" href="/pagos">
+                <a className="stat-card" href="/cobranza?revisar=1">
                   <p className="stat-val">{resumen.comprobantesRevisar}</p>
                   <p className="stat-lbl">Comprobantes por revisar</p>
                 </a>
@@ -1290,11 +1290,6 @@ export default function AdminPanel({
                 <img src="/icons/cobranza.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Cobranza</span>
               </a>
-              <a className="modulo-card" href="/pagos">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/pagos.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Pagos</span>
-              </a>
               <a className="modulo-card" href="/facturas-admin">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
@@ -1419,13 +1414,6 @@ export default function AdminPanel({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/cobranza.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Cobranza</span>
-                </a>
-              ) },
-              { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "pagos", tarjeta: (
-                <a className="modulo-card" href="/pagos">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/pagos.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Pagos</span>
                 </a>
               ) },
               { grupo: 1, ver: rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && rol !== "diseno", key: "facturas", tarjeta: (
