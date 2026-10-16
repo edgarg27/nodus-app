@@ -1,5 +1,7 @@
 "use client";
 
+import { BotonPagoProximamente } from "@/app/components/PagosProximamente";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
@@ -103,7 +105,7 @@ function BotonesPago({ f, esCow, vencida }: { f: Factura; esCow: boolean; vencid
   );
   return (
     <>
-      {esCow ? [tarjeta, spei] : [spei, tarjeta]}
+      {PAGOS_EN_LINEA_ACTIVOS ? (esCow ? [tarjeta, spei] : [spei, tarjeta]) : <BotonPagoProximamente />}
       <a className={clase} href={`/subir-comprobante?facturaId=${f.id}&folio=${encodeURIComponent(f.folio)}&monto=${f.monto}`}>
         💳 Ya pagué, subir comprobante
       </a>
@@ -238,7 +240,7 @@ export default function EstadoCuentaPage() {
           </div>
         </div>
 
-        {esCow ? (
+        {!PAGOS_EN_LINEA_ACTIVOS ? null : esCow ? (
           <a className="pagar-btn-full" href="/mis-tarjetas" style={{ marginBottom: 10, display: "block", textAlign: "center" }}>
             💳 Domicilia tu pago: mis tarjetas y cobro automático
           </a>
@@ -279,12 +281,23 @@ export default function EstadoCuentaPage() {
                     <p className="factura-monto">{formatMonto(totalPendiente)}</p>
                   </div>
                 </div>
-                <a className="pagar-btn-full" href="/pagar-todo">
-                  💳 Liquidar saldo
-                </a>
-                <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0", textAlign: "center" }}>
-                  O paga cada concepto por separado aquí abajo.
-                </p>
+                {PAGOS_EN_LINEA_ACTIVOS ? (
+                  <>
+                    <a className="pagar-btn-full" href="/pagar-todo">
+                      💳 Liquidar saldo
+                    </a>
+                    <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0", textAlign: "center" }}>
+                      O paga cada concepto por separado aquí abajo.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <BotonPagoProximamente texto="💳 Liquidar saldo en línea" />
+                    <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0", textAlign: "center" }}>
+                      Por ahora paga por transferencia y sube tu comprobante en cada concepto.
+                    </p>
+                  </>
+                )}
               </div>
             )}
 
@@ -361,9 +374,13 @@ export default function EstadoCuentaPage() {
                         </span>
                       </div>
                     </div>
-                    <a className="pagar-btn-full" href={`/pagar-tarjeta?pagoId=${p.id}`}>
-                      💳 Ir a pagar
-                    </a>
+                    {PAGOS_EN_LINEA_ACTIVOS ? (
+                      <a className="pagar-btn-full" href={`/pagar-tarjeta?pagoId=${p.id}`}>
+                        💳 Ir a pagar
+                      </a>
+                    ) : (
+                      <BotonPagoProximamente />
+                    )}
                   </div>
                 ))}
               </>
