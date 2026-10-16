@@ -8562,3 +8562,6 @@ a.stat-card {
     grid-template-columns: 1fr;
   }
 }
+.fi-abajo.fi-abajo-solo {
+  grid-template-columns: 1fr;
+}
