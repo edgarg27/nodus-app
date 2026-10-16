@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 // Inicio de Facturación (diseño que pidió contabilidad): buscador, los cuatro módulos, "Otros" (Importar CFDI,
-// Catálogo de conceptos y Configuración fiscal) y las últimas facturas timbradas.
+// Catálogo de conceptos y Configuración fiscal).
 
 const Svg = ({ children }: { children: ReactNode }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -82,10 +81,6 @@ const OTROS: Tarjeta[] = [
   { href: "/facturas-admin/configuracion-fiscal", titulo: "Configuración fiscal", texto: "Datos fiscales de los clientes: razón social, RFC, régimen y código postal.", icono: <IconoFiscal />, color: "verde" },
 ];
 
-type Ultima = { id: string; folio: string; serie: string | null; folio_fiscal: string | null; fecha_emision: string; monto: number; cancelacion_estatus: string | null };
-
-const dinero = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fechaCorta = (iso: string) => (iso && iso.length >= 10 ? iso.slice(8, 10) + "/" + iso.slice(5, 7) + "/" + iso.slice(0, 4) : iso);
 
 function TarjetaModulo({ m }: { m: Tarjeta }) {
   return (
@@ -103,21 +98,9 @@ function TarjetaModulo({ m }: { m: Tarjeta }) {
 }
 
 export default function FacturacionPage() {
-  const supabase = createClient();
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
-  const [ultimas, setUltimas] = useState<Ultima[] | null>(null);
 
-  useEffect(() => {
-    supabase
-      .from("facturas")
-      .select("id, folio, serie, folio_fiscal, fecha_emision, monto, cancelacion_estatus")
-      .not("uuid_cfdi", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .then(({ data }) => setUltimas((data as Ultima[]) || []));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function buscar(e: React.FormEvent) {
     e.preventDefault();
@@ -149,7 +132,7 @@ export default function FacturacionPage() {
           ))}
         </div>
 
-        <div className="fi-abajo">
+        <div className="fi-abajo fi-abajo-solo">
           <div>
             <p className="fi-seccion">Otros</p>
             <div className="fi-otros">
@@ -159,33 +142,6 @@ export default function FacturacionPage() {
             </div>
           </div>
 
-          <div className="fi-ultimas">
-            <div className="fi-ultimas-cab">
-              <p className="fi-seccion" style={{ margin: 0 }}>
-                Últimas facturas
-              </p>
-              <a href="/facturas-admin/timbradas">Ver todas</a>
-            </div>
-            {ultimas === null ? (
-              <p className="fi-vacio">Cargando...</p>
-            ) : ultimas.length === 0 ? (
-              <p className="fi-vacio">Todavía no hay facturas timbradas.</p>
-            ) : (
-              ultimas.map((u) => (
-                <a key={u.id} className="fi-ultima" href={"/facturas-admin/estados-de-cuenta/" + u.id}>
-                  <span className="fi-icono fi-icono-chico fi-icono-azul">
-                    <IconoDoc />
-                  </span>
-                  <span className="fi-ultima-folio">
-                    <b>{u.serie ? u.serie + "-" + (u.folio_fiscal || "") : u.folio}</b>
-                    <small>{fechaCorta(u.fecha_emision)}</small>
-                  </span>
-                  <span className="fi-ultima-monto">{dinero(Number(u.monto))}</span>
-                  <span className={"ft-chip " + (u.cancelacion_estatus === "cancelada" ? "ft-chip-roja" : "ft-chip-verde")}>{u.cancelacion_estatus === "cancelada" ? "Cancelada" : "Timbrada"}</span>
-                </a>
-              ))
-            )}
-          </div>
         </div>
       </div>
     </div>
