@@ -1797,14 +1797,14 @@ export default function CentroPanel({
   }
 
   async function marcarNotifLeida(id: string) {
-    await supabase.from("notificaciones").update({ leida: true }).eq("id", id);
+    await fetch("/api/notificaciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, accion: "leida" }) });
     setNotificaciones((prev) => prev.map((n) => (n.id === id ? { ...n, leida: true } : n)));
   }
 
   async function descartarNotificacion(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     setNotificaciones((prev) => prev.filter((n) => n.id !== id));
-    await supabase.from("notificaciones").delete().eq("id", id);
+    await fetch("/api/notificaciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, accion: "descartar" }) });
   }
 
   const notifsSinLeer = notificaciones.filter((n) => !n.leida).length;
