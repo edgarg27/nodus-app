@@ -1,5 +1,7 @@
 "use client";
 
+import PagosProximamente from "@/app/components/PagosProximamente";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { configOpenpay, prepararOpenpay } from "@/lib/openpayBrowser";
@@ -20,6 +22,11 @@ const etiquetaMarca = (m: string | null) => (m ? m.charAt(0).toUpperCase() + m.s
 // Tarjetas guardadas del cliente y su cobro automático. La tarjeta se guarda en
 // Openpay (Nodus no ve el número); aquí solo se ven la marca y los últimos 4.
 export default function MisTarjetasPage() {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return <PagosProximamente titulo="Mis tarjetas" />;
+  return <MisTarjetasInner />;
+}
+
+function MisTarjetasInner() {
   const supabase = createClient();
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
   const [cargando, setCargando] = useState(true);

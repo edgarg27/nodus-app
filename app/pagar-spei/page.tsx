@@ -1,5 +1,7 @@
 "use client";
 
+import PagosProximamente from "@/app/components/PagosProximamente";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -217,6 +219,7 @@ function PagarSpeiInner() {
 }
 
 export default function PagarSpeiPage() {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return <PagosProximamente titulo="Pagar por referencia" />;
   return (
     <Suspense fallback={null}>
       <PagarSpeiInner />

@@ -4,6 +4,7 @@ import { cobrarTarjetaGuardada } from "@/lib/openpay";
 import { confirmarPagoPorCargo } from "@/lib/pagosOpenpay";
 import { enviarCobroAutomaticoFallido } from "@/lib/correosPagos";
 import { FALLOS_PARA_APAGAR_COBRO_AUTOMATICO } from "@/lib/consentimientoCobros";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -31,6 +32,8 @@ export async function intentarCobroAutomatico(
     intento?: number; // número de intento del día/mes, para que el order_id sea único
   }
 ): Promise<ResultadoCobroAutomatico> {
+  // Pagos en línea apagados (lib/pagosEnLinea.ts): no se cobra ninguna tarjeta.
+  if (!PAGOS_EN_LINEA_ACTIVOS) return { intento: false, pagado: false };
   const { data: tarjeta } = await admin
     .from("tarjetas_guardadas")
     .select("id, openpay_customer_id, openpay_card_id, ultimos4, fallos_consecutivos")

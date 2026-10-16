@@ -1,5 +1,6 @@
 "use client";
 
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -589,6 +590,7 @@ export default function ClientePanel({
           <a className="quick-card" href="/mis-tarjetas">
             <span className="quick-icon" style={{ fontSize: 26 }}>💳</span>
             <span className="quick-name">Mis tarjetas</span>
+            {!PAGOS_EN_LINEA_ACTIVOS && <span className="quick-proximamente">Próximamente</span>}
           </a>
           <a className="quick-card" href="/datos-fiscales">
             <span className="quick-icon" style={{ fontSize: 26 }}>🧾</span>

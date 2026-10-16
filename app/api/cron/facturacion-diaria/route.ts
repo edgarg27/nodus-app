@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoSPEI } from "@/lib/openpay";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
 import { clientesConCoworking } from "@/lib/coworking";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
@@ -86,6 +87,9 @@ async function crearFacturaConSpei(
     }
     if (r.intento) resumen.cobrosAutomaticosFallidos++;
   }
+
+  // Pagos en línea apagados (lib/pagosEnLinea.ts): sin referencia SPEI; el cliente paga por transferencia.
+  if (!PAGOS_EN_LINEA_ACTIVOS) return facturaId;
 
   try {
     const cargo = await crearCargoSPEI({
@@ -537,7 +541,7 @@ export async function POST(req: NextRequest) {
           }
 
           // SPEI automático para esa factura
-          if (facturaId && !pagadaConTarjeta) {
+          if (facturaId && !pagadaConTarjeta && PAGOS_EN_LINEA_ACTIVOS) {
             try {
               const cargo = await crearCargoSPEI({
                 monto: Number(montoMes),
