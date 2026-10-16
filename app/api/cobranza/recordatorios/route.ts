@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { enviarCorreo } from "@/lib/email";
+import { esCorreoFicticio } from "@/lib/correoFicticio";
 import { cargarCobranza, resumenCliente } from "@/lib/cobranza";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza", "gerente_ventas"];
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   let enviados = 0;
   const fallos: string[] = [];
   for (const c of clientes) {
-    if (!c.email) {
+    if (!c.email || esCorreoFicticio(c.email)) {
       fallos.push(c.nombre + ": sin correo");
       continue;
     }

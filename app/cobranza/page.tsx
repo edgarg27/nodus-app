@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { correoVisible } from "@/lib/correoFicticio";
 import type { Baja, Cargo, ClienteCobranza, Pagado, TipoCargo } from "@/lib/cobranza";
 
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -499,7 +500,7 @@ export default function CobranzaPage() {
         Contacto: f.c.nombre,
         "No. cliente": f.c.numero_usuario || "",
         Centro: f.c.centro || "",
-        Correo: f.c.email || "",
+        Correo: correoVisible(f.c.email),
         Teléfono: f.c.telefono || "",
         Saldo: f.saldo,
         Vencido: f.vencido,
@@ -759,7 +760,7 @@ export default function CobranzaPage() {
                             <td>
                               <div className="cb-cliente">{nombreDe(f.c)}</div>
                               <div className="cb-cliente-sub">
-                                {[f.c.numero_usuario, nombreDe(f.c) !== f.c.nombre ? f.c.nombre : null].filter(Boolean).join(" · ") || f.c.email}
+                                {[f.c.numero_usuario, nombreDe(f.c) !== f.c.nombre ? f.c.nombre : null].filter(Boolean).join(" · ") || correoVisible(f.c.email)}
                               </div>
                             </td>
                             {datos.esGlobal && !centro && <td className="ft-nowrap">{f.c.centro || "—"}</td>}
@@ -947,7 +948,7 @@ export default function CobranzaPage() {
             <button type="button" onClick={() => abrirPromesa(menuFila)}>
               Promesa de pago
             </button>
-            <button type="button" disabled={!puedeRegistrar || !menuFila.c.email} onClick={() => abrirRecordatorio([menuFila.c.id])}>
+            <button type="button" disabled={!puedeRegistrar || !correoVisible(menuFila.c.email)} onClick={() => abrirRecordatorio([menuFila.c.id])}>
               Enviar recordatorio
             </button>
             <a href={`/facturas-admin/estados-de-cuenta?cliente=${menuFila.c.id}`}>Ver estados de cuenta</a>
@@ -1142,7 +1143,7 @@ export default function CobranzaPage() {
                         />
                         <span>
                           {nombreDe(c)}
-                          <small>{c.email || "Sin correo"}</small>
+                          <small>{correoVisible(c.email) || "Sin correo"}</small>
                         </span>
                         <b>{f ? moneda(f.saldo) : ""}</b>
                       </label>
@@ -1208,7 +1209,7 @@ function Contacto({ c }: { c: ClienteCobranza }) {
           <IconoTelefono />
         </span>
       )}
-      {c.email ? (
+      {correoVisible(c.email) ? (
         <a href={`mailto:${c.email}`} title={c.email}>
           <IconoCorreo />
         </a>

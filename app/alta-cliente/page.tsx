@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { conIva } from "@/lib/adicionales";
+import AnexosZora, { ANEXOS_VACIOS, guardarAnexos, hayAnexos, validarAnexos, type Anexos, type Oficina, type ResultadoAnexos } from "./AnexosZora";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -151,9 +152,29 @@ function AltaClienteInner() {
   const [contratoSeleccionadoId, setContratoSeleccionadoId] = useState("");
   const [mostrarListaContratos, setMostrarListaContratos] = useState(false);
   const [errorContrato, setErrorContrato] = useState("");
+  // Cómo llega el contrato: uno que ya está en Contratos, uno de ZORA que se captura aquí, o ninguno (quien solo
+  // renta una sala de juntas o un day pass).
+  const [modoContrato, setModoContrato] = useState<"ligar" | "anexar" | "ninguno">("ligar");
+  // Acceso: por omisión se le manda el correo para que ponga su contraseña; si no se puede (no tiene correo, no le
+  // interesa la cuenta, migración), se crea con una contraseña generada y sin mandarle nada.
+  const [sinCorreo, setSinCorreo] = useState(false);
+  const [anexos, setAnexos] = useState<Anexos>(ANEXOS_VACIOS);
+  const [verAnexos, setVerAnexos] = useState(false);
+  const [oficinas, setOficinas] = useState<Oficina[]>([]);
 
   useEffect(() => {
     if (centro) cargarContratosPendientes(centro);
+    if (centro)
+      supabase
+        .from("oficinas")
+        .select("id, numero, tipo, estado")
+        .eq("centro", centro)
+        .then(({ data }) =>
+          setOficinas(
+            ((data as Oficina[]) || []).sort((a, b) => (a.numero || "").localeCompare(b.numero || "", "es", { numeric: true }))
+          )
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro]);
 
   // Una vez que llega la lista, si venimos de "Continuar en Alta de
@@ -354,28 +375,41 @@ function AltaClienteInner() {
   // bloquea el alta, que ya quedó hecha.
   const [avisoContrato, setAvisoContrato] = useState("");
   const [contratoLigado, setContratoLigado] = useState(false);
+  // Resultado del alta para el aviso final: contraseña generada (si fue sin correo) y lo anexado.
+  const [contrasenaCreada, setContrasenaCreada] = useState<string | null>(null);
+  const [resultadoAnexos, setResultadoAnexos] = useState<ResultadoAnexos | null>(null);
+  const [copiado, setCopiado] = useState(false);
+  const [sinCorreoReal, setSinCorreoReal] = useState(false);
 
   async function registrarCliente(e: React.FormEvent) {
     e.preventDefault();
     setErrorCliente("");
     setErrorContrato("");
-    if (!formCliente.nombre.trim() || !formCliente.email.trim()) {
-      setErrorCliente("Nombre y correo son obligatorios");
+    if (!formCliente.nombre.trim() || (!sinCorreo && !formCliente.email.trim())) {
+      setErrorCliente(sinCorreo ? "El nombre es obligatorio" : "Nombre y correo son obligatorios");
       return;
     }
     // Contrato de Oficina Privada mes a mes: siempre se paga del 1 al 10, no
     // se captura un día personalizado.
-    const esMensualLigado = contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual";
+    const esMensualLigado =
+      modoContrato === "ligar" && contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual";
     const diaPagoEfectivo = esMensualLigado ? "1" : formCliente.diaPago;
-    if (!diaPagoEfectivo.trim()) {
+    // Sin contrato (solo sala de juntas, day pass) no hay día de pago fijo.
+    if (modoContrato !== "ninguno" && !diaPagoEfectivo.trim()) {
       setErrorCliente("El día del mes que paga es obligatorio");
       return;
     }
-    // El proceso siempre es: prospecto → cotiza → se sube y aprueba el
-    // contrato → HASTA ENTONCES se crea la cuenta. Por eso ya no se puede
-    // dar de alta un cliente sin ligarlo a un contrato que ya exista.
-    if (!contratoSeleccionadoId) {
+    // Con contrato: o se liga uno que ya está en Contratos (lo normal: prospecto → cotiza → se aprueba el contrato →
+    // se crea la cuenta) o se anexa el de ZORA aquí mismo.
+    if (modoContrato === "ligar" && !contratoSeleccionadoId) {
       setErrorContrato("Selecciona el contrato que este cliente ya tiene en Contratos antes de crear la cuenta.");
+      return;
+    }
+    const conContratoZora = modoContrato === "anexar";
+    const errorAnexos = validarAnexos(anexos, conContratoZora);
+    if (errorAnexos && (conContratoZora || hayAnexos(anexos))) {
+      setVerAnexos(true);
+      setErrorCliente(errorAnexos);
       return;
     }
     if (!centro) return;
@@ -394,6 +428,7 @@ function AltaClienteInner() {
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
           centro,
+          sinCorreo,
         }),
       });
       const data = await res.json();
@@ -411,7 +446,7 @@ function AltaClienteInner() {
       // solo se liga el user_id a la cuenta recién creada. Si ese contrato
       // ya estaba "vigente" (se aprobó sin cliente, sus cobros nunca se
       // generaron), se generan justo ahora.
-      if (contratoSeleccionadoId && nuevoClienteId) {
+      if (modoContrato === "ligar" && contratoSeleccionadoId && nuevoClienteId) {
         const contrato = contratosPendientes.find((c) => c.id === contratoSeleccionadoId);
         // Mismo día de pago que se acaba de mandar a /api/crear-cliente
         // (queda en profiles.dia_pago) — se refleja aquí también en el
@@ -449,7 +484,22 @@ function AltaClienteInner() {
         }
       }
 
+      // Contrato de ZORA, pagos y facturas anexados (la cuenta ya existe: si algo falla aquí, se avisa y se puede
+      // completar después desde Contratos, Cobranza o Importar CFDI).
+      let anexado: ResultadoAnexos | null = null;
+      if (nuevoClienteId && (conContratoZora || hayAnexos(anexos))) {
+        const r = await guardarAnexos(supabase, nuevoClienteId, anexos, conContratoZora, diaPagoEfectivo);
+        if ("resultado" in r) {
+          anexado = r.resultado;
+          ligadoOk = ligadoOk || (conContratoZora && !!r.resultado.folioContrato);
+        } else aviso = [aviso, "La cuenta se creó, pero no se pudo anexar el historial: " + r.error].filter(Boolean).join(" ");
+      }
+
       setClienteCreado(data.numeroUsuario);
+      setContrasenaCreada(data.contrasena || null);
+      setSinCorreoReal(!!data.sinCorreo);
+      setResultadoAnexos(anexado);
+      setCopiado(false);
       setAvisoContrato(aviso);
       setContratoLigado(ligadoOk);
       setFormCliente({
@@ -462,6 +512,8 @@ function AltaClienteInner() {
       });
       limpiarProspecto();
       limpiarContrato();
+      setAnexos(ANEXOS_VACIOS);
+      setVerAnexos(false);
       if (centro) cargarContratosPendientes(centro);
       // Si venimos del botón "👤 Nuevo cliente" de un prospecto (por URL)
       // o se eligió uno en el buscador de arriba, ese prospecto ya se
@@ -623,9 +675,10 @@ function AltaClienteInner() {
                 />
               </div>
               <div>
-                <p className="sub-label">Correo</p>
+                <p className="sub-label">Correo{sinCorreo ? " (opcional)" : ""}</p>
                 <input
                   type="email"
+                  placeholder={sinCorreo ? "Si no tiene, entra con su número N-" : ""}
                   value={formCliente.email}
                   onChange={(e) => setFormCliente({ ...formCliente, email: e.target.value })}
                 />
@@ -649,8 +702,8 @@ function AltaClienteInner() {
                 />
               </div>
               <div>
-                <p className="sub-label">Día del mes que paga</p>
-                {contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual" ? (
+                <p className="sub-label">Día del mes que paga{modoContrato === "ninguno" ? " (opcional)" : ""}</p>
+                {modoContrato === "ligar" && contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual" ? (
                   <>
                     <input value="Del 1 al 10 de cada mes" disabled style={{ background: "#f2f2f2", color: "#555" }} />
                     <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
@@ -671,12 +724,74 @@ function AltaClienteInner() {
             </div>
 
             <p className="panel-section-label" style={{ marginTop: 14 }}>
-              Contrato a ligar (obligatorio)
+              Acceso a su cuenta
             </p>
-            <p style={{ fontSize: 12, color: "#888", margin: "2px 0 8px" }}>
-              No se puede crear la cuenta sin ligarla a un contrato ya existente (armado y/o aprobado desde
-              Cotizar o Contratos). Si ese contrato ya estaba "Aprobado/Vigente", sus cobros pendientes (renta,
-              depósito +IVA, adicionales) se generan justo al ligarlo aquí.
+            <div className="alta-opciones">
+              <label className={!sinCorreo ? "activa" : ""}>
+                <input type="radio" name="acceso" checked={!sinCorreo} onChange={() => setSinCorreo(false)} />
+                <span>
+                  <b>Mandarle correo para que cree su contraseña</b> (recomendado)
+                  <small>Le llega la invitación y él confirma su cuenta.</small>
+                </span>
+              </label>
+              <label className={sinCorreo ? "activa" : ""}>
+                <input type="radio" name="acceso" checked={sinCorreo} onChange={() => setSinCorreo(true)} />
+                <span>
+                  <b>Crear sin mandarle correo</b>
+                  <small>Se le genera una contraseña y no recibe nada. Para quien solo renta una sala de juntas o para migrar de ZORA.</small>
+                </span>
+              </label>
+            </div>
+
+            <p className="panel-section-label" style={{ marginTop: 14 }}>
+              Contrato
+            </p>
+            <div className="alta-opciones">
+              <label className={modoContrato === "ligar" ? "activa" : ""}>
+                <input type="radio" name="contrato" checked={modoContrato === "ligar"} onChange={() => setModoContrato("ligar")} />
+                <span>
+                  <b>Ligar un contrato que ya está en Contratos</b>
+                  <small>El flujo normal: armado en Cotizar o Contratos.</small>
+                </span>
+              </label>
+              <label className={modoContrato === "anexar" ? "activa" : ""}>
+                <input
+                  type="radio"
+                  name="contrato"
+                  checked={modoContrato === "anexar"}
+                  onChange={() => {
+                    setModoContrato("anexar");
+                    setVerAnexos(true);
+                    limpiarContrato();
+                  }}
+                />
+                <span>
+                  <b>Anexar contrato de ZORA</b>
+                  <small>Se captura abajo, en “Anexar contrato, pagos y facturas”.</small>
+                </span>
+              </label>
+              <label className={modoContrato === "ninguno" ? "activa" : ""}>
+                <input
+                  type="radio"
+                  name="contrato"
+                  checked={modoContrato === "ninguno"}
+                  onChange={() => {
+                    setModoContrato("ninguno");
+                    limpiarContrato();
+                  }}
+                />
+                <span>
+                  <b>Sin contrato</b>
+                  <small>Solo renta sala de juntas, day pass u otro servicio suelto.</small>
+                </span>
+              </label>
+            </div>
+
+            {modoContrato === "ligar" && (
+              <>
+            <p style={{ fontSize: 12, color: "#888", margin: "8px 0 8px" }}>
+              Si ese contrato ya estaba "Aprobado/Vigente", sus cobros pendientes (renta, depósito +IVA, adicionales) se
+              generan justo al ligarlo aquí.
             </p>
             <div style={{ position: "relative" }}>
               <input
@@ -774,8 +889,29 @@ function AltaClienteInner() {
                   </div>
                 );
               })()}
+              </>
+            )}
 
             {errorContrato && <p style={{ color: "#A32D2D", fontSize: 13, marginTop: 8 }}>{errorContrato}</p>}
+
+            <div className={"alta-drop" + (verAnexos ? " abierto" : "")}>
+              <button type="button" className="alta-drop-cab" onClick={() => setVerAnexos((v) => !v)}>
+                <span>
+                  <b>Anexar contrato, pagos y facturas</b>
+                  <small>Para migrar clientes de ZORA con todo su historial.</small>
+                </span>
+                <span className="alta-drop-flecha">{verAnexos ? "▲" : "▼"}</span>
+              </button>
+              {verAnexos && (
+                <AnexosZora
+                  valor={anexos}
+                  onChange={setAnexos}
+                  conContrato={modoContrato === "anexar"}
+                  oficinas={oficinas}
+                  rfcCliente={formCliente.rfc}
+                />
+              )}
+            </div>
 
             {errorCliente && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorCliente}</p>}
 
@@ -819,7 +955,8 @@ function AltaClienteInner() {
       </div>
 
       {clienteCreado && (
-        <div className="modal-overlay" onClick={() => setClienteCreado(null)}>
+        // Con contraseña generada no se cierra con un clic afuera: solo se muestra esta vez.
+        <div className="modal-overlay" onClick={() => !contrasenaCreada && setClienteCreado(null)}>
           <div className="confetti-wrap">
             {Array.from({ length: 24 }).map((_, i) => (
               <span
@@ -844,14 +981,47 @@ function AltaClienteInner() {
                 {clienteCreado}
               </span>
               <br />
-              Le mandamos un correo para que cree su contraseña.
+              {contrasenaCreada ? "No se le mandó correo." : "Le mandamos un correo para que cree su contraseña."}
               {contratoLigado && (
                 <>
                   <br />
-                  Su contrato ya quedó ligado a esta cuenta.
+                  {resultadoAnexos?.folioContrato ? `Su contrato ${resultadoAnexos.folioContrato} ya quedó en su cuenta.` : "Su contrato ya quedó ligado a esta cuenta."}
                 </>
               )}
             </p>
+            {contrasenaCreada && (
+              <div className="alta-contrasena">
+                <p>
+                  Contraseña para entrar (con su número {clienteCreado}
+                  {sinCorreoReal ? "" : " o su correo"}):
+                </p>
+                <div>
+                  <code>{contrasenaCreada}</code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard
+                        ?.writeText(`Usuario: ${clienteCreado}\nContraseña: ${contrasenaCreada}`)
+                        .then(() => setCopiado(true))
+                        .catch(() => {});
+                    }}
+                  >
+                    {copiado ? "¡Copiado!" : "Copiar"}
+                  </button>
+                </div>
+                <small>Solo se muestra esta vez. Compártela con el cliente; puede cambiarla después.</small>
+              </div>
+            )}
+            {resultadoAnexos && (resultadoAnexos.pagos > 0 || resultadoAnexos.facturas > 0) && (
+              <p className="celebracion-sub" style={{ marginTop: 0 }}>
+                Anexados: {resultadoAnexos.pagos} pago(s) y {resultadoAnexos.facturas} factura(s).
+              </p>
+            )}
+            {resultadoAnexos?.avisos.map((a, i) => (
+              <p key={i} style={{ color: "#a3701f", fontSize: 12, margin: "0 0 6px" }}>
+                ⚠️ {a}
+              </p>
+            ))}
             {avisoContrato && (
               <p style={{ color: "#a3701f", fontSize: 12, margin: "0 0 8px" }}>⚠️ {avisoContrato}</p>
             )}
@@ -861,6 +1031,8 @@ function AltaClienteInner() {
                 setClienteCreado(null);
                 setAvisoContrato("");
                 setContratoLigado(false);
+                setContrasenaCreada(null);
+                setResultadoAnexos(null);
               }}
             >
               Entendido
