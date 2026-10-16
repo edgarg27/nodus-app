@@ -5,6 +5,19 @@ import { normalizarEmpresa } from "@/lib/empresa";
 import { rolPuede } from "@/lib/permisosApi";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { origenPublico } from "@/lib/origenPublico";
+import { correoFicticio } from "@/lib/correoFicticio";
+import { randomInt } from "crypto";
+
+// Contraseña para las cuentas que se crean sin mandar correo: fácil de dictar o mandar por WhatsApp
+// (sin letras que se confunden, como O/0 o l/1).
+function generarContrasena() {
+  const letras = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz";
+  const digitos = "23456789";
+  let p = "Nodus-";
+  for (let i = 0; i < 4; i++) p += letras[randomInt(letras.length)];
+  for (let i = 0; i < 4; i++) p += digitos[randomInt(digitos.length)];
+  return p;
+}
 
 async function generarNumeroUsuarioUnico(admin: ReturnType<typeof createAdminClient>) {
   for (let intento = 0; intento < 15; intento++) {
@@ -48,28 +61,51 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { nombre, email, empresa, rfc, telefono, centro: centroBody, diaPago, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi } = body;
+  const { nombre, empresa, rfc, telefono, centro: centroBody, diaPago, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi } = body;
+  // sinCorreo: la cuenta se crea con una contraseña generada y NO se le manda correo (quien solo renta una sala de
+  // juntas, o clientes que se migran de ZORA). Si no dio correo se le pone uno ficticio y entra con su número N-.
+  const sinCorreo = body.sinCorreo === true;
+  const emailBody = typeof body.email === "string" ? body.email.trim() : "";
 
   const centro = miProfile.rol === "sistemas" || miProfile.rol === "superadmin" || miProfile.rol === "gerente" || miProfile.rol === "gerente_ventas" ? centroBody : miProfile.centro;
 
-  if (!nombre || !email || !centro) {
+  if (!nombre || (!emailBody && !sinCorreo) || !centro) {
     return NextResponse.json({ error: "Faltan datos obligatorios (nombre, correo, centro)" }, { status: 400 });
   }
 
   const admin = createAdminClient();
   const numeroUsuario = await generarNumeroUsuarioUnico(admin);
+  const email = emailBody || correoFicticio(numeroUsuario);
+  let nuevoId: string;
+  let contrasena: string | null = null;
 
-  const origin = origenPublico(req);
-  const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
+  if (sinCorreo) {
+    contrasena = generarContrasena();
+    const { data: creado, error: errorCrear } = await admin.auth.admin.createUser({
+      email,
+      password: contrasena,
+      email_confirm: true,
+      user_metadata: { nombre },
+    });
+    if (errorCrear || !creado?.user) {
+      const mensaje = /already|registered|exists/i.test(errorCrear?.message || "")
+        ? "No se pudo crear la cuenta del cliente: ya existe ese correo"
+        : "No se pudo crear la cuenta: " + (errorCrear?.message || "error desconocido");
+      return NextResponse.json({ error: mensaje }, { status: 400 });
+    }
+    nuevoId = creado.user.id;
+  } else {
+    const origin = origenPublico(req);
+    const invitacion = await mandarCorreoContrasena({ email, nombre, tipo: "invite", origin });
 
-  if (!invitacion.ok || !invitacion.userId) {
-    const mensaje = invitacion.error?.includes("already been registered")
-      ? "No se pudo crear la cuenta del cliente: ya existe ese correo"
-      : invitacion.error || "No se pudo mandar la invitación al cliente";
-    return NextResponse.json({ error: mensaje }, { status: 400 });
+    if (!invitacion.ok || !invitacion.userId) {
+      const mensaje = invitacion.error?.includes("already been registered")
+        ? "No se pudo crear la cuenta del cliente: ya existe ese correo"
+        : invitacion.error || "No se pudo mandar la invitación al cliente";
+      return NextResponse.json({ error: mensaje }, { status: 400 });
+    }
+    nuevoId = invitacion.userId;
   }
-
-  const nuevoId = invitacion.userId;
 
   const { error: profileError } = await admin.from("profiles").upsert({
     id: nuevoId,
@@ -98,5 +134,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, numeroUsuario, id: nuevoId });
+  return NextResponse.json({ ok: true, numeroUsuario, id: nuevoId, contrasena, sinCorreo: !emailBody });
 }

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { esCorreoFicticio } from "@/lib/correoFicticio";
 
 // Envío de correo genérico y reutilizable — usado por Tours (confirmación +
 // recordatorio) y por el flujo de firma de contratos. Un solo lugar para
@@ -26,6 +27,9 @@ export async function enviarCorreo({
   }
   if (!to) {
     return { ok: false, error: "Falta el destinatario" };
+  }
+  if (esCorreoFicticio(to)) {
+    return { ok: false, error: "El cliente no tiene correo" };
   }
 
   try {
