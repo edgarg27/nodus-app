@@ -16,7 +16,17 @@ const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Pi
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 type Contacto = { id: string; empresa: string; nombre: string; fecha_nacimiento: string; email: string | null };
-type Evento = { id: string; titulo: string; descripcion: string | null; fecha: string; hora: string | null; lugar: string | null };
+// `centro`: quién lo publicó. Los eventos se comparten entre todos los centros (el personal de
+// cada centro ve los de los demás), pero cada centro solo borra los suyos.
+type Evento = {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  fecha: string;
+  hora: string | null;
+  lugar: string | null;
+  centro: string;
+};
 type Pregunta = { id: string; texto: string; tipo: "rating" | "texto" };
 type Encuesta = { id: string; titulo: string; descripcion: string | null; preguntas: Pregunta[]; created_at: string };
 type Envio = {
@@ -104,7 +114,8 @@ export default function ExperienciaClientePage() {
       { data: diasData },
     ] = await Promise.all([
       supabase.from("clientes").select("*").eq("centro", c).order("nombre"),
-      supabase.from("eventos_centro").select("*").eq("centro", c).order("fecha"),
+      // Eventos de todos los centros, no solo el de `c`: se comparten entre centros.
+      supabase.from("eventos_centro").select("*").order("fecha"),
       supabase.from("profiles").select("empresa").eq("centro", c).eq("rol", "cliente"),
       supabase.from("encuestas").select("*").eq("centro", c).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, nombre, email, empresa").eq("centro", c).eq("rol", "cliente").order("nombre"),
@@ -346,7 +357,7 @@ function TabCalendario({
           ))}
           {(eventosPorDia[diaAbierto] || []).map((e) => (
             <p className="contrato-detalle" key={e.id}>
-              🎪 {e.titulo} {e.hora ? `· ${e.hora}` : ""} {e.lugar ? `· ${e.lugar}` : ""}
+              🎪 {e.titulo} {e.hora ? `· ${e.hora}` : ""} {e.lugar ? `· ${e.lugar}` : ""} · {e.centro}
             </p>
           ))}
         </div>
@@ -649,7 +660,7 @@ function TabEventos({
       )}
 
       {eventos.length === 0 ? (
-        <div className="empty-card">Sin eventos registrados en {centro}</div>
+        <div className="empty-card">Sin eventos registrados</div>
       ) : (
         eventos.map((e) => (
           <div className="contrato-card-admin" key={e.id}>
@@ -657,13 +668,15 @@ function TabEventos({
               <div>
                 <p className="contrato-cliente-nombre">{e.titulo}</p>
                 <p className="contrato-detalle">
-                  {e.fecha} {e.hora ? `· ${e.hora}` : ""} {e.lugar ? `· ${e.lugar}` : ""}
+                  {e.fecha} {e.hora ? `· ${e.hora}` : ""} {e.lugar ? `· ${e.lugar}` : ""} · 🏢 {e.centro}
                 </p>
                 {e.descripcion && <p className="contrato-detalle">{e.descripcion}</p>}
               </div>
-              <button className="tel-borrar-btn" style={{ color: "#A32D2D" }} onClick={() => eliminar(e.id)}>
-                Eliminar
-              </button>
+              {e.centro === centro && (
+                <button className="tel-borrar-btn" style={{ color: "#A32D2D" }} onClick={() => eliminar(e.id)}>
+                  Eliminar
+                </button>
+              )}
             </div>
           </div>
         ))

@@ -143,7 +143,8 @@ export default async function DashboardPage() {
         .gte("fecha_vencimiento", hoy)
         .lte("fecha_vencimiento", limite30)
     ),
-    filtrarCentro(supabase.from("eventos_centro").select("*", { count: "exact", head: true }).gte("fecha", hoy)),
+    // Eventos: se comparten entre todos los centros (ver /experiencia-cliente), sin filtrar.
+    supabase.from("eventos_centro").select("*", { count: "exact", head: true }).gte("fecha", hoy),
   ]);
 
   const facturasVencidas = facturasVencidasRows?.length || 0;
