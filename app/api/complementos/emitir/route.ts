@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { emitirComplementoPago } from "@/lib/complementoPago";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 // Emite UN complemento de pago que cubre una o varias facturas (PPD) de un mismo cliente.
 export async function POST(req: NextRequest) {

@@ -8,7 +8,7 @@ import { accesoCliente } from "@/lib/facturasAcceso";
 
 export const dynamic = "force-dynamic";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 // Integrar por cliente: contratos del cliente (con su folio) y, con "previa", lo que se le puede cobrar en el mes:

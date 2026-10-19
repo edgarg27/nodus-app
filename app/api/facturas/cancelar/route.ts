@@ -21,7 +21,7 @@ async function resolverSustituta(admin: ReturnType<typeof createAdminClient>, te
   return null;
 }
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const MAXIMO_POR_LLAMADA = 50;
 
 // Cancela ante el SAT una o varias facturas (CFDI) emitidas desde Nodus, todas

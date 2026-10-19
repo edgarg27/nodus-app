@@ -6,7 +6,7 @@ import { previaPdfCobro, previaCobro } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, REGEX_UUID, TIPOS_RELACION } from "@/lib/formasPagoSat";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 // Vista previa en PDF de la factura que se emitiría de un estado de cuenta (cuadro "Facturar", botón "Vista previa").
 // Es el PDF real que genera Facturapi con los mismos datos que el timbrado; no timbra, no guarda nada ni gasta folio.

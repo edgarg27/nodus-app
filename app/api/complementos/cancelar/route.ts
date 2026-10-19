@@ -5,7 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { cancelarComplemento } from "@/lib/complementoPago";
 import { MOTIVOS_CANCELACION } from "@/lib/facturapiCancelacion";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 // Cancela ante el SAT un complemento de pago. Al cancelarse, lo que cubría vuelve al saldo de sus facturas.
 export async function POST(req: NextRequest) {

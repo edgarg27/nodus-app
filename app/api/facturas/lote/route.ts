@@ -6,7 +6,7 @@ import { avisosDatosFiscales } from "@/lib/datosFiscales";
 
 export const dynamic = "force-dynamic";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const TIPOS = ["Coworking", "Oficina Privada", "Working Desk"];
 
 // Integrar por lote: los cobros de un centro y un mes que todavía no tienen factura (CFDI), con el tipo de

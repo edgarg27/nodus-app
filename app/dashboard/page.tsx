@@ -7,7 +7,7 @@ import { labelRol } from "@/lib/roles";
 import PanelDireccion from "./PanelDireccion";
 import { cargarDatosDireccion } from "./datosDireccion";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 export default async function DashboardPage() {
   const supabase = createClient();

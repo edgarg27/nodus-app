@@ -5,7 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 
 export const dynamic = "force-dynamic";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CAMPOS = "id, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal, uso_cfdi, centro";
 
 // Clientes que se pueden facturar desde un centro: los de ese centro más los que, aunque su perfil sea de otro,

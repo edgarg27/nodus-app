@@ -8,7 +8,7 @@ import { REGIMENES_FISCALES, usosParaTipo, avisosDatosFiscales, normalizarRfc } 
 // Configuración fiscal: los datos fiscales de cada cliente (los que se capturaron al ligar su contrato). Finanzas los
 // revisa y los corrige si vienen con errores o si la empresa los cambió.
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 

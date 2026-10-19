@@ -5,7 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { refrescarCancelaciones } from "@/lib/facturapiCancelacion";
 import { refrescarCancelacionesComplementos } from "@/lib/complementoPago";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 // Consulta a Facturapi cómo van las cancelaciones "en proceso" (las que esperan
 // la aceptación del cliente) y actualiza su estatus. Se llama al abrir Facturas
