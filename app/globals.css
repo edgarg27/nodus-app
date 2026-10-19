@@ -9169,3 +9169,55 @@ a.stat-card {
   width: 100%;
   max-width: 320px;
 }
+
+/* ---------- Ingresos por Centro ---------- */
+.ing-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.ing-kpi-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #888;
+}
+.ing-kpi-btn {
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.ing-kpi-btn.activa {
+  border-color: var(--orange);
+}
+.ing-nota {
+  font-size: 12px;
+  color: #888;
+  margin: 8px 0 0;
+}
+.ing-veces {
+  color: #888;
+  font-weight: 400;
+  font-size: 12px;
+}
+.ing-mov-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+.ing-mov-filtros {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 8px 0;
+}
+.ing-mov-filtros input {
+  flex: 1;
+  min-width: 200px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
