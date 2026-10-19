@@ -9105,3 +9105,67 @@ a.stat-card {
     grid-column: 1 / -1;
   }
 }
+
+/* ---------- Pagos en línea: Próximamente ---------- */
+.pagar-btn-full.pagar-btn-proximamente {
+  background: #eef0f4;
+  color: #5b6478;
+  cursor: not-allowed;
+  margin-bottom: 6px;
+}
+.pagar-btn-proximamente small {
+  display: inline-block;
+  margin-left: 6px;
+  background: #fff3dc;
+  color: #8a5a00;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.quick-proximamente {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #fff3dc;
+  color: #8a5a00;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.proximamente-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 22px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.proximamente-chip {
+  background: #fff3dc;
+  color: #8a5a00;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.proximamente-titulo {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+.proximamente-texto {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: #5b6478;
+  max-width: 420px;
+}
+.proximamente-card .pagar-btn-full {
+  width: 100%;
+  max-width: 320px;
+}

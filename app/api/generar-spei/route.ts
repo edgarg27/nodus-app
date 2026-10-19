@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MENSAJE_PAGOS_PROXIMAMENTE, PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { createClient } from "@/lib/supabase/server";
 import { crearCargoSPEI } from "@/lib/openpay";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -18,6 +19,7 @@ async function registrarPolitica(pagoId: string) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return NextResponse.json({ error: MENSAJE_PAGOS_PROXIMAMENTE }, { status: 503 });
   const supabase = createClient();
   const {
     data: { session },

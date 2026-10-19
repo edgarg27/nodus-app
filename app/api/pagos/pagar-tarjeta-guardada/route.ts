@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { MENSAJE_PAGOS_PROXIMAMENTE, PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { cobrarTarjetaGuardada } from "@/lib/openpay";
@@ -13,6 +14,7 @@ import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 // cuenta como cobro automático: no toca los fallos ni la autorización del cobro
 // automático de esa tarjeta.
 export async function POST(req: NextRequest) {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return NextResponse.json({ error: MENSAJE_PAGOS_PROXIMAMENTE }, { status: 503 });
   const supabase = createClient();
   const {
     data: { session },
