@@ -27,12 +27,20 @@ const PLANTILLAS: Record<string, Record<string, string>> = {
   // La de Coworking es general (trae los contactos de todos los centros): Punto 45 y San Telmo
   // usan la misma que Bosques. Si Diseño la cambia en /diseno/plantillas, cambia para los tres.
   coworking: { Bosques: "BosquesCoworking.pptx", "Punto 45": "BosquesCoworking.pptx", "San Telmo": "BosquesCoworking.pptx" },
-  // Punto 45 usa la misma plantilla que Bosques con sus datos y su plano (Zona A y Zona B, dos
-  // imágenes en la diapositiva 3), pero con una diapositiva menos antes de la tabla: por eso la
-  // tabla no siempre es la diapositiva 5 (ver slideDeLaTabla). Su plano todavía no está medido en
-  // lib/layoutOficinas.ts, así que las oficinas cotizadas no se marcan en él (sale tal cual).
-  "oficina privada": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
-  "working desk": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
+  // Punto 45 y San Telmo usan la misma plantilla que Bosques con sus datos y su plano (diapositiva 3;
+  // en Punto 45 son dos imágenes, Zona A y Zona B), pero con una diapositiva menos antes de la tabla:
+  // por eso la tabla no siempre es la diapositiva 5 (ver slideDeLaTabla). Sus planos todavía no están
+  // medidos en lib/layoutOficinas.ts, así que las oficinas cotizadas no se marcan en ellos.
+  "oficina privada": {
+    Bosques: "BosquesOficinaPrivada.pptx",
+    "Punto 45": "P45OficinaPrivada.pptx",
+    "San Telmo": "SanTelmoOficinaPrivada.pptx",
+  },
+  "working desk": {
+    Bosques: "BosquesOficinaPrivada.pptx",
+    "Punto 45": "P45OficinaPrivada.pptx",
+    "San Telmo": "SanTelmoOficinaPrivada.pptx",
+  },
 };
 
 function normalizarTipo(tipoEspacio: string) {
@@ -207,7 +215,7 @@ async function generarCoworking(datos: DatosCotizacionEspacio): Promise<Buffer> 
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
-// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 y en Punto 45 la 4
+// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 y en Punto 45 y San Telmo la 4
 // (cada plantilla acomoda distinto sus diapositivas). Se busca por el encabezado de la tabla.
 async function slideDeLaTabla(zip: JSZip): Promise<string> {
   const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
