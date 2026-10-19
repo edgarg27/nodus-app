@@ -25,8 +25,10 @@ import { marcarOficinasEnLayout } from "./layoutOficinas";
 // public/plantillas-cotizacion/ no llevan guión).
 const PLANTILLAS: Record<string, Record<string, string>> = {
   coworking: { Bosques: "BosquesCoworking.pptx" },
-  // Punto 45 usa la misma plantilla que Bosques con sus datos, pero sin la diapositiva del plano
-  // (Layout): por eso la tabla no siempre es la diapositiva 5 (ver slideDeLaTabla).
+  // Punto 45 usa la misma plantilla que Bosques con sus datos y su plano (Zona A y Zona B, dos
+  // imágenes en la diapositiva 3), pero con una diapositiva menos antes de la tabla: por eso la
+  // tabla no siempre es la diapositiva 5 (ver slideDeLaTabla). Su plano todavía no está medido en
+  // lib/layoutOficinas.ts, así que las oficinas cotizadas no se marcan en él (sale tal cual).
   "oficina privada": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
   "working desk": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
 };
@@ -203,8 +205,8 @@ async function generarCoworking(datos: DatosCotizacionEspacio): Promise<Buffer> 
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
-// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 (la 3 es el plano);
-// las plantillas sin plano (Punto 45) la traen antes. Se busca por el encabezado de la tabla.
+// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 y en Punto 45 la 4
+// (cada plantilla acomoda distinto sus diapositivas). Se busca por el encabezado de la tabla.
 async function slideDeLaTabla(zip: JSZip): Promise<string> {
   const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
   for (const ruta of slides) {
