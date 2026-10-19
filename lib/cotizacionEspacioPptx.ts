@@ -25,8 +25,10 @@ import { marcarOficinasEnLayout } from "./layoutOficinas";
 // public/plantillas-cotizacion/ no llevan guión).
 const PLANTILLAS: Record<string, Record<string, string>> = {
   coworking: { Bosques: "BosquesCoworking.pptx" },
-  "oficina privada": { Bosques: "BosquesOficinaPrivada.pptx" },
-  "working desk": { Bosques: "BosquesOficinaPrivada.pptx" },
+  // Punto 45 usa la misma plantilla que Bosques con sus datos, pero sin la diapositiva del plano
+  // (Layout): por eso la tabla no siempre es la diapositiva 5 (ver slideDeLaTabla).
+  "oficina privada": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
+  "working desk": { Bosques: "BosquesOficinaPrivada.pptx", "Punto 45": "P45OficinaPrivada.pptx" },
 };
 
 function normalizarTipo(tipoEspacio: string) {
@@ -201,9 +203,20 @@ async function generarCoworking(datos: DatosCotizacionEspacio): Promise<Buffer> 
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
+// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 (la 3 es el plano);
+// las plantillas sin plano (Punto 45) la traen antes. Se busca por el encabezado de la tabla.
+async function slideDeLaTabla(zip: JSZip): Promise<string> {
+  const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
+  for (const ruta of slides) {
+    const xml = await zip.file(ruta)?.async("string");
+    if (xml?.includes("Horas en sala de juntas")) return ruta;
+  }
+  return "ppt/slides/slide5.xml";
+}
+
 async function generarOficinaPrivada(datos: DatosCotizacionEspacio): Promise<Buffer> {
   const zip = await cargarPlantilla(datos.tipoEspacio, datos.centro);
-  const slidePath = "ppt/slides/slide5.xml";
+  const slidePath = await slideDeLaTabla(zip);
   let slide = await zip.file(slidePath)?.async("string");
   if (slide) {
     slide = reemplazarTodas(slide, "Oficina", datos.descripcion);

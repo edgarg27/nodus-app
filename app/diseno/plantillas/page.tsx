@@ -32,6 +32,7 @@ const ETIQUETAS: Record<string, string> = {
   "Bosques.pptx": "Cotización · Sala de Juntas",
   "BosquesCoworking.pptx": "Cotización · Coworking",
   "BosquesOficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk",
+  "P45OficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk · Punto 45",
 };
 
 const CARPETA: Record<Plantilla["tipo"], string> = {
