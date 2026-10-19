@@ -30,7 +30,7 @@ const ETIQUETAS: Record<string, string> = {
   "BosquesOficinaPrivadaFisica.docx": "Oficina Privada / Working Desk · Persona física",
   "BosquesOficinaPrivadaMoral.docx": "Oficina Privada / Working Desk · Persona moral",
   "Bosques.pptx": "Cotización · Sala de Juntas",
-  "BosquesCoworking.pptx": "Cotización · Coworking",
+  "BosquesCoworking.pptx": "Cotización · Coworking (Bosques, Punto 45 y San Telmo)",
   "BosquesOficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk",
   "P45OficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk · Punto 45",
 };

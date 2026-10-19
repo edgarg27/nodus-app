@@ -24,7 +24,9 @@ import { marcarOficinasEnLayout } from "./layoutOficinas";
 // nombres de plantilla de abajo (los .pptx reales en
 // public/plantillas-cotizacion/ no llevan guión).
 const PLANTILLAS: Record<string, Record<string, string>> = {
-  coworking: { Bosques: "BosquesCoworking.pptx" },
+  // La de Coworking es general (trae los contactos de todos los centros): Punto 45 y San Telmo
+  // usan la misma que Bosques. Si Diseño la cambia en /diseno/plantillas, cambia para los tres.
+  coworking: { Bosques: "BosquesCoworking.pptx", "Punto 45": "BosquesCoworking.pptx", "San Telmo": "BosquesCoworking.pptx" },
   // Punto 45 usa la misma plantilla que Bosques con sus datos y su plano (Zona A y Zona B, dos
   // imágenes en la diapositiva 3), pero con una diapositiva menos antes de la tabla: por eso la
   // tabla no siempre es la diapositiva 5 (ver slideDeLaTabla). Su plano todavía no está medido en
