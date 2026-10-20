@@ -6,7 +6,8 @@ import { importeEnLetra } from "./importeLetra";
 // "$1,500.00" sin " MXN": la plantilla ya pone el importe con letra y "M.N." entre paréntesis.
 const fmtImporte = (n: number) => fmtMoneda(n).replace(/ MXN$/, "");
 
-// Plantillas reales de contrato (NBC) — solo centro Bosques. Coworking
+// Plantillas reales de contrato (NBC). Son las mismas para Bosques, Punto 45 y San Telmo: solo
+// cambia la dirección del inmueble (DOMICILIO_INMUEBLE, abajo). Coworking
 // tiene 3 variantes por tipo de persona: paquete "30 Horas" (término fijo
 // de 1 mes), y CON/SIN depósito en garantía según si la venta capturó un
 // depósito (ver resolverVarianteCoworking). Oficina Privada tiene una sola
@@ -54,8 +55,29 @@ function resolverVarianteCoworking(nombrePaquete: string | null | undefined, dep
   return depositoGarantia > 0 ? "conDeposito" : "sinDeposito";
 }
 
+// Dirección del inmueble en el contrato. Las plantillas traen la de Bosques partida en dos, con el
+// número de oficina en medio: "Av Aguascalientes Norte #517 interior {{NUMERO_ESPACIO}}, Fraccionamiento
+// Bosques del Prado Sur CP 20130 Aguascalientes, Ags.". Para otro centro se cambian el inicio y el
+// final por los suyos (direcciones tomadas de sus plantillas de cotización). Se reemplazan por
+// separado porque en algunas plantillas el número de oficina queda en otro renglón de Word.
+const DOMICILIO_BOSQUES = {
+  inicio: "Av Aguascalientes Norte #517 interior ",
+  fin: ", Fraccionamiento Bosques del Prado Sur CP 20130 Aguascalientes, Ags.",
+};
+const DOMICILIO_INMUEBLE: Record<string, { inicio: string; fin: string }> = {
+  Bosques: DOMICILIO_BOSQUES,
+  "Punto 45": {
+    inicio: "Blvd. a Zacatecas No. 845, 311 A, 3er piso, interior ",
+    fin: ", Col. Desarrollo Especial Plaza Punto 45, CP 20126 Aguascalientes, Ags.",
+  },
+  "San Telmo": {
+    inicio: "Prolongación Gral. Ignacio Zaragoza #4200, edificio 1A, primer piso, interior ",
+    fin: ", Fraccionamiento Trojes de Alonso, CP 20115 Aguascalientes, Ags.",
+  },
+};
+
 export function centroTienePlantillaContrato(tipoEspacio: TipoEspacioContrato, centro: string) {
-  return centro === "Bosques" && tipoEspacio !== "Sala de Juntas";
+  return !!DOMICILIO_INMUEBLE[centro] && tipoEspacio !== "Sala de Juntas";
 }
 
 export type DatosContratoDocx = {
@@ -107,6 +129,11 @@ export async function generarContratoDocx(datos: DatosContratoDocx): Promise<Buf
     throw new Error("La plantilla de contrato no tiene word/document.xml — archivo .docx inválido.");
   }
 
+  const domicilio = DOMICILIO_INMUEBLE[datos.centro];
+  if (domicilio && domicilio !== DOMICILIO_BOSQUES) {
+    doc = reemplazarTodasDocx(doc, DOMICILIO_BOSQUES.inicio, domicilio.inicio);
+    doc = reemplazarTodasDocx(doc, DOMICILIO_BOSQUES.fin, domicilio.fin);
+  }
   doc = reemplazarTodasDocx(doc, "{{CENTRO}}", datos.centro);
   doc = reemplazarTodasDocx(doc, "{{TIPO_ESPACIO}}", datos.tipoEspacio);
   doc = reemplazarTodasDocx(doc, "{{FOLIO}}", datos.folio);
