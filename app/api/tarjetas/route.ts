@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { MENSAJE_PAGOS_PROXIMAMENTE, PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { agregarTarjetaACliente, crearClienteOpenpay } from "@/lib/openpay";
@@ -10,6 +11,7 @@ import { checkRateLimit, ipDeRequest } from "@/lib/rateLimit";
 // tarjeta de cobro automático. Las tarjetas las lee el propio cliente con RLS;
 // solo este servidor las crea, cambia o borra.
 export async function POST(req: NextRequest) {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return NextResponse.json({ error: MENSAJE_PAGOS_PROXIMAMENTE }, { status: 503 });
   const supabase = createClient();
   const {
     data: { session },

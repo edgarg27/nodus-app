@@ -1,11 +1,17 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCorreo } from "@/lib/email";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 
 // Correos de cobranza al cliente: aviso de que su pago está por vencer, aviso
 // del día de pago y agradecimiento cuando paga. Ninguno truena el flujo que
 // lo llama — si el correo falla solo se registra en consola.
 type Admin = ReturnType<typeof createAdminClient>;
+
+// Cómo puede pagar: mientras los pagos en línea estén apagados, solo transferencia + comprobante.
+const COMO_PAGAR = PAGOS_EN_LINEA_ACTIVOS
+  ? "Puedes pagarlo por SPEI o subir tu comprobante desde tu panel de cliente."
+  : "Puedes pagarlo por transferencia y subir tu comprobante desde tu panel de cliente.";
 
 const moneda = (n: number) =>
   `$${Number(n).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -52,7 +58,7 @@ export async function enviarAvisoPago(datos: {
       `Te recordamos que tu pago${montoTxt} vence ${
         datos.diasFaltan ? `en ${datos.diasFaltan} días` : "pronto"
       }${datos.diaPago ? ` (día ${datos.diaPago} del mes)` : ""}.`,
-      "Puedes pagarlo por SPEI o subir tu comprobante desde tu panel de cliente.",
+      COMO_PAGAR,
     ];
   } else if (datos.tipo === "hoy") {
     asunto = "Hoy es tu fecha de pago en Nodus";
@@ -60,7 +66,7 @@ export async function enviarAvisoPago(datos: {
     parrafos = [
       `Hola ${nombre},`,
       `Hoy es tu fecha de pago${montoTxt}.`,
-      "Puedes pagarlo por SPEI o subir tu comprobante desde tu panel de cliente.",
+      COMO_PAGAR,
     ];
   } else {
     asunto = "Hoy es el último día para pagar sin recargo";
@@ -68,7 +74,7 @@ export async function enviarAvisoPago(datos: {
     parrafos = [
       `Hola ${nombre},`,
       `Hoy es el último día para pagar tu renta${montoTxt} sin recargo.`,
-      "Pasado el día 10 se genera un recargo del 3% sobre la renta. Puedes pagar por SPEI o subir tu comprobante desde tu panel de cliente.",
+      "Pasado el día 10 se genera un recargo del 3% sobre la renta. " + COMO_PAGAR,
     ];
   }
 

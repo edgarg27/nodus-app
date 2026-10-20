@@ -7,6 +7,8 @@ import FileDropzone from "../soporte/FileDropzone";
 import { conIva, esCobroMensual, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { CATEGORIA_PAGO_INFO, type CategoriaPago, categorizarPago, pagoEstaCubierto } from "@/lib/pagosCategoria";
 import { fechaLocal } from "@/lib/fechaMexico";
+import { exportarExcel } from "@/lib/exportExcel";
+import type { EstadoFacturacion, Movimiento } from "@/app/api/ingresos/movimientos/route";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -25,18 +27,25 @@ type Gasto = {
 };
 type Proveedor = { id: string; nombre: string };
 
-// Fila de pagos usada para el desglose por categoría y la gráfica de la
-// pestaña Resumen — solo lo que ya entró (estado "pagado") en el rango.
-type PagoResumen = { monto: number; concepto: string | null; fecha_pago: string | null; contrato_id: string | null };
-
-// Colores para "Ingresos por servicio" — mismos 3 valores que ya usa el
-// catálogo de paquetes (paquetes.tipo_espacio / oficinas.tipo).
+// Colores de "Qué se vende más": la renta por tipo de espacio, el resto por su categoría.
 const COLOR_TIPO_ESPACIO: Record<string, string> = {
-  Coworking: "#F07E3A",
-  "Oficina Privada": "#0F6E56",
-  "Working Desk": "#185FA5",
+  "Renta · Coworking": "#F07E3A",
+  "Renta · Oficina Privada": "#0F6E56",
+  "Renta · Working Desk": "#185FA5",
 };
-const colorTipoEspacio = (tipo: string) => COLOR_TIPO_ESPACIO[tipo] || "#888";
+const FORMAS_PAGO: Record<string, string> = {
+  "01": "Efectivo",
+  "02": "Cheque",
+  "03": "Transferencia",
+  "04": "Tarjeta de crédito",
+  "28": "Tarjeta de débito",
+};
+const ESTADO_FACTURACION: Record<EstadoFacturacion, { label: string; clase: string }> = {
+  timbrada: { label: "Facturado", clase: "ft-chip-verde" },
+  integrada: { label: "Integrado, sin timbrar", clase: "ft-chip-ambar" },
+  sin_facturar: { label: "Sin facturar", clase: "ft-chip-roja" },
+};
+const moneda = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Lo que le toca pagar este mes a cada cliente con contrato vigente, y si ya
 // se cubrió. No depende del rango de fechas de Resumen — siempre es "este
@@ -92,13 +101,12 @@ export default function IngresosCentroPage() {
 
   const [fechaDesde, setFechaDesde] = useState(primerDiaMes());
   const [fechaHasta, setFechaHasta] = useState(ultimoDiaMes());
-  const [totalIngresos, setTotalIngresos] = useState(0);
   const [totalGastos, setTotalGastos] = useState(0);
-  const [pagosPeriodo, setPagosPeriodo] = useState<PagoResumen[]>([]);
-  // contrato_id -> tipo_espacio ("Coworking" | "Oficina Privada" | "Working
-  // Desk"), para saber qué servicio generó cada pago. No depende del rango
-  // de fechas, solo del centro.
-  const [tipoEspacioPorContrato, setTipoEspacioPorContrato] = useState<Map<string, string>>(new Map());
+  // Todo lo cobrado en el rango (pagos pagados y facturas pagadas sin pagos), de /api/ingresos/movimientos.
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [errorIngresos, setErrorIngresos] = useState("");
+  const [filtroFacturacion, setFiltroFacturacion] = useState<"" | EstadoFacturacion | "facturado">("");
+  const [busquedaMov, setBusquedaMov] = useState("");
 
   // ---- Por cliente: mensualidad de este mes, cubierta o pendiente ----
   const [clientesIngreso, setClientesIngreso] = useState<ClienteIngreso[]>([]);
@@ -139,11 +147,6 @@ export default function IngresosCentroPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centro]);
 
-  useEffect(() => {
-    if (centro) cargarTiposEspacio(centro);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centro]);
-
   async function init() {
     setLoading(true);
     const {
@@ -163,24 +166,22 @@ export default function IngresosCentroPage() {
 
   async function fetchTodo(c: string) {
     setLoading(true);
-    // Ingresos = dinero que efectivamente entró (pagos.estado = 'pagado'),
-    // no lo facturado — por eso sale de `pagos` y no de `facturas`, que
-    // puede incluir pendientes/vencidas. concepto y fecha_pago se usan para
-    // el desglose por categoría y la gráfica de abajo.
-    const [{ data: pagosData }, { data: gastosData }] = await Promise.all([
-      supabase
-        .from("pagos")
-        .select("monto, concepto, fecha_pago, contrato_id")
-        .eq("centro", c)
-        .eq("estado", "pagado")
-        .gte("fecha_pago", fechaDesde)
-        .lte("fecha_pago", fechaHasta),
+    // Ingresos = dinero que efectivamente entró y se registró como pagado (por ahora a mano: Cobranza → Pagado o al
+    // aprobar el comprobante del cliente), facturado o no. Lo arma el servidor: ver /api/ingresos/movimientos.
+    setErrorIngresos("");
+    const params = new URLSearchParams({ centro: c, desde: fechaDesde, hasta: fechaHasta });
+    const [resMov, { data: gastosData }] = await Promise.all([
+      fetch(`/api/ingresos/movimientos?${params}`, { cache: "no-store" })
+        .then(async (r) => ({ ok: r.ok, d: await r.json() }))
+        .catch(() => ({ ok: false, d: { error: "No se pudo conectar" } })),
       supabase.from("gastos").select("monto").eq("centro", c).gte("fecha", fechaDesde).lte("fecha", fechaHasta),
     ]);
-    const pagos = pagosData || [];
-    setTotalIngresos(pagos.reduce((s, p) => s + Number(p.monto), 0));
+    if (resMov.ok) setMovimientos(resMov.d.movimientos || []);
+    else {
+      setMovimientos([]);
+      setErrorIngresos(resMov.d.error || "No se pudieron cargar los ingresos");
+    }
     setTotalGastos((gastosData || []).reduce((s, g) => s + Number(g.monto), 0));
-    setPagosPeriodo(pagos);
     setLoading(false);
   }
 
@@ -290,25 +291,6 @@ export default function IngresosCentroPage() {
     setCargandoClientes(false);
   }
 
-  // contrato -> paquete -> tipo_espacio, para poder decir qué servicio
-  // (Coworking / Oficina Privada / Working Desk) generó cada pago. Se
-  // guardan todos los contratos del centro (no solo los vigentes) porque un
-  // pago cobrado el mes pasado puede venir de un contrato ya terminado.
-  async function cargarTiposEspacio(c: string) {
-    const [{ data: contratosData }, { data: paquetesData }] = await Promise.all([
-      supabase.from("contratos").select("id, paquete_id").eq("centro", c),
-      supabase.from("paquetes").select("id, tipo_espacio").eq("centro", c),
-    ]);
-    const tipoPorPaquete = new Map<string, string>();
-    for (const p of paquetesData || []) tipoPorPaquete.set(p.id, p.tipo_espacio);
-    const tipoPorContrato = new Map<string, string>();
-    for (const ct of contratosData || []) {
-      const tipo = ct.paquete_id ? tipoPorPaquete.get(ct.paquete_id) : undefined;
-      if (tipo) tipoPorContrato.set(ct.id, tipo);
-    }
-    setTipoEspacioPorContrato(tipoPorContrato);
-  }
-
   async function cargarGastos(c: string) {
     setCargandoGastos(true);
     const [{ data: gastosData }, { data: provsData }] = await Promise.all([
@@ -388,39 +370,94 @@ export default function IngresosCentroPage() {
   const proveedorNombre = (id: string | null) => proveedores.find((p) => p.id === id)?.nombre;
   const totalGastosCentro = useMemo(() => gastos.reduce((s, g) => s + Number(g.monto), 0), [gastos]);
 
-  const gananciaNeta = useMemo(() => totalIngresos - totalGastos, [totalIngresos, totalGastos]);
+  // Cobrado, facturado y cobrado sin facturar en el rango.
+  const totales = useMemo(() => {
+    const suma = (xs: Movimiento[]) => round2(xs.reduce((s, m) => s + m.monto, 0));
+    const sinFacturar = movimientos.filter((m) => m.facturacion !== "timbrada");
+    return {
+      cobrado: suma(movimientos),
+      facturado: suma(movimientos.filter((m) => m.facturacion === "timbrada")),
+      sinFacturar: suma(sinFacturar),
+      movimientosSinFacturar: sinFacturar.length,
+    };
+  }, [movimientos]);
+  const totalIngresos = totales.cobrado;
+  const gananciaNeta = useMemo(() => round2(totalIngresos - totalGastos), [totalIngresos, totalGastos]);
 
   // Desglose de lo ya cobrado en el rango, por categoría (renta, adicionales,
   // depósitos, recargos, oficinas agregadas, otros).
   const porCategoria = useMemo(() => {
     const totales = new Map<CategoriaPago, number>();
-    for (const p of pagosPeriodo) {
-      const cat = categorizarPago(p.concepto);
-      totales.set(cat, (totales.get(cat) || 0) + Number(p.monto));
-    }
+    for (const m of movimientos) totales.set(m.categoria, (totales.get(m.categoria) || 0) + m.monto);
     const maxMonto = Math.max(1, ...Array.from(totales.values()));
     return (Object.keys(CATEGORIA_PAGO_INFO) as CategoriaPago[])
       .map((cat) => ({ cat, monto: round2(totales.get(cat) || 0), pct: ((totales.get(cat) || 0) / maxMonto) * 100, ...CATEGORIA_PAGO_INFO[cat] }))
       .filter((c) => c.monto > 0)
       .sort((a, b) => b.monto - a.monto);
-  }, [pagosPeriodo]);
+  }, [movimientos]);
 
-  // Desglose de lo ya cobrado en el rango por tipo de servicio (Coworking /
-  // Oficina Privada / Working Desk) — para ver qué se vende más. Un pago sin
-  // contrato asociado, o de un contrato sin paquete reconocido, cae en
-  // "Otros" (ej. un adicional suelto).
+  // Qué se vende más: cada servicio concreto (renta por tipo de espacio, cada adicional, depósitos…), con cuántas
+  // veces se cobró y cuánto dejó.
   const porServicio = useMemo(() => {
+    const totales = new Map<string, { monto: number; veces: number; cat: CategoriaPago }>();
+    for (const m of movimientos) {
+      const t = totales.get(m.servicio) || { monto: 0, veces: 0, cat: m.categoria };
+      t.monto += m.monto;
+      t.veces += 1;
+      totales.set(m.servicio, t);
+    }
+    const maxMonto = Math.max(1, ...Array.from(totales.values()).map((t) => t.monto));
+    return Array.from(totales.entries())
+      .map(([tipo, t]) => ({
+        tipo,
+        monto: round2(t.monto),
+        veces: t.veces,
+        pct: (t.monto / maxMonto) * 100,
+        color: COLOR_TIPO_ESPACIO[tipo] || CATEGORIA_PAGO_INFO[t.cat].color,
+      }))
+      .filter((s) => s.monto > 0)
+      .sort((a, b) => b.monto - a.monto);
+  }, [movimientos]);
+
+  // Cómo pagaron (forma de pago registrada al marcarlo pagado).
+  const porForma = useMemo(() => {
     const totales = new Map<string, number>();
-    for (const p of pagosPeriodo) {
-      const tipo = (p.contrato_id && tipoEspacioPorContrato.get(p.contrato_id)) || "Otros";
-      totales.set(tipo, (totales.get(tipo) || 0) + Number(p.monto));
+    for (const m of movimientos) {
+      const forma = (m.formaPago && FORMAS_PAGO[m.formaPago]) || "Sin registrar";
+      totales.set(forma, (totales.get(forma) || 0) + m.monto);
     }
     const maxMonto = Math.max(1, ...Array.from(totales.values()));
     return Array.from(totales.entries())
-      .map(([tipo, monto]) => ({ tipo, monto: round2(monto), pct: (monto / maxMonto) * 100 }))
-      .filter((s) => s.monto > 0)
+      .map(([forma, monto]) => ({ forma, monto: round2(monto), pct: (monto / maxMonto) * 100 }))
       .sort((a, b) => b.monto - a.monto);
-  }, [pagosPeriodo, tipoEspacioPorContrato]);
+  }, [movimientos]);
+
+  const movimientosFiltrados = useMemo(() => {
+    const q = busquedaMov.trim().toLowerCase();
+    return movimientos.filter((m) => {
+      if (filtroFacturacion === "facturado" && m.facturacion !== "timbrada") return false;
+      if (filtroFacturacion === "sin_facturar" && m.facturacion === "timbrada") return false;
+      if (!q) return true;
+      return [m.cliente, m.concepto, m.servicio, m.folio].some((v) => (v || "").toLowerCase().includes(q));
+    });
+  }, [movimientos, filtroFacturacion, busquedaMov]);
+
+  function exportarMovimientos() {
+    exportarExcel(
+      `ingresos-${centro}-${fechaDesde}-a-${fechaHasta}`.replace(/\s+/g, "_"),
+      movimientosFiltrados.map((m) => ({
+        Fecha: m.fecha,
+        Cliente: m.cliente,
+        Concepto: m.concepto,
+        Categoría: CATEGORIA_PAGO_INFO[m.categoria].label,
+        Servicio: m.servicio,
+        "Forma de pago": (m.formaPago && FORMAS_PAGO[m.formaPago]) || "",
+        Monto: m.monto,
+        Facturación: ESTADO_FACTURACION[m.facturacion].label,
+        Folio: m.folio || "",
+      }))
+    );
+  }
 
   // Ingresos por día (rangos cortos) o por semana (rangos largos), para la
   // gráfica de barras de Resumen.
@@ -436,9 +473,9 @@ export default function IngresosCentroPage() {
     if (!fechaDesde || !fechaHasta) return [];
     const buckets = new Map<string, { label: string; monto: number }>();
 
-    for (const p of pagosPeriodo) {
-      if (!p.fecha_pago) continue;
-      const fecha = new Date(p.fecha_pago + "T00:00:00");
+    for (const p of movimientos) {
+      if (!p.fecha) continue;
+      const fecha = new Date(p.fecha + "T00:00:00");
       let clave: string;
       let label: string;
       if (porSemana) {
@@ -447,18 +484,18 @@ export default function IngresosCentroPage() {
         clave = inicioSemana.toISOString().split("T")[0];
         label = inicioSemana.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
       } else {
-        clave = p.fecha_pago;
+        clave = p.fecha;
         label = fecha.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
       }
       const actual = buckets.get(clave) || { label, monto: 0 };
-      actual.monto += Number(p.monto);
+      actual.monto += p.monto;
       buckets.set(clave, actual);
     }
     const maxMonto = Math.max(1, ...Array.from(buckets.values()).map((b) => b.monto));
     return Array.from(buckets.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([, b]) => ({ ...b, monto: round2(b.monto), pct: (b.monto / maxMonto) * 100 }));
-  }, [pagosPeriodo, fechaDesde, fechaHasta, porSemana]);
+  }, [movimientos, fechaDesde, fechaHasta, porSemana]);
 
   // Totales de la pestaña "Por cliente": lo que le toca al centro este mes,
   // cuánto ya se cubrió y cuánto sigue pendiente (incluye lo que ni siquiera
@@ -550,26 +587,50 @@ export default function IngresosCentroPage() {
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 8 }}>
+                    {errorIngresos && <p style={{ color: "#A32D2D", fontSize: 13 }}>{errorIngresos}</p>}
+                    <div className="ing-kpis">
                       <div className="stat-card">
                         <p className="stat-val" style={{ color: "#0F6E56" }}>
-                          ${totalIngresos.toLocaleString("es-MX")}
+                          {moneda(totalIngresos)}
                         </p>
-                        <p className="stat-lbl">Ingresos</p>
+                        <p className="stat-lbl">Ingresos (cobrado)</p>
+                        <p className="ing-kpi-sub">{movimientos.length} cobro(s) registrados</p>
                       </div>
                       <div className="stat-card">
+                        <p className="stat-val" style={{ color: "#185FA5" }}>
+                          {moneda(totales.facturado)}
+                        </p>
+                        <p className="stat-lbl">Facturado</p>
+                        <p className="ing-kpi-sub">Con factura timbrada</p>
+                      </div>
+                      <button
+                        type="button"
+                        className={"stat-card ing-kpi-btn" + (filtroFacturacion === "sin_facturar" ? " activa" : "")}
+                        onClick={() => setFiltroFacturacion(filtroFacturacion === "sin_facturar" ? "" : "sin_facturar")}
+                      >
+                        <p className="stat-val" style={{ color: totales.sinFacturar > 0 ? "#A3701F" : "#0F6E56" }}>
+                          {moneda(totales.sinFacturar)}
+                        </p>
+                        <p className="stat-lbl">Cobrado sin facturar</p>
+                        <p className="ing-kpi-sub">{totales.movimientosSinFacturar} por facturar · ver abajo</p>
+                      </button>
+                      <div className="stat-card">
                         <p className="stat-val" style={{ color: "#A32D2D" }}>
-                          ${totalGastos.toLocaleString("es-MX")}
+                          {moneda(totalGastos)}
                         </p>
                         <p className="stat-lbl">Gastos</p>
                       </div>
                       <div className="stat-card">
                         <p className="stat-val" style={{ color: gananciaNeta >= 0 ? "#0F6E56" : "#A32D2D" }}>
-                          ${gananciaNeta.toLocaleString("es-MX")}
+                          {moneda(gananciaNeta)}
                         </p>
                         <p className="stat-lbl">Ganancia neta</p>
                       </div>
                     </div>
+                    <p className="ing-nota">
+                      Cuenta todo lo registrado como pagado: por ahora se registra a mano en Cobranza (Pagado) o al aprobar el
+                      comprobante que sube el cliente; los pagos en línea están en Próximamente.
+                    </p>
 
                     <p className="panel-section-label" style={{ marginTop: 16 }}>
                       Ingresos por tipo
@@ -593,7 +654,7 @@ export default function IngresosCentroPage() {
                     )}
 
                     <p className="panel-section-label" style={{ marginTop: 16 }}>
-                      Ingresos por servicio — qué se vende más
+                      Qué se vende más — por servicio
                     </p>
                     {porServicio.length === 0 ? (
                       <div className="empty-card">Sin ingresos en este rango</div>
@@ -605,11 +666,33 @@ export default function IngresosCentroPage() {
                               <span>
                                 {i === 0 ? "🏆 " : ""}
                                 {s.tipo}
+                                <span className="ing-veces"> · {s.veces} venta(s)</span>
                               </span>
-                              <span style={{ fontWeight: 700 }}>${s.monto.toLocaleString("es-MX")}</span>
+                              <span style={{ fontWeight: 700 }}>{moneda(s.monto)}</span>
                             </div>
                             <div className="cat-bar-track">
-                              <div className="cat-bar-fill" style={{ width: `${s.pct}%`, background: colorTipoEspacio(s.tipo) }} />
+                              <div className="cat-bar-fill" style={{ width: `${s.pct}%`, background: s.color }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="panel-section-label" style={{ marginTop: 16 }}>
+                      Por forma de pago
+                    </p>
+                    {porForma.length === 0 ? (
+                      <div className="empty-card">Sin ingresos en este rango</div>
+                    ) : (
+                      <div className="form-card">
+                        {porForma.map((f) => (
+                          <div className="cat-bar-row" key={f.forma}>
+                            <div className="cat-bar-head">
+                              <span>{f.forma}</span>
+                              <span style={{ fontWeight: 700 }}>{moneda(f.monto)}</span>
+                            </div>
+                            <div className="cat-bar-track">
+                              <div className="cat-bar-fill" style={{ width: `${f.pct}%`, background: f.forma === "Sin registrar" ? "#bbb" : "#0d1b3e" }} />
                             </div>
                           </div>
                         ))}
@@ -636,6 +719,67 @@ export default function IngresosCentroPage() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    <div className="ing-mov-cab">
+                      <p className="panel-section-label" style={{ margin: 0 }}>
+                        Cobros registrados ({movimientosFiltrados.length})
+                      </p>
+                      <button type="button" className="btn-exportar" onClick={exportarMovimientos}>
+                        📥 Excel
+                      </button>
+                    </div>
+                    <div className="ing-mov-filtros">
+                      {(
+                        [
+                          ["", "Todos"],
+                          ["sin_facturar", "Sin facturar"],
+                          ["facturado", "Facturado"],
+                        ] as [typeof filtroFacturacion, string][]
+                      ).map(([v, l]) => (
+                        <button key={l} type="button" className={"filtro-chip" + (filtroFacturacion === v ? " active" : "")} onClick={() => setFiltroFacturacion(v)}>
+                          {l}
+                        </button>
+                      ))}
+                      <input placeholder="Buscar cliente, concepto o folio..." value={busquedaMov} onChange={(e) => setBusquedaMov(e.target.value)} />
+                    </div>
+                    {movimientosFiltrados.length === 0 ? (
+                      <div className="empty-card">Sin cobros en este filtro</div>
+                    ) : (
+                      <div className="form-card ft-tabla-wrap" style={{ padding: 0 }}>
+                        <table className="ft-tabla" style={{ minWidth: 760 }}>
+                          <thead>
+                            <tr>
+                              <th>Fecha</th>
+                              <th>Cliente</th>
+                              <th>Servicio</th>
+                              <th>Forma</th>
+                              <th className="ft-num">Monto</th>
+                              <th>Facturación</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {movimientosFiltrados.map((m) => (
+                              <tr key={m.origen + m.id}>
+                                <td className="ft-nowrap">{fechaLocal(m.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</td>
+                                <td>
+                                  <div style={{ fontWeight: 600 }}>{m.cliente}</div>
+                                  <div style={{ fontSize: 12, color: "#5b6478" }}>{m.concepto}</div>
+                                </td>
+                                <td>{m.servicio}</td>
+                                <td className="ft-nowrap">{(m.formaPago && FORMAS_PAGO[m.formaPago]) || "—"}</td>
+                                <td className="ft-num ft-nowrap">
+                                  <b>{moneda(m.monto)}</b>
+                                </td>
+                                <td>
+                                  <span className={"ft-chip " + ESTADO_FACTURACION[m.facturacion].clase}>{ESTADO_FACTURACION[m.facturacion].label}</span>
+                                  {m.folio && <div style={{ fontSize: 12, color: "#5b6478", marginTop: 2 }}>{m.folio}</div>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </>

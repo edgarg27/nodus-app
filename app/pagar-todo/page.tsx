@@ -1,5 +1,7 @@
 "use client";
 
+import PagosProximamente from "@/app/components/PagosProximamente";
+import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { conceptoParaCliente } from "@/lib/adicionales";
@@ -14,6 +16,11 @@ import { conceptoParaCliente } from "@/lib/adicionales";
 type Concepto = { id: string; tipo: "Factura" | "Pago"; titulo: string; monto: number; vencida: boolean };
 
 export default function PagarTodoPage() {
+  if (!PAGOS_EN_LINEA_ACTIVOS) return <PagosProximamente titulo="Liquidar saldo" />;
+  return <PagarTodoInner />;
+}
+
+function PagarTodoInner() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
