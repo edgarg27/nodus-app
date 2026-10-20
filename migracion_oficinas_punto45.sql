@@ -107,6 +107,12 @@ where b.centro = 'Bosques' and b.tipo = 'Coworking'
     where ya.centro = 'Punto 45' and ya.tipo = 'Coworking' and ya.numero = b.numero
   );
 
+-- El lugar "A" sobre la zona de coworking del plano (en % del plano), para que
+-- el coworking aparezca en el Mapa de oficinas como en Bosques.
+update public.oficinas
+set mapa_x = 72, mapa_y = 27.7
+where centro = 'Punto 45' and tipo = 'Coworking' and numero = 'A' and mapa_x is null;
+
 -- ------------------------------------------------------------ Revisión
 select tipo, count(*) as espacios,
        count(*) filter (where estado = 'ocupada') as ocupados
