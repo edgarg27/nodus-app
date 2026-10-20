@@ -6,7 +6,7 @@ import { categorizarPago, servicioDePago, type CategoriaPago } from "@/lib/pagos
 export const dynamic = "force-dynamic";
 
 const ROLES = ["admin", "gerente", "cobranza", "gerente_ventas", "superadmin", "sistemas"];
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 export type EstadoFacturacion = "timbrada" | "integrada" | "sin_facturar";
