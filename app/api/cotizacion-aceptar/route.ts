@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // cuando el admin reserva directo desde el calendario). En el calendario se
     // muestra el nombre de la cotización (cotizacion_id).
     let reservada = false;
-    for (const espacio of salasDelCentro(venta.centro)) {
+    for (const espacio of salasDelCentro(venta.centro, venta.tipo_espacio)) {
       const { error: resError } = await admin.from("reservaciones").insert({
         user_id: venta.cliente_id ?? session.user.id,
         espacio,

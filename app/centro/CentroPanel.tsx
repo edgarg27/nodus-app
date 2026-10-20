@@ -9,7 +9,7 @@ import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
 import { labelRol } from "@/lib/roles";
 import { hoyMexicoISO, fechaLocal } from "@/lib/fechaMexico";
-import { HORAS_CALENDARIO, esFueraDeHorario } from "@/lib/horarioSala";
+import { HORAS_CALENDARIO, SALAS_POR_CENTRO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 import SolicitudesWifi from "./SolicitudesWifi";
@@ -166,9 +166,10 @@ const CAL_ESPACIOS_DEFAULT = [
   { id: "Working Desk", icono: "🪑" },
   { id: "Sala de Capacitación", icono: "📚" },
 ];
-const CAL_ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = {
-  Bosques: [{ id: "Sala de 10 personas", icono: "🤝" }],
-};
+// Centros con sus salas reales (lib/horarioSala.ts): el calendario muestra solo esas.
+const CAL_ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = Object.fromEntries(
+  Object.entries(SALAS_POR_CENTRO).map(([c, salas]) => [c, salas.map((id) => ({ id, icono: "🤝" }))])
+);
 
 function calLunesDeLaSemana(fecha: Date) {
   const d = new Date(fecha);

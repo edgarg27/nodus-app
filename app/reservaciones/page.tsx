@@ -4,7 +4,7 @@ import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import MisReservaciones from "../mis-reservaciones/MisReservaciones";
-import { HORAS_CALENDARIO as HORAS, TEXTO_FUERA_DE_HORARIO, esFueraDeHorario } from "@/lib/horarioSala";
+import { HORAS_CALENDARIO as HORAS, SALAS_POR_CENTRO, TEXTO_FUERA_DE_HORARIO, esFueraDeHorario } from "@/lib/horarioSala";
 import {
   HORAS_ANTICIPACION_CANCELACION,
   fmtHoras,
@@ -24,11 +24,11 @@ const ESPACIOS_DEFAULT = [
   { id: "Sala de Capacitación", icono: "📚" },
 ];
 
-// Algunos centros solo tienen una sala real — se muestra únicamente esa,
-// en vez de las 4 opciones genéricas.
-const ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = {
-  Bosques: [{ id: "Sala de 10 personas", icono: "🤝" }],
-};
+// Los centros con sus salas reales (lib/horarioSala.ts) muestran solo esas, en vez de las 4
+// opciones genéricas.
+const ESPACIOS_POR_CENTRO: Record<string, { id: string; icono: string }[]> = Object.fromEntries(
+  Object.entries(SALAS_POR_CENTRO).map(([c, salas]) => [c, salas.map((id) => ({ id, icono: "🤝" }))])
+);
 
 // startsWith en vez de igualdad exacta para poder clasificar también
 // oficinas numeradas armadas dinámicamente (ej. "Coworking 1", "Coworking 2")
