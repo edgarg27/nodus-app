@@ -20,3 +20,20 @@
 www.{$DOMINIO} {
 	redir https://{$DOMINIO}{uri} permanent
 }
+
+# Captive Center (repo nodus-dev, en /opt/captive): mismo servidor, su propio contenedor, conectado
+# a esta red de Docker con el nombre "captive". Requisito: registro DNS tipo A de
+# captivecenter.nodus.mx a la IP del servidor.
+captivecenter.nodus.mx {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy captive:3000
+}
