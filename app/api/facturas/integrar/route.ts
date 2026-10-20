@@ -5,7 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { accesoCliente } from "@/lib/facturasAcceso";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const DIAS_PARA_PAGAR = 10;
 
 function sumarDias(iso: string, dias: number) {

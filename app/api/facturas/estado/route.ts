@@ -8,7 +8,7 @@ import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { complementoAlPagar } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
 const DIAS_PARA_PAGAR = 10;
 const FORMA_A_METODO: Record<string, string> = { "01": "cash", "03": "bank_account", "04": "card" };

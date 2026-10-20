@@ -5,7 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { facturarCobro, facturarPagoSuelto } from "@/lib/facturarCobro";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, REGEX_UUID, TIPOS_RELACION } from "@/lib/formasPagoSat";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const MAXIMO_POR_LLAMADA = 50;
 
 // Emite la factura (CFDI, pago diferido) de uno o varios cobros pendientes.

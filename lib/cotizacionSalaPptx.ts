@@ -27,9 +27,19 @@ import { cargarArchivoPlantilla } from "./plantillasStorage";
 //         con un 2º renglón YA PREPARADO EN BLANCO (sin ningún <a:t>) para
 //         un segundo concepto — se usa para el Coffee Break opcional.
 //       · tabla-resumen (Subtotal/IVA/Total), cada valor es un "$" suelto.
+// San Telmo y Punto 45 traen una diapositiva más de fotos antes de la tabla (queda en la 5, no en
+// la 4) y fotos de varias salas con su aforo; por eso la tabla se busca por su texto (slideDe).
+// Punto 45 tiene dos plantillas: Zona A (salas de 6, 8, 10 y 20 personas) y Zona B (aula de 30).
 const PLANTILLAS: Record<string, string> = {
   Bosques: "Bosques.pptx",
+  "San Telmo": "SanTelmoSala.pptx",
+  "Punto 45": "P45ZonaASala.pptx",
 };
+
+function archivoPlantilla(centro: string, tamano: string) {
+  if (centro === "Punto 45" && /^\s*30\b/.test(tamano)) return "P45ZonaBSala.pptx";
+  return PLANTILLAS[centro];
+}
 
 export function centroTienePlantillaCotizacionSala(centro: string) {
   return !!PLANTILLAS[centro];
@@ -52,8 +62,8 @@ export type DatosCotizacionSala = {
   coffeeTotal?: number;
 };
 
-async function cargarPlantilla(centro: string) {
-  const archivo = PLANTILLAS[centro];
+async function cargarPlantilla(centro: string, tamano: string) {
+  const archivo = archivoPlantilla(centro, tamano);
   if (!archivo) {
     throw new Error(`Sin plantilla de cotización en PowerPoint de Sala de Juntas para "${centro}" todavía.`);
   }
@@ -121,18 +131,20 @@ function llenarRenglonCoffee(tablaItemsXml: string, datos: DatosCotizacionSala) 
 }
 
 async function generarSala(datos: DatosCotizacionSala): Promise<Buffer> {
-  const zip = await cargarPlantilla(datos.centro);
+  const zip = await cargarPlantilla(datos.centro, datos.tamano);
 
-  // Slide 2: tarjeta de aforo de la sala.
+  // Slide 2: tarjeta de aforo de la sala. Solo se cambia cuando la plantilla trae UNA sala
+  // (Bosques); las que traen fotos de varias salas, cada una con su aforo, se dejan tal cual.
   const slide2Path = "ppt/slides/slide2.xml";
   let slide2 = await zip.file(slide2Path)?.async("string");
-  if (slide2 && datos.tamano) {
+  const aforos = slide2?.match(/<a:t>\s*\d+ personas\s*<\/a:t>/g) ?? [];
+  if (slide2 && datos.tamano && aforos.length === 1) {
     slide2 = reemplazarTodas(slide2, "10 personas", datos.tamano);
     zip.file(slide2Path, slide2);
   }
 
-  // Slide 4: tabla de cotización.
-  const slide4Path = "ppt/slides/slide4.xml";
+  // Slide 4 (5 en San Telmo y Punto 45): tabla de cotización.
+  const slide4Path = await slideDe(zip, "Paquete de 1 día");
   let slide4 = await zip.file(slide4Path)?.async("string");
   if (slide4) {
     const fechaStr = datos.fecha
@@ -156,6 +168,16 @@ async function generarSala(datos: DatosCotizacionSala): Promise<Buffer> {
   }
 
   return zip.generateAsync({ type: "nodebuffer" });
+}
+
+// Diapositiva que contiene `texto` (la tabla de cotización: en Bosques es la 4, en las demás la 5).
+async function slideDe(zip: JSZip, texto: string): Promise<string> {
+  const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
+  for (const ruta of slides) {
+    const xml = await zip.file(ruta)?.async("string");
+    if (xml?.includes(texto)) return ruta;
+  }
+  return "ppt/slides/slide4.xml";
 }
 
 export async function generarPptxCotizacionSala(datos: DatosCotizacionSala): Promise<Buffer> {

@@ -40,15 +40,32 @@ export function esFueraDeHorario(fechaISO: string, hora: number) {
   return hora >= HORA_CIERRE_SEMANA;
 }
 
-// Salas que se pueden reservar por centro, en el orden en que se intenta
-// asignar una cotización aceptada (mismas que el calendario del Panel de Centro).
-const SALAS_POR_CENTRO: Record<string, string[]> = {
+// Salas de juntas reales de cada centro, nombradas por su capacidad. Es la ÚNICA lista: la usan
+// Reservaciones, el calendario del Panel de Centro, la carta responsiva de Sala de Juntas y la
+// asignación de una cotización aceptada. Un centro que no está aquí usa las genéricas A y B.
+export const SALAS_POR_CENTRO: Record<string, string[]> = {
   Bosques: ["Sala de 10 personas"],
+  "Punto 45": ["Sala de 6 personas", "Sala de 10 personas", "Sala de 20 personas", "Aula de 30 personas"],
+  "San Telmo": ["Sala de 6 personas", "Sala de 10 personas", "Sala de 20 personas"],
 };
 const SALAS_DEFAULT = ["Sala de Juntas A", "Sala de Juntas B"];
 
-export function salasDelCentro(centro: string) {
-  return SALAS_POR_CENTRO[centro] || SALAS_DEFAULT;
+function capacidad(texto: string): number | null {
+  const m = texto.match(/(\d+)\s*(?:px|personas)\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+// Salas del centro en el orden en que se intenta asignar una cotización aceptada. Con
+// `tipoEspacio` de la cotización ("Sala de Juntas 20 px · …") van solo las que caben, de la más
+// chica a la más grande (una de 8 personas va a la de 10); si ninguna alcanza, todas, como antes.
+export function salasDelCentro(centro: string, tipoEspacio?: string | null) {
+  const salas = SALAS_POR_CENTRO[centro] || SALAS_DEFAULT;
+  const personas = tipoEspacio ? capacidad(tipoEspacio) : null;
+  if (!personas) return salas;
+  const queCaben = salas
+    .filter((s) => (capacidad(s) ?? 0) >= personas)
+    .sort((a, b) => (capacidad(a) ?? 0) - (capacidad(b) ?? 0));
+  return queCaben.length > 0 ? queCaben : salas;
 }
 
 // La cotización de Sala guarda el horario dentro de `tipo_espacio`, con el

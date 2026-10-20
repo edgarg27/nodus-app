@@ -4,11 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import CentroPanel from "@/app/centro/CentroPanel";
+import { SALAS_POR_CENTRO } from "@/lib/horarioSala";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
-const SALA_DEFAULT: Record<string, string> = {
-  Bosques: "Sala de 10 personas",
-};
+// Centro con una sola sala: queda fija en la carta responsiva. Con varias (Punto 45, San Telmo)
+// se elige de la lista. Sin lista, se escribe a mano.
+const SALA_DEFAULT: Record<string, string> = Object.fromEntries(
+  Object.entries(SALAS_POR_CENTRO)
+    .filter(([, salas]) => salas.length === 1)
+    .map(([c, salas]) => [c, salas[0]])
+);
 
 type Registro = {
   id: string;
@@ -479,18 +484,29 @@ export default function SalaJuntasPage() {
               <h1 className="responsiva-title">Carta responsiva de Sala de Juntas</h1>
 
               <p className="responsiva-section-title">Sala</p>
-              <input
-                className="responsiva-sala-input"
-                value={tipoSala}
-                onChange={(e) => setTipoSala(e.target.value)}
-                placeholder="Ej. Sala de 10 personas"
-                disabled={!!(centro && SALA_DEFAULT[centro])}
-                style={
-                  centro && SALA_DEFAULT[centro]
-                    ? { background: "#f5f5f5", color: "#555", cursor: "not-allowed" }
-                    : undefined
-                }
-              />
+              {centro && !SALA_DEFAULT[centro] && (SALAS_POR_CENTRO[centro]?.length ?? 0) > 1 ? (
+                <select className="responsiva-sala-input" value={tipoSala} onChange={(e) => setTipoSala(e.target.value)}>
+                  <option value="">Elige la sala</option>
+                  {SALAS_POR_CENTRO[centro].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="responsiva-sala-input"
+                  value={tipoSala}
+                  onChange={(e) => setTipoSala(e.target.value)}
+                  placeholder="Ej. Sala de 10 personas"
+                  disabled={!!(centro && SALA_DEFAULT[centro])}
+                  style={
+                    centro && SALA_DEFAULT[centro]
+                      ? { background: "#f5f5f5", color: "#555", cursor: "not-allowed" }
+                      : undefined
+                  }
+                />
+              )}
 
               <p className="responsiva-section-title">Encargado de Nodus que entrega la sala</p>
               <input

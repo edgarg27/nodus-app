@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 
 // ¿Puede esta persona del staff facturar a este cliente? Los roles globales, siempre. Los demás, si el cliente es de
 // su centro o tiene un contrato en su centro (un cliente puede tener contratos en varios centros). `cruzado` es que

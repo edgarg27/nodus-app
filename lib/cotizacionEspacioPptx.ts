@@ -24,9 +24,23 @@ import { marcarOficinasEnLayout } from "./layoutOficinas";
 // nombres de plantilla de abajo (los .pptx reales en
 // public/plantillas-cotizacion/ no llevan guión).
 const PLANTILLAS: Record<string, Record<string, string>> = {
-  coworking: { Bosques: "BosquesCoworking.pptx" },
-  "oficina privada": { Bosques: "BosquesOficinaPrivada.pptx" },
-  "working desk": { Bosques: "BosquesOficinaPrivada.pptx" },
+  // La de Coworking es general (trae los contactos de todos los centros): Punto 45 y San Telmo
+  // usan la misma que Bosques. Si Diseño la cambia en /diseno/plantillas, cambia para los tres.
+  coworking: { Bosques: "BosquesCoworking.pptx", "Punto 45": "BosquesCoworking.pptx", "San Telmo": "BosquesCoworking.pptx" },
+  // Punto 45 y San Telmo usan la misma plantilla que Bosques con sus datos y su plano (diapositiva 3;
+  // en Punto 45 son dos imágenes, Zona A y Zona B), pero con una diapositiva menos antes de la tabla:
+  // por eso la tabla no siempre es la diapositiva 5 (ver slideDeLaTabla). Sus planos todavía no están
+  // medidos en lib/layoutOficinas.ts, así que las oficinas cotizadas no se marcan en ellos.
+  "oficina privada": {
+    Bosques: "BosquesOficinaPrivada.pptx",
+    "Punto 45": "P45OficinaPrivada.pptx",
+    "San Telmo": "SanTelmoOficinaPrivada.pptx",
+  },
+  "working desk": {
+    Bosques: "BosquesOficinaPrivada.pptx",
+    "Punto 45": "P45OficinaPrivada.pptx",
+    "San Telmo": "SanTelmoOficinaPrivada.pptx",
+  },
 };
 
 function normalizarTipo(tipoEspacio: string) {
@@ -201,9 +215,20 @@ async function generarCoworking(datos: DatosCotizacionEspacio): Promise<Buffer> 
   return zip.generateAsync({ type: "nodebuffer" });
 }
 
+// Diapositiva que trae la tabla de precios de Oficina Privada. En Bosques es la 5 y en Punto 45 y San Telmo la 4
+// (cada plantilla acomoda distinto sus diapositivas). Se busca por el encabezado de la tabla.
+async function slideDeLaTabla(zip: JSZip): Promise<string> {
+  const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
+  for (const ruta of slides) {
+    const xml = await zip.file(ruta)?.async("string");
+    if (xml?.includes("Horas en sala de juntas")) return ruta;
+  }
+  return "ppt/slides/slide5.xml";
+}
+
 async function generarOficinaPrivada(datos: DatosCotizacionEspacio): Promise<Buffer> {
   const zip = await cargarPlantilla(datos.tipoEspacio, datos.centro);
-  const slidePath = "ppt/slides/slide5.xml";
+  const slidePath = await slideDeLaTabla(zip);
   let slide = await zip.file(slidePath)?.async("string");
   if (slide) {
     slide = reemplazarTodas(slide, "Oficina", datos.descripcion);

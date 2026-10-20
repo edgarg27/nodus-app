@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
 import { parsearCfdi, normalizarRfc, nombreBase } from "@/lib/cfdi";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const CONCURRENCIA = 5;
 

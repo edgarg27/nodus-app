@@ -30,8 +30,13 @@ const ETIQUETAS: Record<string, string> = {
   "BosquesOficinaPrivadaFisica.docx": "Oficina Privada / Working Desk · Persona física",
   "BosquesOficinaPrivadaMoral.docx": "Oficina Privada / Working Desk · Persona moral",
   "Bosques.pptx": "Cotización · Sala de Juntas",
-  "BosquesCoworking.pptx": "Cotización · Coworking",
+  "SanTelmoSala.pptx": "Cotización · Sala de Juntas · San Telmo",
+  "P45ZonaASala.pptx": "Cotización · Sala de Juntas · Punto 45 Zona A (6 a 20 personas)",
+  "P45ZonaBSala.pptx": "Cotización · Sala de Juntas · Punto 45 Zona B (30 personas)",
+  "BosquesCoworking.pptx": "Cotización · Coworking (Bosques, Punto 45 y San Telmo)",
   "BosquesOficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk",
+  "P45OficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk · Punto 45",
+  "SanTelmoOficinaPrivada.pptx": "Cotización · Oficina Privada / Working Desk · San Telmo",
 };
 
 const CARPETA: Record<Plantilla["tipo"], string> = {

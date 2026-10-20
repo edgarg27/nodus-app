@@ -507,9 +507,13 @@ export default function ProspectosPage() {
                               >
                                 🧾 Cotizar
                               </a>
-                              <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
-                                🗑
-                              </button>
+                              {/* Los prospectos se ven y se les da seguimiento desde cualquier centro,
+                                  pero solo los borra su propio centro (migracion_prospectos_compartidos.sql). */}
+                              {(esGlobal || p.centro === centro) && (
+                                <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
+                                  🗑
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
