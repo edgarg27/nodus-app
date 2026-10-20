@@ -16,8 +16,8 @@
 --     algún día se renta.
 --   Working Desk 1 a 6 y 50 lugares de Coworking (misma numeración que Bosques).
 --
--- Todo entra como "disponible", salvo las aulas 5, 6 y 7 (ocupadas, según la
--- lista de precios). Solo agrega lo que falte: es seguro volver a correrlo.
+-- Todo entra como "disponible": la administradora marca lo rentado al dar de alta
+-- a cada cliente. Solo agrega lo que falte: es seguro volver a correrlo.
 -- =====================================================================
 
 -- ----------------------------------------------------------- 1) Planes
@@ -75,9 +75,9 @@ from (values
   ('Aula 2',  'disponible', 77604, 'Zona B · 64.67 m² · Semi adecuado $64,670 · Sin servicios ni mobiliario $54,969.50'),
   ('Aula 3',  'disponible', 77604, 'Zona B · 64.67 m² · Semi adecuado $64,670 · Sin servicios ni mobiliario $54,969.50'),
   ('Aula 4',  'disponible', 66732, 'Zona B · 55.61 m² · Semi adecuado $55,610 · Sin servicios ni mobiliario $47,268.50'),
-  ('Aula 5',  'ocupada',    63576, 'Zona B · 52.98 m² · Semi adecuado $52,980 · Sin servicios ni mobiliario $45,033'),
-  ('Aula 6',  'ocupada',    78348, 'Zona B · 65.29 m² · Semi adecuado $65,290 · Sin servicios ni mobiliario $55,496.50'),
-  ('Aula 7',  'ocupada',    72240, 'Zona B · 60.2 m² · Semi adecuado $60,200 · Sin servicios ni mobiliario $51,170'),
+  ('Aula 5',  'disponible',    63576, 'Zona B · 52.98 m² · Semi adecuado $52,980 · Sin servicios ni mobiliario $45,033'),
+  ('Aula 6',  'disponible',    78348, 'Zona B · 65.29 m² · Semi adecuado $65,290 · Sin servicios ni mobiliario $55,496.50'),
+  ('Aula 7',  'disponible',    72240, 'Zona B · 60.2 m² · Semi adecuado $60,200 · Sin servicios ni mobiliario $51,170'),
   ('Aula 8',  'disponible', 17496, 'Zona B · 14.58 m² · Semi adecuado $14,580 · Sin servicios ni mobiliario $12,393'),
   ('Aula 9',  'disponible', 121308, 'Zona B · Comedor · 101.09 m² · Solo en caso especial (nunca se ha rentado) · Semi adecuado $101,090 · Sin servicios ni mobiliario $85,926.50'),
   ('Aula 10', 'disponible', 23184, 'Zona B · Site · 19.32 m² · Semi adecuado $19,320 · Sin servicios ni mobiliario $16,422')
