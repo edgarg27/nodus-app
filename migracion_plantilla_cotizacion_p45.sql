@@ -4,5 +4,10 @@
 -- subir una versión nueva; la cotización funciona aunque no se corra.
 -- Es seguro volver a correrlo.
 insert into public.plantillas_documentos (nombre_archivo, tipo)
-values ('P45OficinaPrivada.pptx', 'cotizacion'), ('SanTelmoOficinaPrivada.pptx', 'cotizacion')
+values
+  ('P45OficinaPrivada.pptx', 'cotizacion'),
+  ('SanTelmoOficinaPrivada.pptx', 'cotizacion'),
+  ('SanTelmoSala.pptx', 'cotizacion'),
+  ('P45ZonaASala.pptx', 'cotizacion'),
+  ('P45ZonaBSala.pptx', 'cotizacion')
 on conflict (nombre_archivo) do nothing;
