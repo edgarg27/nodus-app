@@ -67,12 +67,12 @@ const DOMICILIO_BOSQUES = {
 const DOMICILIO_INMUEBLE: Record<string, { inicio: string; fin: string }> = {
   Bosques: DOMICILIO_BOSQUES,
   "Punto 45": {
-    inicio: "Blvd. a Zacatecas No. 845, 311 A, 3er piso, interior ",
-    fin: ", Col. Desarrollo Especial Plaza Punto 45, CP 20126 Aguascalientes, Ags.",
+    inicio: "Blvd. a Zacatecas 845 311 A 3er piso interior ",
+    fin: ", Col. Desarrollo Especial Plaza Punto 45 C.P 20126 Aguascalientes, Ags.",
   },
   "San Telmo": {
-    inicio: "Prolongación Gral. Ignacio Zaragoza #4200, edificio 1A, primer piso, interior ",
-    fin: ", Fraccionamiento Trojes de Alonso, CP 20115 Aguascalientes, Ags.",
+    inicio: "Prolongación Gral. Ignacio Zaragoza #4200 edificio 1A, primer piso, interior ",
+    fin: ", Trojes de Alonso, 20115 Aguascalientes, Ags.",
   },
 };
 
