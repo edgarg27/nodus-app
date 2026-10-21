@@ -4,8 +4,8 @@
 // Completar conforme se tengan las direcciones de los demás centros.
 export const UBICACION_POR_CENTRO: Record<string, string | null> = {
   Bosques: "Av Aguascalientes Norte #517 interior 1, Fraccionamiento Bosques del Prado Sur, CP 20130, Aguascalientes, Ags.",
-  "Punto 45": null,
-  "San Telmo": null,
+  "Punto 45": "Blvd. a Zacatecas 845, 311 A, 3er piso, Col. Desarrollo Especial Plaza Punto 45, CP 20126, Aguascalientes, Ags.",
+  "San Telmo": "Prolongación Gral. Ignacio Zaragoza #4200, edificio 1A, primer piso, Trojes de Alonso, CP 20115, Aguascalientes, Ags.",
   "Puerta Bajío Piso 2": null,
   "Puerta Bajío Piso 8": null,
   Stadium: null,
@@ -16,8 +16,8 @@ export const UBICACION_POR_CENTRO: Record<string, string | null> = {
 // usa en una factura a público en general. Completar conforme se tengan.
 export const CP_POR_CENTRO: Record<string, string | null> = {
   Bosques: "20130",
-  "Punto 45": null,
-  "San Telmo": null,
+  "Punto 45": "20126",
+  "San Telmo": "20115",
   "Puerta Bajío Piso 2": null,
   "Puerta Bajío Piso 8": null,
   Stadium: null,
