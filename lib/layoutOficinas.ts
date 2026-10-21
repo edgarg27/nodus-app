@@ -13,10 +13,15 @@ import { escaparXml } from "./pptxHelpers";
 // original del plano (medidas sobre su color de piso) y se escalan al
 // tamaño y lugar que tenga la imagen en la diapositiva. Si Diseño sube en
 // /diseno/plantillas un plano con OTRO acomodo, hay que volver a medirlas.
+//
+// Un centro puede tener varios planos (Punto 45: Zona A con las oficinas y
+// Zona B con las aulas, dos imágenes en la misma diapositiva). Cada plano
+// se reconoce por el tamaño en pixeles de su imagen dentro del PowerPoint,
+// así que si Diseño sube una imagen de otro tamaño simplemente no se marca.
 
 type Punto = [number, number];
 
-type LayoutCentro = {
+type PlanoCentro = {
   anchoImagen: number;
   altoImagen: number;
   // número de oficina (oficinas.numero) → contorno de la oficina. Las que
@@ -54,8 +59,16 @@ const CUARTO_29_30: Punto[] = [
   [49, 446],
 ];
 
-const LAYOUTS: Record<string, LayoutCentro> = {
-  Bosques: {
+// P45 Zona B: el Aula 8 tiene la esquina inferior izquierda cortada en diagonal.
+const AULA_8_P45: Punto[] = [
+  [455, 460],
+  [582, 460],
+  [582, 725],
+  [455, 650],
+];
+
+const LAYOUTS: Record<string, PlanoCentro[]> = {
+  Bosques: [{
     anchoImagen: 1276,
     altoImagen: 961,
     oficinas: {
@@ -102,7 +115,79 @@ const LAYOUTS: Record<string, LayoutCentro> = {
       "31": rect(173, 183, 241, 317),
       "32": rect(246, 183, 310, 318),
     },
-  },
+  }],
+  "Punto 45": [
+    {
+      // Zona A (oficinas). 13-14 y 17-18 son un solo cuarto cada una.
+      anchoImagen: 1669,
+      altoImagen: 1331,
+      oficinas: {
+        "1": rect(1425, 591, 1588, 767),
+        "2": rect(1429, 776, 1588, 984),
+        "3": rect(1267, 840, 1420, 961),
+        "4": rect(992, 840, 1257, 961),
+        "5": rect(854, 840, 983, 961),
+        "6": rect(717, 840, 846, 961),
+        "7": rect(584, 840, 707, 961),
+        "8": rect(90, 528, 575, 835),
+        "9": rect(584, 532, 819, 769),
+        "10": rect(584, 275, 820, 523),
+        "11": rect(583, 76, 820, 212),
+        "12": rect(829, 76, 1066, 212),
+        "13-14": rect(1072, 76, 1563, 214),
+        "15": rect(1425, 218, 1562, 333),
+        "16": rect(1425, 343, 1562, 457),
+        "17-18": rect(90, 220, 325, 412),
+        "19": rect(328, 77, 438, 216),
+        "20": rect(447, 77, 574, 216),
+      },
+    },
+    {
+      // Zona B (aulas). El Aula 9 es el comedor.
+      anchoImagen: 1612,
+      altoImagen: 1120,
+      oficinas: {
+        "Aula 1": rect(463, 102, 668, 381),
+        "Aula 2": rect(674, 102, 885, 380),
+        "Aula 3": rect(892, 102, 1102, 380),
+        "Aula 4": rect(1279, 460, 1469, 726),
+        "Aula 5": rect(1081, 460, 1273, 724),
+        "Aula 6": rect(912, 460, 1074, 725),
+        "Aula 7": rect(587, 460, 908, 725),
+        "Aula 8": AULA_8_P45,
+        "Aula 9": rect(1109, 103, 1470, 381),
+      },
+    },
+  ],
+  "San Telmo": [
+    {
+      anchoImagen: 1872,
+      altoImagen: 1995,
+      oficinas: {
+        "1": rect(1204, 817, 1381, 962),
+        "2A": rect(1184, 1118, 1402, 1359),
+        "2B": rect(1414, 1163, 1668, 1359),
+        "3": rect(1455, 976, 1668, 1150),
+        "4": rect(1459, 817, 1668, 964),
+        "5": rect(1457, 495, 1668, 805),
+        "6": rect(1461, 194, 1641, 488),
+        "7": rect(1293, 194, 1449, 443),
+        "8": rect(1136, 194, 1280, 510),
+        "9": rect(976, 362, 1123, 509),
+        "10": rect(974, 194, 1121, 349),
+        "11": rect(658, 194, 805, 349),
+        "12": rect(657, 362, 804, 509),
+        "13": rect(509, 194, 644, 510),
+        "14": rect(348, 194, 496, 443),
+        "15": rect(191, 194, 335, 488),
+        "16": rect(191, 500, 338, 644),
+        "17": rect(191, 656, 338, 805),
+        "18": rect(191, 817, 338, 964),
+        // Zona gris de "cotización especial": los dos privados a los que apunta el 19.
+        "19": rect(191, 976, 321, 1295),
+      },
+    },
+  ],
 };
 
 // Azul de la marca (el mismo "002060" de los textos de la plantilla).
@@ -115,19 +200,40 @@ export function centroTieneLayoutOficinas(centro: string) {
   return !!LAYOUTS[centro];
 }
 
-// Busca la diapositiva del plano (la que dice "Layout") y la imagen más
-// grande dentro de ella; regresa su posición y tamaño en EMU.
-function ubicarPlano(slideXml: string) {
-  if (!slideXml.includes("<a:t>Layout</a:t>")) return null;
-  let mejor: { x: number; y: number; cx: number; cy: number } | null = null;
+// Tamaño en pixeles de una imagen PNG (lo trae el encabezado). Los planos
+// son PNG; cualquier otra imagen regresa null y se ignora.
+function tamanoPng(bytes: Uint8Array): [number, number] | null {
+  if (bytes.length < 24 || bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4e || bytes[3] !== 0x47) return null;
+  const leer = (i: number) => ((bytes[i] << 24) | (bytes[i + 1] << 16) | (bytes[i + 2] << 8) | bytes[i + 3]) >>> 0;
+  return [leer(16), leer(20)];
+}
+
+// Imágenes de la diapositiva que son alguno de los planos del centro, con
+// su posición y tamaño en EMU.
+async function ubicarPlanos(zip: JSZip, slidePath: string, slideXml: string, planos: PlanoCentro[]) {
+  const relsPath = slidePath.replace(/slides\/(slide\d+\.xml)$/, "slides/_rels/$1.rels");
+  const rels = (await zip.file(relsPath)?.async("string")) || "";
+  const destinos = new Map<string, string>();
+  for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) {
+    const id = m[0].match(/\bId="([^"]+)"/)?.[1];
+    const target = m[0].match(/\bTarget="([^"]+)"/)?.[1];
+    if (id && target) destinos.set(id, target);
+  }
+  const encontrados: { plano: PlanoCentro; x: number; y: number; cx: number; cy: number }[] = [];
   for (const m of slideXml.matchAll(/<p:pic>[\s\S]*?<\/p:pic>/g)) {
+    const embed = m[0].match(/r:embed="([^"]+)"/)?.[1];
     const off = m[0].match(/<a:off x="(-?\d+)" y="(-?\d+)"\/>/);
     const ext = m[0].match(/<a:ext cx="(\d+)" cy="(\d+)"\/>/);
-    if (!off || !ext) continue;
-    const pic = { x: Number(off[1]), y: Number(off[2]), cx: Number(ext[1]), cy: Number(ext[2]) };
-    if (!mejor || pic.cx * pic.cy > mejor.cx * mejor.cy) mejor = pic;
+    const target = embed && destinos.get(embed);
+    if (!target || !off || !ext) continue;
+    const mediaPath = target.startsWith("/") ? target.slice(1) : "ppt/" + target.replace(/^\.\.\//, "");
+    const bytes = await zip.file(mediaPath)?.async("uint8array");
+    const tam = bytes && tamanoPng(bytes);
+    const plano = tam && planos.find((p) => p.anchoImagen === tam[0] && p.altoImagen === tam[1]);
+    if (!plano) continue;
+    encontrados.push({ plano, x: Number(off[1]), y: Number(off[2]), cx: Number(ext[1]), cy: Number(ext[2]) });
   }
-  return mejor;
+  return encontrados;
 }
 
 function siguienteId(slideXml: string) {
@@ -159,12 +265,19 @@ function formaOficina(id: number, numero: string, puntos: [number, number][]) {
   );
 }
 
+// Las etiquetas largas ("Oficina 13-14", "Aula 8") se ensanchan para que el
+// texto no se salga del recuadro: ~0.06 in por letra a 7.5 pt.
+function anchoEtiqueta(texto: string) {
+  return Math.max(ANCHO_ETIQUETA, texto.length * 54864);
+}
+
 function formaEtiqueta(id: number, texto: string, centroX: number, centroY: number) {
-  const x = Math.round(centroX - ANCHO_ETIQUETA / 2);
+  const ancho = anchoEtiqueta(texto);
+  const x = Math.round(centroX - ancho / 2);
   const y = Math.round(centroY - ALTO_ETIQUETA / 2);
   return (
     `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Etiqueta ${escaparXml(texto)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>` +
-    `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${ANCHO_ETIQUETA}" cy="${ALTO_ETIQUETA}"/></a:xfrm>` +
+    `<p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${ancho}" cy="${ALTO_ETIQUETA}"/></a:xfrm>` +
     `<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>` +
     `<a:solidFill><a:srgbClr val="${COLOR_MARCA}"/></a:solidFill>` +
     `<a:ln w="9525"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></p:spPr>` +
@@ -177,26 +290,21 @@ function formaEtiqueta(id: number, texto: string, centroX: number, centroY: numb
 
 // numeros = oficinas.numero de las oficinas cotizadas (ej. ["12"] o, al
 // agregar una oficina a un contrato, ["12", "13"]). Si el centro no tiene
-// plano medido, la plantilla no trae la diapositiva "Layout" o el número
-// no está en el plano, no hace nada (el PowerPoint sale igual que antes).
+// plano medido, la plantilla no trae la imagen del plano o el número no
+// está en el plano, no hace nada (el PowerPoint sale igual que antes).
 export async function marcarOficinasEnLayout(zip: JSZip, centro: string, numeros: string[]) {
-  const layout = LAYOUTS[centro];
-  const unicos = [...new Set(numeros.map((n) => String(n).trim()).filter((n) => layout?.oficinas[n]))];
-  if (!layout || unicos.length === 0) return;
+  const planos = LAYOUTS[centro];
+  const unicos = [
+    ...new Set(numeros.map((n) => String(n).trim()).filter((n) => planos?.some((p) => p.oficinas[n]))),
+  ];
+  if (!planos || unicos.length === 0) return;
 
   const slides = Object.keys(zip.files).filter((p) => /^ppt\/slides\/slide\d+\.xml$/.test(p));
   for (const slidePath of slides) {
     const slide = await zip.file(slidePath)?.async("string");
     if (!slide) continue;
-    const plano = ubicarPlano(slide);
-    if (!plano) continue;
-
-    const escalaX = plano.cx / layout.anchoImagen;
-    const escalaY = plano.cy / layout.altoImagen;
-    const aEmu = ([px, py]: Punto): [number, number] => [
-      Math.round(plano.x + px * escalaX),
-      Math.round(plano.y + py * escalaY),
-    ];
+    const encontrados = await ubicarPlanos(zip, slidePath, slide, planos);
+    if (encontrados.length === 0) continue;
 
     let id = siguienteId(slide);
     const marcas: string[] = [];
@@ -205,23 +313,35 @@ export async function marcarOficinasEnLayout(zip: JSZip, centro: string, numeros
     // Centros de las etiquetas ya puestas: oficinas vecinas angostas (ej.
     // 12 y 13) tendrían la etiqueta encimada, así que se baja la que choca.
     const etiquetasPuestas: [number, number][] = [];
-    for (const numero of unicos) {
-      const contorno = layout.oficinas[numero];
-      // 8 y 9 (y las demás parejas) son el mismo cuarto: se marca una vez.
-      if (cuartosYaMarcados.has(contorno)) continue;
-      cuartosYaMarcados.add(contorno);
-      const puntos = contorno.map(aEmu);
-      marcas.push(formaOficina(id++, numero, puntos));
-      const xs = puntos.map((p) => p[0]);
-      const ys = puntos.map((p) => p[1]);
-      const ex = (Math.min(...xs) + Math.max(...xs)) / 2;
-      let ey = (Math.min(...ys) + Math.max(...ys)) / 2;
-      const choca = () =>
-        etiquetasPuestas.some(([px, py]) => Math.abs(px - ex) < ANCHO_ETIQUETA && Math.abs(py - ey) < ALTO_ETIQUETA);
-      while (choca()) ey += ALTO_ETIQUETA * 1.2;
-      etiquetasPuestas.push([ex, ey]);
-      etiquetas.push(formaEtiqueta(id++, `Oficina ${numero}`, ex, ey));
+    for (const { plano, ...img } of encontrados) {
+      const escalaX = img.cx / plano.anchoImagen;
+      const escalaY = img.cy / plano.altoImagen;
+      const aEmu = ([px, py]: Punto): [number, number] => [
+        Math.round(img.x + px * escalaX),
+        Math.round(img.y + py * escalaY),
+      ];
+      for (const numero of unicos) {
+        const contorno = plano.oficinas[numero];
+        // 8 y 9 (y las demás parejas) son el mismo cuarto: se marca una vez.
+        if (!contorno || cuartosYaMarcados.has(contorno)) continue;
+        cuartosYaMarcados.add(contorno);
+        const puntos = contorno.map(aEmu);
+        marcas.push(formaOficina(id++, numero, puntos));
+        const xs = puntos.map((p) => p[0]);
+        const ys = puntos.map((p) => p[1]);
+        const ex = (Math.min(...xs) + Math.max(...xs)) / 2;
+        let ey = (Math.min(...ys) + Math.max(...ys)) / 2;
+        // Las aulas ya traen su nombre ("Aula 3"); las oficinas llevan "Oficina 12".
+        const texto = /^\d/.test(numero) ? `Oficina ${numero}` : numero;
+        const ancho = anchoEtiqueta(texto);
+        const choca = () =>
+          etiquetasPuestas.some(([px, py]) => Math.abs(px - ex) < ancho && Math.abs(py - ey) < ALTO_ETIQUETA);
+        while (choca()) ey += ALTO_ETIQUETA * 1.2;
+        etiquetasPuestas.push([ex, ey]);
+        etiquetas.push(formaEtiqueta(id++, texto, ex, ey));
+      }
     }
+    if (marcas.length === 0) continue;
     // Al final del árbol de formas para que queden encima del plano; las
     // etiquetas después de todas las marcas para que ninguna las tape.
     const nuevo = slide.replace("</p:spTree>", marcas.join("") + etiquetas.join("") + "</p:spTree>");
