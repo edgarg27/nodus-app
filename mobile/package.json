@@ -1,0 +1,22 @@
+{
+  "name": "nodus-app-movil",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App de Nodus para clientes (App Store y Google Play): Capacitor sobre https://app.nodusbc.mx",
+  "scripts": {
+    "sync": "cap sync",
+    "android": "cap open android",
+    "ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

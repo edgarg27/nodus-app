@@ -1,0 +1,30 @@
+{
+  "appId": "mx.nodusbc.app",
+  "appName": "Nodus",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.nodusbc.mx/login",
+    "allowNavigation": ["app.nodusbc.mx"],
+    "errorPath": "sin-conexion.html"
+  },
+  "backgroundColor": "#0d1b3e",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#0d1b3e",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0d1b3e",
+      "overlaysWebView": false
+    }
+  }
+}

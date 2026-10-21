@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { esAppNativa } from "@/lib/appNativa";
 
 // App instalable (PWA): registra el service worker y, en el celular, ofrece instalar Nodus
 // en la pantalla de inicio. En Android/Chrome sale el botón "Instalar"; en iPhone (Safari)
@@ -38,6 +39,8 @@ export default function PwaInstalar() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Dentro de la app móvil (Capacitor) ya está "instalada": ni service worker ni aviso de instalar.
+    if (esAppNativa()) return;
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
