@@ -7,11 +7,12 @@
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
+import { enviarPushNativo, pushNativoConfigurado } from "@/lib/pushNativo";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
 let configurado = false;
-export function pushConfigurado(): boolean {
+function vapidConfigurado(): boolean {
   if (configurado) return true;
   const publica = process.env.VAPID_PUBLIC_KEY;
   const privada = process.env.VAPID_PRIVATE_KEY;
@@ -21,13 +22,25 @@ export function pushConfigurado(): boolean {
   return true;
 }
 
+// Hay al menos un canal de avisos al celular listo: web (VAPID) o la app móvil (lib/pushNativo.ts).
+export function pushConfigurado(): boolean {
+  return vapidConfigurado() || pushNativoConfigurado();
+}
+
 export type AvisoPush = { title: string; body: string; url: string; tag?: string };
 
 // Manda un aviso a todos los dispositivos de las personas indicadas. Las suscripciones que el
 // sistema de avisos del teléfono ya dio de baja (404/410) se borran solas.
 export async function enviarPush(admin: Admin, userIds: string[], aviso: AvisoPush): Promise<{ enviados: number; fallidos: number; borrados: number }> {
   const resultado = { enviados: 0, fallidos: 0, borrados: 0 };
-  if (!pushConfigurado() || userIds.length === 0) return resultado;
+  if (userIds.length === 0) return resultado;
+
+  // App móvil (Android / iPhone).
+  const nativo = await enviarPushNativo(admin, userIds, aviso);
+  resultado.enviados += nativo.enviados;
+  resultado.fallidos += nativo.fallidos;
+  resultado.borrados += nativo.borrados;
+  if (!vapidConfigurado()) return resultado;
 
   const { data: subs } = await admin.from("push_suscripciones").select("id, endpoint, p256dh, auth").in("user_id", Array.from(new Set(userIds)));
   const carga = JSON.stringify(aviso);

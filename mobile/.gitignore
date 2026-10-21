@@ -1,0 +1,8 @@
+# Secretos de la app móvil: nunca al repositorio
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist

@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -8,6 +9,7 @@ export default function LogoutButton() {
   const supabase = createClient();
 
   async function handleLogout() {
+    await soltarDispositivoNativo();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

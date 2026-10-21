@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +19,7 @@ export default function CuentaSuspendidaPage() {
   }, []);
 
   async function handleLogout() {
+    await soltarDispositivoNativo();
     await supabase.auth.signOut();
     router.push("/login");
   }

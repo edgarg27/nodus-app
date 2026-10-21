@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Viewport } from "next";
 import PwaInstalar from "./components/PwaInstalar";
+import AppNativa from "./components/AppNativa";
 
 export const metadata = {
   title: "Nodus",
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body>
         {children}
         <PwaInstalar />
+        <AppNativa />
       </body>
     </html>
   );

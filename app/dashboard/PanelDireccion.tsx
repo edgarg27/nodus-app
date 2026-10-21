@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -79,6 +80,7 @@ export default function PanelDireccion({
   ).sort((a, b) => a.localeCompare(b, "es"));
 
   async function cerrarSesion() {
+    await soltarDispositivoNativo();
     await createClient().auth.signOut();
     router.push("/login");
     router.refresh();

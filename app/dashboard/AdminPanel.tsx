@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import AvisoContratoVentas from "./AvisoContratoVentas";
 import AvisosPush from "@/app/components/AvisosPush";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -835,6 +836,7 @@ export default function AdminPanel({
   }
 
   async function handleLogout() {
+    await soltarDispositivoNativo();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
