@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { activarPushNativo, desactivarPushNativo, esAppNativa, estadoPushNativo } from "@/lib/appNativa";
 
 // Activa o desactiva los avisos al celular (notificaciones push) en este dispositivo.
 // Va dentro del menú de la campana, tanto en el panel del personal como en el del cliente.
@@ -24,6 +25,11 @@ export default function AvisosPush() {
   useEffect(() => {
     let vivo = true;
     (async () => {
+      // App móvil: avisos nativos (Android / iPhone), no los del navegador.
+      if (esAppNativa()) {
+        const e = await estadoPushNativo().catch(() => "no_soportado" as const);
+        return vivo && setEstado(e);
+      }
       const ua = navigator.userAgent;
       const ios = /iphone|ipad|ipod/i.test(ua);
       const instalada = window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
@@ -46,6 +52,14 @@ export default function AvisosPush() {
   async function activar() {
     setOcupado(true);
     setMensaje("");
+    if (esAppNativa()) {
+      const r = await activarPushNativo(true).catch(() => "error" as const);
+      setEstado(r === "ok" ? "activo" : r === "denegado" ? "bloqueado" : "apagado");
+      if (r === "error") setMensaje("No se pudo activar. Intenta de nuevo.");
+      else if (r === "ok") setMensaje("Listo: te llegarán los avisos a este celular.");
+      setOcupado(false);
+      return;
+    }
     try {
       const permiso = await Notification.requestPermission();
       if (permiso !== "granted") {
@@ -78,6 +92,12 @@ export default function AvisosPush() {
   async function desactivar() {
     setOcupado(true);
     setMensaje("");
+    if (esAppNativa()) {
+      await desactivarPushNativo().catch(() => {});
+      setEstado("apagado");
+      setOcupado(false);
+      return;
+    }
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = reg ? await reg.pushManager.getSubscription() : null;

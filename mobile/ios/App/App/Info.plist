@@ -66,5 +66,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Para tomar la foto de tu comprobante de pago o de un documento.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir tu comprobante de pago o un documento de tus fotos.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

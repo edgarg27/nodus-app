@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -306,6 +307,7 @@ export default function ClientePanel({
   }, []);
 
   async function handleLogout() {
+    await soltarDispositivoNativo();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

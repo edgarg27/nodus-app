@@ -1,5 +1,6 @@
 "use client";
 
+import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -785,6 +786,7 @@ export default function CentroPanel({
   }
 
   async function handleLogout() {
+    await soltarDispositivoNativo();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
