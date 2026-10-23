@@ -1434,7 +1434,7 @@ export default function AdminPanel({
                   <span className="modulo-name">Adicionales</span>
                 </a>
               ) },
-              { grupo: 1, ver: esVentasCom, key: "deposito", tarjeta: (
+              { grupo: 1, ver: esVentasCom || rol === "cobranza", key: "deposito", tarjeta: (
                 <a className="modulo-card" href="/deposito-garantia">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/deposito-garantia.png" alt="" className="modulo-icon icon-img-32" />
