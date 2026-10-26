@@ -1,4 +1,5 @@
 import type { DatosDireccion } from "../datosDireccion";
+import ProspectosPorMedio from "@/app/components/ProspectosPorMedio";
 import { BarrasMeses, Delta, Kpi, ListaBarras, deCentro, enMes, etiquetaMes, fechaCorta, mesAnterior, pct, ultimosMeses } from "./util";
 
 // Ventas: prospectos (app/prospectos), cotizaciones (cotizaciones_comerciales;
@@ -8,7 +9,7 @@ const ESTADOS: { clave: string; label: string; color: string }[] = [
   { clave: "nuevo", label: "Nuevo", color: "#185fa5" },
   { clave: "contactado", label: "Contactado", color: "#854f0b" },
   { clave: "en_seguimiento", label: "En seguimiento", color: "#f07e3a" },
-  { clave: "convertido", label: "Convertido", color: "#0f6e56" },
+  { clave: "convertido", label: "Convertido a cliente", color: "#0f6e56" },
   { clave: "perdido", label: "Perdido", color: "#a32d2d" },
 ];
 
@@ -125,6 +126,8 @@ export default function SeccionVentas({ datos, centro, mes }: { datos: DatosDire
           />
         </div>
       </div>
+
+      <ProspectosPorMedio esGlobal />
 
       <div className="dir-card">
         <p className="dir-card-titulo">Desempeño por persona · {etiquetaMes(mes)}</p>

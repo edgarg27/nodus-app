@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { exportarExcel } from "@/lib/exportExcel";
+import { exportarExcelHojas } from "@/lib/exportExcel";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 import SeguimientoModal, {
   type ActividadProspecto,
   estaAtrasada,
@@ -41,12 +43,12 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
   nuevo: { label: "Nuevo", bg: "#E6F1FB", color: "#185FA5" },
   contactado: { label: "Contactado", bg: "#FAEEDA", color: "#854F0B" },
   en_seguimiento: { label: "En seguimiento", bg: "#FFF3E8", color: "#F07E3A" },
-  convertido: { label: "Convertido", bg: "#E1F5EE", color: "#0F6E56" },
+  convertido: { label: "Prospecto convertido a cliente", bg: "#E1F5EE", color: "#0F6E56" },
   perdido: { label: "Perdido", bg: "#FCEBEB", color: "#A32D2D" },
 };
 
 // Mismas opciones que ya usa CotizarForm.tsx para "Medio de contacto" al cotizar.
-const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
+const MEDIOS_PROSPECTO = MEDIOS_CONTACTO;
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -87,6 +89,15 @@ export default function ProspectosPage() {
   const [actividadesPorProspecto, setActividadesPorProspecto] = useState<Record<string, ActividadProspecto[]>>({});
   const [seguimientoDe, setSeguimientoDe] = useState<Prospecto | null>(null);
 
+  // Filtros del seguimiento (tipo CRM). Por omisión, el centro de quien entra.
+  const [fCentro, setFCentro] = useState("");
+  const [fEstado, setFEstado] = useState("");
+  const [fContacto, setFContacto] = useState<"" | "sin_contactar" | "contactados" | "atrasados">("");
+  const [fPersona, setFPersona] = useState("");
+  const [fDesde, setFDesde] = useState("");
+  const [fHasta, setFHasta] = useState("");
+  const [fBuscar, setFBuscar] = useState("");
+
   useEffect(() => {
     init();
   }, []);
@@ -113,6 +124,8 @@ export default function ProspectosPage() {
       if (!miCentro || !centrosRol.includes(miCentro)) miCentro = centrosRol[0];
     }
     setCentro(miCentro);
+    // El admin de un centro abre viendo su centro; los roles globales, todos.
+    setFCentro(ROLES_GLOBALES.includes(rol) ? "" : profile?.centro || "");
     setFormProspecto((f) => ({ ...f, centroInteres: miCentro || "" }));
     await cargarProspectos();
     setLoading(false);
@@ -261,6 +274,142 @@ export default function ProspectosPage() {
     };
   }
 
+  // Ficha de seguimiento de cada prospecto: si ya se le contactó, cuándo, cómo y quién, y cuántos días lleva sin
+  // contacto. "Contactado" = tiene al menos una actividad hecha o ya se movió de "Nuevo".
+  const hoy = hoyMexicoISO();
+  const fichas = useMemo(() => {
+    const diasDesde = (iso: string) => Math.max(0, Math.round((Date.parse(hoy + "T12:00:00") - Date.parse(iso.slice(0, 10) + "T12:00:00")) / 86400000));
+    const mapa: Record<string, ReturnType<typeof resumenSeguimiento> & {
+      contactado: boolean;
+      atrasadas: number;
+      ultimoContactoFecha: string | null;
+      ultimoContactoPor: string;
+      diasSinContacto: number;
+    }> = {};
+    for (const p of prospectos) {
+      const lista = actividadesPorProspecto[p.id] || [];
+      const seg = resumenSeguimiento(p.id);
+      const u = seg.ultimaHecha;
+      const ultimoContactoFecha = u ? (u.completada_en || u.fecha).slice(0, 10) : null;
+      mapa[p.id] = {
+        ...seg,
+        contactado: seg.hechas > 0 || ["contactado", "en_seguimiento", "convertido"].includes(p.estado),
+        atrasadas: lista.filter(estaAtrasada).length,
+        ultimoContactoFecha,
+        ultimoContactoPor: u ? nombrePorRegistradoPor[u.completada_por || u.creado_por || ""] || "" : "",
+        diasSinContacto: diasDesde(ultimoContactoFecha || p.created_at),
+      };
+    }
+    return mapa;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prospectos, actividadesPorProspecto, nombrePorRegistradoPor, hoy]);
+
+  const prospectosFiltrados = useMemo(() => {
+    const q = fBuscar.trim().toLowerCase();
+    return prospectos.filter((p) => {
+      const f = fichas[p.id];
+      if (!f) return false;
+      if (fCentro && p.centro !== fCentro) return false;
+      if (fEstado && p.estado !== fEstado) return false;
+      if (fContacto === "sin_contactar" && f.contactado) return false;
+      if (fContacto === "contactados" && !f.contactado) return false;
+      if (fContacto === "atrasados" && f.atrasadas === 0) return false;
+      if (fPersona && p.registrado_por !== fPersona) return false;
+      const registro = p.created_at.slice(0, 10);
+      if (fDesde && registro < fDesde) return false;
+      if (fHasta && registro > fHasta) return false;
+      if (q && ![p.nombre, p.telefono, p.email, p.empresa, p.rfc, p.interes].some((v) => (v || "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [prospectos, fichas, fCentro, fEstado, fContacto, fPersona, fDesde, fHasta, fBuscar]);
+
+  const kpis = useMemo(() => {
+    const cuenta = (fn: (p: Prospecto) => boolean) => prospectosFiltrados.filter(fn).length;
+    return {
+      total: prospectosFiltrados.length,
+      sinContactar: cuenta((p) => !fichas[p.id]?.contactado),
+      atrasados: cuenta((p) => (fichas[p.id]?.atrasadas || 0) > 0),
+      enSeguimiento: cuenta((p) => p.estado === "en_seguimiento" || p.estado === "contactado"),
+      convertidos: cuenta((p) => p.estado === "convertido"),
+      perdidos: cuenta((p) => p.estado === "perdido"),
+    };
+  }, [prospectosFiltrados, fichas]);
+
+  // Quienes registraron prospectos (para el filtro "Registró"; el Excel sale solo con los suyos).
+  const personasSeguimiento = useMemo(
+    () =>
+      Object.entries(nombrePorRegistradoPor)
+        .filter(([id]) => prospectos.some((p) => p.registrado_por === id))
+        .sort((a, b) => a[1].localeCompare(b[1], "es")),
+    [nombrePorRegistradoPor, prospectos]
+  );
+
+  function limpiarFiltros() {
+    setFCentro("");
+    setFEstado("");
+    setFContacto("");
+    setFPersona("");
+    setFDesde("");
+    setFHasta("");
+    setFBuscar("");
+  }
+
+  // Excel con dos hojas: una fila por prospecto (a quién se contactó y a quién no) y una por actividad de
+  // seguimiento (qué se hizo, cuándo y quién), con los filtros que estén puestos.
+  function exportarSeguimiento() {
+    const nombre = (id: string | null | undefined) => (id && nombrePorRegistradoPor[id]) || "";
+    const tipoTexto = (a: ActividadProspecto) => etiquetaActividad(a).replace(/^\S+\s/, "");
+    const filasProspectos = prospectosFiltrados.map((p) => {
+      const f = fichas[p.id];
+      return {
+        "Fecha de registro": p.created_at.slice(0, 10),
+        Registró: nombre(p.registrado_por),
+        Centro: p.centro || "",
+        Nombre: p.nombre,
+        Empresa: p.empresa || "",
+        Teléfono: p.telefono || "",
+        Correo: p.email || "",
+        Medio: p.medio || "",
+        Interés: p.interes || "",
+        Estado: ESTADOS_PROSPECTO[p.estado]?.label || p.estado,
+        "¿Contactado?": f.contactado ? "Sí" : "No",
+        "Último contacto": f.ultimoContactoFecha || "",
+        "Cómo": f.ultimaHecha ? tipoTexto(f.ultimaHecha) : "",
+        "Contactó": f.ultimoContactoPor,
+        "Días sin contacto": f.diasSinContacto,
+        "Actividades hechas": f.hechas,
+        "Actividades pendientes": f.total - f.hechas,
+        Atrasadas: f.atrasadas,
+        "Próxima actividad": f.proxima ? `${tipoTexto(f.proxima)}${f.proxima.descripcion ? ` · ${f.proxima.descripcion}` : ""}` : "",
+        "Fecha próxima": f.proxima?.fecha || "",
+        "Motivo perdido": p.comentario_perdido || "",
+        Notas: p.notas || "",
+      };
+    });
+    const filasActividades = prospectosFiltrados.flatMap((p) =>
+      [...(actividadesPorProspecto[p.id] || [])]
+        .sort((a, b) => a.fecha.localeCompare(b.fecha))
+        .map((a) => ({
+          Prospecto: p.nombre,
+          Empresa: p.empresa || "",
+          Centro: p.centro || "",
+          Tipo: tipoTexto(a),
+          Descripción: a.descripcion || "",
+          "Fecha programada": a.fecha,
+          Estado: a.completada ? "Hecha" : estaAtrasada(a) ? "Atrasada" : "Pendiente",
+          Registró: nombre(a.creado_por),
+          "Registrada el": a.created_at.slice(0, 10),
+          "Hecha por": a.completada ? nombre(a.completada_por) : "",
+          "Hecha el": a.completada_en ? a.completada_en.slice(0, 10) : "",
+        }))
+    );
+    const quien = fPersona ? `-${nombre(fPersona)}` : "";
+    exportarExcelHojas(`seguimiento-prospectos-${fCentro || "todos"}${quien}-${hoy}`.replace(/[^\p{L}\p{N}_-]+/gu, "_"), {
+      Prospectos: filasProspectos,
+      Seguimiento: filasActividades,
+    });
+  }
+
   // Los nombres de quien registra o palomea una actividad nueva pueden no estar
   // cargados todavía (p. ej. la primera vez que alguien usa el seguimiento).
   async function completarNombres(lista: ActividadProspecto[]) {
@@ -358,7 +507,9 @@ export default function ProspectosPage() {
                   value={formProspecto.centroInteres}
                   onChange={(e) => setFormProspecto({ ...formProspecto, centroInteres: e.target.value })}
                 >
-                  <option value="">Centro de interés</option>
+                  <option value="" hidden>
+                    Centro de interés
+                  </option>
                   {(esGlobal || CENTROS_POR_ROL[miRol] ? centrosDisponibles : centro ? [centro] : CENTROS_SUGERIDOS).map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -377,55 +528,90 @@ export default function ProspectosPage() {
               </button>
             </form>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+            <div className="crm-cab">
               <p className="panel-section-label" style={{ margin: 0 }}>
-                Todos los prospectos ({prospectos.length})
+                Seguimiento de prospectos ({prospectosFiltrados.length}
+                {prospectosFiltrados.length !== prospectos.length ? ` de ${prospectos.length}` : ""})
               </p>
-              <button
-                className="btn-exportar"
-                onClick={() =>
-                  exportarExcel(
-                    "prospectos",
-                    prospectos.map((p) => {
-                      const seg = resumenSeguimiento(p.id);
-                      return {
-                        Nombre: p.nombre,
-                        Telefono: p.telefono || "",
-                        Email: p.email || "",
-                        Empresa: p.empresa || "",
-                        RFC: p.rfc || "",
-                        Interes: p.interes || "",
-                        Medio: p.medio || "",
-                        Centro: p.centro || "",
-                        Estado: p.estado,
-                        "Motivo perdido": p.comentario_perdido || "",
-                        Notas: p.notas || "",
-                        "Actividades hechas": seg.hechas,
-                        "Actividades pendientes": seg.total - seg.hechas,
-                        "Próxima actividad": seg.proxima
-                          ? `${etiquetaActividad(seg.proxima).replace(/^\S+\s/, "")} · ${formatoFechaCorta(seg.proxima.fecha)}${
-                              estaAtrasada(seg.proxima) ? " (atrasada)" : ""
-                            }${seg.proxima.descripcion ? ` · ${seg.proxima.descripcion}` : ""}`
-                          : "",
-                        "Última actividad hecha": seg.ultimaHecha
-                          ? `${etiquetaActividad(seg.ultimaHecha).replace(/^\S+\s/, "")} · ${formatoFechaCorta(seg.ultimaHecha.fecha)}${
-                              seg.ultimaHecha.descripcion ? ` · ${seg.ultimaHecha.descripcion}` : ""
-                            }`
-                          : "",
-                      };
-                    })
-                  )
-                }
-              >
-                📥 Excel
+              <button className="btn-exportar" onClick={exportarSeguimiento}>
+                📥 Excel del seguimiento
               </button>
             </div>
-            {prospectos.length === 0 ? (
-              <div className="empty-card">Sin prospectos registrados</div>
+
+            <div className="crm-kpis">
+              {(
+                [
+                  ["Prospectos", kpis.total, () => (setFContacto(""), setFEstado("")), !fContacto && !fEstado, ""],
+                  ["Sin contactar", kpis.sinContactar, () => setFContacto(fContacto === "sin_contactar" ? "" : "sin_contactar"), fContacto === "sin_contactar", "crm-kpi-roja"],
+                  ["Con atrasadas", kpis.atrasados, () => setFContacto(fContacto === "atrasados" ? "" : "atrasados"), fContacto === "atrasados", "crm-kpi-ambar"],
+                  ["En seguimiento", kpis.enSeguimiento, () => setFEstado(fEstado === "en_seguimiento" ? "" : "en_seguimiento"), fEstado === "en_seguimiento", ""],
+                  ["Convertidos a cliente", kpis.convertidos, () => setFEstado(fEstado === "convertido" ? "" : "convertido"), fEstado === "convertido", "crm-kpi-verde"],
+                  ["Perdidos", kpis.perdidos, () => setFEstado(fEstado === "perdido" ? "" : "perdido"), fEstado === "perdido", ""],
+                ] as [string, number, () => void, boolean, string][]
+              ).map(([lbl, n, alClic, activa, clase]) => (
+                <button key={lbl} type="button" className={`crm-kpi ${clase}${activa ? " activa" : ""}`} onClick={alClic}>
+                  <span className="crm-kpi-val">{n}</span>
+                  <span className="crm-kpi-lbl">{lbl}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="form-card crm-filtros">
+              <div className="crm-buscador">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input type="search" placeholder="Buscar por nombre, empresa, teléfono o correo" value={fBuscar} onChange={(e) => setFBuscar(e.target.value)} />
+              </div>
+              <select value={fCentro} onChange={(e) => setFCentro(e.target.value)}>
+                <option value="">Todos los centros</option>
+                {CENTROS_SUGERIDOS.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select value={fEstado} onChange={(e) => setFEstado(e.target.value)}>
+                <option value="">Todos los estados</option>
+                {Object.entries(ESTADOS_PROSPECTO).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+              <select value={fContacto} onChange={(e) => setFContacto(e.target.value as typeof fContacto)}>
+                <option value="">Contactados y sin contactar</option>
+                <option value="contactados">Solo contactados</option>
+                <option value="sin_contactar">Solo sin contactar</option>
+                <option value="atrasados">Con actividades atrasadas</option>
+              </select>
+              <select value={fPersona} onChange={(e) => setFPersona(e.target.value)}>
+                <option value="">Registrados por cualquiera</option>
+                {personasSeguimiento.map(([id, n]) => (
+                  <option key={id} value={id}>
+                    Registró: {n}
+                  </option>
+                ))}
+              </select>
+              <label>
+                <span>Registrados desde</span>
+                <input type="date" value={fDesde} onChange={(e) => setFDesde(e.target.value)} />
+              </label>
+              <label>
+                <span>hasta</span>
+                <input type="date" value={fHasta} onChange={(e) => setFHasta(e.target.value)} />
+              </label>
+              <button type="button" className="tel-borrar-btn" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </button>
+            </div>
+            {prospectosFiltrados.length === 0 ? (
+              <div className="empty-card">{prospectos.length === 0 ? "Sin prospectos registrados" : "Ningún prospecto coincide con los filtros"}</div>
             ) : (
               (() => {
                 const porMes: Record<string, Prospecto[]> = {};
-                prospectos.forEach((p) => {
+                prospectosFiltrados.forEach((p) => {
                   const d = new Date(p.created_at);
                   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
                   if (!porMes[key]) porMes[key] = [];
@@ -472,6 +658,26 @@ export default function ProspectosPage() {
                                   ? ` · Registró: ${nombrePorRegistradoPor[p.registrado_por]}`
                                   : ""}
                               </p>
+                              {(() => {
+                                const f = fichas[p.id];
+                                if (!f) return null;
+                                if (f.ultimaHecha && f.ultimoContactoFecha)
+                                  return (
+                                    <p className="item-card-extra">
+                                      <span className="seg-proximo">Último contacto:</span> {etiquetaActividad(f.ultimaHecha)} ·{" "}
+                                      {formatoFechaCorta(f.ultimoContactoFecha)}
+                                      {f.ultimoContactoPor ? ` · por ${f.ultimoContactoPor}` : ""}
+                                      {f.diasSinContacto > 0 ? ` (hace ${f.diasSinContacto} día${f.diasSinContacto === 1 ? "" : "s"})` : " (hoy)"}
+                                    </p>
+                                  );
+                                if (!f.contactado && p.estado !== "perdido")
+                                  return (
+                                    <p className="item-card-extra crm-sin-contacto">
+                                      Sin contactar · registrado hace {f.diasSinContacto} día{f.diasSinContacto === 1 ? "" : "s"}
+                                    </p>
+                                  );
+                                return null;
+                              })()}
                               {seg.proxima && (
                                 <p className="item-card-extra">
                                   <span className="seg-proximo">Próximo:</span> {etiquetaActividad(seg.proxima)} ·{" "}
@@ -494,10 +700,12 @@ export default function ProspectosPage() {
                                 className="estado-select-prospecto"
                                 style={{ background: est.bg, color: est.color }}
                                 value={p.estado}
+                                // Ya es cliente: el estado lo puso el alta del cliente, no se cambia a mano.
+                                disabled={p.estado === "convertido"}
                                 onChange={(e) => cambiarEstadoProspecto(p.id, e.target.value)}
                               >
                                 {Object.entries(ESTADOS_PROSPECTO)
-                                  .filter(([k]) => k !== "convertido")
+                                  .filter(([k]) => k !== "convertido" || p.estado === "convertido")
                                   .map(([k, v]) => (
                                     <option key={k} value={k}>
                                       {v.label}

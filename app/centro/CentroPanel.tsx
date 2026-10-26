@@ -1,5 +1,6 @@
 "use client";
 
+import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
 import { soltarDispositivoNativo } from "@/lib/appNativa";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -230,7 +231,7 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
 
 // Medio por el que llegó el prospecto — mismas opciones que ya usa
 // CotizarForm.tsx para "Medio de contacto" al cotizar.
-const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
+const MEDIOS_PROSPECTO = MEDIOS_CONTACTO;
 
 // Cada módulo que antes era pestaña del Panel de Centro ahora es su propia
 // pantalla (/centro/<vista>) con su encabezado azul; comparten este mismo
@@ -4197,7 +4198,9 @@ export default function CentroPanel({
                       value={formProspecto.centroInteres}
                       onChange={(e) => setFormProspecto({ ...formProspecto, centroInteres: e.target.value })}
                     >
-                      <option value="">Centro de interés</option>
+                      <option value="" hidden>
+                    Centro de interés
+                  </option>
                       {centrosDisponibles.map((c) => (
                         <option key={c} value={c}>
                           {c}

@@ -15,6 +15,25 @@ export function exportarExcel(nombreArchivo: string, datos: Record<string, any>[
   XLSX.writeFile(libro, `${nombreArchivo}.xlsx`);
 }
 
+/**
+ * Un archivo con varias hojas, en el orden en que vienen: { "Resumen": [...], "Detalle": [...] }.
+ * Las hojas vacías se omiten.
+ */
+export function exportarExcelHojas(nombreArchivo: string, hojas: Record<string, Record<string, any>[]>) {
+  const libro = XLSX.utils.book_new();
+  let huboDatos = false;
+  for (const [nombre, datos] of Object.entries(hojas)) {
+    if (!datos || datos.length === 0) continue;
+    huboDatos = true;
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(datos), sanitizarNombreHoja(nombre));
+  }
+  if (!huboDatos) {
+    alert("No hay datos para exportar");
+    return;
+  }
+  XLSX.writeFile(libro, `${nombreArchivo}.xlsx`);
+}
+
 // Excel: nombres de hoja máx 31 caracteres, sin : \ / ? * [ ]
 function sanitizarNombreHoja(nombre: string) {
   const limpio = nombre.replace(/[:\\/?*[\]]/g, "").trim();
