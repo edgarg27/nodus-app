@@ -9428,3 +9428,26 @@ a.stat-card {
   color: #888;
   margin: 10px 0 0;
 }
+.pm-fila {
+  cursor: pointer;
+}
+.pm-fila:hover td,
+.pm-fila.activa td {
+  background: #fff7f2;
+}
+.pm-ventas-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0 6px;
+}
+.pm-mini {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
+.pm-nowrap {
+  white-space: nowrap;
+}

@@ -1329,6 +1329,8 @@ export default function CotizarForm({
       centro,
       cliente_id: clienteIdEfectivo,
       prospecto_id: prospectoIdPreseleccionado || null,
+      // Quién hizo la cotización: así el reporte de ventas por medio sabe quién vendió.
+      created_by: (await supabase.auth.getUser()).data.user?.id || null,
       // Persona física/moral y razón social ya no se piden al cotizar: se
       // piden hasta que se acepta la cotización y se crea el contrato (ver
       // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.
@@ -1713,6 +1715,8 @@ export default function CotizarForm({
         centro,
         cliente_id: clienteIdEfectivo,
         prospecto_id: prospectoIdPreseleccionado || null,
+        // Quién hizo la cotización: así el reporte de ventas por medio sabe quién vendió.
+        created_by: (await supabase.auth.getUser()).data.user?.id || null,
         // Persona física/moral y razón social ya no se piden al cotizar: se
         // piden hasta que se acepta la cotización y se crea el contrato (ver
         // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.

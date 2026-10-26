@@ -10,6 +10,22 @@ const ROLES_GLOBALES = ["gerente", "gerente_ventas", "superadmin", "sistemas", "
 const NO_VENDIDOS = ["pre_aprobado", "rechazado", "cancelado"];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
+// Una venta (contrato cerrado en el periodo): qué se vendió, a quién y quién la vendió.
+export type Venta = {
+  id: string;
+  folio: string | null;
+  fecha: string;
+  centro: string | null;
+  medio: string;
+  queSeVendio: string;
+  cliente: string;
+  vendio: string;
+  registroProspecto: string;
+  estatus: string;
+  rentaMensual: number;
+  cobrado: number;
+};
+
 export type FilaMedio = {
   medio: string;
   prospectos: number;
@@ -42,7 +58,7 @@ export async function GET(req: NextRequest) {
   let qProspectos = admin.from("prospectos").select("id, medio, estado, centro, created_at").gte("created_at", `${desde}T00:00:00-06:00`).lte("created_at", `${hasta}T23:59:59-06:00`);
   let qContratos = admin
     .from("contratos")
-    .select("id, cotizacion_id, estatus, renta_mensual, fecha_inicio, centro")
+    .select("id, folio, cotizacion_id, estatus, renta_mensual, fecha_inicio, centro, user_id, paquete_id, oficina_id, cliente_nombre_historico, cliente_empresa_historico")
     .gte("fecha_inicio", desde)
     .lte("fecha_inicio", hasta)
     .not("estatus", "in", `(${NO_VENDIDOS.join(",")})`);
@@ -55,12 +71,15 @@ export async function GET(req: NextRequest) {
   // Medio de cada contrato vendido: cotización → (medio de la cotización o del prospecto).
   const idsCot = Array.from(new Set((contratos || []).map((c) => c.cotizacion_id).filter(Boolean))) as string[];
   const { data: cotizaciones } = idsCot.length
-    ? await admin.from("cotizaciones_comerciales").select("id, medio_contacto, prospecto_id").in("id", idsCot)
-    : { data: [] as { id: string; medio_contacto: string | null; prospecto_id: string | null }[] };
+    ? await admin
+        .from("cotizaciones_comerciales")
+        .select("id, medio_contacto, prospecto_id, created_by, tipo_espacio, paquete_id, oficina_id, duracion_meses, razon_social, nombre_contesta_telefono")
+        .in("id", idsCot)
+    : { data: [] as any[] };
   const idsProsp = Array.from(new Set((cotizaciones || []).map((c) => c.prospecto_id).filter(Boolean))) as string[];
   const { data: prospDeVentas } = idsProsp.length
-    ? await admin.from("prospectos").select("id, medio").in("id", idsProsp)
-    : { data: [] as { id: string; medio: string | null }[] };
+    ? await admin.from("prospectos").select("id, medio, nombre, empresa, registrado_por").in("id", idsProsp)
+    : { data: [] as any[] };
   const medioProspecto = new Map((prospDeVentas || []).map((p) => [p.id, p.medio]));
   const medioCotizacion = new Map(
     (cotizaciones || []).map((c) => [c.id, c.medio_contacto || (c.prospecto_id ? medioProspecto.get(c.prospecto_id) : null) || null])
@@ -95,5 +114,70 @@ export async function GET(req: NextRequest) {
   const resultado = Array.from(filas.values())
     .map((f) => ({ ...f, rentaMensual: r2(f.rentaMensual), cobrado: r2(f.cobrado) }))
     .sort((a, b) => b.rentaMensual - a.rentaMensual || b.prospectos - a.prospectos);
-  return NextResponse.json({ centro: centro || null, desde, hasta, filas: resultado });
+
+  // ---------- Detalle de cada venta ----------
+  const cotPorId = new Map((cotizaciones || []).map((c) => [c.id, c]));
+  const prospPorId = new Map((prospDeVentas || []).map((p) => [p.id, p]));
+  const idsPaquete = new Set<string>();
+  const idsOficina = new Set<string>();
+  const idsPersona = new Set<string>();
+  for (const c of contratos || []) {
+    const q = c.cotizacion_id ? cotPorId.get(c.cotizacion_id) : null;
+    [c.paquete_id, q?.paquete_id].forEach((x) => x && idsPaquete.add(x));
+    [c.oficina_id, q?.oficina_id].forEach((x) => x && idsOficina.add(x));
+    [c.user_id, q?.created_by, q?.prospecto_id ? prospPorId.get(q.prospecto_id)?.registrado_por : null].forEach((x) => x && idsPersona.add(x));
+  }
+  const [{ data: paquetes }, { data: oficinas }, { data: personas }] = await Promise.all([
+    idsPaquete.size ? admin.from("paquetes").select("id, nombre, tipo_espacio").in("id", Array.from(idsPaquete)) : Promise.resolve({ data: [] as any[] }),
+    idsOficina.size ? admin.from("oficinas").select("id, numero, tipo").in("id", Array.from(idsOficina)) : Promise.resolve({ data: [] as any[] }),
+    idsPersona.size
+      ? admin.from("profiles").select("id, nombre, empresa, nombre_fiscal").in("id", Array.from(idsPersona))
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const paquetePorId = new Map((paquetes || []).map((p) => [p.id, p]));
+  const oficinaPorId = new Map((oficinas || []).map((o) => [o.id, o]));
+  const personaPorId = new Map((personas || []).map((p) => [p.id, p]));
+
+  const ventas: Venta[] = (contratos || [])
+    .map((c) => {
+      const q = c.cotizacion_id ? cotPorId.get(c.cotizacion_id) : null;
+      const pr = q?.prospecto_id ? prospPorId.get(q.prospecto_id) : null;
+      const paquete = paquetePorId.get(c.paquete_id || q?.paquete_id || "");
+      const oficina = oficinaPorId.get(c.oficina_id || q?.oficina_id || "");
+      const tipo = paquete?.tipo_espacio || q?.tipo_espacio || oficina?.tipo || "";
+      const queSeVendio = [
+        tipo,
+        paquete?.nombre && paquete.nombre !== tipo ? paquete.nombre : null,
+        oficina?.numero ? `Oficina ${oficina.numero}` : null,
+        q?.duracion_meses ? `${q.duracion_meses} mes${Number(q.duracion_meses) === 1 ? "" : "es"}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const cli = c.user_id ? personaPorId.get(c.user_id) : null;
+      const cliente =
+        cli?.nombre_fiscal || cli?.empresa || cli?.nombre || c.cliente_empresa_historico || c.cliente_nombre_historico || q?.razon_social || pr?.empresa || pr?.nombre || q?.nombre_contesta_telefono || "Sin nombre";
+      return {
+        id: c.id,
+        folio: c.folio || null,
+        fecha: c.fecha_inicio,
+        centro: c.centro,
+        medio: ((c.cotizacion_id ? medioCotizacion.get(c.cotizacion_id) : null) || "").trim() || "Sin medio",
+        queSeVendio: queSeVendio || "Contrato",
+        cliente,
+        // Quién hizo la cotización. Las cotizaciones de antes del 26 oct 2026 no lo guardaban: para esas se toma a
+        // quien registró el prospecto (y se indica).
+        vendio:
+          (q?.created_by && personaPorId.get(q.created_by)?.nombre) ||
+          (pr?.registrado_por && personaPorId.get(pr.registrado_por)?.nombre
+            ? `${personaPorId.get(pr.registrado_por)?.nombre} (registró el prospecto)`
+            : "Sin registrar"),
+        registroProspecto: (pr?.registrado_por && personaPorId.get(pr.registrado_por)?.nombre) || "",
+        estatus: c.estatus,
+        rentaMensual: r2(Number(c.renta_mensual) || 0),
+        cobrado: r2(cobradoPorContrato.get(c.id) || 0),
+      };
+    })
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  return NextResponse.json({ centro: centro || null, desde, hasta, filas: resultado, ventas });
 }

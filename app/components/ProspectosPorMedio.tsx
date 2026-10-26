@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { exportarExcel } from "@/lib/exportExcel";
+import { exportarExcelHojas } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
-import type { FilaMedio } from "@/app/api/reportes/prospectos-medio/route";
+import type { FilaMedio, Venta } from "@/app/api/reportes/prospectos-medio/route";
 
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 type Periodo = "mes" | "mes_pasado" | "3m" | "6m" | "anio" | "otro";
@@ -32,6 +32,9 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
   const [hastaOtro, setHastaOtro] = useState(hoy);
   const [centro, setCentro] = useState(esGlobal ? "" : centroFijo || "");
   const [filas, setFilas] = useState<FilaMedio[]>([]);
+  const [ventas, setVentas] = useState<Venta[]>([]);
+  // Clic en un medio de la tabla: la lista de ventas muestra solo ese medio.
+  const [medioVentas, setMedioVentas] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const { desde, hasta } = rango(periodo, hoy, desdeOtro, hastaOtro);
@@ -44,8 +47,11 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
     fetch(`/api/reportes/prospectos-medio?${params}`, { cache: "no-store" })
       .then(async (r) => ({ ok: r.ok, d: await r.json() }))
       .then(({ ok, d }) => {
-        if (ok) setFilas(d.filas || []);
-        else setError(d.error || "No se pudo cargar el reporte");
+        if (ok) {
+          setFilas(d.filas || []);
+          setVentas(d.ventas || []);
+          setMedioVentas("");
+        } else setError(d.error || "No se pudo cargar el reporte");
       })
       .catch(() => setError("No se pudo conectar"))
       .finally(() => setCargando(false));
@@ -67,10 +73,11 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
   );
   const maxProspectos = Math.max(1, ...filas.map((f) => f.prospectos));
 
+  const ventasVisibles = medioVentas ? ventas.filter((v) => v.medio === medioVentas) : ventas;
+
   function exportar() {
-    exportarExcel(
-      `prospectos-por-medio-${centro || "todos"}-${desde}-a-${hasta}`.replace(/\s+/g, "_"),
-      filas.map((f) => ({
+    exportarExcelHojas(`prospectos-por-medio-${centro || "todos"}-${desde}-a-${hasta}`.replace(/\s+/g, "_"), {
+      "Por medio": filas.map((f) => ({
         Medio: f.medio,
         "Prospectos que llegaron": f.prospectos,
         "Se hicieron clientes": f.convertidos,
@@ -78,8 +85,21 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
         "Contratos cerrados": f.contratos,
         "Renta mensual vendida": f.rentaMensual,
         "Cobrado en el periodo": f.cobrado,
-      }))
-    );
+      })),
+      Ventas: ventas.map((v) => ({
+        Fecha: v.fecha,
+        Folio: v.folio || "",
+        Centro: v.centro || "",
+        Cliente: v.cliente,
+        "Qué se vendió": v.queSeVendio,
+        "Vendió (hizo la cotización)": v.vendio,
+        "Registró el prospecto": v.registroProspecto,
+        Medio: v.medio,
+        "Renta mensual": v.rentaMensual,
+        "Cobrado en el periodo": v.cobrado,
+        Estatus: v.estatus,
+      })),
+    });
   }
 
   return (
@@ -148,7 +168,12 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
             </thead>
             <tbody>
               {filas.map((f) => (
-                <tr key={f.medio}>
+                <tr
+                  key={f.medio}
+                  className={"pm-fila" + (medioVentas === f.medio ? " activa" : "")}
+                  onClick={() => setMedioVentas(medioVentas === f.medio ? "" : f.medio)}
+                  title="Ver las ventas de este medio"
+                >
                   <td>
                     <strong>{f.medio}</strong>
                     <div className="pm-barra">
@@ -180,9 +205,65 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
           </table>
         </div>
       )}
+      {!cargando && !error && ventas.length > 0 && (
+        <>
+          <div className="pm-ventas-cab">
+            <p className="pm-titulo" style={{ fontSize: 14 }}>
+              ¿Qué se vendió y quién lo vendió? ({ventasVisibles.length})
+            </p>
+            {medioVentas && (
+              <button type="button" className="tel-borrar-btn" onClick={() => setMedioVentas("")}>
+                Solo {medioVentas} · ver todas
+              </button>
+            )}
+          </div>
+          <div className="pm-tabla-wrap">
+            <table className="pm-tabla">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Qué se vendió</th>
+                  <th>Vendió</th>
+                  <th>Medio</th>
+                  <th className="pm-num">Renta mensual</th>
+                  <th className="pm-num">Cobrado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ventasVisibles.map((v) => (
+                  <tr key={v.id}>
+                    <td className="pm-nowrap">
+                      {v.fecha}
+                      {v.folio && <div className="pm-mini">{v.folio}</div>}
+                    </td>
+                    <td>
+                      <strong>{v.cliente}</strong>
+                      {esGlobal && !centro && v.centro && <div className="pm-mini">{v.centro}</div>}
+                    </td>
+                    <td>{v.queSeVendio}</td>
+                    <td>
+                      {v.vendio}
+                      {v.registroProspecto && !v.vendio.startsWith(v.registroProspecto) && (
+                        <div className="pm-mini">Registró el prospecto: {v.registroProspecto}</div>
+                      )}
+                    </td>
+                    <td>{v.medio}</td>
+                    <td className="pm-num">
+                      <strong>{moneda(v.rentaMensual)}</strong>
+                    </td>
+                    <td className="pm-num">{moneda(v.cobrado)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
       <p className="pm-nota">
         Prospectos: los que se registraron en el periodo. Contratos: aprobados con inicio en el periodo; su medio es el de
-        la cotización (o el del prospecto). "Redes sociales" son registros de antes de que se usara el bot.
+        la cotización (o el del prospecto). "Vendió" es quien hizo la cotización. "Redes sociales" son registros de antes
+        de que se usara el bot. Da clic en un medio para ver solo sus ventas.
       </p>
     </div>
   );
