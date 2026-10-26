@@ -1,5 +1,6 @@
 "use client";
 
+import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcelHojas } from "@/lib/exportExcel";
@@ -45,7 +46,7 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
 };
 
 // Mismas opciones que ya usa CotizarForm.tsx para "Medio de contacto" al cotizar.
-const MEDIOS_PROSPECTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
+const MEDIOS_PROSPECTO = MEDIOS_CONTACTO;
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -498,7 +499,9 @@ export default function ProspectosPage() {
                   value={formProspecto.centroInteres}
                   onChange={(e) => setFormProspecto({ ...formProspecto, centroInteres: e.target.value })}
                 >
-                  <option value="">Centro de interés</option>
+                  <option value="" hidden>
+                    Centro de interés
+                  </option>
                   {(esGlobal ? centrosDisponibles : centro ? [centro] : CENTROS_SUGERIDOS).map((c) => (
                     <option key={c} value={c}>
                       {c}

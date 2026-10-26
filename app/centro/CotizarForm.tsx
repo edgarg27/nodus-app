@@ -1,5 +1,6 @@
 "use client";
 
+import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
@@ -135,7 +136,6 @@ type AdicionalDraft = {
 };
 
 const TIPOS_PROSPECTO = ["Nuevo", "Referido", "Recurrente", "Otro"];
-const MEDIOS_CONTACTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
 const MODALIDADES = ["Hora", "Día", "Semana", "Mes"] as const;
 type Modalidad = (typeof MODALIDADES)[number];
 const LABEL_MODALIDAD: Record<Modalidad, string> = { Hora: "hora", Día: "día", Semana: "semana", Mes: "mes" };
@@ -765,6 +765,7 @@ export default function CotizarForm({
   const labelDetalleMedioContacto: Record<string, string> = {
     Teléfono: "Número de teléfono",
     "Redes sociales": "Usuario / red social",
+    Bot: "Canal del bot (WhatsApp, Facebook, Instagram…)",
     Referido: "Quién lo refirió",
     "Página web": "Página o formulario",
     Otro: "Especifica",
@@ -1328,6 +1329,8 @@ export default function CotizarForm({
       centro,
       cliente_id: clienteIdEfectivo,
       prospecto_id: prospectoIdPreseleccionado || null,
+      // Quién hizo la cotización: así el reporte de ventas por medio sabe quién vendió.
+      created_by: (await supabase.auth.getUser()).data.user?.id || null,
       // Persona física/moral y razón social ya no se piden al cotizar: se
       // piden hasta que se acepta la cotización y se crea el contrato (ver
       // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.
@@ -1712,6 +1715,8 @@ export default function CotizarForm({
         centro,
         cliente_id: clienteIdEfectivo,
         prospecto_id: prospectoIdPreseleccionado || null,
+        // Quién hizo la cotización: así el reporte de ventas por medio sabe quién vendió.
+        created_by: (await supabase.auth.getUser()).data.user?.id || null,
         // Persona física/moral y razón social ya no se piden al cotizar: se
         // piden hasta que se acepta la cotización y se crea el contrato (ver
         // ModalDatosFiscales.tsx), que es cuando de verdad se necesitan.
