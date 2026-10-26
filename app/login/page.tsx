@@ -6,6 +6,22 @@ import { createClient } from "@/lib/supabase/client";
 
 const RECORDAR_KEY = "nodus_recordar_identificador";
 
+// Fondo de marca del login: degradado azul con formas naranja/azul que se mueven lento. Solo decoración; con
+// "reducir movimiento" activado en el equipo se queda quieto (ver .login-animado en globals.css).
+function FondoLogin() {
+  return (
+    <div className="login-fondo" aria-hidden="true">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+function LogoLogin() {
+  return <img src="/icons/logo-nodus.png" alt="Nodus" className="login-logo" width={56} height={56} />;
+}
+
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -147,9 +163,11 @@ function LoginInner() {
 
   if (modo !== "login") {
     return (
-      <div className="login-wrap">
+      <div className="login-wrap login-animado">
+        <FondoLogin />
         {modo === "recuperar" ? (
           <form className="login-card" onSubmit={handleRecuperar}>
+            <LogoLogin />
             <h1>Recupera tu contraseña</h1>
             <p className="subtitle">Te mandamos un enlace por correo para crear una nueva</p>
 
@@ -216,8 +234,10 @@ function LoginInner() {
   }
 
   return (
-    <div className="login-wrap">
+    <div className="login-wrap login-animado">
+        <FondoLogin />
       <form className="login-card" onSubmit={handleSubmit}>
+        <LogoLogin />
         <h1>Nodus Flex Center</h1>
         <p className="subtitle">Inicia sesión con tu cuenta</p>
 
