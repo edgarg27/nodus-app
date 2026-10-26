@@ -40,7 +40,7 @@ const ESTADOS_PROSPECTO: Record<string, { label: string; bg: string; color: stri
   nuevo: { label: "Nuevo", bg: "#E6F1FB", color: "#185FA5" },
   contactado: { label: "Contactado", bg: "#FAEEDA", color: "#854F0B" },
   en_seguimiento: { label: "En seguimiento", bg: "#FFF3E8", color: "#F07E3A" },
-  convertido: { label: "Convertido", bg: "#E1F5EE", color: "#0F6E56" },
+  convertido: { label: "Prospecto convertido a cliente", bg: "#E1F5EE", color: "#0F6E56" },
   perdido: { label: "Perdido", bg: "#FCEBEB", color: "#A32D2D" },
 };
 
@@ -276,7 +276,6 @@ export default function ProspectosPage() {
       ultimoContactoFecha: string | null;
       ultimoContactoPor: string;
       diasSinContacto: number;
-      personas: Set<string>;
     }> = {};
     for (const p of prospectos) {
       const lista = actividadesPorProspecto[p.id] || [];
@@ -290,9 +289,6 @@ export default function ProspectosPage() {
         ultimoContactoFecha,
         ultimoContactoPor: u ? nombrePorRegistradoPor[u.completada_por || u.creado_por || ""] || "" : "",
         diasSinContacto: diasDesde(ultimoContactoFecha || p.created_at),
-        personas: new Set(
-          [p.registrado_por, ...lista.flatMap((a) => [a.creado_por, a.completada_por])].filter((x): x is string => !!x)
-        ),
       };
     }
     return mapa;
@@ -309,7 +305,7 @@ export default function ProspectosPage() {
       if (fContacto === "sin_contactar" && f.contactado) return false;
       if (fContacto === "contactados" && !f.contactado) return false;
       if (fContacto === "atrasados" && f.atrasadas === 0) return false;
-      if (fPersona && !f.personas.has(fPersona)) return false;
+      if (fPersona && p.registrado_por !== fPersona) return false;
       const registro = p.created_at.slice(0, 10);
       if (fDesde && registro < fDesde) return false;
       if (fHasta && registro > fHasta) return false;
@@ -330,13 +326,13 @@ export default function ProspectosPage() {
     };
   }, [prospectosFiltrados, fichas]);
 
-  // Quienes registraron prospectos o les dieron seguimiento (para el filtro).
+  // Quienes registraron prospectos (para el filtro "Registró"; el Excel sale solo con los suyos).
   const personasSeguimiento = useMemo(
     () =>
       Object.entries(nombrePorRegistradoPor)
-        .filter(([id]) => Object.values(fichas).some((f) => f.personas.has(id)))
+        .filter(([id]) => prospectos.some((p) => p.registrado_por === id))
         .sort((a, b) => a[1].localeCompare(b[1], "es")),
-    [nombrePorRegistradoPor, fichas]
+    [nombrePorRegistradoPor, prospectos]
   );
 
   function limpiarFiltros() {
@@ -398,7 +394,8 @@ export default function ProspectosPage() {
           "Hecha el": a.completada_en ? a.completada_en.slice(0, 10) : "",
         }))
     );
-    exportarExcelHojas(`seguimiento-prospectos-${(fCentro || "todos").replace(/\s+/g, "_")}-${hoy}`, {
+    const quien = fPersona ? `-${nombre(fPersona)}` : "";
+    exportarExcelHojas(`seguimiento-prospectos-${fCentro || "todos"}${quien}-${hoy}`.replace(/[^\p{L}\p{N}_-]+/gu, "_"), {
       Prospectos: filasProspectos,
       Seguimiento: filasActividades,
     });
@@ -537,7 +534,7 @@ export default function ProspectosPage() {
                   ["Sin contactar", kpis.sinContactar, () => setFContacto(fContacto === "sin_contactar" ? "" : "sin_contactar"), fContacto === "sin_contactar", "crm-kpi-roja"],
                   ["Con atrasadas", kpis.atrasados, () => setFContacto(fContacto === "atrasados" ? "" : "atrasados"), fContacto === "atrasados", "crm-kpi-ambar"],
                   ["En seguimiento", kpis.enSeguimiento, () => setFEstado(fEstado === "en_seguimiento" ? "" : "en_seguimiento"), fEstado === "en_seguimiento", ""],
-                  ["Convertidos", kpis.convertidos, () => setFEstado(fEstado === "convertido" ? "" : "convertido"), fEstado === "convertido", "crm-kpi-verde"],
+                  ["Convertidos a cliente", kpis.convertidos, () => setFEstado(fEstado === "convertido" ? "" : "convertido"), fEstado === "convertido", "crm-kpi-verde"],
                   ["Perdidos", kpis.perdidos, () => setFEstado(fEstado === "perdido" ? "" : "perdido"), fEstado === "perdido", ""],
                 ] as [string, number, () => void, boolean, string][]
               ).map(([lbl, n, alClic, activa, clase]) => (
@@ -549,7 +546,13 @@ export default function ProspectosPage() {
             </div>
 
             <div className="form-card crm-filtros">
-              <input placeholder="Buscar nombre, empresa, teléfono, correo..." value={fBuscar} onChange={(e) => setFBuscar(e.target.value)} />
+              <div className="crm-buscador">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input type="search" placeholder="Buscar por nombre, empresa, teléfono o correo" value={fBuscar} onChange={(e) => setFBuscar(e.target.value)} />
+              </div>
               <select value={fCentro} onChange={(e) => setFCentro(e.target.value)}>
                 <option value="">Todos los centros</option>
                 {CENTROS_SUGERIDOS.map((c) => (
@@ -573,10 +576,10 @@ export default function ProspectosPage() {
                 <option value="atrasados">Con actividades atrasadas</option>
               </select>
               <select value={fPersona} onChange={(e) => setFPersona(e.target.value)}>
-                <option value="">Cualquier persona</option>
+                <option value="">Registrados por cualquiera</option>
                 {personasSeguimiento.map(([id, n]) => (
                   <option key={id} value={id}>
-                    Registró o dio seguimiento: {n}
+                    Registró: {n}
                   </option>
                 ))}
               </select>
@@ -674,10 +677,12 @@ export default function ProspectosPage() {
                                 className="estado-select-prospecto"
                                 style={{ background: est.bg, color: est.color }}
                                 value={p.estado}
+                                // Ya es cliente: el estado lo puso el alta del cliente, no se cambia a mano.
+                                disabled={p.estado === "convertido"}
                                 onChange={(e) => cambiarEstadoProspecto(p.id, e.target.value)}
                               >
                                 {Object.entries(ESTADOS_PROSPECTO)
-                                  .filter(([k]) => k !== "convertido")
+                                  .filter(([k]) => k !== "convertido" || p.estado === "convertido")
                                   .map(([k, v]) => (
                                     <option key={k} value={k}>
                                       {v.label}
