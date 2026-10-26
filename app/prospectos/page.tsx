@@ -106,7 +106,7 @@ export default function ProspectosPage() {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       miCentro = miCentro || CENTROS_SUGERIDOS[0];
     }
-    // Ejecutiva de Ventas: solo los centros de León (la base solo le deja ver esos).
+    // Ejecutiva de Ventas: registra solo en los centros de León (ve los de todos, sin modificarlos).
     const centrosRol = CENTROS_POR_ROL[rol];
     if (centrosRol) {
       setCentrosDisponibles(centrosRol);
@@ -446,6 +446,9 @@ export default function ProspectosPage() {
                       {lista.map((p) => {
                         const est = ESTADOS_PROSPECTO[p.estado] || ESTADOS_PROSPECTO.nuevo;
                         const seg = resumenSeguimiento(p.id);
+                        // Ejecutiva de Ventas ve los prospectos de todos los centros, pero solo
+                        // trabaja los de León; los demás le salen de solo consulta.
+                        const soloConsulta = !!CENTROS_POR_ROL[miRol] && !CENTROS_POR_ROL[miRol].includes(p.centro || "");
                         return (
                           <div className="item-card" key={p.id} style={{ marginBottom: 8 }}>
                             <div className="item-card-info">
@@ -478,6 +481,15 @@ export default function ProspectosPage() {
                               )}
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                              {soloConsulta ? (
+                                <>
+                                  <span className="estado-select-prospecto" style={{ background: est.bg, color: est.color }}>
+                                    {est.label}
+                                  </span>
+                                  <span style={{ fontSize: 12, color: "#888" }}>Solo consulta</span>
+                                </>
+                              ) : (
+                              <>
                               <select
                                 className="estado-select-prospecto"
                                 style={{ background: est.bg, color: est.color }}
@@ -500,6 +512,8 @@ export default function ProspectosPage() {
                                 {seg.hayAtrasadas && <span className="seg-btn-alerta" aria-hidden="true" />}
                                 📋 Seguimiento{seg.total > 0 ? ` (${seg.hechas}/${seg.total})` : ""}
                               </button>
+                              </>
+                              )}
                               {miRol !== "ejecutiva_ventas" && (
                               <a
                                 className="tel-borrar-btn"
@@ -519,7 +533,7 @@ export default function ProspectosPage() {
                               )}
                               {/* Los prospectos se ven y se les da seguimiento desde cualquier centro,
                                   pero solo los borra su propio centro (migracion_prospectos_compartidos.sql). */}
-                              {(esGlobal || p.centro === centro || (!!p.centro && !!CENTROS_POR_ROL[miRol]?.includes(p.centro))) && (
+                              {!soloConsulta && (esGlobal || p.centro === centro || (!!p.centro && !!CENTROS_POR_ROL[miRol]?.includes(p.centro))) && (
                                 <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
                                   🗑
                                 </button>

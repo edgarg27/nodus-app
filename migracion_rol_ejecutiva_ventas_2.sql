@@ -11,6 +11,7 @@ as $$
 $$;
 
 -- ------------------------------------------------------------ prospectos
+-- (Ver: migracion_rol_ejecutiva_ventas_3.sql la amplía a todos los centros.)
 drop policy if exists "prospectos_ejecutiva_ventas_select" on public.prospectos;
 create policy "prospectos_ejecutiva_ventas_select" on public.prospectos
   for select to authenticated
