@@ -54,8 +54,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   recordatorioTours: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
   // Correos del seguimiento de prospectos: los roles que pueden escribir en
   // prospectos (ver migracion_prospectos_actividades.sql).
-  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
-  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
+  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas", "ejecutiva_ventas"],
+  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas", "ejecutiva_ventas"],
   vouchers: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "gerente_ventas"],
 };
 

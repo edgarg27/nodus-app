@@ -11,6 +11,8 @@ import SeguimientoModal, {
   ordenarActividades,
 } from "./SeguimientoModal";
 
+import { CENTROS_POR_ROL } from "@/lib/roles";
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
@@ -103,6 +105,12 @@ export default function ProspectosPage() {
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       miCentro = miCentro || CENTROS_SUGERIDOS[0];
+    }
+    // Ejecutiva de Ventas: solo los centros de León (la base solo le deja ver esos).
+    const centrosRol = CENTROS_POR_ROL[rol];
+    if (centrosRol) {
+      setCentrosDisponibles(centrosRol);
+      if (!miCentro || !centrosRol.includes(miCentro)) miCentro = centrosRol[0];
     }
     setCentro(miCentro);
     setFormProspecto((f) => ({ ...f, centroInteres: miCentro || "" }));
@@ -277,7 +285,7 @@ export default function ProspectosPage() {
           ← Regresar
         </a>
         <p className="rep-title">Prospectos</p>
-        <p className="rep-sub">{centro || "Todos los centros"}</p>
+        <p className="rep-sub">{CENTROS_POR_ROL[miRol] ? CENTROS_POR_ROL[miRol].join(" · ") : centro || "Todos los centros"}</p>
       </div>
 
       <div className="rep-content">
@@ -351,7 +359,7 @@ export default function ProspectosPage() {
                   onChange={(e) => setFormProspecto({ ...formProspecto, centroInteres: e.target.value })}
                 >
                   <option value="">Centro de interés</option>
-                  {(esGlobal ? centrosDisponibles : centro ? [centro] : CENTROS_SUGERIDOS).map((c) => (
+                  {(esGlobal || CENTROS_POR_ROL[miRol] ? centrosDisponibles : centro ? [centro] : CENTROS_SUGERIDOS).map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>
@@ -492,6 +500,7 @@ export default function ProspectosPage() {
                                 {seg.hayAtrasadas && <span className="seg-btn-alerta" aria-hidden="true" />}
                                 📋 Seguimiento{seg.total > 0 ? ` (${seg.hechas}/${seg.total})` : ""}
                               </button>
+                              {miRol !== "ejecutiva_ventas" && (
                               <a
                                 className="tel-borrar-btn"
                                 style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}
@@ -507,9 +516,10 @@ export default function ProspectosPage() {
                               >
                                 🧾 Cotizar
                               </a>
+                              )}
                               {/* Los prospectos se ven y se les da seguimiento desde cualquier centro,
                                   pero solo los borra su propio centro (migracion_prospectos_compartidos.sql). */}
-                              {(esGlobal || p.centro === centro) && (
+                              {(esGlobal || p.centro === centro || (!!p.centro && !!CENTROS_POR_ROL[miRol]?.includes(p.centro))) && (
                                 <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(p.id)}>
                                   🗑
                                 </button>

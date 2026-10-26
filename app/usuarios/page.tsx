@@ -22,6 +22,7 @@ const ROLES_STAFF = [
   { id: "diseno", label: "Diseño" },
   { id: "ventas", label: "Asesora de Ventas" },
   { id: "gerente_ventas", label: "Gerente de Ventas" },
+  { id: "ejecutiva_ventas", label: "Ejecutiva de Ventas" },
   { id: "ceo", label: "CEO" },
   { id: "captive", label: "Captive" },
 ];
