@@ -19,6 +19,8 @@ const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente",
 // Las cuentas globales no tienen centro fijo: eligen en el formulario a
 // qué centro va el tour (antes no podían agendar y el aviso decía que
 // faltaba nombre/fecha).
+import { CENTROS_POR_ROL } from "@/lib/roles";
+
 const CENTROS_TOUR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const TIPOS_ESPACIO_INTERES = ["Coworking", "Oficina Privada", "Working Desk", "Sala de Juntas"];
 
@@ -48,7 +50,10 @@ export default function ToursPage() {
   const [error, setError] = useState("");
   const [centroTour, setCentroTour] = useState(CENTROS_TOUR[0]);
   const [borrandoTourId, setBorrandoTourId] = useState<string | null>(null);
-  const esGlobal = ROLES_GLOBALES.includes(miRol);
+  // Ejecutiva de Ventas elige entre los centros de León (y solo ve los tours de esos).
+  const centrosRol = CENTROS_POR_ROL[miRol];
+  const esGlobal = ROLES_GLOBALES.includes(miRol) || !!centrosRol;
+  const centrosTour = centrosRol || CENTROS_TOUR;
 
   useEffect(() => {
     init();
@@ -73,7 +78,8 @@ export default function ToursPage() {
 
   async function fetchTours(c: string | null, rol: string) {
     let query = supabase.from("tours").select("*").order("fecha").order("hora");
-    if (!ROLES_GLOBALES.includes(rol) && c) query = query.eq("centro", c);
+    if (CENTROS_POR_ROL[rol]) query = query.in("centro", CENTROS_POR_ROL[rol]);
+    else if (!ROLES_GLOBALES.includes(rol) && c) query = query.eq("centro", c);
     const { data } = await query;
     setTours(data || []);
   }
@@ -174,7 +180,7 @@ export default function ToursPage() {
           ← Regresar
         </a>
         <p className="rep-title">Tours</p>
-        <p className="rep-sub">{esGlobal ? "Todos los centros" : centro || "Selecciona un centro"}</p>
+        <p className="rep-sub">{centrosRol ? centrosRol.join(" · ") : esGlobal ? "Todos los centros" : centro || "Selecciona un centro"}</p>
       </div>
 
       <div className="rep-content">
@@ -228,7 +234,7 @@ export default function ToursPage() {
                 <div className="tel-form-grid">
                   {esGlobal && (
                     <select value={centroTour} onChange={(e) => setCentroTour(e.target.value)} title="Centro del tour">
-                      {CENTROS_TOUR.map((c) => (
+                      {centrosTour.map((c) => (
                         <option key={c} value={c}>
                           🏢 {c}
                         </option>

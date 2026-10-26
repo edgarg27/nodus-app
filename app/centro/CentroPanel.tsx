@@ -288,7 +288,8 @@ export default function CentroPanel({
 
   const puedeEditarInternet = rol === "sistemas" || (rol === "superadmin" || rol === "gerente");
   const puedeEditarTelefonia = rol === "admin" || (rol === "superadmin" || rol === "gerente");
-  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones" || rol === "gerente_ventas";
+  // Ejecutiva de Ventas también elige centro, pero solo entre los de León (los que le pasa Sala de Juntas).
+  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones" || rol === "gerente_ventas" || rol === "ejecutiva_ventas";
   const TABS_POR_ROL =
     rol === "sistemas"
       ? TABS_TODAS.filter(

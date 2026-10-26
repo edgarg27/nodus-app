@@ -101,7 +101,19 @@ const RUTAS_CEO = ["/dashboard"];
 
 // Ejecutiva de Ventas: también lista cerrada. Al darle más módulos se agregan aquí (y en
 // su bloque de AdminPanel.tsx). Contratos lo ve de solo consulta.
-const RUTAS_EJECUTIVA_VENTAS = ["/dashboard", "/prospectos", "/registrar-plan", "/cotizaciones", "/contratos"];
+const RUTAS_EJECUTIVA_VENTAS = [
+  "/dashboard",
+  "/prospectos",
+  "/registrar-plan",
+  "/cotizaciones",
+  "/contratos",
+  "/expedientes",
+  "/sala-juntas",
+  "/tours",
+  "/experiencia-cliente",
+  "/tickets",
+  "/documentacion-centro",
+];
 
 // `rol` es un rol de personal (los clientes se manejan aparte). Regresa false si ese
 // rol no debe abrir `ruta`.

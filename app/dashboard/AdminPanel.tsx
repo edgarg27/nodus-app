@@ -1235,6 +1235,41 @@ export default function AdminPanel({
                 <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Contratos</span>
               </a>
+              <a className="modulo-card" href="/expedientes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/expediente-clientes.svg" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Expediente de clientes</span>
+              </a>
+            </div>
+            <p className="panel-section-label" style={{ marginTop: 16 }}>
+              Operación del centro
+            </p>
+            <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
+              <a className="modulo-card" href="/sala-juntas">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Sala de Juntas</span>
+              </a>
+              <a className="modulo-card" href="/tours">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tours.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tours</span>
+              </a>
+              <a className="modulo-card" href="/experiencia-cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/calendario-eventos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Calendario de Eventos</span>
+              </a>
+              <a className="modulo-card" href="/tickets">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tickets.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tickets</span>
+              </a>
+              <a className="modulo-card" href="/documentacion-centro">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/documentacion-centro.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Documentación del centro</span>
+              </a>
             </div>
           </div>
           ) : rol === "ventas" ? (

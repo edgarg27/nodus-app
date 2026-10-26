@@ -11,6 +11,8 @@ import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
 // RLS de dias_centro, ver migracion_permisos_diseno_ventas.sql). Diseño también
 // avisa cuándo no abre un centro, y por eso elige el centro como los roles globales.
 const ROLES_EDITAN_DIAS = ["admin", "superadmin", "gerente", "diseno"];
+// Solo ven el calendario (sin pestañas de captura: cumpleaños, eventos, encuestas).
+const ROLES_SOLO_CALENDARIO = ["ejecutiva_ventas"];
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente", "diseno", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -167,12 +169,15 @@ export default function ExperienciaClientePage() {
         ) : (
           <>
             <div className="centro-tabs" style={{ marginBottom: 12 }}>
-              {[
-                { id: "calendario", label: "📅 Calendario" },
-                { id: "cumpleanos", label: "🎂 Cumpleaños" },
-                { id: "eventos", label: "🎪 Eventos" },
-                ...(puedeVerEncuestas ? [{ id: "encuestas", label: "📋 Encuestas" }] : []),
-              ].map((t) => (
+              {(ROLES_SOLO_CALENDARIO.includes(miRol)
+                ? [{ id: "calendario", label: "📅 Calendario" }]
+                : [
+                    { id: "calendario", label: "📅 Calendario" },
+                    { id: "cumpleanos", label: "🎂 Cumpleaños" },
+                    { id: "eventos", label: "🎪 Eventos" },
+                    ...(puedeVerEncuestas ? [{ id: "encuestas", label: "📋 Encuestas" }] : []),
+                  ]
+              ).map((t) => (
                 <button key={t.id} className={"centro-tab" + (tab === t.id ? " active" : "")} onClick={() => setTab(t.id as any)}>
                   {t.label}
                 </button>
@@ -180,7 +185,7 @@ export default function ExperienciaClientePage() {
             </div>
 
             {tab === "calendario" && <TabCalendario contactos={contactos} eventos={eventos} diasCentro={diasCentro} />}
-            {tab === "cumpleanos" && (
+            {tab === "cumpleanos" && !ROLES_SOLO_CALENDARIO.includes(miRol) && (
               <TabCumpleanos
                 contactos={contactos}
                 empresasDisponibles={empresasDisponibles}
@@ -189,7 +194,7 @@ export default function ExperienciaClientePage() {
                 onCambio={() => fetchTodo(centro)}
               />
             )}
-            {tab === "eventos" && (
+            {tab === "eventos" && !ROLES_SOLO_CALENDARIO.includes(miRol) && (
               <TabEventos
                 eventos={eventos}
                 diasCentro={diasCentro}

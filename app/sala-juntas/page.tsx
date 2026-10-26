@@ -6,6 +6,8 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import CentroPanel from "@/app/centro/CentroPanel";
 import { SALAS_POR_CENTRO } from "@/lib/horarioSala";
 
+import { CENTROS_POR_ROL } from "@/lib/roles";
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 // Centro con una sola sala: queda fija en la carta responsiva. Con varias (Punto 45, San Telmo)
 // se elige de la lista. Sin lista, se escribe a mano.
@@ -201,7 +203,9 @@ export default function SalaJuntasPage() {
     const centros = new Set<string>();
     (ofis || []).forEach((o) => o.centro && centros.add(o.centro));
     if (c) centros.add(c);
-    setCentrosDisponibles(Array.from(centros).sort());
+    // Ejecutiva de Ventas: solo los centros de León.
+    const centrosRol = CENTROS_POR_ROL[profile?.rol || ""];
+    setCentrosDisponibles(centrosRol || Array.from(centros).sort());
     if (c) {
       setTipoSala(SALA_DEFAULT[c] || "");
       await fetchRegistros(c, profile?.rol || "");
@@ -214,7 +218,9 @@ export default function SalaJuntasPage() {
       .from("registros_sala_juntas")
       .select("id, nombre, curp, tipo_sala, fecha, hora, archivo_url, encargado_nombre")
       .order("created_at", { ascending: false });
-    if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
+    const centrosRol = CENTROS_POR_ROL[rol];
+    if (centrosRol) query = query.in("centro", centrosRol);
+    else if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
     const { data } = await query;
     setRegistros(data || []);
   }
