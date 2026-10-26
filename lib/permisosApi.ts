@@ -44,8 +44,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   facturaCancelar: ["admin", "gerente", "cobranza"],
   // Emitir (timbrar) la factura de un cobro pendiente, a pago diferido (Facturas).
   facturaEmitir: ["admin", "gerente", "cobranza"],
-  cotizacionAceptar: ["admin", "gerente", "gerente_ventas"],
-  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
+  cotizacionAceptar: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas"],
+  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas", "ejecutiva_ventas"],
   crearCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],
   reenviarInvitacion: ["admin", "gerente", "sistemas", "gerente_ventas"],
   darBajaCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],

@@ -7,6 +7,8 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import ModalDatosFiscales from "./ModalDatosFiscales";
 import type { DatosFiscales, TipoPersonaFiscal } from "@/lib/datosFiscales";
 
+import { CENTROS_POR_ROL } from "@/lib/roles";
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
 type Cotizacion = {
@@ -17,6 +19,7 @@ type Cotizacion = {
   created_at: string;
   estatus: string | null;
   cotizacion_comercial_id: string | null;
+  centro: string | null;
 };
 
 export default function CotizacionesPage() {
@@ -24,6 +27,7 @@ export default function CotizacionesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [centro, setCentro] = useState<string | null>(null);
+  const [miRol, setMiRol] = useState("");
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
 
   const [aceptandoId, setAceptandoId] = useState<string | null>(null);
@@ -46,13 +50,15 @@ export default function CotizacionesPage() {
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const c = profile?.centro || null;
     setCentro(c);
+    setMiRol(profile?.rol || "");
     if (c) await fetchCotizaciones(c, profile?.rol || "");
     setLoading(false);
   }
 
   async function fetchCotizaciones(c: string, rol: string) {
     let query = supabase.from("cotizaciones").select("*").order("created_at", { ascending: false });
-    if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
+    // Ejecutiva de Ventas ve las de todos los centros (las que no son de León, de solo consulta).
+    if (!ROLES_GLOBALES.includes(rol) && !CENTROS_POR_ROL[rol]) query = query.eq("centro", c);
     const { data } = await query;
     setCotizaciones(data || []);
   }
@@ -60,7 +66,7 @@ export default function CotizacionesPage() {
   async function borrarCotizacion(id: string) {
     setConfirmandoBorrarId(null);
     await supabase.from("cotizaciones").delete().eq("id", id);
-    if (centro) fetchCotizaciones(centro, "");
+    if (centro) fetchCotizaciones(centro, miRol);
   }
 
   // Búsqueda por nombre (ahí vive el nombre del cliente/prospecto, ver
@@ -103,7 +109,7 @@ export default function CotizacionesPage() {
           router.push(`/contratos?contratoId=${contratoId}&centro=${encodeURIComponent(centro || "")}`);
         }
       }, 900);
-      if (centro) fetchCotizaciones(centro, "");
+      if (centro) fetchCotizaciones(centro, miRol);
     } finally {
       setAceptandoId(null);
     }
@@ -116,7 +122,7 @@ export default function CotizacionesPage() {
           ← Regresar
         </a>
         <p className="rep-title">Cotizaciones</p>
-        <p className="rep-sub">{centro || "Selecciona un centro"}</p>
+        <p className="rep-sub">{CENTROS_POR_ROL[miRol] ? "Todos los centros" : centro || "Selecciona un centro"}</p>
       </div>
 
       <div className="rep-content">
@@ -159,7 +165,9 @@ export default function CotizacionesPage() {
                 {busqueda ? "Sin cotizaciones que coincidan con la búsqueda" : "Sin cotizaciones registradas"}
               </div>
             ) : (
-              cotizacionesFiltradas.map((c) => (
+              cotizacionesFiltradas.map((c) => {
+                const soloConsulta = !!CENTROS_POR_ROL[miRol] && !CENTROS_POR_ROL[miRol].includes(c.centro || "");
+                return (
                 <div className="cotizacion-card" key={c.id}>
                   <div>
                     <p className="item-card-titulo">{c.nombre}</p>
@@ -174,6 +182,10 @@ export default function CotizacionesPage() {
                         📥 Descargar
                       </BotonArchivo>
                     )}
+                    {soloConsulta ? (
+                      <span style={{ fontSize: 12, color: "#888" }}>{c.centro} · Solo consulta</span>
+                    ) : (
+                    <>
                     <button
                       className={
                         "btn-enviar" +
@@ -218,9 +230,12 @@ export default function CotizacionesPage() {
                     <button className="tel-borrar-btn" onClick={() => setConfirmandoBorrarId(c.id)}>
                       🗑
                     </button>
+                    </>
+                    )}
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </>
         )}

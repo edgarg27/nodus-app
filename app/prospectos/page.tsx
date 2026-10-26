@@ -514,7 +514,7 @@ export default function ProspectosPage() {
                               </button>
                               </>
                               )}
-                              {miRol !== "ejecutiva_ventas" && (
+                              {!soloConsulta && (
                               <a
                                 className="tel-borrar-btn"
                                 style={{ color: "#0d1b3e", fontWeight: 600, textDecoration: "none" }}

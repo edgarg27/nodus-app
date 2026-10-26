@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import CotizarForm from "@/app/centro/CotizarForm";
 
+import { CENTROS_POR_ROL } from "@/lib/roles";
+
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
@@ -50,9 +52,14 @@ function RegistrarPlanInner() {
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const rol = profile?.rol || "";
+    const centrosRol = CENTROS_POR_ROL[rol];
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(centroDesdeUrl || profile?.centro || CENTROS_SUGERIDOS[0]);
+    } else if (centrosRol) {
+      // Ejecutiva de Ventas: cotiza solo en los centros de León.
+      setCentrosDisponibles(centrosRol);
+      setCentro(centroDesdeUrl && centrosRol.includes(centroDesdeUrl) ? centroDesdeUrl : centrosRol[0]);
     } else {
       setCentro(profile?.centro || null);
     }

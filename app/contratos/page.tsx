@@ -10,6 +10,7 @@ import { etiquetaFormaPago } from "@/lib/formaPago";
 import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
 import ContratosVentas from "./ContratosVentas";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 // Lead de la pestaña Prospectos de Centro — todavía sin cuenta (profiles.id).
 // "+ Nuevo contrato" liga uno de estos, nunca un cliente ya existente: la
@@ -78,6 +79,8 @@ export type Contrato = {
 };
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+// Roles que ven los contratos de solo consulta: sin aprobar, editar, renovar ni crear.
+const ROLES_SOLO_CONSULTA = ["ejecutiva_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 export default function ContratosPage() {
@@ -111,6 +114,7 @@ export default function ContratosPage() {
   const [oficinasDisponibles, setOficinasDisponibles] = useState<OficinaOpcion[]>([]);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
+  const soloConsulta = ROLES_SOLO_CONSULTA.includes(miRol);
 
   useEffect(() => {
     init();
@@ -140,12 +144,18 @@ export default function ContratosPage() {
     const rol = profile?.rol || "";
     setMiRol(rol);
 
+    const centrosRol = CENTROS_POR_ROL[rol];
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(centroDesdeUrl || profile?.centro || CENTROS_SUGERIDOS[0]);
+    } else if (centrosRol) {
+      // Ejecutiva de Ventas: solo los contratos de León.
+      setCentrosDisponibles(centrosRol);
+      setCentro(centroDesdeUrl && centrosRol.includes(centroDesdeUrl) ? centroDesdeUrl : centrosRol[0]);
     } else {
       setCentro(profile?.centro || null);
     }
+    if (ROLES_SOLO_CONSULTA.includes(rol)) setVistaContratos("todos");
   }
 
   async function fetchTodo(c: string) {
@@ -601,7 +611,7 @@ export default function ContratosPage() {
         </a>
         <p className="rep-title">Contratos</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
-        {esGlobal && centrosDisponibles.length > 1 && (
+        {centrosDisponibles.length > 1 && (
           <div className="centro-selector">
             <select value={centro || ""} onChange={(e) => setCentro(e.target.value)}>
               {centrosDisponibles.map((c) => (
@@ -632,6 +642,7 @@ export default function ContratosPage() {
           </div>
         ) : (
           <>
+            {!soloConsulta && (
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 className={"centro-tab" + (vistaContratos === "pendientes" ? " active" : "")}
@@ -646,6 +657,7 @@ export default function ContratosPage() {
                 📄 Todos los contratos ({contratosFiltrados.length})
               </button>
             </div>
+            )}
 
             <input
               placeholder="Buscar por nombre, empresa, teléfono, correo o folio..."
@@ -738,6 +750,7 @@ export default function ContratosPage() {
                 >
                   📥 Excel
                 </button>
+                {!soloConsulta && (
                 <button
                   className="tel-borrar-btn"
                   style={{ color: "#0d1b3e", fontWeight: 600 }}
@@ -745,6 +758,7 @@ export default function ContratosPage() {
                 >
                   {mostrarFormContrato ? "Cancelar" : "+ Nuevo contrato"}
                 </button>
+                )}
               </div>
             </div>
 
@@ -1026,11 +1040,12 @@ export default function ContratosPage() {
                     ) : (
                       <p style={{ fontSize: 12, color: "#aaa", margin: 0 }}>Sin contrato PDF adjunto</p>
                     )}
-                    {!c.user_id && c.estatus !== "rechazado" && (
+                    {!soloConsulta && !c.user_id && c.estatus !== "rechazado" && (
                       <a className="ver-pdf-btn" href={`/alta-cliente?contratoId=${c.id}`}>
                         Continuar en Alta de cliente →
                       </a>
                     )}
+                    {!soloConsulta && (
                     <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                       <button
                         className="tel-borrar-btn"
@@ -1049,6 +1064,7 @@ export default function ContratosPage() {
                         </button>
                       )}
                     </div>
+                    )}
 
                     {renovandoId === c.id && (
                       <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, marginTop: 8 }}>
@@ -1155,7 +1171,7 @@ export default function ContratosPage() {
         </div>
       )}
 
-      {contratoEditando && (
+      {contratoEditando && !soloConsulta && (
         <ContratoModal
           contrato={contratoEditando}
           onClose={() => setContratoEditando(null)}

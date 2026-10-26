@@ -7,6 +7,7 @@ import { normalizarDatosFiscales, normalizarRfc, validarDatosFiscales } from "@/
 import { esFueraDeHorario, parseHorarioSala, salasDelCentro } from "@/lib/horarioSala";
 import { rolPuede } from "@/lib/permisosApi";
 import { fechaLocal } from "@/lib/fechaMexico";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 // Botón "✓ Aceptar" en /cotizaciones: redacta el contrato en .docx con los
 // datos de la venta ya capturados en CotizarForm.tsx (cotizaciones_comerciales)
@@ -40,6 +41,11 @@ export async function POST(req: NextRequest) {
     .single();
   if (cotizacionError || !cotizacion) {
     return NextResponse.json({ error: "No se encontró la cotización" }, { status: 404 });
+  }
+  // Roles limitados a algunos centros (Ejecutiva de Ventas: León) solo aceptan las de esos centros.
+  const centrosRol = CENTROS_POR_ROL[miProfile?.rol || ""];
+  if (centrosRol && !centrosRol.includes(cotizacion.centro)) {
+    return NextResponse.json({ error: "Solo puedes aceptar cotizaciones de tus centros" }, { status: 403 });
   }
   if (cotizacion.estatus === "aceptada") {
     return NextResponse.json({ error: "Esta cotización ya fue aceptada" }, { status: 400 });

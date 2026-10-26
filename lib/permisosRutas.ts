@@ -99,9 +99,9 @@ const REGLAS_ORDENADAS = [...REGLAS].sort((a, b) => b.prefijo.length - a.prefijo
 // pantalla nueva no le queda abierta por omisión.
 const RUTAS_CEO = ["/dashboard"];
 
-// Ejecutiva de Ventas: también lista cerrada. Por ahora solo trabaja Prospectos; al darle
-// más módulos se agregan aquí (y en su bloque de AdminPanel.tsx).
-const RUTAS_EJECUTIVA_VENTAS = ["/dashboard", "/prospectos"];
+// Ejecutiva de Ventas: también lista cerrada. Al darle más módulos se agregan aquí (y en
+// su bloque de AdminPanel.tsx). Contratos lo ve de solo consulta.
+const RUTAS_EJECUTIVA_VENTAS = ["/dashboard", "/prospectos", "/registrar-plan", "/cotizaciones", "/contratos"];
 
 // `rol` es un rol de personal (los clientes se manejan aparte). Regresa false si ese
 // rol no debe abrir `ruta`.

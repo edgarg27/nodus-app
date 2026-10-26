@@ -1207,17 +1207,33 @@ export default function AdminPanel({
           )}
 
           {rol === "ejecutiva_ventas" ? (
-          // Ejecutiva de Ventas (León): por ahora SOLO Prospectos. Va aparte por el
+          // Ejecutiva de Ventas (León): SOLO estos módulos (mismas rutas que
+          // RUTAS_EJECUTIVA_VENTAS en lib/permisosRutas.ts). Va aparte por el
           // mismo motivo que el bloque de Asesora de Ventas.
           <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
             <p className="panel-section-label" style={{ marginTop: 8 }}>
-              Módulos
+              Ventas y clientes
             </p>
             <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
               <a className="modulo-card" href="/prospectos">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/prospectos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Prospectos</span>
+              </a>
+              <a className="modulo-card" href="/registrar-plan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizar.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizar</span>
+              </a>
+              <a className="modulo-card" href="/cotizaciones">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizaciones.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizaciones</span>
+              </a>
+              <a className="modulo-card" href="/contratos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Contratos</span>
               </a>
             </div>
           </div>
