@@ -13,6 +13,7 @@ export const ROL_LABEL: Record<string, string> = {
   diseno: "Diseño",
   ventas: "Asesora de Ventas",
   gerente_ventas: "Gerente de Ventas",
+  ejecutiva_ventas: "Ejecutiva de Ventas",
   ceo: "CEO",
   captive: "Captive",
 };
@@ -20,6 +21,13 @@ export const ROL_LABEL: Record<string, string> = {
 export function labelRol(rol: string): string {
   return ROL_LABEL[rol] || rol;
 }
+
+// Roles que trabajan solo con algunos centros (no uno solo ni todos): registran y
+// modifican únicamente en estos; lo de otros centros lo ven de solo consulta. La base
+// los limita igual (ver migracion_rol_ejecutiva_ventas_2.sql y _3.sql).
+export const CENTROS_POR_ROL: Record<string, string[]> = {
+  ejecutiva_ventas: ["Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium"],
+};
 
 // "gerente" tiene exactamente los mismos privilegios que "superadmin" (solo
 // cambia el nombre que se muestra). Todo permiso de superadmin se pregunta

@@ -44,8 +44,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   facturaCancelar: ["admin", "gerente", "cobranza"],
   // Emitir (timbrar) la factura de un cobro pendiente, a pago diferido (Facturas).
   facturaEmitir: ["admin", "gerente", "cobranza"],
-  cotizacionAceptar: ["admin", "gerente", "gerente_ventas"],
-  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
+  cotizacionAceptar: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas"],
+  cotizarPptx: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas", "ejecutiva_ventas"],
   crearCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],
   reenviarInvitacion: ["admin", "gerente", "sistemas", "gerente_ventas"],
   darBajaCliente: ["admin", "gerente", "sistemas", "gerente_ventas"],
@@ -54,8 +54,8 @@ const ROLES_POR_ACCION: Record<AccionApi, string[]> = {
   recordatorioTours: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
   // Correos del seguimiento de prospectos: los roles que pueden escribir en
   // prospectos (ver migracion_prospectos_actividades.sql).
-  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"],
-  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"],
+  seguimientoProspectos: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas", "ejecutiva_ventas"],
+  toursConfirmar: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas", "ejecutiva_ventas"],
   vouchers: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "gerente_ventas"],
 };
 

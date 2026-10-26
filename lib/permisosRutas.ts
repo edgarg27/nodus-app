@@ -23,6 +23,7 @@ export const ROLES_PERSONAL = [
   "diseno",
   "ventas",
   "gerente_ventas",
+  "ejecutiva_ventas",
   "ceo",
   "captive",
 ];
@@ -34,7 +35,7 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/contratos", roles: ["admin", "gerente", "ventas", "gerente_ventas"] },
   { prefijo: "/registrar-plan", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/cotizaciones", roles: ["admin", "gerente", "gerente_ventas"] },
-  { prefijo: "/prospectos", roles: ["admin", "gerente", "gerente_ventas"] },
+  { prefijo: "/prospectos", roles: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas"] },
   { prefijo: "/paquetes", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/alta-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/baja-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
@@ -98,11 +99,28 @@ const REGLAS_ORDENADAS = [...REGLAS].sort((a, b) => b.prefijo.length - a.prefijo
 // pantalla nueva no le queda abierta por omisión.
 const RUTAS_CEO = ["/dashboard"];
 
+// Ejecutiva de Ventas: también lista cerrada. Al darle más módulos se agregan aquí (y en
+// su bloque de AdminPanel.tsx). Contratos lo ve de solo consulta.
+const RUTAS_EJECUTIVA_VENTAS = [
+  "/dashboard",
+  "/prospectos",
+  "/registrar-plan",
+  "/cotizaciones",
+  "/contratos",
+  "/expedientes",
+  "/sala-juntas",
+  "/tours",
+  "/experiencia-cliente",
+  "/tickets",
+  "/documentacion-centro",
+];
+
 // `rol` es un rol de personal (los clientes se manejan aparte). Regresa false si ese
 // rol no debe abrir `ruta`.
 export function rutaPermitida(rol: string, ruta: string): boolean {
   if (esSuperadmin(rol)) return true;
   if (rol === "ceo" || rol === "captive") return RUTAS_CEO.some((r) => ruta === r || ruta.startsWith(r + "/"));
+  if (rol === "ejecutiva_ventas") return RUTAS_EJECUTIVA_VENTAS.some((r) => ruta === r || ruta.startsWith(r + "/"));
   if (CHECKIN_DAY_PASS.test(ruta)) return ROLES_CHECKIN.includes(rol);
   const regla = REGLAS_ORDENADAS.find((r) => ruta === r.prefijo || ruta.startsWith(r.prefijo + "/"));
   if (!regla) return true;

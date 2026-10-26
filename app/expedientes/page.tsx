@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
+import { useCentroAdmin } from "@/lib/useCentroAdmin";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
@@ -118,7 +118,7 @@ function oficinaDe(c: Cliente) {
 
 export default function ExpedientesPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(["gerente", "gerente_ventas"], ["gerente", "gerente_ventas"]);
+  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(["gerente", "gerente_ventas", "ejecutiva_ventas"], ["gerente", "gerente_ventas"]);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [conteoPorCliente, setConteoPorCliente] = useState<Record<string, number>>({});
@@ -427,7 +427,7 @@ export default function ExpedientesPage() {
         {esGlobal && !clienteSel && (
           <div className="centro-selector">
             <select value={centro || ""} onChange={(e) => setCentro(e.target.value)}>
-              {CENTROS.map((c) => (
+              {centrosDisponibles.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

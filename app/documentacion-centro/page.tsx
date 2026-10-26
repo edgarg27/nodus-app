@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
+import { useCentroAdmin } from "@/lib/useCentroAdmin";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
 
@@ -48,8 +48,8 @@ function iconoArchivo(a: Archivo) {
 
 export default function DocumentacionCentroPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido } = useCentroAdmin(
-    ["diseno", "atencion_cliente"],
+  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(
+    ["diseno", "atencion_cliente", "ejecutiva_ventas"],
     ["atencion_cliente"]
   );
 
@@ -349,7 +349,7 @@ export default function DocumentacionCentroPage() {
         {esGlobal && (
           <div className="centro-selector">
             <select value={centro || ""} onChange={(e) => setCentro(e.target.value)}>
-              {CENTROS.map((c) => (
+              {centrosDisponibles.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

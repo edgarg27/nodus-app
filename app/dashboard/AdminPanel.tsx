@@ -862,7 +862,7 @@ export default function AdminPanel({
               ? "Panel de Atención al Cliente"
               : rol === "diseno"
               ? "Panel de Diseño"
-              : rol === "ventas" || rol === "gerente_ventas" || rol === "cobranza"
+              : rol === "ventas" || rol === "gerente_ventas" || rol === "cobranza" || rol === "ejecutiva_ventas"
               ? nombre.trim()
                 ? `Hola, ${nombre.trim().split(/\s+/)[0]}`
                 : "Hola"
@@ -978,7 +978,7 @@ export default function AdminPanel({
         </div>
       )}
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && rol !== "ventas" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && rol !== "ventas" && rol !== "ejecutiva_ventas" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -1012,7 +1012,7 @@ export default function AdminPanel({
               </div>
             ))}
 
-          {ticketsUrgentes.length > 0 && rol !== "ventas" && rol !== "gerente_ventas" && (
+          {ticketsUrgentes.length > 0 && rol !== "ventas" && rol !== "gerente_ventas" && rol !== "ejecutiva_ventas" && (
             <a href="/tickets" className="alerta-urgente alerta-urgente-link">
               <span className="alerta-urgente-dot" />
               <span className="alerta-urgente-body">
@@ -1031,7 +1031,7 @@ export default function AdminPanel({
             </a>
           )}
 
-          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && rol !== "gerente_ventas" && (
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && rol !== "gerente_ventas" && rol !== "ejecutiva_ventas" && (
             deslizadorConBanners(
                 <div className="resumen-deslizable-contenido">
               <p className="panel-section-label">Por atender</p>
@@ -1193,7 +1193,7 @@ export default function AdminPanel({
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas" || rol === "gerente_ventas") && (
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas" || rol === "gerente_ventas" || rol === "ejecutiva_ventas") && (
             <div style={{ maxWidth: 700, width: "100%", margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
@@ -1206,7 +1206,73 @@ export default function AdminPanel({
             </div>
           )}
 
-          {rol === "ventas" ? (
+          {rol === "ejecutiva_ventas" ? (
+          // Ejecutiva de Ventas (León): SOLO estos módulos (mismas rutas que
+          // RUTAS_EJECUTIVA_VENTAS en lib/permisosRutas.ts). Va aparte por el
+          // mismo motivo que el bloque de Asesora de Ventas.
+          <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>
+            <p className="panel-section-label" style={{ marginTop: 8 }}>
+              Ventas y clientes
+            </p>
+            <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
+              <a className="modulo-card" href="/prospectos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/prospectos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Prospectos</span>
+              </a>
+              <a className="modulo-card" href="/registrar-plan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizar.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizar</span>
+              </a>
+              <a className="modulo-card" href="/cotizaciones">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizaciones.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizaciones</span>
+              </a>
+              <a className="modulo-card" href="/contratos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Contratos</span>
+              </a>
+              <a className="modulo-card" href="/expedientes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/expediente-clientes.svg" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Expediente de clientes</span>
+              </a>
+            </div>
+            <p className="panel-section-label" style={{ marginTop: 16 }}>
+              Operación del centro
+            </p>
+            <div className="modulos-grid modulos-grid-compacta" style={{ marginTop: 8 }}>
+              <a className="modulo-card" href="/sala-juntas">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/sala-juntas.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Sala de Juntas</span>
+              </a>
+              <a className="modulo-card" href="/tours">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tours.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tours</span>
+              </a>
+              <a className="modulo-card" href="/experiencia-cliente">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/calendario-eventos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Calendario de Eventos</span>
+              </a>
+              <a className="modulo-card" href="/tickets">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tickets.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tickets</span>
+              </a>
+              <a className="modulo-card" href="/documentacion-centro">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/documentacion-centro.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Documentación del centro</span>
+              </a>
+            </div>
+          </div>
+          ) : rol === "ventas" ? (
           // Mismo ancho que .modulos-grid-5, para que "Módulos" quede alineado con las tarjetas.
           <div style={{ maxWidth: 800, margin: "0 auto", width: "100%" }}>
             <p className="panel-section-label" style={{ marginTop: 8 }}>

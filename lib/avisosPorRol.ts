@@ -48,6 +48,8 @@ export const AVISOS_POR_ROL: Record<string, string[]> = {
   diseno: [...PERSONAL.logros],
   ventas: [...PERSONAL.tours, ...PERSONAL.contratosAFirma, ...PERSONAL.salaJuntas],
   gerente_ventas: [...PERSONAL.tours, ...PERSONAL.contratosAFirma, ...PERSONAL.cobros],
+  // Ejecutiva de Ventas (León): por ahora solo Prospectos; sus tours los agenda desde el seguimiento.
+  ejecutiva_ventas: [...PERSONAL.tours],
 };
 
 // Respuestas a algo que pidió esa misma persona (p. ej. una reservación de

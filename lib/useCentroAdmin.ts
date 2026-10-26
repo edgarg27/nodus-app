@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ROLES_SUPERADMIN, esSuperadmin } from "@/lib/roles";
+import { CENTROS_POR_ROL, ROLES_SUPERADMIN, esSuperadmin } from "@/lib/roles";
 
 export const CENTROS = [
   "Bosques",
@@ -48,10 +48,18 @@ export function useCentroAdmin(rolesExtra: string[] = [], rolesGlobales: string[
       const { data: perfil } = await supabase.from("profiles").select("rol, nombre, centro").eq("id", user.id).single();
       const r = perfil?.rol || "";
       const esGlobalParaMi = esSuperadmin(r) || rolesGlobales.includes(r);
+      // Roles de algunos centros (Ejecutiva de Ventas: León) arrancan en uno de los suyos.
+      const centrosRol = CENTROS_POR_ROL[r];
       setRol(r);
       setNombre(perfil?.nombre || "");
       setUserId(user.id);
-      setCentro(esGlobalParaMi ? perfil?.centro || CENTROS[0] : perfil?.centro || null);
+      setCentro(
+        centrosRol
+          ? centrosRol.includes(perfil?.centro || "") ? perfil?.centro || null : centrosRol[0]
+          : esGlobalParaMi
+          ? perfil?.centro || CENTROS[0]
+          : perfil?.centro || null
+      );
       setCargando(false);
     })();
   }, []);
@@ -63,7 +71,9 @@ export function useCentroAdmin(rolesExtra: string[] = [], rolesGlobales: string[
     userId,
     centro,
     setCentro,
-    esGlobal: esSuperadmin(rol) || rolesGlobales.includes(rol),
+    esGlobal: esSuperadmin(rol) || rolesGlobales.includes(rol) || !!CENTROS_POR_ROL[rol],
+    // Centros que puede elegir en el selector (los globales, todos).
+    centrosDisponibles: CENTROS_POR_ROL[rol] || CENTROS,
     permitido: ROLES_ADMIN_CENTRO.includes(rol) || rolesExtra.includes(rol),
   };
 }

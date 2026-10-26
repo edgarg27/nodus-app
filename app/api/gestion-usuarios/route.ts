@@ -8,7 +8,7 @@ import { origenPublico } from "@/lib/origenPublico";
 // privilegios, pero no puede multiplicarlos; el CEO es una sola persona).
 const ROLES_RESERVADOS = ["superadmin", "gerente", "ceo"];
 
-const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas", "ceo", "captive"];
+const ROLES_STAFF = ["admin", "superadmin", "gerente", "sistemas", "operaciones", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas", "ejecutiva_ventas", "ceo", "captive"];
 
 async function verificarSoyGerente(req: NextRequest) {
   const supabase = createClient();

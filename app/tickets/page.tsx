@@ -147,6 +147,9 @@ export default function TicketsPage() {
       query = query.eq("categoria", "sistemas");
     } else if (rolActual === "operaciones") {
       query = query.eq("categoria", "mantenimiento");
+    } else if (rolActual === "ejecutiva_ventas" && user) {
+      // Ejecutiva de Ventas reporta como un cliente: solo ve sus propios reportes.
+      query = query.eq("user_id", user.id);
     }
 
     const { data } = await query;
