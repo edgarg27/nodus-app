@@ -1,4 +1,5 @@
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
+import ProspectosPorMedio from "@/app/components/ProspectosPorMedio";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
@@ -146,6 +147,9 @@ export default async function ReportesPage() {
       </div>
 
       <div className="rep-content">
+        <p className="rep-section-label">📣 Prospectos y ventas por medio</p>
+        <ProspectosPorMedio esGlobal={esGlobal || profile?.rol === "gerente_ventas"} centroFijo={miCentro} />
+
         <p className="rep-section-label">🏢 Ocupación por centro</p>
         {ocupacion.length === 0 ? (
           <div className="empty-card">Sin oficinas registradas</div>

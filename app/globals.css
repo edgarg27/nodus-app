@@ -9328,3 +9328,103 @@ a.stat-card {
   color: #b42323 !important;
   font-weight: 600;
 }
+
+/* ---------- Reporte: prospectos y ventas por medio ---------- */
+.pm-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin: 8px 0 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.pm-cab {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pm-titulo {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0d1b3e;
+}
+.pm-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #5b6478;
+}
+.pm-filtros {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.pm-filtros select,
+.pm-filtros input {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fafafa;
+  color: #1a1a1a;
+}
+.pm-tabla-wrap {
+  overflow-x: auto;
+}
+.pm-tabla {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #1f2a44;
+}
+.pm-tabla th {
+  text-align: left;
+  font-size: 12px;
+  color: #5b6478;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e3e8f0;
+  white-space: nowrap;
+}
+.pm-tabla td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #f1f3f7;
+  vertical-align: middle;
+}
+.pm-tabla tfoot td {
+  font-weight: 800;
+  color: #0d1b3e;
+  border-top: 2px solid #e3e8f0;
+  border-bottom: none;
+}
+.pm-num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+.pm-barra {
+  height: 5px;
+  background: #f1f3f7;
+  border-radius: 999px;
+  margin-top: 5px;
+  max-width: 180px;
+}
+.pm-barra span {
+  display: block;
+  height: 100%;
+  background: var(--orange);
+  border-radius: 999px;
+}
+.pm-vacio {
+  font-size: 13px;
+  color: #888;
+  margin: 8px 0;
+}
+.pm-nota {
+  font-size: 11px;
+  color: #888;
+  margin: 10px 0 0;
+}

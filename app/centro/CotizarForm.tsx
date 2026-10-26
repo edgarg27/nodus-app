@@ -1,5 +1,6 @@
 "use client";
 
+import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
@@ -135,7 +136,6 @@ type AdicionalDraft = {
 };
 
 const TIPOS_PROSPECTO = ["Nuevo", "Referido", "Recurrente", "Otro"];
-const MEDIOS_CONTACTO = ["Teléfono", "Redes sociales", "Referido", "Página web", "Venta en piso", "Otro"];
 const MODALIDADES = ["Hora", "Día", "Semana", "Mes"] as const;
 type Modalidad = (typeof MODALIDADES)[number];
 const LABEL_MODALIDAD: Record<Modalidad, string> = { Hora: "hora", Día: "día", Semana: "semana", Mes: "mes" };
@@ -765,6 +765,7 @@ export default function CotizarForm({
   const labelDetalleMedioContacto: Record<string, string> = {
     Teléfono: "Número de teléfono",
     "Redes sociales": "Usuario / red social",
+    Bot: "Canal del bot (WhatsApp, Facebook, Instagram…)",
     Referido: "Quién lo refirió",
     "Página web": "Página o formulario",
     Otro: "Especifica",
