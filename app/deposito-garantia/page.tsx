@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
+// Cobranza también ve los tres centros (como en Facturación e Ingresos).
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 // Mismo concepto exacto que genera ContratoModal.tsx → aprobar() al crear
