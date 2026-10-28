@@ -1403,11 +1403,6 @@ export default function AdminPanel({
                 <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Correos</span>
               </a>
-              <a className="modulo-card" href="/centro/resumen">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Resumen</span>
-              </a>
               <a className="modulo-card" href="/expedientes">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/expediente-clientes.svg" alt="" className="modulo-icon icon-img-32" />
@@ -1662,13 +1657,6 @@ export default function AdminPanel({
               ) },
 
               // ---------- 5. Reportes y administración ----------
-              { grupo: 4, ver: rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente", key: "resumen", tarjeta: (
-                <a className="modulo-card" href="/centro/resumen">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Resumen</span>
-                </a>
-              ) },
               { grupo: 4, ver: esVentasCom, key: "reportes", tarjeta: (
                 <a className="modulo-card" href="/reportes">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
