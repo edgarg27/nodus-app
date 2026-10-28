@@ -84,6 +84,8 @@ export default function IngresosCentroPage() {
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const esGlobal = ROLES_GLOBALES.includes(miRol);
+  // La gerente de ventas solo ve ingresos: sin gastos ni ganancia neta.
+  const verGastos = miRol !== "gerente_ventas";
   const [abriendoArchivoUrl, setAbriendoArchivoUrl] = useState<string | null>(null);
 
   async function abrirComprobante(archivoUrl: string) {
@@ -554,9 +556,11 @@ export default function IngresosCentroPage() {
             <button className={"centro-tab" + (tab === "clientes" ? " active" : "")} onClick={() => setTab("clientes")}>
               🧑‍💼 Por cliente
             </button>
-            <button className={"centro-tab" + (tab === "gastos" ? " active" : "")} onClick={() => setTab("gastos")}>
-              💸 Gastos
-            </button>
+            {verGastos && (
+              <button className={"centro-tab" + (tab === "gastos" ? " active" : "")} onClick={() => setTab("gastos")}>
+                💸 Gastos
+              </button>
+            )}
           </div>
 
           <div className="rep-content">
@@ -614,18 +618,22 @@ export default function IngresosCentroPage() {
                         <p className="stat-lbl">Cobrado sin facturar</p>
                         <p className="ing-kpi-sub">{totales.movimientosSinFacturar} por facturar · ver abajo</p>
                       </button>
-                      <div className="stat-card">
-                        <p className="stat-val" style={{ color: "#A32D2D" }}>
-                          {moneda(totalGastos)}
-                        </p>
-                        <p className="stat-lbl">Gastos</p>
-                      </div>
-                      <div className="stat-card">
-                        <p className="stat-val" style={{ color: gananciaNeta >= 0 ? "#0F6E56" : "#A32D2D" }}>
-                          {moneda(gananciaNeta)}
-                        </p>
-                        <p className="stat-lbl">Ganancia neta</p>
-                      </div>
+                      {verGastos && (
+                        <>
+                          <div className="stat-card">
+                            <p className="stat-val" style={{ color: "#A32D2D" }}>
+                              {moneda(totalGastos)}
+                            </p>
+                            <p className="stat-lbl">Gastos</p>
+                          </div>
+                          <div className="stat-card">
+                            <p className="stat-val" style={{ color: gananciaNeta >= 0 ? "#0F6E56" : "#A32D2D" }}>
+                              {moneda(gananciaNeta)}
+                            </p>
+                            <p className="stat-lbl">Ganancia neta</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                     <p className="ing-nota">
                       Cuenta todo lo registrado como pagado: por ahora se registra a mano en Cobranza (Pagado) o al aprobar el
@@ -876,7 +884,7 @@ export default function IngresosCentroPage() {
               </>
             )}
 
-            {tab === "gastos" && (
+            {tab === "gastos" && verGastos && (
               <>
                 <div className="gastos-total-card">
                   <p className="gastos-total-monto">

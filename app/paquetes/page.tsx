@@ -201,9 +201,9 @@ export default function PaquetesPage() {
   }
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
-  // Solo superadmin/gerente puede crear/editar/borrar paquetes — el resto de roles
+  // Solo superadmin/gerente y la gerente de ventas pueden crear/editar/borrar paquetes — el resto de roles
   // (incluyendo "admin" de centro) únicamente los visualiza.
-  const puedeGestionarPaquetes = esSuperadmin(miRol);
+  const puedeGestionarPaquetes = esSuperadmin(miRol) || miRol === "gerente_ventas";
 
   useEffect(() => {
     init();
