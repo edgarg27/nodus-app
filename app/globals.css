@@ -9583,3 +9583,43 @@ a.stat-card {
 .pm-nowrap {
   white-space: nowrap;
 }
+
+/* Pestañas "Por centro / Por cliente / Por mes" del historial de facturas (/reportes). */
+.pm-vistas {
+  display: inline-flex;
+  gap: 4px;
+  background: #f2f4f9;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 10px;
+}
+
+.pm-vistas button {
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7897;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pm-vistas button.activa {
+  background: #fff;
+  color: #0d1b3e;
+  box-shadow: 0 1px 3px rgba(13, 27, 62, 0.12);
+}
+
+.pm-filtros input[type="search"] {
+  flex: 1;
+  min-width: 180px;
+}
+
+.pm-link {
+  color: #f07e3a;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+}

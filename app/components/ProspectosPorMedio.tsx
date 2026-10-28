@@ -3,24 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { exportarExcelHojas } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { moneda, rango, type Periodo } from "@/lib/periodoReporte";
 import type { FilaMedio, Venta } from "@/app/api/reportes/prospectos-medio/route";
 
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
-type Periodo = "mes" | "mes_pasado" | "3m" | "6m" | "anio" | "otro";
 
-const moneda = (n: number) => "$" + n.toLocaleString("es-MX", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
-
-function rango(periodo: Periodo, hoy: string, desde: string, hasta: string) {
-  const [a, m] = hoy.split("-").map(Number);
-  const iso = (y: number, mes: number, d: number) => new Date(Date.UTC(y, mes - 1, d)).toISOString().slice(0, 10);
-  if (periodo === "mes") return { desde: iso(a, m, 1), hasta: hoy };
-  if (periodo === "mes_pasado") return { desde: iso(a, m - 1, 1), hasta: iso(a, m, 0) };
-  if (periodo === "3m") return { desde: iso(a, m - 2, 1), hasta: hoy };
-  if (periodo === "6m") return { desde: iso(a, m - 5, 1), hasta: hoy };
-  if (periodo === "anio") return { desde: `${a}-01-01`, hasta: hoy };
-  return { desde, hasta };
-}
 
 // "Prospectos y ventas por medio de contacto": cuántos prospectos llegaron por cada medio (bot, página web,
 // teléfono…), cuántos se volvieron clientes, cuántos contratos se cerraron, su renta mensual y lo ya cobrado.

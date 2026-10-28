@@ -1348,6 +1348,11 @@ export default function AdminPanel({
                 <img src="/icons/baja-cliente.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Baja de cliente</span>
               </a>
+              <a className="modulo-card" href="/reportes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/reportes.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Reportes de ventas</span>
+              </a>
             </div>
             <p className="panel-section-label" style={{ marginTop: 16 }}>
               Cobros y finanzas
