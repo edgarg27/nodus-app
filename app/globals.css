@@ -5453,9 +5453,15 @@ a.stat-card {
 }
 
 .invitado-menu-icon-img {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
+}
+
+/* Los boletos de Day Pass y la tarjeta de cliente frecuente son anchos: ocupan casi todo el recuadro. */
+.invitado-menu-item.daypass .invitado-menu-icon-img {
+  width: 38px;
+  height: 38px;
 }
 
 .invitado-menu-text {
