@@ -5,6 +5,7 @@ import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { rolPuede } from "@/lib/permisosApi";
 import { complementoAlPagar } from "@/lib/facturapi";
+import { esCuentaDeposito } from "@/lib/cuentasDeposito";
 
 // Requiere sesión de staff. Puede marcar pagado CUALQUIER pago, con o sin
 // factura_id. Lo usa /pagos (botón "✓ Marcar como pagado"), tanto para
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { pagoId, comprobanteUrl } = await req.json();
+  // cuentaDestino: solo depósitos en garantía (a qué cuenta cayó, ver lib/cuentasDeposito.ts).
+  const { pagoId, comprobanteUrl, cuentaDestino } = await req.json();
   if (!pagoId) {
     return NextResponse.json({ error: "Falta pagoId" }, { status: 400 });
   }
@@ -33,8 +35,13 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: pago } = await admin.from("pagos").select("id, user_id, estado, adicional_tipo").eq("id", pagoId).maybeSingle();
 
-  const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string } = { estado: "pagado" };
+  if (cuentaDestino !== undefined && !esCuentaDeposito(cuentaDestino)) {
+    return NextResponse.json({ error: "Cuenta no válida" }, { status: 400 });
+  }
+
+  const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string; cuenta_destino?: string } = { estado: "pagado" };
   if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
+  if (cuentaDestino) datosActualizar.cuenta_destino = cuentaDestino;
   // Solo la primera vez: si ya estaba pagado y lo vuelven a mandar (doble
   // clic, o un comprobante nuevo), no se pisa la fecha real del pago.
   if (!pago || pago.estado !== "pagado") datosActualizar.fecha_pago = hoyMexicoISO();
