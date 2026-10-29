@@ -6,6 +6,7 @@ import { useCentroAdmin } from "@/lib/useCentroAdmin";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
+import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
 
 // Expediente de clientes: los archivos que la administradora tenga de cada
 // cliente (identificación, constancia fiscal, comprobantes, contrato…).
@@ -207,7 +208,7 @@ export default function ExpedientesPage() {
       if (!verBajas && c.activo === false) return false;
       if (soloSinArchivos && (conteoPorCliente[c.id] || 0) > 0) return false;
       if (!q) return true;
-      return [c.nombre, c.empresa, c.email, c.rfc, oficinaDe(c), c.numero_usuario != null ? `N-${c.numero_usuario}` : ""]
+      return [c.nombre, c.empresa, c.email, c.rfc, oficinaDe(c), numeroUsuarioVisible(c.numero_usuario) || ""]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q));
     });
@@ -487,7 +488,7 @@ export default function ExpedientesPage() {
                           {c.activo === false && <span className="expediente-badge-baja">Baja</span>}
                         </p>
                         <p className="expediente-cliente-extra">
-                          {[c.empresa, oficinaDe(c), c.numero_usuario != null ? `N-${c.numero_usuario}` : null].filter(Boolean).join(" · ") ||
+                          {[c.empresa, oficinaDe(c), numeroUsuarioVisible(c.numero_usuario)].filter(Boolean).join(" · ") ||
                             c.email}
                         </p>
                       </div>
@@ -512,7 +513,7 @@ export default function ExpedientesPage() {
                 <Dato titulo="Correo" valor={clienteSel.email} />
                 <Dato titulo="Teléfono" valor={clienteSel.telefono} />
                 <Dato titulo="Oficina" valor={oficinaDe(clienteSel)} />
-                <Dato titulo="N.º de usuario" valor={clienteSel.numero_usuario != null ? `N-${clienteSel.numero_usuario}` : null} />
+                <Dato titulo="N.º de usuario" valor={numeroUsuarioVisible(clienteSel.numero_usuario)} />
                 <Dato titulo="Centro" valor={clienteSel.centro} />
               </div>
               {contratoPrincipal && (
