@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
 import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import AvisoExito from "@/app/components/AvisoExito";
+import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
 
 // Adicionales: cobros sueltos que el admin le pone a un cliente fuera de su
 // contrato (una hora extra de sala de juntas, copias, frituras…). Cada uno es
@@ -135,7 +136,7 @@ export default function AdicionalesPage() {
     if (!q) return [];
     return clientes
       .filter((c) =>
-        [c.nombre, c.empresa, c.email, c.numero_oficina, c.numero_usuario != null ? `N-${c.numero_usuario}` : ""]
+        [c.nombre, c.empresa, c.email, c.numero_oficina, numeroUsuarioVisible(c.numero_usuario) || ""]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(q))
       )
