@@ -339,6 +339,10 @@ function LoginInner() {
         >
           ¿No eres cliente aún? Agenda o pide tu Day Pass aquí
         </a>
+
+        <a href="/aviso-privacidad" className="login-aviso">
+          Aviso de privacidad
+        </a>
       </form>
     </div>
   );

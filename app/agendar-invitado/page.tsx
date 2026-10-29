@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
 import { WHATSAPP_MOSTRAR, whatsappUrl } from "@/lib/contacto";
+import { AVISO_PRIVACIDAD_URL } from "@/lib/avisoPrivacidad";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -292,6 +293,10 @@ export default function AgendarInvitadoPage() {
               </span>
               <span className="invitado-menu-chevron">›</span>
             </a>
+
+            <p className="aviso-privacidad-nota">
+              <a href={AVISO_PRIVACIDAD_URL}>Aviso de privacidad</a>
+            </p>
           </>
         )}
 
@@ -346,6 +351,13 @@ export default function AgendarInvitadoPage() {
             <button className="reservar-btn" type="submit">
               Continuar
             </button>
+            <p className="aviso-privacidad-nota">
+              Tus datos se usan solo para atender tu solicitud. Consulta nuestro{" "}
+              <a href={AVISO_PRIVACIDAD_URL} target="_blank" rel="noopener noreferrer">
+                Aviso de privacidad
+              </a>
+              .
+            </p>
           </form>
         )}
 
