@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 type Usuario = {
   id: string;
@@ -152,9 +153,9 @@ export default function UsuariosPage() {
   return (
     <div className="rep-page">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Gestión de Usuarios</p>
         <p className="rep-sub">Cuentas de staff (no clientes)</p>
       </div>

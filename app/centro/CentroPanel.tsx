@@ -15,6 +15,7 @@ import { HORAS_CALENDARIO, SALAS_POR_CENTRO, esFueraDeHorario } from "@/lib/hora
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
 import { espaciosDeClientes, type EspaciosClientes } from "@/lib/coworking";
 import SolicitudesWifi from "./SolicitudesWifi";
+import Link from "next/link";
 
 type Cliente = { id: string; nombre: string; email: string; numero_oficina: string | null; empresa: string | null; centro?: string; telefono?: string | null };
 // user_id null + "para" = voucher manual (visita, proveedor…), ver
@@ -464,8 +465,11 @@ export default function CentroPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Los datos de todos los centros solo los usan Resumen, Vouchers, Proveedores y
+  // Gastos; en las demás pantallas (Sala de Juntas, Invitados…) eran consultas de más.
+  const usaDatosGlobales = !vista || ["resumen", "vouchers", "proveedores", "gastos"].includes(vista);
   useEffect(() => {
-    if (esGlobal) {
+    if (esGlobal && usaDatosGlobales) {
       fetchVouchersTodosLosCentros();
       fetchDatosGlobales();
     }
@@ -544,14 +548,18 @@ export default function CentroPanel({
     setLoading(true);
     // Una solicitud de reservación que sigue pendiente cuando ya pasó su fecha
     // se cancela sola, para que no estorbe en "Pendientes de confirmar".
+    // No se espera a que termine: abajo se marcan igual en la lista que se muestra.
     const hoyVencidas = hoyMexicoISO();
-    await supabase
+    supabase
       .from("reservaciones")
       .update({ estado: "cancelada" })
       .eq("centro", c)
       .eq("estado", "pendiente")
       .lt("fecha", hoyVencidas)
-      .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`);
+      .or(`fecha_fin.is.null,fecha_fin.lt.${hoyVencidas}`)
+      .then(() => {});
+    // Todo lo que solo depende del centro va en una sola tanda (antes eran ~9
+    // rondas en fila y Sala de Juntas tardaba ~3 s).
     const [
       { data: clis },
       { data: ofis },
@@ -560,13 +568,15 @@ export default function CentroPanel({
       { data: provs },
       { data: gts },
       { data: pros },
-      { data: reservas },
+      { data: reservasRaw },
       { data: notifs },
       { data: vchs },
       { data: sols },
       { data: dps },
       { data: solsCli },
       { data: visitasCli },
+      { data: solsAgendadas },
+      { data: cartasHechas },
     ] = await Promise.all([
       supabase
         .from("profiles")
@@ -585,7 +595,7 @@ export default function CentroPanel({
       supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
       supabase
         .from("reservaciones")
-        .select("id, espacio, fecha, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
+        .select("id, espacio, fecha, fecha_fin, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
         .eq("centro", c)
         .order("fecha", { ascending: false }),
       supabase
@@ -631,7 +641,19 @@ export default function CentroPanel({
         .order("fecha", { ascending: false })
         .order("hora", { ascending: false })
         .limit(200),
+      // Reservaciones que el admin agendó a partir de una solicitud de invitado.
+      supabase
+        .from("solicitudes_invitados")
+        .select("reservacion_id, nombre")
+        .eq("centro", c)
+        .not("reservacion_id", "is", null),
+      supabase.from("registros_sala_juntas").select("reservacion_id").eq("centro", c).not("reservacion_id", "is", null),
     ]);
+    const reservas = (reservasRaw || []).map((r) =>
+      r.estado === "pendiente" && r.fecha < hoyVencidas && (!r.fecha_fin || r.fecha_fin < hoyVencidas)
+        ? { ...r, estado: "cancelada" }
+        : r
+    );
     setClientes(clis || []);
     setOficinas(ofis || []);
     setExtensiones(exts || []);
@@ -649,26 +671,56 @@ export default function CentroPanel({
     // Reservaciones hechas por personal (ej. Ventas desde el calendario) no son de un
     // cliente: su nombre se busca aparte para que se vea quién la pidió.
     const sinNombre = Array.from(new Set((reservas || []).map((r) => r.user_id).filter((id) => id && !nombrePorId[id])));
-    if (sinNombre.length > 0) {
-      const { data: personal } = await supabase.from("profiles").select("id, nombre").in("id", sinNombre);
-      (personal || []).forEach((pf) => {
-        if (pf.nombre) nombrePorId[pf.id] = pf.nombre;
-      });
-    }
+
+    // Lo que sigue depende solo de "reservas": se pide todo al mismo tiempo y
+    // después se arma cada parte.
+    const cotizacionIds = Array.from(
+      new Set((reservas || []).map((r) => r.cotizacion_id).filter((id): id is string => !!id))
+    );
+    const contratosCowork = Array.from(
+      new Set((reservas || []).filter((r) => esEspacioCowork(r.espacio) && r.contrato_id).map((r) => r.contrato_id as string))
+    );
+    const canceladasIds = (reservas || []).filter((r) => r.estado === "cancelada").map((r) => r.id);
+    const rechazadasIds = (reservas || []).filter((r) => r.estado === "rechazada").map((r) => r.id);
+    const idsParaMotivos = [...canceladasIds, ...rechazadasIds];
+    const [personalRes, cotsRes, coworkRes, motivosRes] = await Promise.all([
+      sinNombre.length > 0 ? supabase.from("profiles").select("id, nombre").in("id", sinNombre) : null,
+      cotizacionIds.length > 0
+        ? supabase
+            .from("cotizaciones_comerciales")
+            .select("id, paquete_id, modalidad_paquete, tipo_espacio, nombre_contesta_telefono")
+            .in("id", cotizacionIds)
+        : null,
+      contratosCowork.length > 0
+        ? Promise.all([
+            supabase.from("contratos").select("id, horas_bolsa, fecha_inicio, fecha_vencimiento").in("id", contratosCowork),
+            supabase
+              .from("reservaciones")
+              .select("contrato_id, espacio, fecha, hora_inicio, hora_fin, estado, horas_cobradas, asistencia")
+              .in("contrato_id", contratosCowork)
+              .in("estado", ["pendiente", "confirmada", "cancelada"]),
+          ])
+        : null,
+      idsParaMotivos.length > 0
+        ? supabase
+            .from("notificaciones")
+            .select("reservacion_id, mensaje, tipo")
+            .in("tipo", ["reservacion_cancelada_cliente", "reservacion_rechazada"])
+            .in("reservacion_id", idsParaMotivos)
+        : null,
+    ]);
+
+    (personalRes?.data || []).forEach((pf) => {
+      if (pf.nombre) nombrePorId[pf.id] = pf.nombre;
+    });
 
     // Reservaciones creadas desde Cotizar traen cotizacion_id — se resuelve
     // el label 📦 {paquete} · {modalidad} vía join manual a
     // cotizaciones_comerciales → paquetes.
-    const cotizacionIds = Array.from(
-      new Set((reservas || []).map((r) => r.cotizacion_id).filter((id): id is string => !!id))
-    );
     const labelPorCotizacion: Record<string, string> = {};
     const nombreSalaPorCotizacion: Record<string, string> = {};
-    if (cotizacionIds.length > 0) {
-      const { data: cots } = await supabase
-        .from("cotizaciones_comerciales")
-        .select("id, paquete_id, modalidad_paquete, tipo_espacio, nombre_contesta_telefono")
-        .in("id", cotizacionIds);
+    if (cotsRes) {
+      const cots = cotsRes.data;
       const paqueteIds = Array.from(new Set((cots || []).map((ct) => ct.paquete_id).filter((id): id is string => !!id)));
       const { data: paqs } =
         paqueteIds.length > 0
@@ -690,21 +742,11 @@ export default function CentroPanel({
 
     // Reservaciones que el admin agendó a partir de una solicitud de invitado: se
     // muestra el nombre de quien la pidió, no el de quien la capturó.
-    const { data: solsAgendadas } = await supabase
-      .from("solicitudes_invitados")
-      .select("reservacion_id, nombre")
-      .eq("centro", c)
-      .not("reservacion_id", "is", null);
     const invitadoPorReserva: Record<string, string> = {};
     (solsAgendadas || []).forEach((sol) => {
       if (sol.reservacion_id && sol.nombre) invitadoPorReserva[sol.reservacion_id] = sol.nombre;
     });
 
-    const { data: cartasHechas } = await supabase
-      .from("registros_sala_juntas")
-      .select("reservacion_id")
-      .eq("centro", c)
-      .not("reservacion_id", "is", null);
     const conCarta: Record<string, boolean> = {};
     (cartasHechas || []).forEach((x) => {
       if (x.reservacion_id) conCarta[x.reservacion_id] = true;
@@ -725,19 +767,9 @@ export default function CentroPanel({
     );
 
     // Saldo de Horas Cowork de cada contrato con reservaciones de Coworking.
-    const contratosCowork = Array.from(
-      new Set((reservas || []).filter((r) => esEspacioCowork(r.espacio) && r.contrato_id).map((r) => r.contrato_id as string))
-    );
     const saldos: Record<string, SaldoHoras> = {};
-    if (contratosCowork.length > 0) {
-      const [{ data: conts }, { data: resCont }] = await Promise.all([
-        supabase.from("contratos").select("id, horas_bolsa, fecha_inicio, fecha_vencimiento").in("id", contratosCowork),
-        supabase
-          .from("reservaciones")
-          .select("contrato_id, espacio, fecha, hora_inicio, hora_fin, estado, horas_cobradas, asistencia")
-          .in("contrato_id", contratosCowork)
-          .in("estado", ["pendiente", "confirmada", "cancelada"]),
-      ]);
+    if (coworkRes) {
+      const [{ data: conts }, { data: resCont }] = coworkRes;
       (conts || []).forEach((ct) => {
         const v = ventanaHoras(ct);
         const delContrato = (resCont || []).filter(
@@ -748,15 +780,8 @@ export default function CentroPanel({
     }
     setSaldosCowork(saldos);
 
-    const canceladasIds = (reservas || []).filter((r) => r.estado === "cancelada").map((r) => r.id);
-    const rechazadasIds = (reservas || []).filter((r) => r.estado === "rechazada").map((r) => r.id);
-    const idsParaMotivos = [...canceladasIds, ...rechazadasIds];
-    if (idsParaMotivos.length > 0) {
-      const { data: notifsMotivos } = await supabase
-        .from("notificaciones")
-        .select("reservacion_id, mensaje, tipo")
-        .in("tipo", ["reservacion_cancelada_cliente", "reservacion_rechazada"])
-        .in("reservacion_id", idsParaMotivos);
+    if (motivosRes) {
+      const notifsMotivos = motivosRes.data;
       const mapaCancel: Record<string, string> = {};
       const mapaRechazo: Record<string, string> = {};
       (notifsMotivos || []).forEach((n) => {
@@ -2202,9 +2227,9 @@ export default function CentroPanel({
               ← Regresar
             </a>
           ) : (
-            <a className="rep-back" href="/dashboard">
+            <Link className="rep-back" href="/dashboard">
               ← Regresar
-            </a>
+            </Link>
           )}
           <p className="panel-header-title">{TITULO_POR_TAB[tab] || "Panel de Centro"}</p>
           <p className="panel-header-sub">{esGlobal ? "Todos tus centros" : centro || "Sin centro asignado"}</p>

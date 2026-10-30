@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcel } from "@/lib/exportExcel";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -242,9 +243,9 @@ export default function FacturasPorClientePage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Facturas por cliente</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (

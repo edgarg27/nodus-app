@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 // Inicio de Facturación (diseño que pidió contabilidad): buscador, los cuatro módulos, "Otros" (Importar CFDI,
 // Catálogo de conceptos y Configuración fiscal).
@@ -111,9 +112,9 @@ export default function FacturacionPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Facturación</p>
         <p className="rep-sub">Gestiona tus facturas y comprobantes de forma rápida y segura</p>
       </div>

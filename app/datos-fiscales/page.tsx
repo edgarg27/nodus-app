@@ -11,6 +11,7 @@ import {
   validarDatosFiscales,
   type TipoPersonaFiscal,
 } from "@/lib/datosFiscales";
+import Link from "next/link";
 
 const estiloCampo = { width: "100%", border: "1px solid #eee", borderRadius: 10, padding: "10px 12px", fontSize: 15 } as const;
 
@@ -97,9 +98,9 @@ export default function DatosFiscalesPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Mis datos fiscales</p>
         <p className="rep-sub">Con estos datos se emiten tus facturas</p>
       </div>

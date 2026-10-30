@@ -8,6 +8,7 @@ import BotonArchivo from "@/app/components/BotonArchivo";
 import { conceptoParaCliente } from "@/lib/adicionales";
 import { fechaLocal } from "@/lib/fechaMexico";
 import { esClienteCoworking } from "@/lib/coworking";
+import Link from "next/link";
 
 type Factura = {
   id: string;
@@ -203,9 +204,9 @@ export default function EstadoCuentaPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Estado de Cuenta</p>
         <p className="rep-sub">
           {nombre} {sub ? `· ${sub}` : ""}

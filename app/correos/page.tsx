@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../soporte/FileDropzone";
 import { construirHtmlComunicado } from "@/lib/comunicado";
+import Link from "next/link";
 
 type Cliente = { id: string; nombre: string; email: string; empresa: string | null; numero_oficina: string | null };
 
@@ -200,9 +201,9 @@ export default function CorreosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Correos masivos</p>
         <p className="rep-sub">
           {esGlobal ? "Envía comunicados a clientes de cualquier centro" : `Clientes de ${centro || "tu centro"}`}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../../soporte/FileDropzone";
+import Link from "next/link";
 
 const BUCKET = "plantillas-documentos";
 
@@ -254,9 +255,9 @@ export default function PlantillasPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Plantillas</p>
         <p className="rep-sub">Machotes de contrato y presentaciones de cotización</p>
       </div>

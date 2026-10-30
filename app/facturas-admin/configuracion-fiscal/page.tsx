@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { rolPuede } from "@/lib/permisosApi";
 import { REGIMENES_FISCALES, usosParaTipo, avisosDatosFiscales, normalizarRfc } from "@/lib/datosFiscales";
+import Link from "next/link";
 
 // Configuración fiscal: los datos fiscales de cada cliente (los que se capturaron al ligar su contrato). Finanzas los
 // revisa y los corrige si vienen con errores o si la empresa los cambió.
@@ -113,9 +114,9 @@ export default function ConfiguracionFiscalPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Facturación
-        </a>
+        </Link>
         <p className="rep-title">Configuración fiscal</p>
         <p className="rep-sub">Datos fiscales de los clientes (los que se capturaron al ligar su contrato)</p>
       </div>

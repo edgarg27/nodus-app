@@ -9,6 +9,7 @@ import { CATEGORIA_PAGO_INFO, type CategoriaPago, categorizarPago, pagoEstaCubie
 import { fechaLocal } from "@/lib/fechaMexico";
 import { exportarExcel } from "@/lib/exportExcel";
 import type { EstadoFacturacion, Movimiento } from "@/app/api/ingresos/movimientos/route";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -525,9 +526,9 @@ export default function IngresosCentroPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Ingresos por Centro</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (

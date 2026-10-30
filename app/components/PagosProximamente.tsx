@@ -1,12 +1,13 @@
+import Link from "next/link";
 // Pantalla de "Próximamente" para los pagos en línea (tarjeta, SPEI, tarjetas guardadas) mientras están apagados
 // (lib/pagosEnLinea.ts). Ofrece lo que sí se puede hacer hoy: pagar por transferencia y subir el comprobante.
 export default function PagosProximamente({ titulo = "Pagos en línea" }: { titulo?: string }) {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Estado de cuenta
-        </a>
+        </Link>
         <p className="rep-title">{titulo}</p>
       </div>
       <div className="rep-content">

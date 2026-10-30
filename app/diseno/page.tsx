@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../soporte/FileDropzone";
+import Link from "next/link";
 
 type Logro = {
   id: string;
@@ -120,9 +121,9 @@ export default function DisenoPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Logros</p>
         <p className="rep-sub">Banners de logros de todos los centros</p>
       </div>

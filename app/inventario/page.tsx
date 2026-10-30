@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { esSuperadmin } from "@/lib/roles";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
+import Link from "next/link";
 
 // atencion_cliente es cuenta sin centro: ve todos, con selector.
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "atencion_cliente"];
@@ -245,9 +246,9 @@ export default function InventarioPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Inventario</p>
         <p className="rep-sub">
           {centro || "Selecciona un centro"}

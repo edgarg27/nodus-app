@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FormularioNuevaFactura from "../FormularioNuevaFactura";
 import IntegrarPorCliente from "../IntegrarPorCliente";
+import Link from "next/link";
 
 export default function IntegrarClientePage() {
   const supabase = createClient();
@@ -30,9 +31,9 @@ export default function IntegrarClientePage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Facturación
-        </a>
+        </Link>
         <p className="rep-title">Integrar por cliente</p>
         <p className="rep-sub">Elige al cliente y el periodo, revisa lo que se le cobra y deja integrada o timbra la factura</p>
       </div>

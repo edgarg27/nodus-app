@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../../soporte/FileDropzone";
+import Link from "next/link";
 
 type Banner = {
   id: string;
@@ -177,9 +178,9 @@ export default function BannersPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Banners</p>
         <p className="rep-sub">Carrusel de arriba del dashboard del cliente</p>
       </div>

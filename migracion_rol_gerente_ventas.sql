@@ -7,7 +7,7 @@
 --   Cobros y finanzas: Cobranza, Pagos, Facturas, Adicionales, Depósito en
 --     garantía, Ingresos por Centro.
 --   Servicios y administración: Tours, Planes, Calendario de eventos,
---     Correos, Resumen (solo lectura) y Expediente de clientes.
+--     Correos, Resumen (solo lectura) y Expediente de clientes (solo lectura).
 --   Pestaña "Clientes" del panel: ver y editar cuentas de cliente.
 -- No ve Sala de juntas, Mapa de oficinas, Usuarios, Reportes, Tickets ni el
 -- resto de la operación del centro (las pantallas las limita
@@ -54,7 +54,7 @@ declare
     "profiles":                       ["select"],
     "paquetes":                       ["select", "insert", "update", "delete"],
     "coffee_break_paquetes":          ["select", "insert", "update", "delete"],
-    "expediente_archivos":            ["select", "insert", "update", "delete"],
+    "expediente_archivos":            ["select"],
     "vouchers":                       ["select", "delete"],
     "clientes":                       ["select", "insert", "delete"],
     "encuestas":                      ["select", "insert", "delete"],
@@ -127,18 +127,9 @@ begin
 end $$;
 
 -- 5) Archivos del Expediente de clientes (bucket privado, ver
--- migracion_expedientes_clientes.sql): ver, subir y borrar de todos los centros.
+-- migracion_expedientes_clientes.sql): solo ver, de todos los centros
+-- (subir/borrar se quitó, ver migracion_expedientes_gerente_ventas_consulta.sql).
 drop policy if exists "expedientes_storage_gerente_ventas_select" on storage.objects;
 create policy "expedientes_storage_gerente_ventas_select" on storage.objects
   for select to authenticated
-  using (bucket_id = 'expedientes-clientes' and public.mi_rol()::text = 'gerente_ventas');
-
-drop policy if exists "expedientes_storage_gerente_ventas_insert" on storage.objects;
-create policy "expedientes_storage_gerente_ventas_insert" on storage.objects
-  for insert to authenticated
-  with check (bucket_id = 'expedientes-clientes' and public.mi_rol()::text = 'gerente_ventas');
-
-drop policy if exists "expedientes_storage_gerente_ventas_delete" on storage.objects;
-create policy "expedientes_storage_gerente_ventas_delete" on storage.objects
-  for delete to authenticated
   using (bucket_id = 'expedientes-clientes' and public.mi_rol()::text = 'gerente_ventas');

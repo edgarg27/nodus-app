@@ -13,6 +13,7 @@ import {
   type SaldoHoras,
   type VentanaHoras,
 } from "@/lib/horasCowork";
+import Link from "next/link";
 
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
@@ -606,9 +607,9 @@ function ReservacionesInner() {
     return (
       <div className="panel">
         <div className="rep-header">
-          <a className="rep-back" href="/dashboard-cliente">
+          <Link className="rep-back" href="/dashboard-cliente">
             ← Regresar
-          </a>
+          </Link>
           <p className="rep-title">Sala de Juntas</p>
           <p className="rep-sub">{miCentro || "Mis reservaciones"}</p>
         </div>
@@ -623,9 +624,9 @@ function ReservacionesInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Reservar espacio</p>
         <p className="rep-sub">{miCentro || "Selecciona tu horario"}</p>
       </div>

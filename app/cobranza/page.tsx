@@ -7,6 +7,7 @@ import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { correoVisible } from "@/lib/correoFicticio";
 import type { Baja, Cargo, ClienteCobranza, Pagado, TipoCargo } from "@/lib/cobranza";
+import Link from "next/link";
 
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -567,9 +568,9 @@ export default function CobranzaPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Cobranza</p>
         <p className="rep-sub">
           {datos?.esGlobal ? centro || "Todos los centros" : datos?.centro || "Tu centro"} · {textoPeriodo}

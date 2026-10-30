@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
+import Link from "next/link";
 
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -135,9 +136,9 @@ export default function IntegrarLotePage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Facturación
-        </a>
+        </Link>
         <p className="rep-title">Integrar por lote</p>
         <p className="rep-sub">{centro || "Cargando..."} · cobros del mes que faltan por facturar</p>
       </div>

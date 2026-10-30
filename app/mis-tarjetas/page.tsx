@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { configOpenpay, prepararOpenpay } from "@/lib/openpayBrowser";
 import { CONSENTIMIENTO_COBROS_TEXTO } from "@/lib/consentimientoCobros";
+import Link from "next/link";
 
 type Tarjeta = {
   id: string;
@@ -183,9 +184,9 @@ function MisTarjetasInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Mis tarjetas</p>
         <p className="rep-sub">Cobro automático de tu renta</p>
       </div>

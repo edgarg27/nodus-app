@@ -7,6 +7,7 @@ import CentroPanel from "@/app/centro/CentroPanel";
 import { SALAS_POR_CENTRO } from "@/lib/horarioSala";
 
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 // Centro con una sola sala: queda fija en la carta responsiva. Con varias (Punto 45, San Telmo)
@@ -358,9 +359,9 @@ export default function SalaJuntasPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Sala de Juntas</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
       </div>

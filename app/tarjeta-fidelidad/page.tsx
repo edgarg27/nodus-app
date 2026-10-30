@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import FidelidadCard from "@/app/components/FidelidadCard";
 import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
+import Link from "next/link";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -109,9 +110,9 @@ export default function TarjetaFidelidadPage() {
     <div className="panel">
       <div className="rep-header">
         {paso === "intro" ? (
-          <a className="rep-back" href="/agendar-invitado">
+          <Link className="rep-back" href="/agendar-invitado">
             ← Regresar
-          </a>
+          </Link>
         ) : (
           <a
             className="rep-back"

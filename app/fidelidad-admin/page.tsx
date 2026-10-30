@@ -12,6 +12,7 @@ import {
 import FidelidadCard from "@/app/components/FidelidadCard";
 import AvisoExito from "@/app/components/AvisoExito";
 import { CENTROS } from "@/lib/useCentroAdmin";
+import Link from "next/link";
 
 // Módulo de tarjetas de fidelidad para el staff: ver las tarjetas, buscar
 // por folio, poner o quitar sellos, entregar el regalo y eliminar tarjetas.
@@ -369,9 +370,9 @@ export default function FidelidadAdminPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Tarjeta de fidelidad</p>
         <p className="rep-sub">{esGlobal ? "Todos los centros" : centro || ""}</p>
       </div>
