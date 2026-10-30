@@ -1351,6 +1351,11 @@ export default function AdminPanel({
                 <img src="/icons/baja-cliente.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Baja de cliente</span>
               </Link>
+              <Link className="modulo-card" href="/reportes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/reportes.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Reportes de ventas</span>
+              </Link>
             </div>
             <p className="panel-section-label" style={{ marginTop: 16 }}>
               Cobros y finanzas
@@ -1405,11 +1410,6 @@ export default function AdminPanel({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/correos.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Correos</span>
-              </Link>
-              <Link className="modulo-card" href="/centro/resumen">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Resumen</span>
               </Link>
               <Link className="modulo-card" href="/expedientes">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1665,13 +1665,6 @@ export default function AdminPanel({
               ) },
 
               // ---------- 5. Reportes y administración ----------
-              { grupo: 4, ver: rol === "admin" || rol === "sistemas" || rol === "operaciones" || rol === "superadmin" || rol === "gerente", key: "resumen", tarjeta: (
-                <Link className="modulo-card" href="/centro/resumen">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icons/resumen.png" alt="" className="modulo-icon icon-img-32" />
-                  <span className="modulo-name">Resumen</span>
-                </Link>
-              ) },
               { grupo: 4, ver: esVentasCom, key: "reportes", tarjeta: (
                 <Link className="modulo-card" href="/reportes">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

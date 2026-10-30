@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
 import { WHATSAPP_MOSTRAR, whatsappUrl } from "@/lib/contacto";
+import { AVISO_PRIVACIDAD_URL } from "@/lib/avisoPrivacidad";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -26,31 +27,31 @@ function hoyISO() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-// `icono` es la ruta a un icono real (ver /public/images/icons), no un emoji.
+// `icono` es la ruta a un icono real (ver /public/images/icons/agendar), no un emoji.
 // Sala de juntas, coworking, oficina privada y working desk se cotizan por
 // WhatsApp: el chatbot toma los datos y una administradora del centro
 // trabaja la cotización.
 const SERVICIOS_WHATSAPP: { icono: string; label: string; desc: string; mensaje: string }[] = [
   {
-    icono: "/images/icons/sala-juntas.png",
+    icono: "/images/icons/agendar/sala-juntas.png",
     label: "Agendar sala de juntas",
     desc: "Reserva un horario para tu junta o reunión",
     mensaje: "Hola, quiero agendar una sala de juntas en Nodus Flex Center.",
   },
   {
-    icono: "/images/icons/coworking.png",
+    icono: "/images/icons/agendar/coworking.png",
     label: "Agendar coworking",
     desc: "Aparta tu espacio en el área de coworking",
     mensaje: "Hola, quiero agendar un espacio de coworking en Nodus Flex Center.",
   },
   {
-    icono: "/images/icons/oficina-privada.png",
+    icono: "/images/icons/agendar/oficina-privada.png",
     label: "Agendar oficina privada",
     desc: "Solicita una oficina privada para tu equipo",
     mensaje: "Hola, quiero cotizar una oficina privada en Nodus Flex Center.",
   },
   {
-    icono: "/images/icons/working-desk.png",
+    icono: "/images/icons/agendar/working-desk.png",
     label: "Agendar working desk",
     desc: "Aparta tu escritorio individual",
     mensaje: "Hola, quiero agendar un working desk en Nodus Flex Center.",
@@ -64,19 +65,19 @@ type TipoDayPass = "day_pass_coworking" | "day_pass_oficina_privada" | "day_pass
 const DAY_PASSES: { id: TipoDayPass; icono: string; label: string; desc: string }[] = [
   {
     id: "day_pass_coworking",
-    icono: "/images/icons/coworking.png",
+    icono: "/images/icons/agendar/daypass-coworking.png",
     label: "Day Pass — Coworking",
     desc: "Acceso de un día al área de coworking",
   },
   {
     id: "day_pass_oficina_privada",
-    icono: "/images/icons/oficina-privada.png",
+    icono: "/images/icons/agendar/daypass-oficina-privada.png",
     label: "Day Pass — Oficina privada",
     desc: "Acceso de un día a una oficina privada",
   },
   {
     id: "day_pass_working_desk",
-    icono: "/images/icons/working-desk.png",
+    icono: "/images/icons/agendar/daypass-working-desk.png",
     label: "Day Pass — Working Desk",
     desc: "Acceso de un día a un escritorio individual",
   },
@@ -284,7 +285,7 @@ export default function AgendarInvitadoPage() {
 
             <a className="invitado-menu-item daypass" href="/tarjeta-fidelidad">
               <span className="invitado-menu-icon">
-                <img src="/images/icons/tarjeta-fidelidad.png" alt="" className="invitado-menu-icon-img" />
+                <img src="/images/icons/agendar/tarjeta-fidelidad.png" alt="" className="invitado-menu-icon-img" />
               </span>
               <span className="invitado-menu-text">
                 <p className="invitado-menu-title">¿Eres cliente frecuente?</p>
@@ -292,6 +293,10 @@ export default function AgendarInvitadoPage() {
               </span>
               <span className="invitado-menu-chevron">›</span>
             </a>
+
+            <p className="aviso-privacidad-nota">
+              <a href={AVISO_PRIVACIDAD_URL}>Aviso de privacidad</a>
+            </p>
           </>
         )}
 
@@ -346,6 +351,13 @@ export default function AgendarInvitadoPage() {
             <button className="reservar-btn" type="submit">
               Continuar
             </button>
+            <p className="aviso-privacidad-nota">
+              Tus datos se usan solo para atender tu solicitud. Consulta nuestro{" "}
+              <a href={AVISO_PRIVACIDAD_URL} target="_blank" rel="noopener noreferrer">
+                Aviso de privacidad
+              </a>
+              .
+            </p>
           </form>
         )}
 

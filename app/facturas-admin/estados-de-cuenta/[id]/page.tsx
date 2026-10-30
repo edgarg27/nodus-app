@@ -11,6 +11,7 @@ import { EMISOR } from "@/lib/emisor";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
+import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
 import Link from "next/link";
 
 // Estado de cuenta (como en ZORA): lo que se integró para un cliente, sus pagos y su historial. Desde "Acciones" se
@@ -717,7 +718,7 @@ export default function EstadoDeCuentaPage() {
                                 ▾
                               </button>
                             </td>
-                            <td className="fac-nowrap">{cliente?.numero_usuario != null ? (String(cliente.numero_usuario).startsWith("N-") ? String(cliente.numero_usuario) : "N-" + cliente.numero_usuario) : "—"}</td>
+                            <td className="fac-nowrap">{numeroUsuarioVisible(cliente?.numero_usuario) || "—"}</td>
                             <td className="fac-nowrap">
                               <a href={"/facturas-admin/estados-de-cuenta/" + h.id} style={{ color: "#0d1b3e", textDecoration: "underline" }}>
                                 <b>{h.folio}</b>

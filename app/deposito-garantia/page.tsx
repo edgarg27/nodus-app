@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
+import { CUENTAS_DEPOSITO } from "@/lib/cuentasDeposito";
 import Link from "next/link";
 
 // Cobranza también ve los tres centros (como en Facturación e Ingresos).
@@ -29,6 +30,8 @@ type Deposito = {
   estado: string;
   created_at: string;
   comprobante_url?: string | null;
+  // A qué cuenta cayó (IT CREATIVE / Nova Holding), ver migracion_deposito_cuenta.sql.
+  cuenta_destino?: string | null;
   cliente_nombre?: string;
   cliente_empresa?: string | null;
   // Depósitos "todavía sin pago real": el contrato ya tiene monto de
@@ -63,6 +66,9 @@ export default function DepositoGarantiaPage() {
   const [subiendoParaId, setSubiendoParaId] = useState<string | null>(null);
   const [archivosComprobante, setArchivosComprobante] = useState<File[]>([]);
   const [errorComprobante, setErrorComprobante] = useState("");
+  const [cuentaElegida, setCuentaElegida] = useState("");
+  // "Cambiar cuenta" de un depósito ya realizado.
+  const [cambiandoCuentaId, setCambiandoCuentaId] = useState<string | null>(null);
 
   const esGlobal = ROLES_GLOBALES.includes(miRol);
 
@@ -95,13 +101,10 @@ export default function DepositoGarantiaPage() {
 
   async function fetchDepositos(c: string) {
     setLoading(true);
-    const [{ data: pgs }, { data: contratosConDeposito }] = await Promise.all([
-      supabase
-        .from("pagos")
-        .select("id, user_id, monto, contrato_id, centro, estado, created_at, comprobante_url")
-        .eq("centro", c)
-        .eq("concepto", CONCEPTO_DEPOSITO)
-        .order("created_at", { ascending: false }),
+    const leerDepositos = (columnas: string) =>
+      supabase.from("pagos").select(columnas).eq("centro", c).eq("concepto", CONCEPTO_DEPOSITO).order("created_at", { ascending: false });
+    const [{ data: pgsConCuenta, error: errCuenta }, { data: contratosConDeposito }] = await Promise.all([
+      leerDepositos("id, user_id, monto, contrato_id, centro, estado, created_at, comprobante_url, cuenta_destino"),
       // Contratos que ya tienen monto de depósito capturado pero siguen
       // pre_aprobado — todavía no existe su fila real en `pagos` (nace
       // hasta que se aprueban), pero el staff necesita verlos igual.
@@ -112,6 +115,12 @@ export default function DepositoGarantiaPage() {
         .eq("estatus", "pre_aprobado")
         .gt("deposito_garantia", 0),
     ]);
+    // Si todavía no se corre migracion_deposito_cuenta.sql, la lista se sigue viendo (sin la cuenta).
+    const pgs = (
+      errCuenta && /cuenta_destino/.test(errCuenta.message)
+        ? (await leerDepositos("id, user_id, monto, contrato_id, centro, estado, created_at, comprobante_url")).data
+        : pgsConCuenta
+    ) as unknown as Omit<Deposito, "esPagoReal">[] | null;
 
     const userIds = Array.from(
       new Set([...(pgs || []).map((p) => p.user_id), ...(contratosConDeposito || []).map((c) => c.user_id)].filter(
@@ -164,12 +173,17 @@ export default function DepositoGarantiaPage() {
   function abrirSubidaComprobante(id: string) {
     setErrorComprobante("");
     setArchivosComprobante([]);
+    setCuentaElegida("");
     setSubiendoParaId(id);
   }
 
   async function confirmarConComprobante(id: string) {
     setErrorComprobante("");
     const archivoComprobante = archivosComprobante[0];
+    if (!cuentaElegida) {
+      setErrorComprobante("Elige a qué cuenta cayó el depósito");
+      return;
+    }
     if (!archivoComprobante) {
       setErrorComprobante("Adjunta el comprobante antes de confirmar");
       return;
@@ -188,11 +202,17 @@ export default function DepositoGarantiaPage() {
     }
     const comprobanteUrl = supabase.storage.from("comprobantes").getPublicUrl(fileName).data.publicUrl;
 
-    await fetch("/api/pagos/marcar-pagado", {
+    const res = await fetch("/api/pagos/marcar-pagado", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pagoId: id, comprobanteUrl }),
+      body: JSON.stringify({ pagoId: id, comprobanteUrl, cuentaDestino: cuentaElegida }),
     });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setErrorComprobante(d.error || "No se pudo marcar como realizado");
+      setProcesando(null);
+      return;
+    }
 
     setProcesando(null);
     setSubiendoParaId(null);
@@ -200,7 +220,31 @@ export default function DepositoGarantiaPage() {
     if (centro) fetchDepositos(centro);
   }
 
+  async function cambiarCuenta(id: string, cuentaDestino: string) {
+    setProcesando(id);
+    const res = await fetch("/api/pagos/cuenta-destino", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pagoId: id, cuentaDestino }),
+    });
+    setProcesando(null);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "No se pudo cambiar la cuenta");
+      return;
+    }
+    setCambiandoCuentaId(null);
+    setDepositos((prev) => prev.map((d) => (d.id === id ? { ...d, cuenta_destino: cuentaDestino } : d)));
+  }
+
   const depositosFiltrados = soloPendientes ? depositos.filter((d) => d.estado !== "pagado") : depositos;
+  // Lo ya realizado del centro, por cuenta.
+  const porCuenta = [...CUENTAS_DEPOSITO, "Sin cuenta registrada"].map((cuenta) => {
+    const lista = depositos.filter(
+      (d) => d.esPagoReal && d.estado === "pagado" && (d.cuenta_destino || "Sin cuenta registrada") === cuenta
+    );
+    return { cuenta, cuantos: lista.length, total: lista.reduce((t, d) => t + (Number(d.monto) || 0), 0) };
+  });
 
   return (
     <div className="panel">
@@ -255,6 +299,22 @@ export default function DepositoGarantiaPage() {
               </button>
             </div>
 
+            {porCuenta.some((c) => c.cuantos > 0) && (
+              <div className="dep-cuentas">
+                {porCuenta
+                  .filter((c) => c.cuantos > 0)
+                  .map((c) => (
+                    <div key={c.cuenta} className="dep-cuenta">
+                      <span>🏦 {c.cuenta}</span>
+                      <strong>${c.total.toLocaleString("es-MX", { maximumFractionDigits: 2 })}</strong>
+                      <small>
+                        {c.cuantos} {c.cuantos === 1 ? "depósito realizado" : "depósitos realizados"}
+                      </small>
+                    </div>
+                  ))}
+              </div>
+            )}
+
             {depositosFiltrados.length === 0 ? (
               <div className="empty-card">
                 {soloPendientes ? "Sin depósitos pendientes en " + centro : "Sin depósitos registrados en " + centro}
@@ -286,19 +346,64 @@ export default function DepositoGarantiaPage() {
                         cuanto se apruebe (ahí se calcula con IVA).
                       </p>
                     ) : d.estado === "pagado" ? (
-                      d.comprobante_url && (
-                        <button
-                          type="button"
-                          className="ver-pdf-btn"
-                          onClick={() => abrirComprobante(d.id, d.comprobante_url!)}
-                          disabled={abriendoComprobanteId === d.id}
-                          style={{ marginTop: 8, display: "inline-block" }}
-                        >
-                          {abriendoComprobanteId === d.id ? "Abriendo…" : "👁️ Ver comprobante"}
-                        </button>
-                      )
+                      <div className="dep-pagado">
+                        {cambiandoCuentaId === d.id ? (
+                          <div className="dep-cuenta-elegir">
+                            <span className="dep-cuenta-pregunta">¿A qué cuenta cayó?</span>
+                            {CUENTAS_DEPOSITO.map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                className={"dep-cuenta-btn" + (d.cuenta_destino === c ? " activa" : "")}
+                                onClick={() => cambiarCuenta(d.id, c)}
+                                disabled={procesando === d.id}
+                              >
+                                {c}
+                              </button>
+                            ))}
+                            <button type="button" className="tel-borrar-btn" onClick={() => setCambiandoCuentaId(null)}>
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <p className={"dep-cuenta-dato" + (d.cuenta_destino ? "" : " falta")}>
+                            🏦 {d.cuenta_destino ? `Cayó en ${d.cuenta_destino}` : "Sin cuenta registrada"}
+                            <button type="button" className="tel-borrar-btn" onClick={() => setCambiandoCuentaId(d.id)}>
+                              {d.cuenta_destino ? "Cambiar" : "Registrar cuenta"}
+                            </button>
+                          </p>
+                        )}
+                        {d.comprobante_url && (
+                          <button
+                            type="button"
+                            className="ver-pdf-btn"
+                            onClick={() => abrirComprobante(d.id, d.comprobante_url!)}
+                            disabled={abriendoComprobanteId === d.id}
+                            style={{ display: "inline-block" }}
+                          >
+                            {abriendoComprobanteId === d.id ? "Abriendo…" : "👁️ Ver comprobante"}
+                          </button>
+                        )}
+                      </div>
                     ) : subiendoParaId === d.id ? (
                       <div style={{ marginTop: 8 }}>
+                        <p className="sub-label">¿A qué cuenta cayó el depósito?</p>
+                        <div className="dep-cuenta-elegir" style={{ marginBottom: 10 }}>
+                          {CUENTAS_DEPOSITO.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              className={"dep-cuenta-btn" + (cuentaElegida === c ? " activa" : "")}
+                              onClick={() => {
+                                setCuentaElegida(c);
+                                setErrorComprobante("");
+                              }}
+                              aria-pressed={cuentaElegida === c}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
                         <p className="sub-label">Adjunta el comprobante del depósito</p>
                         <FileDropzone
                           files={archivosComprobante}

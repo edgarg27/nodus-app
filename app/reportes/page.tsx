@@ -1,5 +1,8 @@
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 import ProspectosPorMedio from "@/app/components/ProspectosPorMedio";
+import VentasPorCentro from "@/app/components/VentasPorCentro";
+import SeguimientoEquipo from "@/app/components/SeguimientoEquipo";
+import HistorialFacturas from "@/app/components/HistorialFacturas";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
@@ -20,7 +23,7 @@ export default async function ReportesPage() {
 
   if (profile?.rol === "cliente") redirect("/dashboard-cliente");
 
-  const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
+  const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;
 
@@ -148,8 +151,17 @@ export default async function ReportesPage() {
       </div>
 
       <div className="rep-content">
+        <p className="rep-section-label">💼 Ventas por centro</p>
+        <VentasPorCentro esGlobal={esGlobal} centroFijo={miCentro} />
+
         <p className="rep-section-label">📣 Prospectos y ventas por medio</p>
-        <ProspectosPorMedio esGlobal={esGlobal || profile?.rol === "gerente_ventas"} centroFijo={miCentro} />
+        <ProspectosPorMedio esGlobal={esGlobal} centroFijo={miCentro} />
+
+        <p className="rep-section-label">📋 Seguimiento de prospectos del equipo</p>
+        <SeguimientoEquipo esGlobal={esGlobal} centroFijo={miCentro} />
+
+        <p className="rep-section-label">🧾 Historial de facturas</p>
+        <HistorialFacturas esGlobal={esGlobal} centroFijo={miCentro} />
 
         <p className="rep-section-label">🏢 Ocupación por centro</p>
         {ocupacion.length === 0 ? (

@@ -5453,9 +5453,15 @@ a.stat-card {
 }
 
 .invitado-menu-icon-img {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
+}
+
+/* Los boletos de Day Pass y la tarjeta de cliente frecuente son anchos: ocupan casi todo el recuadro. */
+.invitado-menu-item.daypass .invitado-menu-icon-img {
+  width: 38px;
+  height: 38px;
 }
 
 .invitado-menu-text {
@@ -9500,6 +9506,47 @@ a.stat-card {
 .pm-tabla-wrap {
   overflow-x: auto;
 }
+
+/* Pestañas "Por centro / Por cliente / Por mes" del historial de facturas (/reportes). */
+.pm-vistas {
+  display: inline-flex;
+  gap: 4px;
+  background: #f2f4f9;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 10px;
+}
+
+.pm-vistas button {
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7897;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pm-vistas button.activa {
+  background: #fff;
+  color: #0d1b3e;
+  box-shadow: 0 1px 3px rgba(13, 27, 62, 0.12);
+}
+
+.pm-filtros input[type="search"] {
+  flex: 1;
+  min-width: 180px;
+}
+
+.pm-link {
+  color: #f07e3a;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+}
+
 .pm-tabla {
   width: 100%;
   min-width: 640px;
@@ -9576,4 +9623,155 @@ a.stat-card {
 }
 .pm-nowrap {
   white-space: nowrap;
+}
+
+/* Depósito en garantía: a qué cuenta cayó (IT CREATIVE / Nova Holding). */
+.dep-cuentas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+
+.dep-cuenta {
+  background: #fff;
+  border: 1px solid #e6e9f2;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dep-cuenta span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7897;
+}
+
+.dep-cuenta strong {
+  font-size: 18px;
+  color: #0d1b3e;
+}
+
+.dep-cuenta small {
+  font-size: 11px;
+  color: #8a93a8;
+}
+
+.dep-pagado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.dep-cuenta-dato {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f6e56;
+}
+
+.dep-cuenta-dato.falta {
+  color: #854f0b;
+}
+
+.dep-cuenta-elegir {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.dep-cuenta-pregunta {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0d1b3e;
+}
+
+.dep-cuenta-btn {
+  border: 1.5px solid #dde3ef;
+  background: #fff;
+  color: #0d1b3e;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dep-cuenta-btn:hover {
+  border-color: #f07e3a;
+}
+
+.dep-cuenta-btn.activa {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+/* Aviso de privacidad (/aviso-privacidad) y sus enlaces en el login y en "Agendar sin cuenta". */
+.aviso-privacidad {
+  line-height: 1.6;
+  color: #333;
+  font-size: 14px;
+}
+
+.aviso-privacidad-intro {
+  font-size: 15px;
+  color: #0d1b3e;
+}
+
+.aviso-privacidad h2 {
+  font-size: 16px;
+  color: #0d1b3e;
+  margin: 22px 0 6px;
+}
+
+.aviso-privacidad ol {
+  margin: 6px 0;
+  padding-left: 22px;
+}
+
+.aviso-privacidad li {
+  margin-bottom: 6px;
+}
+
+.aviso-privacidad a,
+.aviso-privacidad-nota a {
+  color: #f07e3a;
+  font-weight: 600;
+}
+
+.aviso-privacidad-contacto {
+  margin-top: 22px;
+}
+
+.aviso-privacidad-fecha {
+  font-size: 12px;
+  color: #888;
+  margin-top: 8px;
+}
+
+.aviso-privacidad-nota {
+  font-size: 12px;
+  color: #8a93a8;
+  text-align: center;
+  margin: 12px 0 0;
+}
+
+.login-aviso {
+  text-align: center;
+  font-size: 12px;
+  color: #8a93a8;
+  text-decoration: none;
+}
+
+.login-aviso:hover {
+  text-decoration: underline;
 }
