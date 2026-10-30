@@ -19,6 +19,10 @@ docker compose up -d
 echo "==> Limpiando imágenes viejas"
 docker image prune -f >/dev/null
 
+echo "==> Limpiando temporales de compilación (más de 3 días)"
+# Se conservan los recientes para que el siguiente despliegue no tarde de más; si falla, no detiene el despliegue.
+docker builder prune -f --filter until=72h >/dev/null || true
+
 echo "==> Estado"
 docker compose ps
 echo
