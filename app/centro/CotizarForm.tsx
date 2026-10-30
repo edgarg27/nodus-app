@@ -178,6 +178,7 @@ export default function CotizarForm({
   prospectoEmailPreseleccionado,
   prospectoInteresPreseleccionado,
   prospectoRfcPreseleccionado,
+  permiteRenovacion = true,
 }: {
   centro: string;
   clientePreseleccionadoId?: string;
@@ -199,6 +200,9 @@ export default function CotizarForm({
   prospectoEmailPreseleccionado?: string;
   prospectoInteresPreseleccionado?: string;
   prospectoRfcPreseleccionado?: string;
+  // false para quien no puede modificar contratos (Ejecutiva de Ventas): sin
+  // esto la renovación "se guardaba" pero la base la rechazaba sin avisar.
+  permiteRenovacion?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -2314,7 +2318,7 @@ export default function CotizarForm({
 
       {/* Renovación de contrato existente — solo tiene sentido con un
           cliente real ya seleccionado (no un prospecto). */}
-      {!!clienteId && (
+      {!!clienteId && permiteRenovacion && (
         <div>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
             <input

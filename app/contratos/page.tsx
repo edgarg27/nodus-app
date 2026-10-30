@@ -11,6 +11,7 @@ import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
 import ContratosVentas from "./ContratosVentas";
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 // Lead de la pestaña Prospectos de Centro — todavía sin cuenta (profiles.id).
 // "+ Nuevo contrato" liga uno de estos, nunca un cliente ya existente: la
@@ -136,9 +137,11 @@ export default function ContratosPage() {
 
   async function init() {
     setLoading(true);
+    // getSession lee la sesión ya guardada (el middleware ya la validó), sin ir a la red.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const rol = profile?.rol || "";
@@ -160,21 +163,20 @@ export default function ContratosPage() {
 
   async function fetchTodo(c: string) {
     setLoading(true);
-    const { data: clis } = await supabase
-      .from("profiles")
-      .select("id, nombre, email, empresa, telefono")
-      .eq("rol", "cliente")
-      .eq("centro", c)
-      .order("nombre");
-
-    const { data: prospectos } = await supabase
-      .from("prospectos")
-      .select("id, nombre, telefono, email, empresa, rfc, dia_pago")
-      .eq("centro", c)
-      .order("created_at", { ascending: false });
+    // Las cuatro consultas no dependen entre sí: van al mismo tiempo (antes
+    // iban en fila y la pantalla tardaba ~3 s).
+    const [{ data: clis }, { data: prospectos }, { data: ofs }, { data: conts }] = await Promise.all([
+      supabase.from("profiles").select("id, nombre, email, empresa, telefono").eq("rol", "cliente").eq("centro", c).order("nombre"),
+      supabase
+        .from("prospectos")
+        .select("id, nombre, telefono, email, empresa, rfc, dia_pago")
+        .eq("centro", c)
+        .order("created_at", { ascending: false }),
+      supabase.from("oficinas").select("id, numero, tipo, estado").eq("centro", c),
+      supabase.from("contratos").select("*").eq("centro", c).order("created_at", { ascending: false }),
+    ]);
     setProspectosBusqueda(prospectos || []);
 
-    const { data: ofs } = await supabase.from("oficinas").select("id, numero, tipo, estado").eq("centro", c);
     // .order("numero") de Supabase ordena como texto (1, 10, 11, 2, 20...) —
     // aquí se ordena numéricamente (1, 2, 3...) y, si empatan, por tipo.
     setOficinasDisponibles(
@@ -196,12 +198,6 @@ export default function ContratosPage() {
       emailPorId[cl.id] = cl.email;
       telefonoPorId[cl.id] = cl.telefono;
     });
-
-    const { data: conts } = await supabase
-      .from("contratos")
-      .select("*")
-      .eq("centro", c)
-      .order("created_at", { ascending: false });
 
     // Contratos creados desde Cotizar no tienen "plan" — su origen (paquete
     // y/o oficina) se resuelve vía cotizacion_id → cotizaciones_comerciales.
@@ -606,9 +602,9 @@ export default function ContratosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Contratos</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {centrosDisponibles.length > 1 && (

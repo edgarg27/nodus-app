@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ImagenPrivada from "@/app/components/ImagenPrivada";
 import FileDropzone from "./FileDropzone";
+import Link from "next/link";
 
 type Ticket = {
   id: string;
@@ -40,6 +41,9 @@ const URGENCIAS = [
 export default function SoportePage() {
   const supabase = createClient();
   const [nombre, setNombre] = useState("Cliente");
+  // Regresar: el cliente vuelve a su panel; la Ejecutiva de Ventas (que también
+  // reporta desde aquí) vuelve al panel del staff.
+  const [panel, setPanel] = useState("/dashboard-cliente");
   const [asunto, setAsunto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -66,10 +70,11 @@ export default function SoportePage() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("nombre")
+      .select("nombre, rol")
       .eq("id", user.id)
       .single();
     if (profile?.nombre) setNombre(profile.nombre);
+    if (profile?.rol && profile.rol !== "cliente") setPanel("/dashboard");
 
     const { data } = await supabase
       .from("tickets")
@@ -261,9 +266,9 @@ export default function SoportePage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href={panel}>
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Soporte y Mantenimiento</p>
         <p className="rep-sub">{nombre}</p>
       </div>

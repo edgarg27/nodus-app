@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
 import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import AvisoExito from "@/app/components/AvisoExito";
+import Link from "next/link";
 
 // Adicionales: cobros sueltos que el admin le pone a un cliente fuera de su
 // contrato (una hora extra de sala de juntas, copias, frituras…). Cada uno es
@@ -225,9 +226,9 @@ export default function AdicionalesPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Adicionales</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && (

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import AceptoPolitica from "@/app/components/AceptoPolitica";
 import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
 import { conceptoParaCliente } from "@/lib/adicionales";
+import Link from "next/link";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 const OPENPAY_JS = "https://resources.openpay.mx/lib/openpay-js/1.2.38/openpay.v1.min.js";
@@ -268,9 +269,9 @@ function PagarTarjetaInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Pagar con tarjeta</p>
       </div>
       <div className="sub-content">

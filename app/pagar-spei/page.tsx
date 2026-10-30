@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import AceptoPolitica from "@/app/components/AceptoPolitica";
 import { POLITICA_CANCELACION_VERSION } from "@/lib/politicaCancelacion";
+import Link from "next/link";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -139,9 +140,9 @@ function PagarSpeiInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Pagar por SPEI</p>
         <p className="rep-sub">Factura {folio}</p>
       </div>

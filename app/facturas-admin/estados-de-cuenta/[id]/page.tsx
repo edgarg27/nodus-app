@@ -11,6 +11,7 @@ import { EMISOR } from "@/lib/emisor";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
+import Link from "next/link";
 
 // Estado de cuenta (como en ZORA): lo que se integró para un cliente, sus pagos y su historial. Desde "Acciones" se
 // timbra (aquí se elige el método y la forma de pago), se envía o imprime, se edita el concepto y la fecha, se registran
@@ -417,9 +418,9 @@ export default function EstadoDeCuentaPage() {
   return (
     <div className="panel">
       <div className="rep-header no-imprimir">
-        <a className="rep-back" href="/facturas-admin/estados-de-cuenta">
+        <Link className="rep-back" href="/facturas-admin/estados-de-cuenta">
           ← Estados de cuenta
-        </a>
+        </Link>
         <p className="rep-title">Estado de cuenta</p>
         <p className="rep-sub">{factura ? factura.folio : "Cargando..."}</p>
       </div>

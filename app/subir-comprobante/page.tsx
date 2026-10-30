@@ -3,6 +3,7 @@
 import { useMemo, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 const COLORES_CONFETTI = ["#f07e3a", "#0d1b3e", "#2bbd7e", "#ffd166", "#5b8dee"];
 
@@ -131,9 +132,9 @@ function SubirComprobanteInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Subir comprobante</p>
         <p className="rep-sub">
           Factura {folio} · ${Number(monto).toLocaleString("es-MX")}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
+import Link from "next/link";
 
 // Cobranza también ve los tres centros (como en Facturación e Ingresos).
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
@@ -204,9 +205,9 @@ export default function DepositoGarantiaPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Depósito en garantía</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (

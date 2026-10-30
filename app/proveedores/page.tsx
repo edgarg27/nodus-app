@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 type Proveedor = {
   id: string;
@@ -154,9 +155,9 @@ export default function ProveedoresPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Proveedores</p>
         <p className="rep-sub">{esGlobal ? "Todos los centros" : miCentro || "Tu centro"}</p>
       </div>

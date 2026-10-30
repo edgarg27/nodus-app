@@ -20,6 +20,7 @@ const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "atencion_cliente",
 // qué centro va el tour (antes no podían agendar y el aviso decía que
 // faltaba nombre/fecha).
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 const CENTROS_TOUR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const TIPOS_ESPACIO_INTERES = ["Coworking", "Oficina Privada", "Working Desk", "Sala de Juntas"];
@@ -176,9 +177,9 @@ export default function ToursPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Tours</p>
         <p className="rep-sub">{centrosRol ? centrosRol.join(" · ") : esGlobal ? "Todos los centros" : centro || "Selecciona un centro"}</p>
       </div>

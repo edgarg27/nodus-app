@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { exportarExcelPorCentro } from "@/lib/exportExcel";
+import Link from "next/link";
 
 type Extension = {
   id: string;
@@ -225,9 +226,9 @@ export default function TelefoniaPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Telefonía</p>
         <p className="rep-sub">Extensiones, DID e internet por centro</p>
       </div>

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { esSuperadmin } from "@/lib/roles";
+import { CENTROS_POR_ROL, esSuperadmin } from "@/lib/roles";
 import { empresasDistintas } from "@/lib/empresa";
 import { diasSinServicio, festivosMx, type DiaCentro } from "@/lib/festivosMx";
+import Link from "next/link";
 
 // Quién puede agregar/quitar días sin servicio (mismo criterio que la política
 // RLS de dias_centro, ver migracion_permisos_diseno_ventas.sql). Diseño también
@@ -100,6 +101,11 @@ export default function ExperienciaClientePage() {
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(profile?.centro || CENTROS_SUGERIDOS[0]);
+    } else if (CENTROS_POR_ROL[rol]) {
+      // Ejecutiva de Ventas: elige entre los centros de León.
+      const centrosRol = CENTROS_POR_ROL[rol];
+      setCentrosDisponibles(centrosRol);
+      setCentro(profile?.centro && centrosRol.includes(profile.centro) ? profile.centro : centrosRol[0]);
     } else {
       setCentro(profile?.centro || null);
     }
@@ -135,12 +141,12 @@ export default function ExperienciaClientePage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Calendario de Eventos</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
-        {esGlobal && centrosDisponibles.length > 1 && (
+        {(esGlobal || !!CENTROS_POR_ROL[miRol]) && centrosDisponibles.length > 1 && (
           <div className="centro-selector">
             <select value={centro || ""} onChange={(e) => setCentro(e.target.value)}>
               {centrosDisponibles.map((c) => (

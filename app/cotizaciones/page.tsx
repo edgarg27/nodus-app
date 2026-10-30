@@ -8,6 +8,7 @@ import ModalDatosFiscales from "./ModalDatosFiscales";
 import type { DatosFiscales, TipoPersonaFiscal } from "@/lib/datosFiscales";
 
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 
@@ -57,8 +58,10 @@ export default function CotizacionesPage() {
 
   async function fetchCotizaciones(c: string, rol: string) {
     let query = supabase.from("cotizaciones").select("*").order("created_at", { ascending: false });
-    // Ejecutiva de Ventas ve las de todos los centros (las que no son de León, de solo consulta).
-    if (!ROLES_GLOBALES.includes(rol) && !CENTROS_POR_ROL[rol]) query = query.eq("centro", c);
+    // Ejecutiva de Ventas: solo las de sus centros (León); la base también la limita
+    // (migracion_rol_ejecutiva_ventas_7.sql).
+    if (CENTROS_POR_ROL[rol]) query = query.in("centro", CENTROS_POR_ROL[rol]);
+    else if (!ROLES_GLOBALES.includes(rol)) query = query.eq("centro", c);
     const { data } = await query;
     setCotizaciones(data || []);
   }
@@ -118,11 +121,11 @@ export default function CotizacionesPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Cotizaciones</p>
-        <p className="rep-sub">{CENTROS_POR_ROL[miRol] ? "Todos los centros" : centro || "Selecciona un centro"}</p>
+        <p className="rep-sub">{CENTROS_POR_ROL[miRol] ? CENTROS_POR_ROL[miRol].join(" · ") : centro || "Selecciona un centro"}</p>
       </div>
 
       <div className="rep-content">

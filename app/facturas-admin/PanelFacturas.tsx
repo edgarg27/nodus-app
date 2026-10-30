@@ -8,6 +8,7 @@ import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { FORMAS_PAGO_SAT } from "@/lib/formasPagoSat";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
+import Link from "next/link";
 
 // ---- Íconos de Facturas timbradas (trazo simple, toman el color del texto) ----
 const Svg = ({ children }: { children: ReactNode }) => (
@@ -866,9 +867,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Facturación
-        </a>
+        </Link>
         <p className="rep-title">{modo === "timbradas" ? "Facturas timbradas" : "Estados de cuenta"}</p>
         <p className="rep-sub">
           {centro || "Selecciona un centro"}

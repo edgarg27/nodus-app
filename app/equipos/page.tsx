@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
+import Link from "next/link";
 
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const TIPOS_EQUIPO = ["Laptop", "Computadora de escritorio", "Celular", "Tablet", "Monitor", "Impresora", "Otro"];
@@ -851,9 +852,9 @@ export default function EquiposPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Equipos Asignados</p>
         <p className="rep-sub">Quién tiene qué equipo, en todos los centros</p>
       </div>

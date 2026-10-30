@@ -2,6 +2,7 @@ import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 import ProspectosPorMedio from "@/app/components/ProspectosPorMedio";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 
 export default async function ReportesPage() {
   const supabase = createClient();
@@ -137,9 +138,9 @@ export default async function ReportesPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Reportes</p>
         <p className="rep-sub">
           {esGlobal ? "Estadísticas de todos los centros" : `Estadísticas de ${miCentro || "tu centro"}`}

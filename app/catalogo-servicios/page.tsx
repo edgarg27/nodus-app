@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ServicioCatalogo } from "@/lib/catalogoServicios";
+import Link from "next/link";
 
 // Servicios: quien puede editar el catálogo (ventasit@nodusbc.mx, finanzas@nodusbc.mx y el superadmin) agrega o
 // quita servicios y sus claves del SAT. No tienen precio fijo: el precio lo pone quien cobra, según el cliente. Las demás personas solo los eligen en
@@ -99,9 +100,9 @@ export default function CatalogoServiciosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/facturas-admin">
+        <Link className="rep-back" href="/facturas-admin">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Catálogo de conceptos</p>
         <p className="rep-sub">Los servicios adicionales que se cobran y se facturan, con su clave del SAT · el precio lo pone quien cobra, según el cliente</p>
       </div>

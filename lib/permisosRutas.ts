@@ -111,7 +111,8 @@ const RUTAS_EJECUTIVA_VENTAS = [
   "/sala-juntas",
   "/tours",
   "/experiencia-cliente",
-  "/tickets",
+  // Reporta como un cliente: la misma pantalla de Soporte, no la de Tickets del staff.
+  "/soporte",
   "/documentacion-centro",
 ];
 

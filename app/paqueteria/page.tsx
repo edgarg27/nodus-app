@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ImagenPrivada from "@/app/components/ImagenPrivada";
 import FileDropzone from "../soporte/FileDropzone";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 
@@ -206,9 +207,9 @@ export default function PaqueteriaPage() {
     return (
       <div className="panel">
         <div className="rep-header">
-          <a className="rep-back" href="/dashboard">
+          <Link className="rep-back" href="/dashboard">
             ← Regresar
-          </a>
+          </Link>
           <p className="rep-title">Paquetería y Mensajería</p>
           <p className="rep-sub">Cargando...</p>
         </div>
@@ -230,9 +231,9 @@ export default function PaqueteriaPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href={rutaRegresar}>
+        <Link className="rep-back" href={rutaRegresar}>
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Paquetería y Mensajería</p>
         <p className="rep-sub">{esStaff ? centro || nombre : nombre}</p>
       </div>

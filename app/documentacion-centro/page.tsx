@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useCentroAdmin } from "@/lib/useCentroAdmin";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
+import Link from "next/link";
 
 const BUCKET = "documentacion-centro";
 
@@ -341,9 +342,9 @@ export default function DocumentacionCentroPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Documentación del centro</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && (

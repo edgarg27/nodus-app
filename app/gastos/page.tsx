@@ -6,6 +6,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "../soporte/FileDropzone";
 import ResumenGastos from "./ResumenGastos";
 import { fechaLocal } from "@/lib/fechaMexico";
+import Link from "next/link";
 
 type Gasto = {
   id: string;
@@ -220,9 +221,9 @@ export default function GastosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Gastos</p>
         <p className="rep-sub">
           {esGlobal

@@ -6,6 +6,7 @@ import { useCentroAdmin } from "@/lib/useCentroAdmin";
 import { pedirLinkFirmado } from "@/lib/storage";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import AvisoExito from "@/app/components/AvisoExito";
+import Link from "next/link";
 
 // Expediente de clientes: los archivos que la administradora tenga de cada
 // cliente (identificación, constancia fiscal, comprobantes, contrato…).
@@ -118,7 +119,11 @@ function oficinaDe(c: Cliente) {
 
 export default function ExpedientesPage() {
   const supabase = createClient();
-  const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(["gerente", "gerente_ventas", "ejecutiva_ventas"], ["gerente", "gerente_ventas"]);
+  const { cargando, rol, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(["gerente", "gerente_ventas", "ejecutiva_ventas"], ["gerente", "gerente_ventas"]);
+  // La Gerente de Ventas solo consulta: ve y abre lo que sube la admin, pero
+  // no sube, reemplaza, renombra ni borra (también lo impide la base, ver
+  // migracion_expedientes_gerente_ventas_consulta.sql).
+  const soloConsulta = rol === "gerente_ventas";
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [conteoPorCliente, setConteoPorCliente] = useState<Record<string, number>>({});
@@ -418,9 +423,9 @@ export default function ExpedientesPage() {
             ← Regresar
           </button>
         ) : (
-          <a className="rep-back" href="/dashboard">
+          <Link className="rep-back" href="/dashboard">
             ← Regresar
-          </a>
+          </Link>
         )}
         <p className="rep-title">Expediente de clientes</p>
         <p className="rep-sub">{clienteSel ? clienteSel.nombre || "Cliente" : centro || "Selecciona un centro"}</p>
@@ -448,8 +453,9 @@ export default function ExpedientesPage() {
           // ---------- Lista de clientes ----------
           <>
             <p style={{ fontSize: 12, color: "#aaa", margin: "0 0 10px" }}>
-              Elige un cliente para ver y subir los documentos de su expediente: identificación, constancia fiscal,
-              comprobantes, contrato o lo que tengas de él.
+              {soloConsulta
+                ? "Elige un cliente para ver los documentos de su expediente. Solo consulta: los documentos los sube la administración."
+                : "Elige un cliente para ver y subir los documentos de su expediente: identificación, constancia fiscal, comprobantes, contrato o lo que tengas de él."}
             </p>
             <input
               type="text"
@@ -566,6 +572,7 @@ export default function ExpedientesPage() {
                           {abriendoId === a.id ? "Abriendo…" : "Ver"}
                         </button>
                       )}
+                      {!soloConsulta && (
                       <button
                         type="button"
                         className="tel-borrar-btn"
@@ -578,7 +585,9 @@ export default function ExpedientesPage() {
                       >
                         {ocupado ? "Subiendo…" : a ? "Reemplazar" : "Seleccionar archivo"}
                       </button>
-                      {a && (
+                      )}
+                      {!a && soloConsulta && <span style={{ fontSize: 12, color: "#aaa" }}>Pendiente</span>}
+                      {a && !soloConsulta && (
                         <button type="button" className="tel-borrar-btn" onClick={() => setBorrando(a)}>
                           Eliminar
                         </button>
@@ -593,6 +602,7 @@ export default function ExpedientesPage() {
               <p className="sub-label" style={{ margin: 0 }}>
                 Otros documentos {archivos.filter((a) => !a.tipo_documento).length > 0 ? `(${archivos.filter((a) => !a.tipo_documento).length})` : ""}
               </p>
+              {!soloConsulta && (
               <button
                 type="button"
                 className="btn-aceptar"
@@ -603,9 +613,10 @@ export default function ExpedientesPage() {
               >
                 {mostrarSubida ? "Cerrar" : "Subir documentos"}
               </button>
+              )}
             </div>
 
-            {mostrarSubida && (
+            {mostrarSubida && !soloConsulta && (
               <div className="form-card" style={{ marginBottom: 10 }}>
                 <FileDropzone
                   files={archivosNuevos}
@@ -638,7 +649,7 @@ export default function ExpedientesPage() {
             ) : (
               <>
                 {archivosLibres.length === 0 && archivosDeContrato.length === 0 && (
-                  <div className="empty-card">No hay otros documentos. Sube lo que más tengas del cliente.</div>
+                  <div className="empty-card">{soloConsulta ? "No hay otros documentos." : "No hay otros documentos. Sube lo que más tengas del cliente."}</div>
                 )}
 
                 {archivosLibres.map((a) => {
@@ -683,16 +694,20 @@ export default function ExpedientesPage() {
                             >
                               {abriendoId === a.id ? "Abriendo…" : "Ver"}
                             </button>
-                            <button
-                              className="tel-borrar-btn"
-                              style={{ color: "#0d1b3e", fontWeight: 600 }}
-                              onClick={() => setRenombrando({ id: a.id, valor: a.nombre })}
-                            >
-                              Renombrar
-                            </button>
-                            <button className="tel-borrar-btn" onClick={() => setBorrando(a)}>
-                              Eliminar
-                            </button>
+                            {!soloConsulta && (
+                              <>
+                                <button
+                                  className="tel-borrar-btn"
+                                  style={{ color: "#0d1b3e", fontWeight: 600 }}
+                                  onClick={() => setRenombrando({ id: a.id, valor: a.nombre })}
+                                >
+                                  Renombrar
+                                </button>
+                                <button className="tel-borrar-btn" onClick={() => setBorrando(a)}>
+                                  Eliminar
+                                </button>
+                              </>
+                            )}
                           </div>
                         </>
                       )}

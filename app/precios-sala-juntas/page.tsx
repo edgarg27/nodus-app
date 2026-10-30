@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -151,9 +152,9 @@ export default function PreciosSalaJuntasPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Precios Sala de Juntas</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (

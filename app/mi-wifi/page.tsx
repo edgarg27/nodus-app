@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { esClienteCoworking } from "@/lib/coworking";
+import Link from "next/link";
 
 type Voucher = {
   id: string;
@@ -197,9 +198,9 @@ export default function MiWifiPage() {
   return (
     <div className="rep-page">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">WiFi</p>
         <p className="rep-sub">{centro || "Tu centro"}</p>
       </div>

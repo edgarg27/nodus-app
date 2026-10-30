@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { diasSinServicio, proximosDiasSinServicio, type DiaCentro } from "@/lib/festivosMx";
+import Link from "next/link";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -158,9 +159,9 @@ export default function CalendarioEventosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Calendario de Eventos</p>
         <p className="rep-sub">{centro || "Tu centro"}</p>
       </div>

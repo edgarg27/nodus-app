@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import CotizarForm from "@/app/centro/CotizarForm";
 
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -36,6 +37,7 @@ function RegistrarPlanInner() {
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [miRol, setMiRol] = useState("");
 
   const esGlobal = centrosDisponibles.length > 1;
 
@@ -52,6 +54,7 @@ function RegistrarPlanInner() {
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     const rol = profile?.rol || "";
+    setMiRol(rol);
     const centrosRol = CENTROS_POR_ROL[rol];
     if (ROLES_GLOBALES.includes(rol)) {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
@@ -69,9 +72,9 @@ function RegistrarPlanInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Cotizar</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {esGlobal && centrosDisponibles.length > 1 && (
@@ -106,6 +109,8 @@ function RegistrarPlanInner() {
             centro={centro}
             clientePreseleccionadoId={clienteIdPreseleccionado}
             onRegistrado={() => setRefreshKey((k) => k + 1)}
+            // Contratos es solo consulta para la Ejecutiva de Ventas: no renueva.
+            permiteRenovacion={miRol !== "ejecutiva_ventas"}
             tipoEspacioPreseleccionado={tipoEspacioDesdeUrl}
             oficinaPreseleccionadaId={oficinaIdDesdeUrl}
             paquetePreseleccionadoId={paqueteIdDesdeUrl}

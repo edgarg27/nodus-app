@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
 
 type Logro = {
   id: string;
@@ -109,9 +110,9 @@ export default function LogrosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Logros</p>
         <p className="rep-sub">{nombre}</p>
       </div>

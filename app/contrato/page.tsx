@@ -7,6 +7,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { conIva, totalAdicionalesMensuales } from "@/lib/adicionales";
 import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
 import { fechaLocal } from "@/lib/fechaMexico";
+import Link from "next/link";
 
 type Adicional = { id: string; concepto: string; cantidad: number | null; monto: number | null };
 
@@ -202,9 +203,9 @@ export default function ContratoPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard-cliente">
+        <Link className="rep-back" href="/dashboard-cliente">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Mi Contrato</p>
         <p className="rep-sub">{sub}</p>
       </div>

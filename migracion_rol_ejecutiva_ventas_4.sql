@@ -2,6 +2,8 @@
 --
 --   Cotizar        cotiza solo en León (lee planes, adicionales y precios de León).
 --   Cotizaciones   ve las de todos los centros; crea, cambia y borra solo las de León.
+--                  (Ver: ahora solo León, lo cambia migracion_rol_ejecutiva_ventas_7.sql;
+--                  correr el _7 DESPUÉS si se vuelve a correr este.)
 --   Contratos      ve solo los de León, de solo consulta (sin escribir).
 --
 -- Las políticas se AGREGAN; no se toca ninguna de los demás roles. Usa

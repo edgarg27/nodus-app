@@ -5,6 +5,7 @@ import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { conceptoParaCliente } from "@/lib/adicionales";
+import Link from "next/link";
 
 // "Pagar todo junto": junta en un solo total lo que el cliente tiene
 // pendiente — facturas pendientes/vencidas y los otros pagos sueltos (renta,
@@ -76,9 +77,9 @@ function PagarTodoInner() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/estado-cuenta">
+        <Link className="rep-back" href="/estado-cuenta">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Estado de cuenta</p>
       </div>
       <div className="sub-content">

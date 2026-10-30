@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import MapaConPines from "./MapaConPines";
+import Link from "next/link";
 
 // Operaciones necesita moverse entre todos los centros para poder subir el
 // layout de cada uno (es quien registra los planos), igual que ya puede
@@ -129,9 +130,9 @@ export default function MapaOficinasPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Mapa de Oficinas</p>
         <p className="rep-sub">{centro || "Selecciona un centro"}</p>
         {centrosDisponibles.length > 1 && (

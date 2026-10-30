@@ -14,6 +14,7 @@ import SeguimientoModal, {
 } from "./SeguimientoModal";
 
 import { CENTROS_POR_ROL } from "@/lib/roles";
+import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -104,9 +105,14 @@ export default function ProspectosPage() {
 
   async function init() {
     setLoading(true);
+    // La lista no depende del perfil: se pide al mismo tiempo (antes eran 6
+    // consultas en fila y la pantalla tardaba ~3.5 s). getSession lee la sesión
+    // ya guardada en el navegador (el middleware ya la validó), sin ir a la red.
+    const listaLista = cargarProspectos();
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return;
     const { data: profile } = await supabase.from("profiles").select("rol, centro, nombre").eq("id", user.id).single();
     const rol = profile?.rol || "";
@@ -127,7 +133,7 @@ export default function ProspectosPage() {
     // El admin de un centro abre viendo su centro; los roles globales, todos.
     setFCentro(ROLES_GLOBALES.includes(rol) ? "" : profile?.centro || "");
     setFormProspecto((f) => ({ ...f, centroInteres: miCentro || "" }));
-    await cargarProspectos();
+    await listaLista;
     setLoading(false);
   }
 
@@ -135,21 +141,21 @@ export default function ProspectosPage() {
     // Sin filtrar por centro a propósito — un prospecto puede interesarse en
     // cualquier Nodus, y cualquier admin debe poder ver y dar seguimiento a
     // todos los prospectos, no solo los de un centro.
-    const { data } = await supabase.from("prospectos").select("*").order("created_at", { ascending: false });
-    const lista = data || [];
-    setProspectos(lista);
-    await marcarSeguimientoAutomatico(lista);
-
+    // Prospectos y actividades van al mismo tiempo; las actividades se quedan
+    // solo con las de prospectos de la lista (lo que antes hacía el .in()).
     // Actividades de seguimiento (ver migracion_prospectos_actividades.sql). Si la
     // migración aún no se corrió, la consulta falla y la lista solo sale vacía.
-    let actividades: ActividadProspecto[] = [];
-    if (lista.length > 0) {
-      const { data: filas } = await supabase
-        .from("prospecto_actividades")
-        .select("*")
-        .in("prospecto_id", lista.map((p) => p.id));
-      actividades = filas || [];
-    }
+    const [{ data }, { data: filas }] = await Promise.all([
+      supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
+      supabase.from("prospecto_actividades").select("*"),
+    ]);
+    const lista = data || [];
+    setProspectos(lista);
+    // No se espera: solo ajusta el estado de algunos y actualiza la lista sola.
+    marcarSeguimientoAutomatico(lista);
+
+    const idsLista = new Set(lista.map((p) => p.id));
+    const actividades: ActividadProspecto[] = ((filas || []) as ActividadProspecto[]).filter((a) => idsLista.has(a.prospecto_id));
     const porProspecto: Record<string, ActividadProspecto[]> = {};
     actividades.forEach((a) => {
       (porProspecto[a.prospecto_id] ||= []).push(a);
@@ -430,9 +436,9 @@ export default function ProspectosPage() {
   return (
     <div className="panel">
       <div className="rep-header">
-        <a className="rep-back" href="/dashboard">
+        <Link className="rep-back" href="/dashboard">
           ← Regresar
-        </a>
+        </Link>
         <p className="rep-title">Prospectos</p>
         <p className="rep-sub">{CENTROS_POR_ROL[miRol] ? CENTROS_POR_ROL[miRol].join(" · ") : centro || "Todos los centros"}</p>
       </div>
