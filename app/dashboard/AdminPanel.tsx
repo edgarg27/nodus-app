@@ -10,6 +10,8 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { esSuperadmin, labelRol } from "@/lib/roles";
+import { rolPuede } from "@/lib/permisosApi";
+import { REGIMENES_FISCALES, USOS_CFDI, USO_CFDI_DEFAULT, avisosDatosFiscales, normalizarRfc, usosParaTipo } from "@/lib/datosFiscales";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
 import Link from "next/link";
@@ -32,7 +34,14 @@ type Cliente = {
   telefono: string | null;
   ocupantes_oficina: string | null;
   dia_pago?: number | null;
+  nombre_fiscal?: string | null;
+  regimen_fiscal?: string | null;
+  cp_fiscal?: string | null;
+  uso_cfdi?: string | null;
 };
+
+// Ticket de conexión en el detalle del cliente: oculto mientras se define cómo quedará Vouchers.
+const MOSTRAR_VOUCHER_CLIENTE = false;
 
 // Centros que se pueden asignar a un cliente al editarlo (mismos que usa el
 // resto de la app).
@@ -243,6 +252,14 @@ export default function AdminPanel({
   const [formNombre, setFormNombre] = useState("");
   const [formEmail, setFormEmail] = useState("");
   const [formRfc, setFormRfc] = useState("");
+  // Datos fiscales del cliente: con estos se timbran sus facturas. Van aparte de los datos generales porque se
+  // validan completos y los guarda quien puede facturar (la misma API de Configuración fiscal).
+  const puedeEditarFiscal = rolPuede(rol, "facturaEmitir");
+  const [editandoFiscal, setEditandoFiscal] = useState(false);
+  const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT });
+  const [guardandoFiscal, setGuardandoFiscal] = useState(false);
+  const [errorFiscal, setErrorFiscal] = useState("");
+  const tipoFiscal = normalizarRfc(formFiscal.rfc).length === 12 ? "moral" : "fisica";
   const [formDiaPago, setFormDiaPago] = useState("");
   const [formCentro, setFormCentro] = useState("");
   const [formActivo, setFormActivo] = useState(true);
@@ -539,6 +556,8 @@ export default function AdminPanel({
     setFormCentro(cliente.centro || "");
     setFormActivo(cliente.activo !== false);
     setErrorDatos("");
+    setEditandoFiscal(false);
+    setErrorFiscal("");
     setMensajeAcceso(null);
     setNuevaPassword("");
     setClienteSeleccionado(cliente);
@@ -617,6 +636,44 @@ export default function AdminPanel({
       setErrorVoucher("No se pudo conectar. Intenta de nuevo.");
     }
     setBorrandoVoucher(null);
+  }
+
+  function abrirEdicionFiscal(c: Cliente) {
+    setFormFiscal({
+      rfc: c.rfc || "",
+      nombre_fiscal: c.nombre_fiscal || "",
+      regimen_fiscal: c.regimen_fiscal || "",
+      cp_fiscal: c.cp_fiscal || "",
+      uso_cfdi: c.uso_cfdi || USO_CFDI_DEFAULT,
+    });
+    setErrorFiscal("");
+    setEditandoFiscal(true);
+  }
+
+  async function guardarDatosFiscales() {
+    if (!clienteSeleccionado) return;
+    setGuardandoFiscal(true);
+    setErrorFiscal("");
+    try {
+      const res = await fetch("/api/facturas/datos-fiscales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: clienteSeleccionado.id, ...formFiscal }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorFiscal(data.error || "No se pudieron guardar los datos fiscales");
+      } else {
+        const actualizado: Cliente = { ...clienteSeleccionado, ...data.datos };
+        setClienteSeleccionado(actualizado);
+        setClientes((prev) => prev.map((x) => (x.id === actualizado.id ? actualizado : x)));
+        setFormRfc(actualizado.rfc || "");
+        setEditandoFiscal(false);
+      }
+    } catch {
+      setErrorFiscal("No se pudo conectar. Intenta de nuevo.");
+    }
+    setGuardandoFiscal(false);
   }
 
   async function llamarGestionClientes(payload: Record<string, unknown>) {
@@ -2027,12 +2084,6 @@ export default function AdminPanel({
                     <span className="modal-val">{clienteSeleccionado.empresa}</span>
                   </div>
                 )}
-                {clienteSeleccionado.rfc && (
-                  <div className="modal-row">
-                    <span className="modal-label">RFC</span>
-                    <span className="modal-val">{clienteSeleccionado.rfc}</span>
-                  </div>
-                )}
                 <div className="modal-row">
                   <span className="modal-label">Ciudad</span>
                   <span className="modal-val">{clienteSeleccionado.ciudad || "-"}</span>
@@ -2065,6 +2116,105 @@ export default function AdminPanel({
                     <span className="modal-val">{clienteSeleccionado.ocupantes_oficina}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+              <p className="modal-seccion" style={{ margin: 0 }}>
+                🧾 Datos fiscales
+              </p>
+              {puedeEditarFiscal && !editandoFiscal && (
+                <button
+                  className="tel-borrar-btn"
+                  style={{ color: "#0d1b3e", fontWeight: 600 }}
+                  onClick={() => abrirEdicionFiscal(clienteSeleccionado)}
+                >
+                  ✎ Editar
+                </button>
+              )}
+            </div>
+            {editandoFiscal ? (
+              <div className="form-card" style={{ padding: 0, border: "none" }}>
+                <p className="sub-label">RFC</p>
+                <input
+                  type="text"
+                  maxLength={13}
+                  value={formFiscal.rfc}
+                  onChange={(e) => setFormFiscal({ ...formFiscal, rfc: e.target.value.toUpperCase() })}
+                  placeholder={tipoFiscal === "moral" ? "12 caracteres: persona moral" : "13 caracteres: persona física"}
+                />
+                <p className="sub-label">Razón social</p>
+                <input
+                  type="text"
+                  maxLength={200}
+                  value={formFiscal.nombre_fiscal}
+                  onChange={(e) => setFormFiscal({ ...formFiscal, nombre_fiscal: e.target.value.toUpperCase() })}
+                  placeholder='Como en la Constancia, sin "S.A. DE C.V."'
+                />
+                <p className="sub-label">Régimen fiscal</p>
+                <select value={formFiscal.regimen_fiscal} onChange={(e) => setFormFiscal({ ...formFiscal, regimen_fiscal: e.target.value })}>
+                  <option value="">Elige el régimen</option>
+                  {REGIMENES_FISCALES.filter((r) => r.aplica.includes(tipoFiscal)).map((r) => (
+                    <option key={r.clave} value={r.clave}>
+                      {r.clave} · {r.nombre}
+                    </option>
+                  ))}
+                </select>
+                <p className="sub-label">Código postal fiscal</p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={5}
+                  value={formFiscal.cp_fiscal}
+                  onChange={(e) => setFormFiscal({ ...formFiscal, cp_fiscal: e.target.value.replace(/\D/g, "") })}
+                />
+                <p className="sub-label">Uso del CFDI</p>
+                <select value={formFiscal.uso_cfdi} onChange={(e) => setFormFiscal({ ...formFiscal, uso_cfdi: e.target.value })}>
+                  {usosParaTipo(tipoFiscal).map((u) => (
+                    <option key={u.clave} value={u.clave}>
+                      {u.clave} · {u.nombre}
+                    </option>
+                  ))}
+                </select>
+                {avisosDatosFiscales(formFiscal).length > 0 && (
+                  <p style={{ color: "#854F0B", fontSize: 12, margin: "6px 0 0" }}>{avisosDatosFiscales(formFiscal)[0]}</p>
+                )}
+                {errorFiscal && <p style={{ color: "#A32D2D", fontSize: 12, margin: "6px 0 0" }}>{errorFiscal}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button className="btn-enviar" style={{ flex: 1 }} onClick={guardarDatosFiscales} disabled={guardandoFiscal}>
+                    <span className="btn-enviar-text">{guardandoFiscal ? "Guardando..." : "Guardar datos fiscales"}</span>
+                  </button>
+                  <button className="tel-borrar-btn" style={{ color: "#888" }} disabled={guardandoFiscal} onClick={() => setEditandoFiscal(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {[
+                  { label: "RFC", valor: clienteSeleccionado.rfc },
+                  { label: "Razón social", valor: clienteSeleccionado.nombre_fiscal },
+                  {
+                    label: "Régimen",
+                    valor:
+                      clienteSeleccionado.regimen_fiscal &&
+                      [clienteSeleccionado.regimen_fiscal, REGIMENES_FISCALES.find((r) => r.clave === clienteSeleccionado.regimen_fiscal)?.nombre].filter(Boolean).join(" · "),
+                  },
+                  { label: "C.P. fiscal", valor: clienteSeleccionado.cp_fiscal },
+                  {
+                    label: "Uso del CFDI",
+                    valor:
+                      clienteSeleccionado.uso_cfdi &&
+                      [clienteSeleccionado.uso_cfdi, USOS_CFDI.find((u) => u.clave === clienteSeleccionado.uso_cfdi)?.nombre].filter(Boolean).join(" · "),
+                  },
+                ].map((d) => (
+                  <div className="modal-row" key={d.label}>
+                    <span className="modal-label">{d.label}</span>
+                    <span className="modal-val" style={d.valor ? undefined : { color: "#A32D2D" }}>
+                      {d.valor || "Falta"}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -2197,6 +2347,8 @@ export default function AdminPanel({
                   </p>
                 )}
 
+                {MOSTRAR_VOUCHER_CLIENTE && (
+                <>
                 <p className="modal-seccion">
                   <img
                     src="/icons/wifi.png"
@@ -2384,6 +2536,9 @@ export default function AdminPanel({
                       </div>
                     ))}
                   </>
+                )}
+
+                </>
                 )}
 
                 {puedeGestionarClientes && (
