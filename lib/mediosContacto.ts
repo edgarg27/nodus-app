@@ -2,4 +2,5 @@
 // para que las tres pantallas ofrezcan lo mismo y los reportes por medio cuadren.
 // "Redes sociales" ya no se ofrece (ahora llegan por el bot), pero los registros viejos lo conservan y los
 // reportes lo siguen mostrando.
-export const MEDIOS_CONTACTO = ["Teléfono", "Bot", "Referido", "Página web", "Venta en piso", "Otro"];
+// "Ya es cliente" es para quien se migra de ZORA: en los reportes sale en su propia fila, separado de las ventas nuevas.
+export const MEDIOS_CONTACTO = ["Teléfono", "Bot", "Referido", "Página web", "Venta en piso", "Ya es cliente", "Otro"];
