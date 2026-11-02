@@ -577,7 +577,9 @@ export default function ClientePanel({
 
         <p className="panel-section-label">Mi espacio</p>
         <div className="quick-grid">
-          {tieneCoworking && (
+          {/* WiFi (vouchers) oculto en todas las cuentas mientras se define cómo
+              quedará; para volver a mostrarlo basta con quitar el "false &&". */}
+          {false && tieneCoworking && (
             <a className="quick-card" href="/mi-wifi">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/icons/wifi.png" alt="" className="quick-icon icon-img-28" />

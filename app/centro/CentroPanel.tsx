@@ -218,7 +218,8 @@ const TABS_TODAS = [
   { id: "invitados", label: "🙋 Invitados" },
   { id: "solicitudes", label: "📨 Solicitudes" },
   { id: "visitas", label: "🚪 Visitas" },
-  { id: "vouchers", label: "🎟️ Vouchers" },
+  // Vouchers oculto mientras se define cómo quedará (la vista sigue en /centro/vouchers).
+  // { id: "vouchers", label: "🎟️ Vouchers" },
   { id: "proveedores", label: "🧾 Proveedores" },
 ];
 
