@@ -2904,7 +2904,7 @@ export default function CotizarForm({
                 ))}
               </select>
             </div>
-            {medioContacto && medioContacto !== "Teléfono" && medioContacto !== "Venta en piso" && (
+            {medioContacto && medioContacto !== "Teléfono" && medioContacto !== "Venta en piso" && medioContacto !== "Ya es cliente" && (
               <div>
                 <p className="sub-label">{labelDetalleMedioContacto[medioContacto] || "Detalle"}</p>
                 <input
