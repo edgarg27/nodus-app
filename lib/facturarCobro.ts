@@ -6,6 +6,7 @@
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, previaPdfCfdi, tipoPorOmision, ErrorFacturacion, type ParametrosCfdi } from "@/lib/facturapi";
 import { cuentaPredialDeSerie, lineaConCuentaPredial, serieCentro } from "@/lib/centros";
+import { tieneOficinaPrivada } from "@/lib/coworking";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
@@ -74,6 +75,7 @@ async function parametrosDeCobro(
     lineas,
     adicionalTipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null),
     serie: serieCentro(f.centro),
+    oficinaPrivada: await tieneOficinaPrivada(admin as any, f.user_id),
     metodo,
     formaPago: metodo === "PUE" ? opts.formaPago || "03" : "99", // PPD: "Por definir"; la forma real va en el complemento
     condiciones: opts.condiciones,
@@ -168,10 +170,10 @@ export async function previaCobro(admin: Admin, facturaId: string): Promise<{ ok
   const conClave = await Promise.all(
     base.map(async (l) => {
       const clave = await servicioPorClave(admin, l.tipo);
-      return { ...l, clave, claveProd: clave?.satProdServ || "80131502" };
+      return { ...l, clave, adicionalTipo: l.tipo, claveProd: clave?.satProdServ || "80131502" };
     })
   );
-  const lineaPredial = lineaConCuentaPredial(conClave);
+  const lineaPredial = lineaConCuentaPredial(conClave, await tieneOficinaPrivada(admin as any, f.user_id));
   const cuentaPredial = cuentaPredialDeSerie(serieCentro(f.centro));
   const lineas = [];
   let subtotal = 0;

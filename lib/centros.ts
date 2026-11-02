@@ -67,12 +67,15 @@ export function cuentaPredialDeSerie(serie: string | null | undefined): string |
   return (centro && CUENTA_PREDIAL_POR_CENTRO[centro]) || null;
 }
 
-// Clave del SAT de arrendamiento de oficina. Los cobros sin tipo de servicio (depósito, estacionamiento del contrato…)
-// también se timbran con ella, pero no son renta: esos no llevan cuenta predial.
-const CLAVE_ARRENDAMIENTO = "80131502";
+// Únicamente la renta de oficina privada lleva cuenta predial. Un cobro sin tipo de servicio se timbra con la clave de
+// oficina aunque sea de Working Desk, un depósito o el estacionamiento del contrato: por eso se revisa quién es el
+// cliente (oficinaPrivada) y el concepto. Los tipos de abajo ya dicen que es renta de oficina.
+const TIPOS_RENTA_OFICINA = ["renta_oficina_privada", "oficina_privada"];
 const NO_ES_RENTA = /^\s*(dep[oó]sito|estacionamiento|tel[eé]fono|extensi[oó]n|adicional)/i;
 
-// La línea de la factura que lleva la cuenta predial: la primera de renta de oficina (-1 si ninguna lo es).
-export function lineaConCuentaPredial(lineas: { claveProd: string; concepto: string | null | undefined }[]): number {
-  return lineas.findIndex((l) => l.claveProd === CLAVE_ARRENDAMIENTO && !NO_ES_RENTA.test(l.concepto || ""));
+// La línea de la factura que lleva la cuenta predial: la primera de renta de oficina privada (-1 si ninguna lo es).
+export function lineaConCuentaPredial(lineas: { adicionalTipo?: string | null; concepto: string | null | undefined }[], oficinaPrivada: boolean): number {
+  return lineas.findIndex(
+    (l) => !NO_ES_RENTA.test(l.concepto || "") && (l.adicionalTipo ? TIPOS_RENTA_OFICINA.includes(l.adicionalTipo) : oficinaPrivada)
+  );
 }

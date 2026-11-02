@@ -113,6 +113,8 @@ export type ParametrosCfdi = {
   idempotencyKey?: string;
   // Serie de la factura (cada centro tiene la suya, ver lib/centros.ts); el folio cuenta por serie.
   serie?: string | null;
+  // El cliente renta una oficina privada: su renta lleva la cuenta predial del centro.
+  oficinaPrivada?: boolean;
 };
 
 // Error con mensaje pensado para mostrarse tal cual al personal.
@@ -151,7 +153,7 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
     })
   );
   // Va solo en la primera línea de renta; el PDF de Facturapi la imprime debajo del concepto.
-  const lineaPredial = lineaConCuentaPredial(conClave);
+  const lineaPredial = lineaConCuentaPredial(conClave, !!p.oficinaPrivada);
   const cuentaPredial = cuentaPredialDeSerie(p.serie);
   const itemsNuevos = [];
   for (const [i, l] of conClave.entries()) {

@@ -78,3 +78,18 @@ export async function clientesConCoworking(supabase: SupabaseClient, userIds?: s
 export async function esClienteCoworking(supabase: SupabaseClient, userId: string): Promise<boolean> {
   return (await clientesConCoworking(supabase, [userId])).has(userId);
 }
+
+// ¿Renta una oficina privada? Por la oficina del contrato o, si no tiene, por su paquete. Working Desk y Coworking no
+// cuentan. Incluye contratos ya terminados: se le puede facturar un mes pendiente. Decide si su renta lleva cuenta predial.
+export async function tieneOficinaPrivada(supabase: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: contratos } = await supabase.from("contratos").select("oficina_id, paquete_id").eq("user_id", userId).not("estatus", "in", "(cancelado,rechazado)");
+  if (!contratos || contratos.length === 0) return false;
+  const oficinaIds = contratos.map((c) => c.oficina_id).filter(Boolean) as string[];
+  const paqueteIds = contratos.filter((c) => !c.oficina_id && c.paquete_id).map((c) => c.paquete_id) as string[];
+  const [{ data: oficinas }, { data: paquetes }] = await Promise.all([
+    oficinaIds.length > 0 ? supabase.from("oficinas").select("tipo").in("id", oficinaIds) : Promise.resolve({ data: [] as { tipo: string | null }[] }),
+    paqueteIds.length > 0 ? supabase.from("paquetes").select("tipo_espacio").in("id", paqueteIds) : Promise.resolve({ data: [] as { tipo_espacio: string | null }[] }),
+  ]);
+  const esOficina = (t: string | null | undefined) => (t || "").trim().toLowerCase() === "oficina privada";
+  return (oficinas || []).some((o) => esOficina(o.tipo)) || (paquetes || []).some((p) => esOficina(p.tipo_espacio));
+}
