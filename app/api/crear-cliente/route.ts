@@ -6,6 +6,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { origenPublico } from "@/lib/origenPublico";
 import { correoFicticio } from "@/lib/correoFicticio";
+import { USO_CFDI_DEFAULT, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { randomInt } from "crypto";
 
 // Contraseña para las cuentas que se crean sin mandar correo: fácil de dictar o mandar por WhatsApp
@@ -73,6 +74,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan datos obligatorios (nombre, correo, centro)" }, { status: 400 });
   }
 
+  // Datos fiscales: opcionales, pero si vienen deben estar completos (antes de crear la cuenta o mandar la invitación).
+  const rfcCliente = normalizarRfc(rfc);
+  const conFiscal = !!(regimen_fiscal || cp_fiscal || nombre_fiscal);
+  const fiscal = {
+    nombre_fiscal: String(nombre_fiscal || "").trim().toUpperCase(),
+    regimen_fiscal: String(regimen_fiscal || ""),
+    cp_fiscal: String(cp_fiscal || "").trim(),
+    uso_cfdi: String(uso_cfdi || USO_CFDI_DEFAULT),
+  };
+  if (conFiscal) {
+    const errorFiscal = validarDatosFiscales({ ...fiscal, rfc: rfcCliente }, rfcCliente.length === 12 ? "moral" : "fisica");
+    if (errorFiscal) return NextResponse.json({ error: "Datos fiscales: " + errorFiscal }, { status: 400 });
+  }
+
   const admin = createAdminClient();
   const numeroUsuario = await generarNumeroUsuarioUnico(admin);
   const email = emailBody || correoFicticio(numeroUsuario);
@@ -115,11 +130,8 @@ export async function POST(req: NextRequest) {
     centro,
     ciudad: CIUDAD_POR_CENTRO[centro] || null,
     empresa: empresa ? normalizarEmpresa(empresa) : null,
-    rfc: rfc || null,
-    // Datos fiscales capturados al aceptar la cotización (si los hay).
-    ...(regimen_fiscal || cp_fiscal || nombre_fiscal
-      ? { nombre_fiscal: nombre_fiscal || null, regimen_fiscal: regimen_fiscal || null, cp_fiscal: cp_fiscal || null, uso_cfdi: uso_cfdi || null }
-      : {}),
+    rfc: rfcCliente || null,
+    ...(conFiscal ? fiscal : {}),
     numero_usuario: numeroUsuario,
     telefono: telefono || null,
     dia_pago: diaPago ? Number(diaPago) : null,
