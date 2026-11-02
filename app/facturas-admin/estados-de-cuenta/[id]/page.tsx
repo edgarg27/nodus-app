@@ -9,6 +9,7 @@ import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, TIPOS_RELACION, REGEX_UUID, separarUuids } from "@/lib/formasPagoSat";
 import { EMISOR } from "@/lib/emisor";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
+import CargoFactura, { type CargoNuevo } from "@/app/facturas-admin/CargoFactura";
 import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
@@ -119,6 +120,7 @@ export default function EstadoDeCuentaPage() {
   );
   const [accionando, setAccionando] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
+  const [modalCargo, setModalCargo] = useState(false);
   const [conceptoEdit, setConceptoEdit] = useState("");
   const [fechaEdit, setFechaEdit] = useState("");
   const [modalPago, setModalPago] = useState(false);
@@ -400,6 +402,18 @@ export default function EstadoDeCuentaPage() {
     cargar();
   }
 
+  async function agregarCargo(c: CargoNuevo) {
+    setErrorModal("");
+    setAccionando(true);
+    const { ok, data } = await llamar({ accion: "agregar_cargo", ...c });
+    setAccionando(false);
+    if (!ok) return setErrorModal(data.error || "No se pudo agregar el cargo");
+    setModalCargo(false);
+    setPrevia(null);
+    setAviso("✓ Cargo agregado: «" + c.descripcion + "» por " + dinero(c.monto) + ". El total ya lo incluye.");
+    cargar();
+  }
+
   function abrirTimbrar() {
     setMetodo(factura?.estado === "pagada" ? "PUE" : "PPD");
     setFormaPago("03");
@@ -467,6 +481,20 @@ export default function EstadoDeCuentaPage() {
                       <button type="button" role="menuitem" disabled={!editable} title={editable ? "" : "Ya está timbrada o cancelada"} onClick={abrirEditar}>
                         Editar concepto y fecha de estado de cuenta
                       </button>
+                      {rolPuede(rol, "adicionalesCobrar") && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={!editable || factura.estado === "pagada"}
+                          title={factura.estado === "pagada" ? "Ya está pagada" : editable ? "" : "Ya está timbrada o cancelada"}
+                          onClick={() => {
+                            setErrorModal("");
+                            setModalCargo(true);
+                          }}
+                        >
+                          Agregar penalización o adicional
+                        </button>
+                      )}
                       <a role="menuitem" href="/facturas-admin/integrar-cliente">
                         Crear estado de cuenta
                       </a>
@@ -791,6 +819,20 @@ export default function EstadoDeCuentaPage() {
             <p className="fac-facturar-sub">
               Se genera factura a {(cliente ? cliente.nombre_fiscal || cliente.empresa || cliente.nombre : "").toUpperCase()} · {dinero(total)}
             </p>
+            {rolPuede(rol, "adicionalesCobrar") && factura.estado !== "pagada" && (
+              <button
+                type="button"
+                className="tel-borrar-btn"
+                style={{ color: "#0d1b3e", fontWeight: 600, marginBottom: 12 }}
+                disabled={timbrando}
+                onClick={() => {
+                  setErrorModal("");
+                  setModalCargo(true);
+                }}
+              >
+                + Agregar penalización o adicional
+              </button>
+            )}
                 <div className="fac-facturar-fila">
                   <label>
                     Cond. pago <span style={{ color: "#A32D2D" }}>*</span>
@@ -1247,6 +1289,26 @@ export default function EstadoDeCuentaPage() {
               }}
             >
               Ir a factura generada
+            </button>
+          </div>
+        </div>
+      )}
+
+      {modalCargo && factura && (
+        <div
+          className="no-imprimir"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => !accionando && setModalCargo(false)}
+        >
+          <div className="form-card" style={{ maxWidth: 640, width: "100%", maxHeight: "92vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+            <p className="contrato-cliente-nombre">Agregar penalización o adicional</p>
+            <p className="sub-label" style={{ margin: "6px 0 12px" }}>
+              Total actual: {dinero(Number(factura.monto))}. El cargo se suma a este estado de cuenta y sale como otro concepto en la factura.
+            </p>
+            <CargoFactura base={Number(factura.monto)} ocupado={accionando} textoBoton={accionando ? "Agregando..." : "Agregar a la factura"} onAgregar={agregarCargo} />
+            {errorModal && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorModal}</p>}
+            <button className="tel-borrar-btn" style={{ marginTop: 10 }} disabled={accionando} onClick={() => setModalCargo(false)}>
+              Cancelar
             </button>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { complementoAlPagar } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
+import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
@@ -93,6 +94,51 @@ export async function POST(req: NextRequest) {
     const { error } = await admin.from("facturas").update({ concepto, fecha_emision: fecha, fecha_vencimiento: sumarDias(fecha, DIAS_PARA_PAGAR) }).eq("id", factura.id);
     if (error) return NextResponse.json({ error: "No se pudo guardar el cambio" }, { status: 500 });
     return NextResponse.json({ ok: true });
+  }
+
+  // ---- Agregar una penalización o un adicional a un estado de cuenta sin timbrar ----
+  if (accion === "agregar_cargo") {
+    if (!rolPuede(miProfile?.rol, "adicionalesCobrar")) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (factura.uuid_cfdi) return NextResponse.json({ error: "Ya está timbrada: ya no se le pueden agregar cargos" }, { status: 409 });
+    if (factura.estado === "cancelada") return NextResponse.json({ error: "El estado de cuenta está cancelado" }, { status: 409 });
+    if (factura.estado === "pagada") return NextResponse.json({ error: "Ya está pagada: el cargo debe ir en otro estado de cuenta" }, { status: 409 });
+    if (!factura.user_id) return NextResponse.json({ error: "Este estado de cuenta no tiene cliente" }, { status: 409 });
+
+    const descripcion = typeof cuerpo.descripcion === "string" ? cuerpo.descripcion.trim().slice(0, 200) : "";
+    const montoCargo = Math.round(Number(cuerpo.monto) * 100) / 100;
+    if (!descripcion || !(montoCargo > 0) || montoCargo > 1000000) return NextResponse.json({ error: "Escribe la descripción y un monto válido" }, { status: 400 });
+    const servicio = await servicioActivoPorClave(admin, typeof cuerpo.adicionalTipo === "string" ? cuerpo.adicionalTipo : "");
+    if (!servicio) return NextResponse.json({ error: "Elige un servicio del catálogo" }, { status: 400 });
+
+    const { data: ligados } = await admin.from("pagos").select("id, monto, estado, concepto, openpay_charge_id").eq("factura_id", factura.id);
+    const pagosLigados = ligados || [];
+    // Un cargo en línea ya emitido es por el monto original: no se puede cambiar el total sin dejarlo descuadrado.
+    if (pagosLigados.some((p) => p.openpay_charge_id && p.estado !== "pagado")) {
+      return NextResponse.json({ error: "Tiene una referencia de pago en línea abierta: el cargo debe ir en otro estado de cuenta" }, { status: 409 });
+    }
+    const suma = pagosLigados.reduce((s, p) => s + Number(p.monto), 0);
+    if (pagosLigados.length > 0 && Math.abs(suma - Number(factura.monto)) > 0.01) {
+      return NextResponse.json({ error: "Sus pagos no suman el total del estado de cuenta: revísalo antes de agregar cargos" }, { status: 409 });
+    }
+
+    const nuevos: Record<string, unknown>[] = [{ user_id: factura.user_id, centro: factura.centro, estado: "pendiente", concepto: descripcion, monto: montoCargo, factura_id: factura.id, adicional_tipo: servicio.clave }];
+    // La renta que genera el sistema no tiene pagos ligados: su monto se vuelve línea para que la factura salga con un concepto por cargo.
+    if (pagosLigados.length === 0) {
+      nuevos.unshift({ user_id: factura.user_id, centro: factura.centro, estado: "pendiente", concepto: factura.concepto, monto: Number(factura.monto), factura_id: factura.id, adicional_tipo: factura.adicional_tipo || null });
+    }
+    const { data: creados, error: errInsert } = await admin.from("pagos").insert(nuevos).select("id");
+    if (errInsert || !creados) return NextResponse.json({ error: "No se pudo agregar el cargo" }, { status: 500 });
+
+    const sinConcepto = pagosLigados.filter((p) => !p.concepto).map((p) => p.id);
+    if (sinConcepto.length > 0) await admin.from("pagos").update({ concepto: factura.concepto }).in("id", sinConcepto);
+
+    const total = Math.round((Number(factura.monto) + montoCargo) * 100) / 100;
+    const { error: errTotal } = await admin.from("facturas").update({ monto: total }).eq("id", factura.id).is("uuid_cfdi", null);
+    if (errTotal) {
+      await admin.from("pagos").delete().in("id", creados.map((c) => c.id));
+      return NextResponse.json({ error: "No se pudo actualizar el total" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, total });
   }
 
   // ---- Registrar pago: marca como pagados los pagos elegidos de este estado de cuenta ----
