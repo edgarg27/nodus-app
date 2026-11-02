@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { rolPuede } from "@/lib/permisosApi";
-import { REGIMENES_FISCALES, usosParaTipo, avisosDatosFiscales, normalizarRfc } from "@/lib/datosFiscales";
+import {
+  CAMPOS_DOMICILIO_FISCAL,
+  DOMICILIO_FISCAL_VACIO,
+  REGIMENES_FISCALES,
+  avisosDatosFiscales,
+  domicilioDePerfil,
+  normalizarRfc,
+  textoDomicilioFiscal,
+  usosParaTipo,
+  type CampoDomicilioFiscal,
+} from "@/lib/datosFiscales";
 import Link from "next/link";
 
 // Configuración fiscal: los datos fiscales de cada cliente, con los que se timbran sus facturas. La administradora los
@@ -24,7 +34,7 @@ type ClienteFiscal = {
   cp_fiscal: string | null;
   uso_cfdi: string | null;
   porContrato?: boolean;
-};
+} & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
 export default function ConfiguracionFiscalPage() {
   const supabase = createClient();
@@ -35,7 +45,7 @@ export default function ConfiguracionFiscalPage() {
   const [busqueda, setBusqueda] = useState("");
   const [soloConPendientes, setSoloConPendientes] = useState(false);
   const [editando, setEditando] = useState<ClienteFiscal | null>(null);
-  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03" });
+  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03", ...DOMICILIO_FISCAL_VACIO });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
@@ -87,7 +97,14 @@ export default function ConfiguracionFiscalPage() {
 
   function abrir(c: ClienteFiscal) {
     setEditando(c);
-    setForm({ rfc: c.rfc || "", nombre_fiscal: c.nombre_fiscal || "", regimen_fiscal: c.regimen_fiscal || "", cp_fiscal: c.cp_fiscal || "", uso_cfdi: c.uso_cfdi || "G03" });
+    setForm({
+      rfc: c.rfc || "",
+      nombre_fiscal: c.nombre_fiscal || "",
+      regimen_fiscal: c.regimen_fiscal || "",
+      cp_fiscal: c.cp_fiscal || "",
+      uso_cfdi: c.uso_cfdi || "G03",
+      ...domicilioDePerfil(c),
+    });
     setError("");
   }
 
@@ -170,6 +187,7 @@ export default function ConfiguracionFiscalPage() {
                     <th>RFC</th>
                     <th>Régimen</th>
                     <th>C.P.</th>
+                    <th>Domicilio</th>
                     <th>Uso CFDI</th>
                     <th>Estado</th>
                     <th></th>
@@ -189,6 +207,7 @@ export default function ConfiguracionFiscalPage() {
                         <td className="ft-nowrap">{c.rfc || "—"}</td>
                         <td>{c.regimen_fiscal || "—"}</td>
                         <td className="ft-nowrap">{c.cp_fiscal || "—"}</td>
+                        <td>{textoDomicilioFiscal(c) || "—"}</td>
                         <td className="ft-nowrap">{c.uso_cfdi || "—"}</td>
                         <td>
                           <span className={"ft-chip ft-chip-" + e.tipo} title={e.detalle || ""}>
@@ -270,6 +289,21 @@ export default function ConfiguracionFiscalPage() {
                 </select>
               </div>
             </div>
+            <p className="fac-facturar-seccion">Domicilio fiscal (como en la Constancia)</p>
+            {CAMPOS_DOMICILIO_FISCAL.map((c) => (
+              <div className="fac-facturar-fila" key={c.campo}>
+                <label>{c.label}</label>
+                <div>
+                  <input
+                    type="text"
+                    maxLength={200}
+                    placeholder={c.placeholder}
+                    value={form[c.campo]}
+                    onChange={(e) => setForm({ ...form, [c.campo]: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+            ))}
             {avisosForm.length > 0 && <p style={{ fontSize: 12, color: "#854F0B", margin: "6px 0 0" }}>{avisosForm[0]}</p>}
             {error && <p style={{ fontSize: 13, color: "#A32D2D", margin: "8px 0 0" }}>{error}</p>}
             <p className="fac-facturar-nota">Aplica a las facturas que se emitan desde ahora. Las ya timbradas no cambian: si estaban mal, se cancelan y se vuelven a emitir.</p>
