@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
+import CargoFactura, { CLAVE_PENALIZACION, type CargoNuevo } from "./CargoFactura";
 
 // Integrar por cliente (como en ZORA): centro, cliente, contrato, fecha y periodo, qué incluir (recurrentes y
 // adicionales) y el concepto. "Previa" trae lo que se le puede cobrar ese mes; se marca lo que va en la factura
@@ -24,7 +25,7 @@ type ClienteForm = {
   porContrato?: boolean;
 };
 type ContratoOpc = { id: string; folio: string | null; centro: string; estatus: string; renta: number; tipo: string; etiqueta: string };
-type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string };
+type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string; adicionalTipo?: string };
 
 const razonSocial = (c: ClienteForm) => c.nombre_fiscal || c.empresa || c.nombre;
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -66,6 +67,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
   const [trabajando, setTrabajando] = useState(false);
   // Evita integrar dos veces si se pulsa de nuevo mientras se abre el estado de cuenta.
   const [cobroIntegrado, setCobroIntegrado] = useState<string | null>(null);
+  const [lineasAgregadas, setLineasAgregadas] = useState(0);
 
   const cliente = clientes.find((c) => c.id === clienteId) || null;
   // El concepto se arma con los servicios que van en la factura (como en ZORA: "Prestación de servicios de sala de juntas septiembre 2026").
@@ -156,6 +158,26 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
     setMarcadas(nuevas.filter((l) => !(data.rentaYaIntegrada && (l.tipo === "Renta" || l.tipo === "Adicional mensual"))).map((l) => l.key));
   }
 
+  // Penalización o adicional que se agrega a mano: entra como una línea más, ya marcada.
+  function agregarLinea(c: CargoNuevo) {
+    const key = "manual-" + lineasAgregadas;
+    setLineasAgregadas((n) => n + 1);
+    setCobroIntegrado(null);
+    setLineas((ls) => [
+      ...(ls || []),
+      {
+        key,
+        tipo: c.adicionalTipo === CLAVE_PENALIZACION ? "Penalización" : "Adicional",
+        contrato: "—",
+        descripcion: c.descripcion,
+        servicio: c.descripcion.toLowerCase(),
+        total: c.monto,
+        adicionalTipo: c.adicionalTipo,
+      },
+    ]);
+    setMarcadas((m) => [...m, key]);
+  }
+
   const elegidas = (lineas || []).filter((l) => marcadas.includes(l.key));
   // Centro de la factura: el del contrato (un cliente puede tener contratos en varios centros).
   const centrosDeLasLineas = Array.from(new Set(elegidas.map((l) => l.centro).filter(Boolean))) as string[];
@@ -183,7 +205,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
         concepto: concepto.trim(),
         fecha,
         centro: centroFactura,
-        lineas: elegidas.map((l) => (l.pagoId ? { pagoId: l.pagoId } : { descripcion: l.descripcion, monto: l.total })),
+        lineas: elegidas.map((l) => (l.pagoId ? { pagoId: l.pagoId } : { descripcion: l.descripcion, monto: l.total, adicionalTipo: l.adicionalTipo })),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -345,7 +367,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
           {rentaYa && (
             <p style={{ fontSize: 13, color: "#854F0B", background: "#FAEEDA", borderRadius: 8, padding: "8px 10px", margin: "8px 0" }}>
               La renta de {MESES[mes - 1]} ya está integrada ({rentaYa.folio}, {rentaYa.timbrada ? "ya timbrada" : "por timbrar"}). Búscala en Estados de cuenta; por eso la renta y los
-              adicionales mensuales vienen sin marcar.
+              adicionales mensuales vienen sin marcar. Para sumarle una penalización o un adicional a esa misma factura, ábrela ahí y usa Acciones.
             </p>
           )}
           {lineas.length === 0 ? (
@@ -412,6 +434,18 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
               </table>
             </div>
           )}
+
+          <div style={{ borderTop: "1px solid #eee", marginTop: 14, paddingTop: 12 }}>
+            <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e", marginBottom: 8 }}>
+              Agregar penalización por atraso o adicional
+            </p>
+            <CargoFactura
+              base={redondear((lineas || []).filter((l) => l.tipo === "Renta").reduce((s, l) => s + l.total, 0))}
+              ocupado={trabajando}
+              textoBoton="Agregar a la factura"
+              onAgregar={agregarLinea}
+            />
+          </div>
 
           {(faltanDatosFiscales || avisosFiscales.length > 0) && (
             <p style={{ fontSize: 12, color: "#A32D2D", margin: "10px 0 0" }}>

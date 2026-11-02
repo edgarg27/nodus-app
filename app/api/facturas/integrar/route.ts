@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { accesoCliente } from "@/lib/facturasAcceso";
+import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const DIAS_PARA_PAGAR = 10;
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const userId: string = typeof cuerpo.userId === "string" ? cuerpo.userId : "";
   const concepto: string = typeof cuerpo.concepto === "string" ? cuerpo.concepto.trim().slice(0, 200) : "";
   const fecha: string = typeof cuerpo.fecha === "string" ? cuerpo.fecha : "";
-  const lineas: { pagoId?: string; descripcion?: string; monto?: number }[] = Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [];
+  const lineas: { pagoId?: string; descripcion?: string; monto?: number; adicionalTipo?: string }[] = Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [];
   const centroPedido: string = typeof cuerpo.centro === "string" ? cuerpo.centro : "";
   if (!userId || !concepto || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || lineas.length === 0) {
     return NextResponse.json({ error: "Faltan datos: cliente, concepto, fecha y al menos una línea" }, { status: 400 });
@@ -64,6 +65,10 @@ export async function POST(req: NextRequest) {
   for (const l of nuevas) {
     if (typeof l.descripcion !== "string" || !l.descripcion.trim() || !(Number(l.monto) > 0)) {
       return NextResponse.json({ error: "Cada línea necesita descripción y un monto mayor a cero" }, { status: 400 });
+    }
+    // Penalización o adicional agregado a mano: su servicio da la clave del SAT con la que se timbra.
+    if (l.adicionalTipo && !(await servicioActivoPorClave(admin, l.adicionalTipo))) {
+      return NextResponse.json({ error: "El servicio de una de las líneas ya no está en el catálogo" }, { status: 400 });
     }
   }
 
@@ -102,6 +107,7 @@ export async function POST(req: NextRequest) {
           concepto: String(l.descripcion).trim().slice(0, 200),
           monto: Number(l.monto),
           factura_id: factura.id,
+          adicional_tipo: l.adicionalTipo || null,
         }))
       )
       .select("id");
