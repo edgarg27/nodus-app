@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { etiquetaPagoSuelto } from "@/lib/adicionales";
+import { conceptoLineaEditable, etiquetaPagoSuelto } from "@/lib/adicionales";
 import { rolPuede } from "@/lib/permisosApi";
 import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, TIPOS_RELACION, REGEX_UUID, separarUuids } from "@/lib/formasPagoSat";
@@ -122,6 +122,7 @@ export default function EstadoDeCuentaPage() {
   const [modalEditar, setModalEditar] = useState(false);
   const [modalCargo, setModalCargo] = useState(false);
   const [conceptoEdit, setConceptoEdit] = useState("");
+  const [lineasEdit, setLineasEdit] = useState<{ id: string; concepto: string; original: string; editable: boolean }[]>([]);
   const [fechaEdit, setFechaEdit] = useState("");
   const [modalPago, setModalPago] = useState(false);
   const [pagosSel, setPagosSel] = useState<string[]>([]);
@@ -177,6 +178,8 @@ export default function EstadoDeCuentaPage() {
 
   const lineas = useMemo(() => {
     if (!factura) return [];
+    // Con una sola línea, la factura sale con el concepto del estado de cuenta (lib/facturarCobro.ts).
+    if (pagos.length === 1) return [{ key: pagos[0].id, tipo: tipoDeLinea(pagos[0]), descripcion: factura.concepto, total: Number(pagos[0].monto) }];
     if (pagos.length > 0) {
       return pagos.map((p) => ({ key: p.id, tipo: tipoDeLinea(p), descripcion: etiquetaPagoSuelto(p.concepto), total: Number(p.monto) }));
     }
@@ -366,6 +369,11 @@ export default function EstadoDeCuentaPage() {
   function abrirEditar() {
     if (!factura) return;
     setConceptoEdit(factura.concepto);
+    setLineasEdit(
+      pagos.length >= 2
+        ? pagos.map((p) => ({ id: p.id, concepto: etiquetaPagoSuelto(p.concepto), original: etiquetaPagoSuelto(p.concepto), editable: conceptoLineaEditable(p.concepto) }))
+        : []
+    );
     setFechaEdit(factura.fecha_emision);
     setErrorModal("");
     setModalEditar(true);
@@ -374,12 +382,15 @@ export default function EstadoDeCuentaPage() {
   async function guardarEdicion() {
     setErrorModal("");
     if (!conceptoEdit.trim() || !fechaEdit) return setErrorModal("Escribe el concepto y elige la fecha");
+    const lineasCambiadas = lineasEdit.filter((l) => l.editable && l.concepto.trim() !== l.original).map((l) => ({ id: l.id, concepto: l.concepto }));
+    if (lineasCambiadas.some((l) => !l.concepto.trim())) return setErrorModal("Escribe el concepto de cada línea");
     setAccionando(true);
-    const { ok, data } = await llamar({ accion: "editar", concepto: conceptoEdit, fecha: fechaEdit });
+    const { ok, data } = await llamar({ accion: "editar", concepto: conceptoEdit, fecha: fechaEdit, lineas: lineasCambiadas });
     setAccionando(false);
     if (!ok) return setErrorModal(data.error || "No se pudo guardar");
     setModalEditar(false);
-    setAviso("✓ Concepto y fecha actualizados.");
+    setPrevia(null);
+    setAviso("✓ Concepto y fecha actualizados. La factura y su vista previa ya salen con estos datos.");
     cargar();
   }
 
@@ -1326,6 +1337,26 @@ export default function EstadoDeCuentaPage() {
               Concepto
             </p>
             <textarea rows={3} maxLength={200} value={conceptoEdit} onChange={(e) => setConceptoEdit(e.target.value)} />
+            {lineasEdit.length > 0 && (
+              <>
+                <p className="sub-label" style={{ marginTop: 8 }}>
+                  Conceptos en la factura
+                </p>
+                <p style={{ fontSize: 12, color: "#888", margin: "0 0 6px" }}>Esta factura lleva varias líneas: en el CFDI sale el concepto de cada una.</p>
+                {lineasEdit.map((l, i) => (
+                  <input
+                    key={l.id}
+                    type="text"
+                    maxLength={200}
+                    style={{ marginBottom: 6 }}
+                    disabled={!l.editable}
+                    title={l.editable ? "" : "El concepto del depósito y de la mensualidad no se puede cambiar"}
+                    value={l.concepto}
+                    onChange={(e) => setLineasEdit((ls) => ls.map((x, j) => (j === i ? { ...x, concepto: e.target.value } : x)))}
+                  />
+                ))}
+              </>
+            )}
             <p className="sub-label" style={{ marginTop: 8 }}>
               Fecha (vence 10 días después)
             </p>

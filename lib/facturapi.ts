@@ -196,12 +196,26 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
   return { cuerpo, datos, hoy, publicoGeneral, usoCfdi, lineas, cliente };
 }
 
+// El siguiente folio LIVE de una serie, o null si no se pudo leer o la serie aún no lo tiene capturado.
+async function siguienteFolio(serie: string): Promise<number | null> {
+  try {
+    const org: any = await facturapi.organizations.me();
+    const series = await facturapi.organizations.listSeriesGroup(org.id);
+    const folio = series.find((s) => s.series === serie)?.next_folio;
+    return typeof folio === "number" && folio > 0 ? folio : null;
+  } catch {
+    return null;
+  }
+}
+
 // Vista previa en PDF de la factura (la misma que se emitiría, con la marca de que no es válida): Facturapi la
 // genera con su plantilla, sin timbrar nada ni gastar un folio.
 export async function previaPdfCfdi(admin: Admin, p: ParametrosCfdi): Promise<Buffer> {
   const { cuerpo } = await prepararFactura(admin, p);
+  // El borrador muestra el folio que le toca a la serie. Es solo informativo: al timbrar lo asigna Facturapi.
+  const folio = p.serie ? await siguienteFolio(p.serie) : null;
   // Como las descargas del timbrado: Facturapi da una dirección firmada y de ahí se baja el PDF.
-  const firmada: any = await (facturapi.invoices as any).previewPdfUrl(cuerpo);
+  const firmada: any = await (facturapi.invoices as any).previewPdfUrl(folio ? { ...cuerpo, folio_number: folio } : cuerpo);
   return bufferDesdeUrlFirmada(firmada.url);
 }
 
