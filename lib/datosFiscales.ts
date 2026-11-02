@@ -11,6 +11,47 @@ export type DatosFiscales = {
 
 export type TipoPersonaFiscal = "fisica" | "moral";
 
+// Domicilio fiscal, tal como viene en la Constancia de Situación Fiscal (ver migracion_domicilio_fiscal.sql). Es para
+// consulta y no impide facturar: el CFDI 4.0 solo lleva el código postal del receptor (cp_fiscal).
+export const CAMPOS_DOMICILIO_FISCAL = [
+  { campo: "dom_tipo_vialidad", label: "Tipo de vialidad", placeholder: "CALLE, AVENIDA…" },
+  { campo: "dom_vialidad", label: "Nombre de vialidad", placeholder: "" },
+  { campo: "dom_num_exterior", label: "Número exterior", placeholder: "" },
+  { campo: "dom_num_interior", label: "Número interior", placeholder: "Si tiene" },
+  { campo: "dom_colonia", label: "Colonia", placeholder: "" },
+  { campo: "dom_localidad", label: "Localidad", placeholder: "Si tiene" },
+  { campo: "dom_municipio", label: "Municipio o demarcación", placeholder: "" },
+  { campo: "dom_entidad", label: "Entidad federativa", placeholder: "" },
+  { campo: "dom_entre_calle", label: "Entre calle", placeholder: "Si tiene" },
+  { campo: "dom_y_calle", label: "Y calle", placeholder: "Si tiene" },
+] as const;
+
+export type CampoDomicilioFiscal = (typeof CAMPOS_DOMICILIO_FISCAL)[number]["campo"];
+export type DomicilioFiscal = Record<CampoDomicilioFiscal, string>;
+
+export const DOMICILIO_FISCAL_VACIO = Object.fromEntries(CAMPOS_DOMICILIO_FISCAL.map((c) => [c.campo, ""])) as DomicilioFiscal;
+
+// Lo que llega del perfil a un formulario (las columnas vacías vienen en null).
+export function domicilioDePerfil(p: Partial<Record<CampoDomicilioFiscal, string | null>> | null | undefined): DomicilioFiscal {
+  return Object.fromEntries(CAMPOS_DOMICILIO_FISCAL.map((c) => [c.campo, p?.[c.campo] || ""])) as DomicilioFiscal;
+}
+
+// Lo que se guarda: en mayúsculas como en la Constancia, y null lo vacío.
+export function domicilioParaGuardar(body: any): Record<CampoDomicilioFiscal, string | null> {
+  return Object.fromEntries(CAMPOS_DOMICILIO_FISCAL.map((c) => [c.campo, String(body?.[c.campo] ?? "").trim().toUpperCase().slice(0, 200) || null])) as Record<
+    CampoDomicilioFiscal,
+    string | null
+  >;
+}
+
+// El domicilio en una línea: "CALLE RIO TIGRIS 9, COL. VILLA LA PAZ, TEPIC, NAYARIT".
+export function textoDomicilioFiscal(p: Partial<Record<CampoDomicilioFiscal, string | null>> | null | undefined): string {
+  if (!p) return "";
+  const calle = [p.dom_tipo_vialidad, p.dom_vialidad, p.dom_num_exterior, p.dom_num_interior ? `INT. ${p.dom_num_interior}` : ""].filter(Boolean).join(" ");
+  const entre = p.dom_entre_calle ? `ENTRE ${p.dom_entre_calle}${p.dom_y_calle ? ` Y ${p.dom_y_calle}` : ""}` : p.dom_y_calle || "";
+  return [calle, p.dom_colonia ? `COL. ${p.dom_colonia}` : "", p.dom_localidad, p.dom_municipio, p.dom_entidad, entre].filter(Boolean).join(", ");
+}
+
 // Catálogo de regímenes fiscales del SAT (c_RegimenFiscal, CFDI 4.0) y a qué tipo de
 // persona aplica cada uno. Antes solo estaban los más comunes y faltaban varios
 // (p. ej. Arrendamiento de personas morales o Sociedades Cooperativas).

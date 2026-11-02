@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { accesoCliente } from "@/lib/facturasAcceso";
-import { RFC_PUBLICO_GENERAL, normalizarRfc, validarDatosFiscales, type TipoPersonaFiscal } from "@/lib/datosFiscales";
+import { RFC_PUBLICO_GENERAL, domicilioParaGuardar, normalizarRfc, validarDatosFiscales, type TipoPersonaFiscal } from "@/lib/datosFiscales";
 
 // Configuración fiscal (Facturación): finanzas corrige los datos fiscales de un cliente (los que se capturaron al
 // ligar su contrato) si vienen con errores o si la empresa los cambió. Las facturas ya timbradas no cambian: si
@@ -44,11 +44,13 @@ export async function POST(req: NextRequest) {
   const msg = validarDatosFiscales(datos, tipo);
   if (msg) return NextResponse.json({ error: msg }, { status: 400 });
 
-  const { error } = await admin.from("profiles").update(datos).eq("id", userId);
+  // El domicilio solo va en el perfil: los contratos no tienen esas columnas.
+  const domicilio = domicilioParaGuardar(body);
+  const { error } = await admin.from("profiles").update({ ...datos, ...domicilio }).eq("id", userId);
   if (error) return NextResponse.json({ error: "No se pudieron guardar los datos fiscales: " + error.message }, { status: 500 });
 
   // Contratos sin RFC real (vacío o público en general): se ponen al día. Los que ya traen un RFC van con el documento firmado.
   await admin.from("contratos").update(datos).eq("user_id", userId).or(`rfc.is.null,rfc.eq.,rfc.eq.${RFC_PUBLICO_GENERAL}`);
 
-  return NextResponse.json({ ok: true, datos });
+  return NextResponse.json({ ok: true, datos: { ...datos, ...domicilio } });
 }

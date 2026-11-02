@@ -6,7 +6,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { mandarCorreoContrasena } from "@/lib/correoContrasena";
 import { origenPublico } from "@/lib/origenPublico";
 import { correoFicticio } from "@/lib/correoFicticio";
-import { USO_CFDI_DEFAULT, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
+import { USO_CFDI_DEFAULT, domicilioParaGuardar, normalizarRfc, validarDatosFiscales } from "@/lib/datosFiscales";
 import { randomInt } from "crypto";
 
 // Contraseña para las cuentas que se crean sin mandar correo: fácil de dictar o mandar por WhatsApp
@@ -132,6 +132,7 @@ export async function POST(req: NextRequest) {
     empresa: empresa ? normalizarEmpresa(empresa) : null,
     rfc: rfcCliente || null,
     ...(conFiscal ? fiscal : {}),
+    ...Object.fromEntries(Object.entries(domicilioParaGuardar(body)).filter(([, v]) => v)),
     numero_usuario: numeroUsuario,
     telefono: telefono || null,
     dia_pago: diaPago ? Number(diaPago) : null,

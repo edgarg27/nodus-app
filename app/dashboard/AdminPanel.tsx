@@ -11,7 +11,19 @@ import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
 import { esSuperadmin, labelRol } from "@/lib/roles";
 import { rolPuede } from "@/lib/permisosApi";
-import { REGIMENES_FISCALES, USOS_CFDI, USO_CFDI_DEFAULT, avisosDatosFiscales, normalizarRfc, usosParaTipo } from "@/lib/datosFiscales";
+import {
+  CAMPOS_DOMICILIO_FISCAL,
+  DOMICILIO_FISCAL_VACIO,
+  REGIMENES_FISCALES,
+  USOS_CFDI,
+  USO_CFDI_DEFAULT,
+  avisosDatosFiscales,
+  domicilioDePerfil,
+  normalizarRfc,
+  textoDomicilioFiscal,
+  usosParaTipo,
+  type CampoDomicilioFiscal,
+} from "@/lib/datosFiscales";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
 import Link from "next/link";
@@ -38,7 +50,7 @@ type Cliente = {
   regimen_fiscal?: string | null;
   cp_fiscal?: string | null;
   uso_cfdi?: string | null;
-};
+} & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
 // Ticket de conexión en el detalle del cliente: oculto mientras se define cómo quedará Vouchers.
 const MOSTRAR_VOUCHER_CLIENTE = false;
@@ -256,7 +268,7 @@ export default function AdminPanel({
   // validan completos y los guarda quien puede facturar (la misma API de Configuración fiscal).
   const puedeEditarFiscal = rolPuede(rol, "facturaEmitir");
   const [editandoFiscal, setEditandoFiscal] = useState(false);
-  const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT });
+  const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT, ...DOMICILIO_FISCAL_VACIO });
   const [guardandoFiscal, setGuardandoFiscal] = useState(false);
   const [errorFiscal, setErrorFiscal] = useState("");
   const tipoFiscal = normalizarRfc(formFiscal.rfc).length === 12 ? "moral" : "fisica";
@@ -645,6 +657,7 @@ export default function AdminPanel({
       regimen_fiscal: c.regimen_fiscal || "",
       cp_fiscal: c.cp_fiscal || "",
       uso_cfdi: c.uso_cfdi || USO_CFDI_DEFAULT,
+      ...domicilioDePerfil(c),
     });
     setErrorFiscal("");
     setEditandoFiscal(true);
@@ -2178,6 +2191,21 @@ export default function AdminPanel({
                     </option>
                   ))}
                 </select>
+                <p className="panel-section-label" style={{ marginTop: 10 }}>
+                  Domicilio fiscal
+                </p>
+                {CAMPOS_DOMICILIO_FISCAL.map((c) => (
+                  <Fragment key={c.campo}>
+                    <p className="sub-label">{c.label}</p>
+                    <input
+                      type="text"
+                      maxLength={200}
+                      placeholder={c.placeholder}
+                      value={formFiscal[c.campo]}
+                      onChange={(e) => setFormFiscal({ ...formFiscal, [c.campo]: e.target.value.toUpperCase() })}
+                    />
+                  </Fragment>
+                ))}
                 {avisosDatosFiscales(formFiscal).length > 0 && (
                   <p style={{ color: "#854F0B", fontSize: 12, margin: "6px 0 0" }}>{avisosDatosFiscales(formFiscal)[0]}</p>
                 )}
@@ -2203,6 +2231,7 @@ export default function AdminPanel({
                       [clienteSeleccionado.regimen_fiscal, REGIMENES_FISCALES.find((r) => r.clave === clienteSeleccionado.regimen_fiscal)?.nombre].filter(Boolean).join(" · "),
                   },
                   { label: "C.P. fiscal", valor: clienteSeleccionado.cp_fiscal },
+                  { label: "Domicilio", valor: textoDomicilioFiscal(clienteSeleccionado) },
                   {
                     label: "Uso del CFDI",
                     valor:

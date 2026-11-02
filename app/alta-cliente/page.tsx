@@ -4,7 +4,16 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { conIva } from "@/lib/adicionales";
-import { REGIMENES_FISCALES, USO_CFDI_DEFAULT, avisosDatosFiscales, normalizarRfc, usosParaTipo, validarDatosFiscales } from "@/lib/datosFiscales";
+import {
+  CAMPOS_DOMICILIO_FISCAL,
+  DOMICILIO_FISCAL_VACIO,
+  REGIMENES_FISCALES,
+  USO_CFDI_DEFAULT,
+  avisosDatosFiscales,
+  normalizarRfc,
+  usosParaTipo,
+  validarDatosFiscales,
+} from "@/lib/datosFiscales";
 import AnexosZora, { ANEXOS_VACIOS, guardarAnexos, hayAnexos, validarAnexos, type Anexos, type Oficina, type ResultadoAnexos } from "./AnexosZora";
 import Link from "next/link";
 
@@ -368,6 +377,7 @@ function AltaClienteInner() {
   // Con qué datos se le factura. Opcional al crear la cuenta: si faltan, Finanzas lo ve como "Faltan datos" en
   // Configuración fiscal y se pueden completar ahí.
   const [fiscal, setFiscal] = useState(FISCAL_VACIO);
+  const [domicilioFiscal, setDomicilioFiscal] = useState(DOMICILIO_FISCAL_VACIO);
   const rfcFiscal = normalizarRfc(formCliente.rfc);
   const tipoFiscal = rfcFiscal.length === 12 ? "moral" : "fisica";
   const hayFiscal = !!(fiscal.nombre_fiscal.trim() || fiscal.regimen_fiscal || fiscal.cp_fiscal.trim());
@@ -438,6 +448,7 @@ function AltaClienteInner() {
           empresa: formCliente.empresa,
           rfc: rfcFiscal,
           ...(hayFiscal ? fiscal : {}),
+          ...domicilioFiscal,
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
           centro,
@@ -524,6 +535,7 @@ function AltaClienteInner() {
         diaPago: "",
       });
       setFiscal(FISCAL_VACIO);
+      setDomicilioFiscal(DOMICILIO_FISCAL_VACIO);
       limpiarProspecto();
       limpiarContrato();
       setAnexos(ANEXOS_VACIOS);
@@ -786,6 +798,22 @@ function AltaClienteInner() {
               </div>
             </div>
             {avisosFiscal.length > 0 && <p style={{ fontSize: 12, color: "#854F0B", margin: "6px 0 0" }}>{avisosFiscal[0]}</p>}
+            <p className="sub-label" style={{ marginTop: 10 }}>
+              Domicilio fiscal
+            </p>
+            <div className="tel-form-grid">
+              {CAMPOS_DOMICILIO_FISCAL.map((c) => (
+                <div key={c.campo}>
+                  <p className="sub-label">{c.label}</p>
+                  <input
+                    maxLength={200}
+                    placeholder={c.placeholder}
+                    value={domicilioFiscal[c.campo]}
+                    onChange={(e) => setDomicilioFiscal({ ...domicilioFiscal, [c.campo]: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              ))}
+            </div>
 
             <p className="panel-section-label" style={{ marginTop: 14 }}>
               Acceso a su cuenta
