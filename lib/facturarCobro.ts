@@ -5,7 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, previaPdfCfdi, tipoPorOmision, ErrorFacturacion, type ParametrosCfdi } from "@/lib/facturapi";
-import { serieCentro } from "@/lib/centros";
+import { cuentaPredialDeSerie, serieCentro } from "@/lib/centros";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
@@ -171,11 +171,13 @@ export async function previaCobro(admin: Admin, facturaId: string): Promise<{ ok
     const clave = await servicioPorClave(admin, l.tipo);
     const unitario = Math.round((l.monto / 1.16) * 100) / 100;
     subtotal += unitario;
+    const claveProd = clave?.satProdServ || "80131502";
+    const cuentaPredial = claveProd === "80131502" ? cuentaPredialDeSerie(serieCentro(f.centro)) : null;
     lineas.push({
       cantidad: 1,
       unidad: (clave?.satUnidad || "E48") + " - " + (NOMBRE_UNIDAD[clave?.satUnidad || "E48"] || ""),
-      claveProd: clave?.satProdServ || "80131502",
-      descripcion: l.concepto || "Servicios Nodus Flex Center",
+      claveProd,
+      descripcion: (l.concepto || "Servicios Nodus Flex Center") + (cuentaPredial ? ` · Cuenta predial: ${cuentaPredial}` : ""),
       precioUnitario: unitario,
       importe: unitario,
     });

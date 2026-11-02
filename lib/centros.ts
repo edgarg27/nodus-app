@@ -47,3 +47,21 @@ export const SERIE_POR_CENTRO: Record<string, string> = {
 export function serieCentro(centro: string | null | undefined): string | null {
   return (centro && SERIE_POR_CENTRO[centro]) || null;
 }
+
+// Cuenta predial del inmueble de cada centro. Va en cada concepto de arrendamiento del CFDI (nodo CuentaPredial).
+// Son texto: algunas empiezan con cero. Definidas por el área de facturación.
+export const CUENTA_PREDIAL_POR_CENTRO: Record<string, string> = {
+  Bosques: "U050706",
+  "San Telmo": "0846397",
+  "Punto 45": "0851501",
+  "Puerta Bajío Piso 2": "03G000750009",
+  "Puerta Bajío Piso 8": "03G000750022",
+  Stadium: "02C002495001",
+  ILEVA: "5422207600",
+};
+
+// El centro de una factura se conoce por su serie.
+export function cuentaPredialDeSerie(serie: string | null | undefined): string | null {
+  const centro = Object.keys(SERIE_POR_CENTRO).find((c) => SERIE_POR_CENTRO[c] === serie);
+  return (centro && CUENTA_PREDIAL_POR_CENTRO[centro]) || null;
+}

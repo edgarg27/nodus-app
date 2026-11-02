@@ -12,7 +12,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
-import { serieCentro } from "@/lib/centros";
+import { cuentaPredialDeSerie, serieCentro } from "@/lib/centros";
 import { esClienteCoworking } from "@/lib/coworking";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -147,11 +147,15 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
   const itemsNuevos = [];
   for (const l of lineas) {
     const claveSat = await servicioPorClave(admin, l.adicionalTipo);
+    const claveProd = claveSat?.satProdServ || CLAVE_PROD_SERV;
+    // Solo el arrendamiento lleva cuenta predial; el PDF de Facturapi la imprime debajo del concepto.
+    const cuentaPredial = claveProd === CLAVE_PROD_SERV ? cuentaPredialDeSerie(p.serie) : null;
     itemsNuevos.push({
       quantity: 1,
+      ...(cuentaPredial ? { property_tax_account: [cuentaPredial] } : {}),
       product: {
         description: l.concepto || "Servicios Nodus Flex Center",
-        product_key: claveSat?.satProdServ || CLAVE_PROD_SERV,
+        product_key: claveProd,
         unit_key: claveSat?.satUnidad || CLAVE_UNIDAD,
         price: Number(l.monto),
         tax_included: true,
