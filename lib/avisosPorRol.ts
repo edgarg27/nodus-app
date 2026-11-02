@@ -54,7 +54,7 @@ export const AVISOS_POR_ROL: Record<string, string[]> = {
 
 // Respuestas a algo que pidió esa misma persona (p. ej. una reservación de
 // sala que solicitó Ventas): le llegan a quien la pidió, sea cual sea su rol.
-export const AVISOS_PROPIOS = ["reservacion_confirmada", "reservacion_rechazada"];
+export const AVISOS_PROPIOS = ["reservacion_confirmada", "reservacion_rechazada", "reservacion_cancelada_centro"];
 
 const TICKETS = PERSONAL.tickets;
 
