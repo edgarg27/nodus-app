@@ -5,7 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, previaPdfCfdi, tipoPorOmision, ErrorFacturacion, type ParametrosCfdi } from "@/lib/facturapi";
-import { cuentaPredialDeSerie, serieCentro } from "@/lib/centros";
+import { cuentaPredialDeSerie, lineaConCuentaPredial, serieCentro } from "@/lib/centros";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
@@ -165,19 +165,25 @@ export async function previaCobro(admin: Admin, facturaId: string): Promise<{ ok
     ? await Promise.all(pagosLigados.map(async (l) => ({ concepto: etiquetaPagoSuelto(l.concepto), monto: Number(l.monto), tipo: await tipoPorOmision(admin, f.user_id, l.adicional_tipo) })))
     : [{ concepto: f.concepto as string, monto: Number(f.monto), tipo: await tipoPorOmision(admin, f.user_id, f.adicional_tipo || pagoAdicional?.adicional_tipo || null) }];
 
+  const conClave = await Promise.all(
+    base.map(async (l) => {
+      const clave = await servicioPorClave(admin, l.tipo);
+      return { ...l, clave, claveProd: clave?.satProdServ || "80131502" };
+    })
+  );
+  const lineaPredial = lineaConCuentaPredial(conClave);
+  const cuentaPredial = cuentaPredialDeSerie(serieCentro(f.centro));
   const lineas = [];
   let subtotal = 0;
-  for (const l of base) {
-    const clave = await servicioPorClave(admin, l.tipo);
+  for (const [i, l] of conClave.entries()) {
+    const { clave, claveProd } = l;
     const unitario = Math.round((l.monto / 1.16) * 100) / 100;
     subtotal += unitario;
-    const claveProd = clave?.satProdServ || "80131502";
-    const cuentaPredial = claveProd === "80131502" ? cuentaPredialDeSerie(serieCentro(f.centro)) : null;
     lineas.push({
       cantidad: 1,
       unidad: (clave?.satUnidad || "E48") + " - " + (NOMBRE_UNIDAD[clave?.satUnidad || "E48"] || ""),
       claveProd,
-      descripcion: (l.concepto || "Servicios Nodus Flex Center") + (cuentaPredial ? ` · Cuenta predial: ${cuentaPredial}` : ""),
+      descripcion: (l.concepto || "Servicios Nodus Flex Center") + (i === lineaPredial && cuentaPredial ? ` · Cuenta predial: ${cuentaPredial}` : ""),
       precioUnitario: unitario,
       importe: unitario,
     });

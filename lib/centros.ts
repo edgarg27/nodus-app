@@ -48,7 +48,8 @@ export function serieCentro(centro: string | null | undefined): string | null {
   return (centro && SERIE_POR_CENTRO[centro]) || null;
 }
 
-// Cuenta predial del inmueble de cada centro. Va en cada concepto de arrendamiento del CFDI (nodo CuentaPredial).
+// Cuenta predial del inmueble de cada centro. En cada factura va solo en el primer concepto de renta de oficina
+// (nodo CuentaPredial del CFDI), como pidió el área de facturación.
 // Son texto: algunas empiezan con cero. Definidas por el área de facturación.
 export const CUENTA_PREDIAL_POR_CENTRO: Record<string, string> = {
   Bosques: "U050706",
@@ -64,4 +65,14 @@ export const CUENTA_PREDIAL_POR_CENTRO: Record<string, string> = {
 export function cuentaPredialDeSerie(serie: string | null | undefined): string | null {
   const centro = Object.keys(SERIE_POR_CENTRO).find((c) => SERIE_POR_CENTRO[c] === serie);
   return (centro && CUENTA_PREDIAL_POR_CENTRO[centro]) || null;
+}
+
+// Clave del SAT de arrendamiento de oficina. Los cobros sin tipo de servicio (depósito, estacionamiento del contrato…)
+// también se timbran con ella, pero no son renta: esos no llevan cuenta predial.
+const CLAVE_ARRENDAMIENTO = "80131502";
+const NO_ES_RENTA = /^\s*(dep[oó]sito|estacionamiento|tel[eé]fono|extensi[oó]n|adicional)/i;
+
+// La línea de la factura que lleva la cuenta predial: la primera de renta de oficina (-1 si ninguna lo es).
+export function lineaConCuentaPredial(lineas: { claveProd: string; concepto: string | null | undefined }[]): number {
+  return lineas.findIndex((l) => l.claveProd === CLAVE_ARRENDAMIENTO && !NO_ES_RENTA.test(l.concepto || ""));
 }
