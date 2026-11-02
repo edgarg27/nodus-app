@@ -4,11 +4,13 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { conIva } from "@/lib/adicionales";
+import { REGIMENES_FISCALES, USO_CFDI_DEFAULT, avisosDatosFiscales, normalizarRfc, usosParaTipo, validarDatosFiscales } from "@/lib/datosFiscales";
 import AnexosZora, { ANEXOS_VACIOS, guardarAnexos, hayAnexos, validarAnexos, type Anexos, type Oficina, type ResultadoAnexos } from "./AnexosZora";
 import Link from "next/link";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
+const FISCAL_VACIO = { nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT };
 
 // Lead registrado en la pestaña Prospectos de Centro — no tiene cuenta
 // (profiles.id), así que elegirlo aquí solo precarga los campos del
@@ -250,12 +252,15 @@ function AltaClienteInner() {
 
   function seleccionarContrato(c: ContratoPendiente) {
     setContratoSeleccionadoId(c.id);
-    // Datos fiscales que se capturaron al aceptar la cotización: pasan a la cuenta nueva.
-    setFiscalContrato(
-      c.regimen_fiscal || c.cp_fiscal || c.nombre_fiscal
-        ? { nombre_fiscal: c.nombre_fiscal || "", regimen_fiscal: c.regimen_fiscal || "", cp_fiscal: c.cp_fiscal || "", uso_cfdi: c.uso_cfdi || "" }
-        : null
-    );
+    // Datos fiscales que se capturaron al aceptar la cotización: se precargan y se pueden corregir.
+    if (c.regimen_fiscal || c.cp_fiscal || c.nombre_fiscal) {
+      setFiscal({
+        nombre_fiscal: c.nombre_fiscal || "",
+        regimen_fiscal: c.regimen_fiscal || "",
+        cp_fiscal: c.cp_fiscal || "",
+        uso_cfdi: c.uso_cfdi || USO_CFDI_DEFAULT,
+      });
+    }
     setBusquedaContrato(c.nombreContesta || c.tipoEspacio || "Contrato");
     setMostrarListaContratos(false);
     if (c.nombreContesta || c.telefono || c.correo || c.rfc || c.razonSocial || c.empresaHistorica) {
@@ -271,7 +276,6 @@ function AltaClienteInner() {
   }
 
   function limpiarContrato() {
-    setFiscalContrato(null);
     setContratoSeleccionadoId("");
     setBusquedaContrato("");
     setMostrarListaContratos(false);
@@ -361,12 +365,13 @@ function AltaClienteInner() {
     telefono: telefonoDesdeUrl,
     diaPago: diaPagoDesdeUrl,
   });
-  const [fiscalContrato, setFiscalContrato] = useState<{
-    nombre_fiscal: string;
-    regimen_fiscal: string;
-    cp_fiscal: string;
-    uso_cfdi: string;
-  } | null>(null);
+  // Con qué datos se le factura. Opcional al crear la cuenta: si faltan, Finanzas lo ve como "Faltan datos" en
+  // Configuración fiscal y se pueden completar ahí.
+  const [fiscal, setFiscal] = useState(FISCAL_VACIO);
+  const rfcFiscal = normalizarRfc(formCliente.rfc);
+  const tipoFiscal = rfcFiscal.length === 12 ? "moral" : "fisica";
+  const hayFiscal = !!(fiscal.nombre_fiscal.trim() || fiscal.regimen_fiscal || fiscal.cp_fiscal.trim());
+  const avisosFiscal = avisosDatosFiscales({ rfc: rfcFiscal, nombre_fiscal: fiscal.nombre_fiscal, regimen_fiscal: fiscal.regimen_fiscal });
   const [guardandoCliente, setGuardandoCliente] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [errorCliente, setErrorCliente] = useState("");
@@ -413,6 +418,13 @@ function AltaClienteInner() {
       setErrorCliente(errorAnexos);
       return;
     }
+    if (hayFiscal) {
+      const errorFiscal = validarDatosFiscales({ ...fiscal, rfc: rfcFiscal }, tipoFiscal);
+      if (errorFiscal) {
+        setErrorCliente("Datos fiscales: " + errorFiscal);
+        return;
+      }
+    }
     if (!centro) return;
     setGuardandoCliente(true);
 
@@ -424,8 +436,8 @@ function AltaClienteInner() {
           nombre: formCliente.nombre,
           email: formCliente.email,
           empresa: formCliente.empresa,
-          rfc: formCliente.rfc,
-          ...(fiscalContrato || {}),
+          rfc: rfcFiscal,
+          ...(hayFiscal ? fiscal : {}),
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
           centro,
@@ -511,6 +523,7 @@ function AltaClienteInner() {
         telefono: "",
         diaPago: "",
       });
+      setFiscal(FISCAL_VACIO);
       limpiarProspecto();
       limpiarContrato();
       setAnexos(ANEXOS_VACIOS);
@@ -723,6 +736,56 @@ function AltaClienteInner() {
                 )}
               </div>
             </div>
+
+            <p className="panel-section-label" style={{ marginTop: 14 }}>
+              Datos fiscales
+            </p>
+            <p style={{ fontSize: 12, color: "#888", margin: "4px 0 8px" }}>
+              Escribe primero el RFC de arriba y copia los datos de su Constancia de Situación Fiscal. Si todavía no los tienes, déjalos vacíos: se
+              completan después en Facturación → Configuración fiscal.
+            </p>
+            <div className="tel-form-grid">
+              <div>
+                <p className="sub-label">Razón social</p>
+                <input
+                  maxLength={200}
+                  placeholder='Como en la Constancia, sin "S.A. DE C.V."'
+                  value={fiscal.nombre_fiscal}
+                  onChange={(e) => setFiscal({ ...fiscal, nombre_fiscal: e.target.value.toUpperCase() })}
+                />
+              </div>
+              <div>
+                <p className="sub-label">Régimen fiscal</p>
+                <select value={fiscal.regimen_fiscal} onChange={(e) => setFiscal({ ...fiscal, regimen_fiscal: e.target.value })}>
+                  <option value="">Elige el régimen</option>
+                  {REGIMENES_FISCALES.filter((r) => r.aplica.includes(tipoFiscal)).map((r) => (
+                    <option key={r.clave} value={r.clave}>
+                      {r.clave} · {r.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <p className="sub-label">Código postal fiscal</p>
+                <input
+                  inputMode="numeric"
+                  maxLength={5}
+                  value={fiscal.cp_fiscal}
+                  onChange={(e) => setFiscal({ ...fiscal, cp_fiscal: e.target.value.replace(/\D/g, "") })}
+                />
+              </div>
+              <div>
+                <p className="sub-label">Uso del CFDI</p>
+                <select value={fiscal.uso_cfdi} onChange={(e) => setFiscal({ ...fiscal, uso_cfdi: e.target.value })}>
+                  {usosParaTipo(tipoFiscal).map((u) => (
+                    <option key={u.clave} value={u.clave}>
+                      {u.clave} · {u.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {avisosFiscal.length > 0 && <p style={{ fontSize: 12, color: "#854F0B", margin: "6px 0 0" }}>{avisosFiscal[0]}</p>}
 
             <p className="panel-section-label" style={{ marginTop: 14 }}>
               Acceso a su cuenta

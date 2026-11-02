@@ -6,8 +6,8 @@ import { rolPuede } from "@/lib/permisosApi";
 import { REGIMENES_FISCALES, usosParaTipo, avisosDatosFiscales, normalizarRfc } from "@/lib/datosFiscales";
 import Link from "next/link";
 
-// Configuración fiscal: los datos fiscales de cada cliente (los que se capturaron al ligar su contrato). Finanzas los
-// revisa y los corrige si vienen con errores o si la empresa los cambió.
+// Configuración fiscal: los datos fiscales de cada cliente, con los que se timbran sus facturas. La administradora los
+// captura en el alta o aquí; Finanzas los revisa y los corrige si vienen con errores o si la empresa los cambió.
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const CENTROS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -118,7 +118,7 @@ export default function ConfiguracionFiscalPage() {
           ← Facturación
         </Link>
         <p className="rep-title">Configuración fiscal</p>
-        <p className="rep-sub">Datos fiscales de los clientes (los que se capturaron al ligar su contrato)</p>
+        <p className="rep-sub">Datos fiscales de los clientes, con los que se timbran sus facturas</p>
       </div>
 
       <div className="rep-content rep-content-completo">

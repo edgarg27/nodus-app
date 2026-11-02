@@ -1494,6 +1494,14 @@ export default function AdminPanel({
                   <span className="modulo-name">Facturas</span>
                 </Link>
               ) },
+              // Mismos roles que pueden editarlos (facturaEmitir, ver lib/permisosApi.ts).
+              { grupo: 1, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "cobranza", key: "datos-fiscales", tarjeta: (
+                <Link className="modulo-card" href="/facturas-admin/configuracion-fiscal">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Datos fiscales</span>
+                </Link>
+              ) },
               // Adicionales: cobros sueltos (hora extra de sala, copias, frituras…).
               // Mismos roles que su ruta y su API (permisosRutas.ts / permisosApi.ts).
               { grupo: 1, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "cobranza", key: "adicionales", tarjeta: (
