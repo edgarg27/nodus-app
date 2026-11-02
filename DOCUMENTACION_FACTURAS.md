@@ -168,13 +168,15 @@ uno, según el día del mes actual:
 | Momento | Acción |
 |---|---|
 | `dia_pago - 3` | Notificación + email de recordatorio (una sola vez al mes, controlado con `yaExisteNotifEsteMs`). |
-| `dia_pago` | Si no existe ya una factura de ese mes para el cliente: crea la factura (`folio: FAC-{año}{mes}-{id.slice(0,6)}`, `monto: contrato.renta_mensual`, `estado: 'pendiente'`) **+** genera un cargo SPEI automático vía Openpay y su `pago` correspondiente (`estado: 'pendiente_spei'`) **+** si el centro tiene UniFi real configurado (`centroTieneUnifi`), renueva el voucher de wifi del cliente (43200 min = 30 días). Además manda notificación/email de "hoy es tu día de pago". |
-| `dia_pago + 3` | Si la factura de ese mes **no** quedó `pagada`: la marca `vencida`, suspende al cliente (`profiles.suspendido = true`), revoca su voucher de wifi real si tenía uno, y notifica. |
+| `dia_pago` | Si la renta de ese contrato y mes no está en `cargos_periodo` (ver abajo): crea la factura (`folio: FAC-{año}{mes}-{id.slice(0,6)}`, `monto: contrato.renta_mensual`, `estado: 'pendiente'`) **+** genera un cargo SPEI automático vía Openpay y su `pago` correspondiente (`estado: 'pendiente_spei'`) **+** si el centro tiene UniFi real configurado (`centroTieneUnifi`), renueva el voucher de wifi del cliente (43200 min = 30 días). Además manda notificación/email de "hoy es tu día de pago". |
+| `dia_pago + 3` | Si la renta de ese contrato y mes **no** quedó liquidada y ya pasó su vencimiento: la marca `vencida`, suspende al cliente (`profiles.suspendido = true`), revoca su voucher de wifi real si tenía uno, y notifica. |
 
 Los tres bloques son independientes entre sí y se evalúan cada uno
 según si `diaHoy` coincide exactamente con esa fecha — el cron está
 pensado para correr **una vez al día**, no en batch retroactivo (si se
 salta un día de corrida, esos eventos puntuales no se recuperan solos).
+
+**Cómo sabe que la renta ya existe:** `cargos_periodo` (`migracion_cargos_periodo.sql`, `lib/cargosPeriodo.ts`) guarda una fila por contrato + mes + tipo (`renta` o `recargo`), con llave única. La llenan este cron (`origen: cron`) e Integrar por cliente (`origen: integrada`). Nunca se decide por el concepto, la fecha ni el número de facturas del mes, porque todo eso se puede editar. Si la consulta falla, no se factura y se reporta en `errores`. Una renta integrada a mano no recibe del cron reintentos de tarjeta, avisos del día 10 ni recargo: esa cobranza es de finanzas; sí recibe el voucher de Coworking.
 
 `resumen` (devuelto en la respuesta y mostrado en `/cobranza`) trae
 contadores de cada acción más un arreglo de `errores` — los `try/catch`

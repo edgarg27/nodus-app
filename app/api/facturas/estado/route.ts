@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -137,8 +138,9 @@ export async function POST(req: NextRequest) {
 
     const nuevos: Record<string, unknown>[] = [{ user_id: factura.user_id, centro: factura.centro, estado: "pendiente", concepto: descripcion, monto: montoCargo, factura_id: factura.id, adicional_tipo: servicio.clave }];
     // La renta que genera el sistema no tiene pagos ligados: su monto se vuelve línea para que la factura salga con un concepto por cargo.
-    if (pagosLigados.length === 0) {
-      nuevos.unshift({ user_id: factura.user_id, centro: factura.centro, estado: "pendiente", concepto: factura.concepto, monto: Number(factura.monto), factura_id: factura.id, adicional_tipo: factura.adicional_tipo || null });
+    const lineaRentaId = pagosLigados.length === 0 ? randomUUID() : null;
+    if (lineaRentaId) {
+      nuevos.unshift({ id: lineaRentaId, user_id: factura.user_id, centro: factura.centro, estado: "pendiente", concepto: factura.concepto, monto: Number(factura.monto), factura_id: factura.id, adicional_tipo: factura.adicional_tipo || null });
     }
     const { data: creados, error: errInsert } = await admin.from("pagos").insert(nuevos).select("id");
     if (errInsert || !creados) return NextResponse.json({ error: "No se pudo agregar el cargo" }, { status: 500 });
@@ -152,6 +154,8 @@ export async function POST(req: NextRequest) {
       await admin.from("pagos").delete().in("id", creados.map((c) => c.id));
       return NextResponse.json({ error: "No se pudo actualizar el total" }, { status: 500 });
     }
+    // Esa línea es ahora la renta del mes (si la factura era una renta): el cobro diario revisa su pago, no el del total.
+    if (lineaRentaId) await admin.from("cargos_periodo").update({ pago_id: lineaRentaId }).eq("factura_id", factura.id).eq("tipo", "renta").is("pago_id", null);
     return NextResponse.json({ ok: true, total });
   }
 

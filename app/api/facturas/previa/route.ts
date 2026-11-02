@@ -5,6 +5,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { etiquetaPagoSuelto } from "@/lib/adicionales";
 import { cargarCatalogo } from "@/lib/catalogoServicios";
 import { accesoCliente } from "@/lib/facturasAcceso";
+import { facturaCancelada } from "@/lib/cargosPeriodo";
 
 export const dynamic = "force-dynamic";
 
@@ -75,8 +76,9 @@ export async function GET(req: NextRequest) {
   if (!(mes >= 1 && mes <= 12) || !(anio >= 2020 && anio <= 2100)) return NextResponse.json({ error: "Mes o año no válidos" }, { status: 400 });
   const nombreMes = `${MESES[mes - 1]} de ${anio}`;
   const contratoId = q.get("contratoId") || "";
+  const inicio = `${anio}-${String(mes).padStart(2, "0")}-01`;
 
-  type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string };
+  type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string; periodo?: string };
   const lineas: Linea[] = [];
 
   // Recurrentes: renta mensual y adicionales mensuales (estacionamiento…) de cada contrato.
@@ -87,7 +89,7 @@ export async function GET(req: NextRequest) {
   for (const c of elegidos) {
     const quien = c.folio || c.etiqueta;
     const servicio = (c.tipo || "renta de espacio").toLowerCase();
-    if (c.renta > 0) lineas.push({ key: "renta-" + c.id, tipo: "Renta", contrato: quien, descripcion: `Renta mensual ${nombreMes}`, servicio, total: c.renta, contratoId: c.id, centro: c.centro });
+    if (c.renta > 0) lineas.push({ key: "renta-" + c.id, tipo: "Renta", contrato: quien, descripcion: `Renta mensual ${nombreMes}`, servicio, total: c.renta, contratoId: c.id, centro: c.centro, periodo: inicio });
     for (const [i, e] of (extras || []).filter((x) => x.contrato_id === c.id).entries()) {
       if (Number(e.monto) > 0)
         lineas.push({ key: `extra-${c.id}-${i}`, tipo: "Adicional mensual", contrato: quien, descripcion: `${e.concepto} ${nombreMes}`, servicio: String(e.concepto).toLowerCase(), total: Number(e.monto), contratoId: c.id, centro: c.centro });
@@ -117,23 +119,24 @@ export async function GET(req: NextRequest) {
     lineas.push({ key: "pago-" + p.id, tipo, contrato: "—", descripcion: `${nombre}${p.estado === "pagado" ? " (ya pagado)" : ""}`, servicio, total: Number(p.monto), pagoId: p.id });
   }
 
-  // ¿Ya existe el cobro de renta de ese mes? (el sistema lo genera solo en los primeros días del mes)
-  const inicio = `${anio}-${String(mes).padStart(2, "0")}-01`;
-  const fin = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
-  const { data: rentaMes } = await admin
-    .from("facturas")
-    .select("folio, estado, uuid_cfdi")
-    .eq("user_id", userId)
-    .ilike("concepto", "Renta mensual%")
-    .gte("fecha_emision", inicio)
-    .lte("fecha_emision", fin)
-    .limit(1)
-    .maybeSingle();
+  // ¿Ya existe el cobro de renta de ese mes, contrato por contrato? (la genera el cobro diario o se integró a mano)
+  const { data: marcas, error: errMarcas } = elegidos.length
+    ? await admin.from("cargos_periodo").select("contrato_id, factura_id").in("contrato_id", elegidos.map((c) => c.id)).eq("periodo", inicio).eq("tipo", "renta").not("factura_id", "is", null)
+    : { data: [] as { contrato_id: string; factura_id: string }[], error: null };
+  if (errMarcas) return NextResponse.json({ error: "No se pudo revisar si la renta ya existe" }, { status: 500 });
+  const { data: facturasRenta } = (marcas || []).length
+    ? await admin.from("facturas").select("id, folio, estado, uuid_cfdi, cancelacion_estatus").in("id", (marcas || []).map((m) => m.factura_id))
+    : { data: [] as { id: string; folio: string; estado: string; uuid_cfdi: string | null; cancelacion_estatus: string | null }[] };
+  const rentasYaIntegradas = (marcas || []).flatMap((m) => {
+    const f = (facturasRenta || []).find((x) => x.id === m.factura_id);
+    // Una factura cancelada ya no ocupa la renta: se puede volver a integrar.
+    return f && !facturaCancelada(f) ? [{ contratoId: m.contrato_id, folio: f.folio, estado: f.estado, timbrada: !!f.uuid_cfdi }] : [];
+  });
 
   return NextResponse.json({
     contratos: contratosOut,
     lineas,
-    rentaYaIntegrada: rentaMes ? { folio: rentaMes.folio, estado: rentaMes.estado, timbrada: !!rentaMes.uuid_cfdi } : null,
+    rentasYaIntegradas,
     puedeTimbrar: rolPuede(miProfile?.rol, "facturaEmitir"),
   });
 }

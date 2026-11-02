@@ -10,6 +10,7 @@ import { totalAdicionalesMensuales } from "@/lib/adicionales";
 import { enviarAvisoPago } from "@/lib/correosPagos";
 import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
 import { rolPuede } from "@/lib/permisosApi";
+import { apartarCargo, cargoDelPeriodo, estadoDelCargo, ligarCargoAFactura, periodoDe, soltarCargo } from "@/lib/cargosPeriodo";
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -36,13 +37,68 @@ async function montoMensualConAdicionales(admin: Admin, contratoId: string, rent
   return Math.round((renta + totalAdicionalesMensuales(data || [])) * 100) / 100;
 }
 
-// Crea una factura pendiente y su cargo SPEI (mismo mecanismo que la renta
-// del flujo normal de abajo). Devuelve el id de la factura.
+// Voucher de WiFi del mes (solo Coworking y solo en centros con UniFi real configurado).
+async function generarVoucherMensual(
+  admin: Admin,
+  resumen: Resumen,
+  userId: string,
+  cliente: { nombre: string | null; email: string | null; centro: string | null }
+) {
+  if (!cliente.centro || !centroTieneUnifi(cliente.centro)) return;
+  try {
+    const { codigo, unifiId } = await generarVoucherReal(cliente.centro, {
+      notaBase: `Nodus - ${cliente.nombre} (renovación mensual)`,
+      minutos: 43200,
+    });
+    await admin.from("vouchers").insert({
+      user_id: userId,
+      codigo,
+      folio: `VCH-${Date.now().toString().slice(-6)}`,
+      centro: cliente.centro,
+      duracion_minutos: 43200,
+      expira_en: new Date(Date.now() + 43200 * 60 * 1000).toISOString(),
+      unifi_id: unifiId,
+    });
+    resumen.vouchersGenerados++;
+  } catch (err: any) {
+    resumen.errores.push(`Voucher ${cliente.email}: ${err.message}`);
+  }
+}
+
+// La renta integrada a mano no pasa por la creación de factura de aquí, que es donde
+// sale el voucher: sin esto, un cliente de Coworking se quedaría sin WiFi ese mes.
+async function voucherMensualSiFalta(
+  admin: Admin,
+  resumen: Resumen,
+  userId: string,
+  cliente: { nombre: string | null; email: string | null; centro: string | null },
+  inicioMes: string
+) {
+  if (!cliente.centro || !centroTieneUnifi(cliente.centro)) return;
+  const { data: yaTiene, error } = await admin
+    .from("vouchers")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("duracion_minutos", 43200)
+    .gte("created_at", `${inicioMes}T00:00:00`)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    resumen.errores.push(`Voucher ${cliente.email}: ${error.message}`);
+    return;
+  }
+  if (!yaTiene) await generarVoucherMensual(admin, resumen, userId, cliente);
+}
+
+// Crea una factura pendiente y su cargo SPEI, ya ligada a su apartado en
+// cargos_periodo (antes de cobrar nada, para que el mes nunca quede sin marca).
+// Devuelve el id de la factura; si no se pudo, suelta el apartado.
 async function crearFacturaConSpei(
   admin: Admin,
   resumen: Resumen,
   datos: {
     userId: string;
+    cargoId: string;
     cliente: { nombre: string | null; email: string | null; centro: string | null };
     monto: number;
     concepto: string;
@@ -55,7 +111,7 @@ async function crearFacturaConSpei(
     autopago?: boolean;
   }
 ): Promise<string | undefined> {
-  const { data: nuevaFactura } = await admin
+  const { data: nuevaFactura, error: errFactura } = await admin
     .from("facturas")
     .insert({
       user_id: datos.userId,
@@ -70,7 +126,19 @@ async function crearFacturaConSpei(
     .select("id")
     .single();
   const facturaId = nuevaFactura?.id as string | undefined;
-  if (!facturaId) return undefined;
+  if (!facturaId) {
+    resumen.errores.push(`Factura ${datos.cliente.email}: ${errFactura?.message || "no se pudo crear"}`);
+    await soltarCargo(admin, datos.cargoId);
+    return undefined;
+  }
+  try {
+    await ligarCargoAFactura(admin, datos.cargoId, facturaId);
+  } catch (err) {
+    // Sin la marca, mañana se generaría otra: se deshace antes de cobrar nada.
+    await admin.from("facturas").delete().eq("id", facturaId);
+    await soltarCargo(admin, datos.cargoId);
+    throw err;
+  }
   resumen.facturasGeneradas++;
 
   if (datos.autopago) {
@@ -125,6 +193,9 @@ async function crearFacturaConSpei(
 // automáticamente — eso lo decide cobranza. El primer mes lo cobra
 // ContratoModal.tsx → aprobar(), por eso este flujo arranca el mes siguiente
 // al de fecha_inicio y termina en fecha_vencimiento.
+// Si finanzas ya integró la renta del mes, la cobranza de esa factura es suya: aquí
+// no se reintenta la tarjeta, no se avisa del día 10 (trae su propio vencimiento) ni
+// se genera el recargo (finanzas agrega su penalización por atraso, también de 3%).
 async function procesarMensual(
   admin: Admin,
   resumen: Resumen,
@@ -137,10 +208,9 @@ async function procesarMensual(
     hoy: Date;
     hoyISO: string;
     inicioMes: string;
-    finMes: string;
   }
 ) {
-  const { userId, contrato, cliente, esCoworking, hoy, hoyISO, inicioMes, finMes } = ctx;
+  const { userId, contrato, cliente, esCoworking, hoy, hoyISO, inicioMes } = ctx;
   const renta = Number(contrato.renta_mensual) || 0;
   if (renta <= 0) return;
 
@@ -155,22 +225,18 @@ async function procesarMensual(
   const sufijoFolio = `${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`;
   const fechaLimiteISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(DIA_LIMITE_PAGO_MENSUAL).padStart(2, "0")}`;
 
-  const { data: facturaRenta } = await admin
-    .from("facturas")
-    .select("id, estado")
-    .eq("user_id", userId)
-    .eq("concepto", conceptoRenta)
-    .gte("fecha_emision", inicioMes)
-    .lte("fecha_emision", finMes)
-    .maybeSingle();
+  const periodo = periodoDe(hoy);
+  const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
 
   // ---------- Días 1 al 10: facturar la renta del mes (una sola vez) ----------
-  if (!facturaRenta && diaHoy <= DIA_LIMITE_PAGO_MENSUAL) {
-    // Renta + adicionales de cobro mensual (Estacionamiento). El concepto se
-    // deja igual porque es la llave para no facturar dos veces el mismo mes.
+  if (!rentaMes && diaHoy <= DIA_LIMITE_PAGO_MENSUAL) {
+    const cargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta", origen: "cron" });
+    if (!cargoId) return;
+    // Renta + adicionales de cobro mensual (Estacionamiento).
     const montoMes = await montoMensualConAdicionales(admin, contrato.id, renta);
     const facturaId = await crearFacturaConSpei(admin, resumen, {
       userId,
+      cargoId,
       cliente,
       monto: montoMes,
       concepto: conceptoRenta,
@@ -184,26 +250,7 @@ async function procesarMensual(
       autopago: true,
     });
 
-    if (facturaId && esCoworking && cliente.centro && centroTieneUnifi(cliente.centro)) {
-      try {
-        const { codigo, unifiId } = await generarVoucherReal(cliente.centro, {
-          notaBase: `Nodus - ${cliente.nombre} (renovación mensual)`,
-          minutos: 43200,
-        });
-        await admin.from("vouchers").insert({
-          user_id: userId,
-          codigo,
-          folio: `VCH-${Date.now().toString().slice(-6)}`,
-          centro: cliente.centro,
-          duracion_minutos: 43200,
-          expira_en: new Date(Date.now() + 43200 * 60 * 1000).toISOString(),
-          unifi_id: unifiId,
-        });
-        resumen.vouchersGenerados++;
-      } catch (err: any) {
-        resumen.errores.push(`Voucher ${cliente.email}: ${err.message}`);
-      }
-    }
+    if (facturaId && esCoworking) await generarVoucherMensual(admin, resumen, userId, cliente);
 
     const { data: estadoFactura } = facturaId
       ? await admin.from("facturas").select("estado").eq("id", facturaId).maybeSingle()
@@ -219,15 +266,27 @@ async function procesarMensual(
     return;
   }
 
-  if (!facturaRenta || facturaRenta.estado === "pagada") return;
+  if (!rentaMes) return;
+  const estadoRenta = await estadoDelCargo(admin, rentaMes);
+  // Sin factura: otra corrida la está creando. Cancelada: alguien lo decidió; no se regenera ni se le cobra nada más.
+  if (!estadoRenta || estadoRenta.cancelada) return;
+  if (rentaMes.origen === "integrada") {
+    if (esCoworking) await voucherMensualSiFalta(admin, resumen, userId, cliente, inicioMes);
+    return;
+  }
+  if (estadoRenta.liquidada) return;
+  const facturaRenta = estadoRenta.factura;
+  const montoFactura = Number(facturaRenta.monto);
 
   // ---------- Reintento del cobro automático (días 3 y 7) ----------
-  if (diaHoy === 3 || diaHoy === 7) {
+  // Se cobra lo que dice la factura. Si ya tiene líneas a mano (una penalización agregada) no se
+  // reintenta: el pago con tarjeta la marcaría pagada completa, con esas líneas todavía pendientes.
+  if ((diaHoy === 3 || diaHoy === 7) && !estadoRenta.tieneLineas) {
     const r = await intentarCobroAutomatico(admin, {
       userId,
       facturaId: facturaRenta.id,
-      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
-      concepto: conceptoRenta,
+      monto: montoFactura,
+      concepto: facturaRenta.concepto,
       cliente,
     });
     if (r.pagado) {
@@ -249,7 +308,7 @@ async function procesarMensual(
       to: cliente.email,
       nombre: cliente.nombre,
       tipo: "antes",
-      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+      monto: montoFactura,
       diasFaltan: 2,
     });
     resumen.recordatorios++;
@@ -267,28 +326,26 @@ async function procesarMensual(
       to: cliente.email,
       nombre: cliente.nombre,
       tipo: "ultimo_dia",
-      monto: await montoMensualConAdicionales(admin, contrato.id, renta),
+      monto: montoFactura,
     });
     resumen.recordatorios++;
   }
 
   // ---------- Pasado el día 10 sin pagar: recargo del 3% (una sola vez) ----------
-  if (diaHoy > DIA_LIMITE_PAGO_MENSUAL) {
-    const { data: recargoExistente } = await admin
-      .from("facturas")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("concepto", conceptoRecargo)
-      .maybeSingle();
-    if (recargoExistente) return;
+  // Si finanzas le movió la fecha a la factura, se respeta su vencimiento.
+  if (diaHoy > DIA_LIMITE_PAGO_MENSUAL && (!facturaRenta.fecha_vencimiento || hoyISO > facturaRenta.fecha_vencimiento)) {
+    if (await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" })) return;
+    const cargoRecargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo", origen: "cron" });
+    if (!cargoRecargoId) return;
 
     // Vence junto con la renta del mes siguiente (día límite de ese mes).
     const siguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, DIA_LIMITE_PAGO_MENSUAL);
     const vencimientoSiguiente = `${siguiente.getFullYear()}-${String(siguiente.getMonth() + 1).padStart(2, "0")}-${String(
       siguiente.getDate()
     ).padStart(2, "0")}`;
-    await crearFacturaConSpei(admin, resumen, {
+    const facturaRecargoId = await crearFacturaConSpei(admin, resumen, {
       userId,
+      cargoId: cargoRecargoId,
       cliente,
       monto: recargoConIva(renta),
       concepto: conceptoRecargo,
@@ -297,6 +354,7 @@ async function procesarMensual(
       fechaVencimiento: vencimientoSiguiente,
       notaSpei: "Cargo SPEI generado automático (recargo por pago tardío)",
     });
+    if (!facturaRecargoId) return;
     await admin.from("facturas").update({ estado: "vencida" }).eq("id", facturaRenta.id);
     await admin.from("notificaciones").insert({
       centro: cliente.centro,
@@ -393,7 +451,8 @@ export async function POST(req: NextRequest) {
   const hoy = new Date();
   const diaHoy = hoy.getDate();
   const hoyISO = hoy.toISOString().split("T")[0];
-  const { inicio: inicioMes, fin: finMes } = inicioFinDeMes(hoy);
+  const { inicio: inicioMes } = inicioFinDeMes(hoy);
+  const periodo = periodoDe(hoy);
 
   const resumen = {
     recordatorios: 0,
@@ -418,16 +477,20 @@ export async function POST(req: NextRequest) {
     .from("contratos")
     .select("id, user_id, renta_mensual, dia_pago, estatus, forma_pago, fecha_inicio, fecha_vencimiento")
     .eq("estatus", "vigente")
-    .not("dia_pago", "is", null);
+    .not("dia_pago", "is", null)
+    .order("fecha_inicio", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (!contratos) {
     return NextResponse.json({ ok: true, resumen });
   }
 
-  // Solo el contrato más reciente por cliente
+  // Solo el contrato más reciente por cliente. Uno ya firmado que todavía no
+  // arranca (una renovación a futuro) no le gana al que sigue corriendo.
   const contratoPorCliente = new Map<string, (typeof contratos)[number]>();
   for (const c of contratos) {
-    if (!contratoPorCliente.has(c.user_id)) contratoPorCliente.set(c.user_id, c);
+    const elegido = contratoPorCliente.get(c.user_id);
+    if (!elegido || (elegido.fecha_inicio && elegido.fecha_inicio > hoyISO)) contratoPorCliente.set(c.user_id, c);
   }
 
   // El voucher mensual de WiFi ya solo es para clientes de Coworking.
@@ -459,7 +522,6 @@ export async function POST(req: NextRequest) {
           hoy,
           hoyISO,
           inicioMes,
-          finMes,
         });
       } catch (err: any) {
         resumen.errores.push(`${cliente.email}: ${err.message}`);
@@ -496,103 +558,37 @@ export async function POST(req: NextRequest) {
 
       // ---------- Día de pago: generar factura + SPEI + voucher ----------
       if (diaHoy === diaPago) {
-        const { data: facturaExistente } = await admin
-          .from("facturas")
-          .select("id")
-          .eq("user_id", userId)
-          .gte("fecha_emision", inicioMes)
-          .lte("fecha_emision", finMes)
-          .maybeSingle();
+        const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        let rentaYaResuelta = false;
 
-        let facturaId = facturaExistente?.id;
-
-        if (!facturaExistente) {
-          const nombreMes = hoy.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-          const { data: nuevaFactura } = await admin
-            .from("facturas")
-            .insert({
-              user_id: userId,
-              folio: `FAC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
-              concepto: `Renta mensual - ${nombreMes}`,
-              monto: montoMes,
-              fecha_emision: hoyISO,
-              fecha_vencimiento: hoyISO,
-              estado: "pendiente",
-              centro: cliente.centro,
-            })
-            .select("id")
-            .single();
-          facturaId = nuevaFactura?.id;
-          resumen.facturasGeneradas++;
-
-          // Cobro automático con tarjeta, si el cliente lo autorizó (si falla, sigue el SPEI)
-          let pagadaConTarjeta = false;
-          if (facturaId) {
-            const r = await intentarCobroAutomatico(admin, {
+        if (!rentaMes) {
+          const cargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta", origen: "cron" });
+          if (cargoId) {
+            const nombreMes = hoy.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+            const facturaId = await crearFacturaConSpei(admin, resumen, {
               userId,
-              facturaId,
-              monto: Number(montoMes),
-              concepto: `Renta mensual - ${nombreMes}`,
+              cargoId,
               cliente,
+              monto: montoMes,
+              concepto: `Renta mensual - ${nombreMes}`,
+              folio: `FAC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
+              hoyISO,
+              fechaVencimiento: hoyISO,
+              notaSpei: "Cargo SPEI generado automático (cobranza mensual)",
+              autopago: true,
             });
-            pagadaConTarjeta = r.pagado;
-            if (r.pagado) resumen.cobrosAutomaticos++;
-            else if (r.intento) resumen.cobrosAutomaticosFallidos++;
+            if (facturaId && conCoworking.has(userId)) await generarVoucherMensual(admin, resumen, userId, cliente);
           }
-
-          // SPEI automático para esa factura
-          if (facturaId && !pagadaConTarjeta && PAGOS_EN_LINEA_ACTIVOS) {
-            try {
-              const cargo = await crearCargoSPEI({
-                monto: Number(montoMes),
-                descripcion: `Renta mensual - ${nombreMes}`,
-                ordenId: facturaId,
-                nombre: cliente.nombre || "Cliente Nodus",
-                email: cliente.email || "",
-              });
-              await admin.from("pagos").insert({
-                factura_id: facturaId,
-                user_id: userId,
-                monto: montoMes,
-                estado: "pendiente_spei",
-                notas: "Cargo SPEI generado automático (cobranza mensual)",
-                openpay_charge_id: cargo.id,
-                clabe: cargo.payment_method?.clabe || null,
-                banco: cargo.payment_method?.bank || null,
-                referencia: cargo.payment_method?.reference || cargo.payment_method?.agreement || null,
-                fecha_limite: cargo.due_date || null,
-              });
-              resumen.speiGenerados++;
-            } catch (err: any) {
-              resumen.errores.push(`SPEI ${cliente.email}: ${err.message}`);
-            }
-          }
-
-          // Voucher nuevo del mes (solo Coworking y solo en centros con
-          // UniFi real configurado)
-          if (conCoworking.has(userId) && cliente.centro && centroTieneUnifi(cliente.centro)) {
-            try {
-              const { codigo, unifiId } = await generarVoucherReal(cliente.centro, {
-                notaBase: `Nodus - ${cliente.nombre} (renovación mensual)`,
-                minutos: 43200,
-              });
-              await admin.from("vouchers").insert({
-                user_id: userId,
-                codigo,
-                folio: `VCH-${Date.now().toString().slice(-6)}`,
-                centro: cliente.centro,
-                duracion_minutos: 43200,
-                expira_en: new Date(Date.now() + 43200 * 60 * 1000).toISOString(),
-                unifi_id: unifiId,
-              });
-              resumen.vouchersGenerados++;
-            } catch (err: any) {
-              resumen.errores.push(`Voucher ${cliente.email}: ${err.message}`);
-            }
+        } else {
+          const estadoRenta = await estadoDelCargo(admin, rentaMes);
+          rentaYaResuelta = !!estadoRenta && (estadoRenta.liquidada || estadoRenta.cancelada);
+          if (rentaMes.origen === "integrada" && !estadoRenta?.cancelada && conCoworking.has(userId)) {
+            await voucherMensualSiFalta(admin, resumen, userId, cliente, inicioMes);
           }
         }
 
-        const yaAvisado = await yaExisteNotifEsteMs(admin, userId, "pago_hoy");
+        // A quien ya pagó (o le cancelaron) esa renta no se le avisa que hoy le toca.
+        const yaAvisado = rentaYaResuelta || (await yaExisteNotifEsteMs(admin, userId, "pago_hoy"));
         if (!yaAvisado) {
           await admin.from("notificaciones").insert({
             centro: cliente.centro,
@@ -607,16 +603,19 @@ export async function POST(req: NextRequest) {
       // ---------- Después de la gracia: pausar si no pagó ----------
       const diaLimiteGracia = diaPago + DIAS_GRACIA_DESPUES;
       if (diaHoy === diaLimiteGracia) {
-        const { data: facturaDelMes } = await admin
-          .from("facturas")
-          .select("id, estado")
-          .eq("user_id", userId)
-          .gte("fecha_emision", inicioMes)
-          .lte("fecha_emision", finMes)
-          .maybeSingle();
+        // Solo cuenta la renta de este contrato y mes, no cualquier factura del cliente (una
+        // sala de juntas no suspende a nadie). Y no antes de su vencimiento: una integrada a
+        // mano puede traer otra fecha.
+        const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
 
-        if (facturaDelMes && facturaDelMes.estado !== "pagada") {
-          await admin.from("facturas").update({ estado: "vencida" }).eq("id", facturaDelMes.id);
+        if (
+          estadoRenta &&
+          !estadoRenta.liquidada &&
+          !estadoRenta.cancelada &&
+          (!estadoRenta.factura.fecha_vencimiento || hoyISO > estadoRenta.factura.fecha_vencimiento)
+        ) {
+          await admin.from("facturas").update({ estado: "vencida" }).eq("id", estadoRenta.factura.id);
           await admin
             .from("profiles")
             .update({ suspendido: true, suspendido_desde: hoyISO })

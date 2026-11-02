@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
@@ -5,6 +6,7 @@ import { rolPuede } from "@/lib/permisosApi";
 import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { accesoCliente } from "@/lib/facturasAcceso";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
+import { rentaOcupada } from "@/lib/cargosPeriodo";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const DIAS_PARA_PAGAR = 10;
@@ -18,6 +20,8 @@ function sumarDias(iso: string, dias: number) {
 // Integrar por cliente: junta las líneas elegidas en un solo cobro (factura sin timbrar). Las líneas que ya son
 // un pago del cliente se ligan; las que no (renta y adicionales mensuales del contrato) se crean como pagos
 // pendientes para que el cobro quede con un concepto por línea. Después se timbra con /api/facturas/facturar.
+// Cada línea de renta deja su marca en cargos_periodo (contrato + mes): así el cobro diario sabe que ya existe,
+// diga lo que diga el concepto, y no se puede integrar dos veces la misma renta.
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -32,7 +36,7 @@ export async function POST(req: NextRequest) {
   const userId: string = typeof cuerpo.userId === "string" ? cuerpo.userId : "";
   const concepto: string = typeof cuerpo.concepto === "string" ? cuerpo.concepto.trim().slice(0, 200) : "";
   const fecha: string = typeof cuerpo.fecha === "string" ? cuerpo.fecha : "";
-  const lineas: { pagoId?: string; descripcion?: string; monto?: number; adicionalTipo?: string }[] = Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [];
+  const lineas: { pagoId?: string; descripcion?: string; monto?: number; adicionalTipo?: string; rentaContratoId?: string; rentaPeriodo?: string }[] = Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [];
   const centroPedido: string = typeof cuerpo.centro === "string" ? cuerpo.centro : "";
   if (!userId || !concepto || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || lineas.length === 0) {
     return NextResponse.json({ error: "Faltan datos: cliente, concepto, fecha y al menos una línea" }, { status: 400 });
@@ -76,6 +80,38 @@ export async function POST(req: NextRequest) {
     Math.round(((pagosExistentes || []).reduce((s, p) => s + Number(p.monto), 0) + nuevas.reduce((s, l) => s + Number(l.monto), 0)) * 100) / 100;
   if (!(total > 0)) return NextResponse.json({ error: "El total debe ser mayor a cero" }, { status: 400 });
 
+  // Rentas de la factura: de qué contrato y de qué mes (lo dice la Previa, no el texto de la línea).
+  const lineasConId = nuevas.map((l) => ({ ...l, id: randomUUID() }));
+  const rentas = lineasConId.filter((l) => l.rentaContratoId || l.rentaPeriodo);
+  if (rentas.some((l) => typeof l.rentaContratoId !== "string" || !/^\d{4}-\d{2}-01$/.test(String(l.rentaPeriodo)))) {
+    return NextResponse.json({ error: "Una línea de renta no trae su contrato y su mes. Vuelve a pulsar Previa." }, { status: 400 });
+  }
+  if (new Set(rentas.map((l) => `${l.rentaContratoId}|${l.rentaPeriodo}`)).size !== rentas.length) {
+    return NextResponse.json({ error: "La misma renta viene dos veces en la factura" }, { status: 400 });
+  }
+  const marcasPorReemplazar: string[] = [];
+  if (rentas.length > 0) {
+    const contratoIds = Array.from(new Set(rentas.map((l) => l.rentaContratoId as string)));
+    const { data: contratosCliente } = await admin.from("contratos").select("id").in("id", contratoIds).eq("user_id", userId);
+    if ((contratosCliente || []).length !== contratoIds.length) {
+      return NextResponse.json({ error: "Una línea de renta es de un contrato que no es de este cliente" }, { status: 400 });
+    }
+    try {
+      for (const l of rentas) {
+        const ocupada = await rentaOcupada(admin, l.rentaContratoId as string, l.rentaPeriodo as string);
+        if ("folio" in ocupada) {
+          return NextResponse.json(
+            { error: ocupada.folio ? `Esa renta ya está en el estado de cuenta ${ocupada.folio}: quítala de esta factura o cancela aquella.` : "El cobro diario está generando esa renta en este momento. Vuelve a pulsar Previa." },
+            { status: 409 }
+          );
+        }
+        if (ocupada.reemplazar) marcasPorReemplazar.push(ocupada.reemplazar);
+      }
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+  }
+
   const serie = serieCentro(centro);
   const folio = `${serie || "FAC"}-${Date.now().toString().slice(-6)}`;
   const { data: factura, error: errFactura } = await admin
@@ -96,11 +132,12 @@ export async function POST(req: NextRequest) {
   if (errFactura || !factura) return NextResponse.json({ error: "No se pudo guardar la factura" }, { status: 500 });
 
   const idsNuevos: string[] = [];
-  if (nuevas.length > 0) {
+  if (lineasConId.length > 0) {
     const { data: creados, error: errPagos } = await admin
       .from("pagos")
       .insert(
-        nuevas.map((l) => ({
+        lineasConId.map((l) => ({
+          id: l.id,
           user_id: userId,
           centro,
           estado: "pendiente",
@@ -116,6 +153,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No se pudieron guardar las líneas de la factura" }, { status: 500 });
     }
     idsNuevos.push(...creados.map((c) => c.id));
+  }
+
+  if (rentas.length > 0) {
+    // Al borrar la factura, su FK se lleva también estas marcas; las que se reemplazan (de una factura cancelada) se quitan hasta ahora.
+    if (marcasPorReemplazar.length > 0) await admin.from("cargos_periodo").delete().in("id", marcasPorReemplazar);
+    const { error: errMarcas } = await admin.from("cargos_periodo").insert(
+      rentas.map((l) => ({
+        contrato_id: l.rentaContratoId,
+        user_id: userId,
+        periodo: l.rentaPeriodo,
+        tipo: "renta",
+        factura_id: factura.id,
+        pago_id: l.id,
+        origen: "integrada",
+      }))
+    );
+    if (errMarcas) {
+      await admin.from("pagos").delete().in("id", idsNuevos);
+      await admin.from("facturas").delete().eq("id", factura.id);
+      // 23505: el cobro diario u otra persona la generó entre la Previa y este momento.
+      return NextResponse.json(
+        (errMarcas as { code?: string }).code === "23505"
+          ? { error: "Esa renta se acaba de generar en otro estado de cuenta. Vuelve a pulsar Previa." }
+          : { error: "No se pudo registrar la renta del mes" },
+        { status: (errMarcas as { code?: string }).code === "23505" ? 409 : 500 }
+      );
+    }
   }
 
   if (pagoIds.length > 0) {
