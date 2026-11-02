@@ -1687,7 +1687,9 @@ export default function AdminPanel({
                   <span className="modulo-name">Mapa oficinas</span>
                 </Link>
               ) },
-              { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas", key: "vouchers", tarjeta: (
+              // Vouchers oculto en todas las cuentas mientras se define cómo quedará;
+              // para volver a mostrarlo basta con quitar el "false &&".
+              { grupo: 3, ver: false && (rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas"), key: "vouchers", tarjeta: (
                 <Link className="modulo-card" href="/centro/vouchers">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/vouchers.png" alt="" className="modulo-icon icon-img-32" />
