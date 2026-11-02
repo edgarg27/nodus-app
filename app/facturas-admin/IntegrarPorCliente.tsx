@@ -112,6 +112,8 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
     setMarcadas([]);
     setRentaYa(null);
     setCobroIntegrado(null);
+    // Otro cliente: vuelve el concepto sugerido. Pulsar Previa ya no borra lo que se escribió.
+    setConceptoTocado(false);
     setContratos([]);
     setContratoId("");
     if (!clienteId) return;
@@ -153,7 +155,6 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
     const nuevas: Linea[] = data.lineas || [];
     setLineas(nuevas);
     setRentaYa(data.rentaYaIntegrada || null);
-    setConceptoTocado(false);
     // Si la renta del mes ya está integrada, no se marca otra vez (evita cobrarla doble).
     setMarcadas(nuevas.filter((l) => !(data.rentaYaIntegrada && (l.tipo === "Renta" || l.tipo === "Adicional mensual"))).map((l) => l.key));
   }

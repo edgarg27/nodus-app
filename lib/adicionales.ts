@@ -116,6 +116,12 @@ export function conceptoParaCliente(concepto: string | null | undefined, porDefe
   return limpio || porDefecto;
 }
 
+// Otras partes buscan el depósito y el primer pago ("Contrato") por su concepto: ese texto no se edita.
+export function conceptoLineaEditable(concepto: string | null | undefined) {
+  const c = String(concepto || "").trim().toLowerCase();
+  return c !== "contrato" && !/dep[oó]sito/.test(c);
+}
+
 // El primer pago de un contrato se guarda con el concepto "Contrato": es el pago de la mensualidad.
 export function etiquetaPagoSuelto(concepto: string | null | undefined) {
   const c = conceptoParaCliente(concepto, "Pago");

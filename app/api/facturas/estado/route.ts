@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { enviarCorreo } from "@/lib/email";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
-import { etiquetaPagoSuelto } from "@/lib/adicionales";
+import { conceptoLineaEditable, etiquetaPagoSuelto } from "@/lib/adicionales";
 import { complementoAlPagar } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
@@ -91,6 +91,20 @@ export async function POST(req: NextRequest) {
     const concepto = typeof cuerpo.concepto === "string" ? cuerpo.concepto.trim().slice(0, 200) : "";
     const fecha = typeof cuerpo.fecha === "string" ? cuerpo.fecha : "";
     if (!concepto || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return NextResponse.json({ error: "Escribe el concepto y elige la fecha" }, { status: 400 });
+    // Con dos o más líneas, en la factura sale el concepto de cada una.
+    const cambiosLineas: { id: string; concepto: string }[] = (Array.isArray(cuerpo.lineas) ? cuerpo.lineas : [])
+      .map((l: any) => ({ id: String(l?.id || ""), concepto: typeof l?.concepto === "string" ? l.concepto.trim().slice(0, 200) : "" }))
+      .filter((l: { id: string }) => l.id);
+    if (cambiosLineas.some((l) => !l.concepto)) return NextResponse.json({ error: "Escribe el concepto de cada línea" }, { status: 400 });
+    if (cambiosLineas.length > 0) {
+      const { data: ligados } = await admin.from("pagos").select("id, concepto").eq("factura_id", factura.id).in("id", cambiosLineas.map((l) => l.id));
+      if ((ligados || []).length !== cambiosLineas.length) return NextResponse.json({ error: "Alguna línea ya no es de este estado de cuenta. Recarga la pantalla." }, { status: 409 });
+      if ((ligados || []).some((p) => !conceptoLineaEditable(p.concepto))) return NextResponse.json({ error: "El concepto del depósito y de la mensualidad no se puede cambiar" }, { status: 409 });
+      for (const l of cambiosLineas) {
+        const { error: errLinea } = await admin.from("pagos").update({ concepto: l.concepto }).eq("id", l.id).eq("factura_id", factura.id);
+        if (errLinea) return NextResponse.json({ error: "No se pudo guardar el concepto de una línea" }, { status: 500 });
+      }
+    }
     const { error } = await admin.from("facturas").update({ concepto, fecha_emision: fecha, fecha_vencimiento: sumarDias(fecha, DIAS_PARA_PAGAR) }).eq("id", factura.id);
     if (error) return NextResponse.json({ error: "No se pudo guardar el cambio" }, { status: 500 });
     return NextResponse.json({ ok: true });
