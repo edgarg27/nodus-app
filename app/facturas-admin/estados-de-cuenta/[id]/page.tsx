@@ -85,6 +85,7 @@ export default function EstadoDeCuentaPage() {
   const [metodo, setMetodo] = useState<"PPD" | "PUE">("PPD");
   const [formaPago, setFormaPago] = useState("03");
   const [timbrando, setTimbrando] = useState(false);
+  const [timbrandoLento, setTimbrandoLento] = useState(false);
   const [errorTimbrar, setErrorTimbrar] = useState("");
   const [condiciones, setCondiciones] = useState("Contado");
   const [tipoRelacion, setTipoRelacion] = useState("");
@@ -272,15 +273,48 @@ export default function EstadoDeCuentaPage() {
     if (e) return setErrorTimbrar(e);
     setErrorTimbrar("");
     setTimbrando(true);
-    const res = await fetch("/api/facturas/facturar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ facturaIds: [factura.id], ...cuerpoFactura() }),
-    });
-    const data = await res.json().catch(() => ({}));
+    setTimbrandoLento(false);
+    // Timbrar puede tardar (Facturapi, el SAT y guardar el XML y el PDF). Si la respuesta tarda mucho o se corta, la
+    // factura pudo haberse timbrado igual (pasó con A405): se revisa en la base en vez de dejar el botón colgado.
+    // Reintentar no duplica: Facturapi recibe la misma llave por cobro (lib/facturarCobro.ts).
+    const aviso = setTimeout(() => setTimbrandoLento(true), 15000);
+    const control = new AbortController();
+    const limite = setTimeout(() => control.abort(), 120000);
+    let respuesta: { ok: boolean; data: any } | null = null;
+    try {
+      const res = await fetch("/api/facturas/facturar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ facturaIds: [factura.id], ...cuerpoFactura() }),
+        signal: control.signal,
+      });
+      respuesta = { ok: res.ok, data: await res.json().catch(() => ({})) };
+    } catch {
+      respuesta = null;
+    } finally {
+      clearTimeout(aviso);
+      clearTimeout(limite);
+    }
+
+    if (!respuesta) {
+      const { data: revisada } = await supabase.from("facturas").select("uuid_cfdi").eq("id", factura.id).maybeSingle();
+      setTimbrando(false);
+      setTimbrandoLento(false);
+      if (revisada?.uuid_cfdi) {
+        setModalTimbrar(false);
+        setExito(true);
+        cargar();
+        return;
+      }
+      return setErrorTimbrar(
+        "No llegó la respuesta del servidor y la factura todavía no aparece timbrada. Espera un minuto, recarga la página y revisa antes de volver a intentar (reintentar no la duplica)."
+      );
+    }
+
     setTimbrando(false);
-    const r = (data.resultados || [])[0];
-    if (!res.ok || (r && !r.ok)) return setErrorTimbrar(r?.error || data.error || "No se pudo timbrar");
+    setTimbrandoLento(false);
+    const r = (respuesta.data.resultados || [])[0];
+    if (!respuesta.ok || (r && !r.ok)) return setErrorTimbrar(r?.error || respuesta.data.error || "No se pudo timbrar");
     setModalTimbrar(false);
     setExito(true);
     cargar();
@@ -985,6 +1019,11 @@ export default function EstadoDeCuentaPage() {
                 {timbrando ? "Timbrando..." : "Timbrar"}
               </button>
             </div>
+            {timbrandoLento && (
+              <p className="fac-facturar-nota" style={{ textAlign: "center" }}>
+                Está tardando más de lo normal: el SAT puede demorar. No cierres ni recargues esta ventana.
+              </p>
+            )}
           </div>
         </div>
       )}
