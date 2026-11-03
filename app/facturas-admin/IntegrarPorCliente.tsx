@@ -25,7 +25,7 @@ type ClienteForm = {
   porContrato?: boolean;
 };
 type ContratoOpc = { id: string; folio: string | null; centro: string; estatus: string; renta: number; tipo: string; etiqueta: string };
-type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string; adicionalTipo?: string };
+type Linea = { key: string; tipo: string; contrato: string; descripcion: string; servicio: string; total: number; pagoId?: string; contratoId?: string; centro?: string; adicionalTipo?: string; periodo?: string };
 
 const razonSocial = (c: ClienteForm) => c.nombre_fiscal || c.empresa || c.nombre;
 const sinAcentos = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -60,7 +60,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
 
   const [lineas, setLineas] = useState<Linea[] | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
-  const [rentaYa, setRentaYa] = useState<{ folio: string; estado: string; timbrada: boolean } | null>(null);
+  const [rentasYa, setRentasYa] = useState<{ contratoId: string; folio: string; estado: string; timbrada: boolean }[]>([]);
   const [cargandoPrevia, setCargandoPrevia] = useState(false);
 
   const [error, setError] = useState("");
@@ -110,7 +110,7 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
   useEffect(() => {
     setLineas(null);
     setMarcadas([]);
-    setRentaYa(null);
+    setRentasYa([]);
     setCobroIntegrado(null);
     // Otro cliente: vuelve el concepto sugerido. Pulsar Previa ya no borra lo que se escribió.
     setConceptoTocado(false);
@@ -154,9 +154,10 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
     if (!res.ok) return setError(data.error || "No se pudo traer lo que se le cobra");
     const nuevas: Linea[] = data.lineas || [];
     setLineas(nuevas);
-    setRentaYa(data.rentaYaIntegrada || null);
-    // Si la renta del mes ya está integrada, no se marca otra vez (evita cobrarla doble).
-    setMarcadas(nuevas.filter((l) => !(data.rentaYaIntegrada && (l.tipo === "Renta" || l.tipo === "Adicional mensual"))).map((l) => l.key));
+    const yaIntegradas: { contratoId: string; folio: string; estado: string; timbrada: boolean }[] = data.rentasYaIntegradas || [];
+    setRentasYa(yaIntegradas);
+    // Si la renta de ese contrato y mes ya está integrada, no se marca otra vez (evita cobrarla doble).
+    setMarcadas(nuevas.filter((l) => !((l.tipo === "Renta" || l.tipo === "Adicional mensual") && yaIntegradas.some((r) => r.contratoId === l.contratoId))).map((l) => l.key));
   }
 
   // Penalización o adicional que se agrega a mano: entra como una línea más, ya marcada.
@@ -206,7 +207,11 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
         concepto: concepto.trim(),
         fecha,
         centro: centroFactura,
-        lineas: elegidas.map((l) => (l.pagoId ? { pagoId: l.pagoId } : { descripcion: l.descripcion, monto: l.total, adicionalTipo: l.adicionalTipo })),
+        lineas: elegidas.map((l) =>
+          l.pagoId
+            ? { pagoId: l.pagoId }
+            : { descripcion: l.descripcion, monto: l.total, adicionalTipo: l.adicionalTipo, ...(l.tipo === "Renta" ? { rentaContratoId: l.contratoId, rentaPeriodo: l.periodo } : {}) }
+        ),
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -365,9 +370,9 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
           <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e" }}>
             Lo que se le cobra a {cliente ? razonSocial(cliente) : "el cliente"} · serie {serieCentro(centroFactura) || "—"}
           </p>
-          {rentaYa && (
+          {rentasYa.length > 0 && (
             <p style={{ fontSize: 13, color: "#854F0B", background: "#FAEEDA", borderRadius: 8, padding: "8px 10px", margin: "8px 0" }}>
-              La renta de {MESES[mes - 1]} ya está integrada ({rentaYa.folio}, {rentaYa.timbrada ? "ya timbrada" : "por timbrar"}). Búscala en Estados de cuenta; por eso la renta y los
+              La renta de {MESES[mes - 1]} ya está integrada ({rentasYa.map((r) => `${r.folio}, ${r.timbrada ? "ya timbrada" : "por timbrar"}`).join("; ")}). Búscala en Estados de cuenta; por eso esa renta y sus
               adicionales mensuales vienen sin marcar. Para sumarle una penalización o un adicional a esa misma factura, ábrela ahí y usa Acciones.
             </p>
           )}
