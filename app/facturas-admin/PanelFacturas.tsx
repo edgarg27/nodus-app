@@ -424,6 +424,10 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     });
   }, [facturas, busqueda, filtroEstado, filtroFuente, filtroDesde, filtroHasta, soloSinCliente, filtroCliente, filtroCfdi]);
 
+  // Las de esta vista sin filtros: el conteo y "Ver todas" no deben contar las de la otra vista.
+  const facturasDeLaVista = useMemo(() => facturas.filter((f) => (pestana === "timbradas" ? !!f.uuid_cfdi : !f.uuid_cfdi)), [facturas, pestana]);
+  const timbradasDelCentro = facturas.length - (pestana === "timbradas" ? 0 : facturasDeLaVista.length);
+
   const facturasFiltradas = useMemo(
     () => facturasBase.filter((f) => (pestana === "timbradas" ? !!f.uuid_cfdi : !f.uuid_cfdi)),
     [facturasBase, pestana]
@@ -896,7 +900,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
               <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p className="panel-section-label" style={{ margin: 0 }}>
-                Facturas ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturas.length}` : facturas.length})
+                Por timbrar ({hayFiltrosActivos ? `${facturasFiltradas.length} de ${facturasDeLaVista.length}` : facturasDeLaVista.length})
               </p>
               <div style={{ display: "flex", gap: 8 }}>
                 {puedoCancelar && hayEnProceso && (
@@ -1370,14 +1374,24 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
 
             {modo !== "timbradas" && (
             <>
-            {facturas.length === 0 ? (
-              <div className="empty-card">Sin facturas registradas en {centro}</div>
+            {facturasDeLaVista.length === 0 ? (
+              <div className="empty-card">
+                Nada pendiente por timbrar en {centro}.
+                {timbradasDelCentro > 0 && (
+                  <>
+                    {" "}
+                    <a href="/facturas-admin/timbradas" style={{ color: "#0d1b3e", fontWeight: 600 }}>
+                      Ver {timbradasDelCentro === 1 ? "la ya timbrada" : `las ${timbradasDelCentro} ya timbradas`} en Facturas timbradas →
+                    </a>
+                  </>
+                )}
+              </div>
             ) : !hayFiltrosActivos && !verTodas ? (
               <div className="empty-card" style={{ padding: "28px 16px" }}>
                 <p style={{ margin: "0 0 4px", fontWeight: 600, color: "#0d1b3e" }}>Busca un cliente para ver sus facturas</p>
                 <p style={{ margin: "0 0 12px", fontSize: 13 }}>Escribe su nombre, razón social, RFC o folio arriba, o elige al cliente en la lista.</p>
                 <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => setVerTodas(true)}>
-                  Ver todas las facturas de {centro} ({facturas.length})
+                  Ver todo lo pendiente de {centro} ({facturasDeLaVista.length})
                 </button>
               </div>
             ) : (pestana === "timbradas" ? filasTimbradas.length === 0 : facturasFiltradas.length === 0) ? (
