@@ -89,7 +89,8 @@ export default function MapaConPines({
 
   // Guarda la posición (en % del plano) de un pin. Se actualiza en pantalla
   // de inmediato y luego se relee para confirmar lo guardado.
-  async function guardarPosicion(id: string, x: number, y: number) {
+  // Con x/y en null se quita el pin y la oficina regresa a la bandeja.
+  async function guardarPosicion(id: string, x: number | null, y: number | null) {
     setOficinas((prev) => prev.map((o) => (o.id === id ? { ...o, mapa_x: x, mapa_y: y } : o)));
     setColocando(true);
     // .select() para saber si de verdad se actualizó: con RLS un update sin
@@ -100,6 +101,14 @@ export default function MapaConPines({
       alert("No se pudo guardar la posición del pin (¿tu usuario tiene permiso para editar oficinas?).");
     }
     fetchOficinas();
+  }
+
+  // Quitar un pin: tocarlo (sin arrastrar) en modo edición, o arrastrarlo fuera del plano.
+  // Se confirma con el modal de la app (no el confirm() nativo "localhost dice…").
+  const [pinAQuitar, setPinAQuitar] = useState<Oficina | null>(null);
+  function quitarPin(id: string) {
+    const o = oficinas.find((x) => x.id === id);
+    if (o) setPinAQuitar(o);
   }
 
   // Alternativa al arrastre: elegir una oficina de la bandeja (clic) y dar
@@ -159,11 +168,16 @@ export default function MapaConPines({
       if (!a || !imgRef.current || ev.type === "pointercancel") return;
       if (!seMovioRef.current) {
         if (a.origen === "bandeja") setOficinaAColocar((prev) => (prev === a.id ? "" : a.id));
+        else quitarPin(a.id);
         return;
       }
       const p = coordsEnMapa(ev.clientX, ev.clientY);
       const dentro = p.x >= 0 && p.x <= 100 && p.y >= 0 && p.y <= 100;
       if (a.origen === "bandeja" && !dentro) return; // la soltó fuera del plano
+      if (a.origen === "pin" && !dentro) {
+        quitarPin(a.id);
+        return;
+      }
       guardarPosicion(a.id, limitar(p.x), limitar(p.y));
     };
     window.addEventListener("pointermove", mover);
@@ -234,7 +248,7 @@ export default function MapaConPines({
         <div className="form-card" style={{ marginBottom: 8 }}>
           <p className="sub-label">
             Arrastra cada oficina al lugar que le corresponde en el plano. Los pines ya colocados también se arrastran
-            para moverlos.
+            para moverlos. Para quitar un pin, tócalo (o arrástralo fuera del plano).
           </p>
           {oficinasSinPin.length > 0 ? (
             <>
@@ -330,6 +344,31 @@ export default function MapaConPines({
           );
         })}
       </div>
+
+      {pinAQuitar && (
+        <div className="modal-overlay" onClick={() => setPinAQuitar(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Quitar pin</p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              ¿Quitar el pin de la oficina {pinAQuitar.numero}? Regresa a &quot;Sin colocar&quot; para ponerlo de nuevo.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setPinAQuitar(null)}>
+                Cancelar
+              </button>
+              <button
+                className="btn-rechazar"
+                onClick={() => {
+                  guardarPosicion(pinAQuitar.id, null, null);
+                  setPinAQuitar(null);
+                }}
+              >
+                Quitar pin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {arrastre?.origen === "bandeja" && (
         <div className="mapa-fantasma" style={{ left: arrastre.cx, top: arrastre.cy }}>
