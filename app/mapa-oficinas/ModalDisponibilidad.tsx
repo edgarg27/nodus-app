@@ -257,7 +257,13 @@ export default function ModalDisponibilidad({
             <span className="disp-resultado-icono">{resultado.disponible ? "✓" : "✗"}</span>
             <span>
               {resultado.disponible ? (
-                "Disponible en esas fechas"
+                resultado.compartidoCon ? (
+                  <>
+                    Disponible — lugar compartido, ya están: <strong>{resultado.compartidoCon}</strong>
+                  </>
+                ) : (
+                  "Disponible en esas fechas"
+                )
               ) : (
                 <>
                   Ocupada{resultado.ocupadoPor ? " por " : ""}

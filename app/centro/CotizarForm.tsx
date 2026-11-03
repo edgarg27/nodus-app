@@ -84,6 +84,9 @@ type Oficina = {
   deposito_garantia: number | null;
   cliente_id: string | null;
   paquete_default_id: string | null;
+  // Lugar compartido (Coworking C3–C11 de Bosques): caben varias empresas,
+  // nunca se marca ocupado ni se bloquea.
+  compartida?: boolean | null;
 };
 type Paquete = {
   id: string;
@@ -219,6 +222,8 @@ export default function CotizarForm({
   const [ocupacionPorOficina, setOcupacionPorOficina] = useState<
     Record<string, { clienteNombre: string; fechaVencimiento: string }>
   >({});
+  // Lugares compartidos: cuántas empresas tienen contrato vigente en cada uno.
+  const [empresasEnCompartida, setEmpresasEnCompartida] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -232,7 +237,7 @@ export default function CotizarForm({
       supabase.from("profiles").select("id, nombre, email, empresa, telefono, rfc").eq("rol", "cliente").eq("centro", centro),
       supabase
         .from("oficinas")
-        .select("id, numero, tipo, estado, precio, deposito_garantia, cliente_id, paquete_default_id")
+        .select("*") // "*" y no la lista: así no falla si aún no se corre migracion_coworking_compartido_bosques.sql
         .eq("centro", centro)
         .order("numero"),
       supabase.from("paquetes").select("*").eq("centro", centro).order("nombre"),
@@ -276,14 +281,21 @@ export default function CotizarForm({
     const nombrePorUserId = Object.fromEntries((perfiles || []).map((p) => [p.id, p.nombre]));
 
     const mapaOcupacion: Record<string, { clienteNombre: string; fechaVencimiento: string }> = {};
+    const compartidas = new Set((ofisRes.data || []).filter((o) => o.compartida).map((o) => o.id));
+    const empresas: Record<string, Set<string>> = {};
     contratosConOficina.forEach((c) => {
       if (!c.oficina_id) return;
+      if (compartidas.has(c.oficina_id)) {
+        (empresas[c.oficina_id] ||= new Set()).add(c.user_id as string);
+        return;
+      }
       mapaOcupacion[c.oficina_id] = {
         clienteNombre: (c.user_id && nombrePorUserId[c.user_id]) || "Cliente",
         fechaVencimiento: c.fecha_vencimiento,
       };
     });
     setOcupacionPorOficina(mapaOcupacion);
+    setEmpresasEnCompartida(Object.fromEntries(Object.entries(empresas).map(([id, set]) => [id, set.size])));
 
     setLoading(false);
   }
@@ -442,6 +454,11 @@ export default function CotizarForm({
   }, [oficinas, centro]);
 
   const [tipoEspacio, setTipoEspacio] = useState("");
+
+  function textoCompartida(id: string) {
+    const n = empresasEnCompartida[id] || 0;
+    return n === 0 ? "Compartido · sin empresas aún" : `Compartido · ${n} empresa${n === 1 ? "" : "s"}`;
+  }
 
   const oficinasDelTipo = useMemo(() => {
     return oficinas
@@ -1613,7 +1630,7 @@ export default function CotizarForm({
     });
     await sincronizarAdicionalesDelContrato(contratoARenovarId);
 
-    if (cliente?.id) {
+    if (cliente?.id && !oficinas.find((o) => o.id === oficinaNuevaId)?.compartida) {
       await supabase.from("oficinas").update({ cliente_id: cliente.id, estado: "ocupada" }).eq("id", oficinaNuevaId);
     }
 
@@ -1857,7 +1874,7 @@ export default function CotizarForm({
       .update({ contrato_id: contratoIdCreado, reservacion_id: null })
       .eq("id", cotizacion.id);
 
-    if (oficina && clienteIdEfectivo) {
+    if (oficina && clienteIdEfectivo && !oficina.compartida) {
       await supabase.from("oficinas").update({ cliente_id: clienteIdEfectivo, estado: "ocupada" }).eq("id", oficina.id);
     }
 
@@ -2687,6 +2704,8 @@ export default function CotizarForm({
                     </p>
                   ) : o.estado === "mantenimiento" ? (
                     <p style={{ fontSize: 12, color: "#a3701f", margin: "4px 0 0" }}>En mantenimiento</p>
+                  ) : o.compartida ? (
+                    <p style={{ fontSize: 12, color: "#0F6E56", margin: "4px 0 0" }}>{textoCompartida(o.id)}</p>
                   ) : (
                     <p style={{ fontSize: 12, color: "#0F6E56", margin: "4px 0 0" }}>Disponible</p>
                   )}
@@ -2699,7 +2718,9 @@ export default function CotizarForm({
               );
             };
 
-            if (!esCoworkingSel) return <div style={gridStyle}>{visibles.map((o) => tarjeta(o))}</div>;
+            // Los lugares compartidos (C3–C11 de Bosques) son pocos: van sueltos, sin agrupar por letra.
+            if (!esCoworkingSel || visibles.every((o) => o.compartida))
+              return <div style={gridStyle}>{visibles.map((o) => tarjeta(o))}</div>;
 
             // Coworking: primero las letras; la que agrupa varios espacios
             // (la "A": A, AA, AB… AZ) despliega su tabla al elegirla.
@@ -2765,6 +2786,8 @@ export default function CotizarForm({
                                     ? ` · Ocupado por ${ocupacion.clienteNombre} (hasta ${ocupacion.fechaVencimiento})`
                                     : o.estado === "mantenimiento"
                                     ? " · En mantenimiento"
+                                    : o.compartida
+                                    ? ` · ${textoCompartida(o.id)}`
                                     : ""}
                                 </button>
                               );

@@ -15,7 +15,9 @@ export type ParametrosDisponibilidad = {
 
 // `ocupadoPor`: quién la tiene (nombre · empresa), para que el staff sepa
 // con quién choca sin ir a buscar el contrato.
-export type ResultadoDisponibilidad = { disponible: boolean; motivo?: string; ocupadoPor?: string };
+// `compartidoCon`: en un lugar compartido (Coworking C3–C11 de Bosques), las
+// empresas que ya están ahí; el lugar sigue disponible para una más.
+export type ResultadoDisponibilidad = { disponible: boolean; motivo?: string; ocupadoPor?: string; compartidoCon?: string };
 
 // "2026-12-31" → "31/12/2026", sin pasar por Date (evita el corrimiento
 // de un día por zona horaria).
@@ -48,6 +50,26 @@ export async function verificarDisponibilidadOficina(
   params: ParametrosDisponibilidad
 ): Promise<ResultadoDisponibilidad> {
   const { oficinaId, fechaInicio, fechaFin, modalidad, horaInicio, horaFin } = params;
+
+  // Lugar compartido: caben todas las empresas que se quiera, así que
+  // siempre está disponible; solo se dice quiénes ya están en esas fechas.
+  const { data: oficina } = await supabase.from("oficinas").select("*").eq("id", oficinaId).maybeSingle();
+  if (oficina?.compartida) {
+    const { data: enElLugar } = await supabase
+      .from("contratos")
+      .select("user_id, cliente_nombre_historico, cliente_empresa_historico")
+      .eq("oficina_id", oficinaId)
+      .eq("estatus", "vigente")
+      .lte("fecha_inicio", fechaFin)
+      .gte("fecha_vencimiento", fechaInicio);
+    if (!enElLugar || enElLugar.length === 0) return { disponible: true };
+    const perfiles = await nombresPorUserId(supabase, enElLugar.map((c) => c.user_id));
+    const quienes = enElLugar.map((c) => {
+      const p = c.user_id ? perfiles[c.user_id] : undefined;
+      return unirNombre(p?.nombre || c.cliente_nombre_historico, p?.empresa || c.cliente_empresa_historico);
+    });
+    return { disponible: true, compartidoCon: Array.from(new Set(quienes)).join(", ") };
+  }
 
   // Solo contratos `vigente` cuentan como ocupación real — uno
   // `pre_aprobado` todavía puede rechazarse, no debe bloquear la
