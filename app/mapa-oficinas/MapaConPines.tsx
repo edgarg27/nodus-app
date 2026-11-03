@@ -22,8 +22,9 @@ const ESTADO_ALIAS: Record<string, string> = { libre: "disponible" };
 
 // El pin no es un emoji — un emoji no se puede colorear vía CSS.
 const COLOR_POR_ESTADO: Record<string, string> = {
-  disponible: "#0F6E56", // verde
-  ocupada: "#185FA5", // azul
+  // Verde claro vs. rojo: el verde oscuro y el azul de antes casi no se distinguían.
+  disponible: "#22A06B", // verde
+  ocupada: "#D64545", // rojo
   mantenimiento: "#8A8A8A", // gris
 };
 const COLOR_DEFAULT = "#8A8A8A"; // gris — cualquier otro valor de estado
@@ -337,9 +338,17 @@ export default function MapaConPines({
       )}
 
       <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 11, color: "#666" }}>
-        <span>🟢 Disponible</span>
-        <span>🔵 Ocupada</span>
-        <span>⚪ Mantenimiento / otro estado</span>
+        {/* Puntos con los mismos colores que los pines (los emojis no coincidían). */}
+        {[
+          [COLOR_POR_ESTADO.disponible, "Disponible"],
+          [COLOR_POR_ESTADO.ocupada, "Ocupada"],
+          [COLOR_DEFAULT, "Mantenimiento / otro estado"],
+        ].map(([color, texto]) => (
+          <span key={texto} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
+            {texto}
+          </span>
+        ))}
       </div>
 
       {oficinasVisibles.length > 0 && (

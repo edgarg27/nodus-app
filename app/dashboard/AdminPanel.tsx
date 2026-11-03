@@ -470,7 +470,7 @@ export default function AdminPanel({
       router.push("/tours");
     } else if (n.tipo === "contrato_a_firma") {
       router.push("/contratos");
-    } else if (n.tipo === "reservacion_confirmada" || n.tipo === "reservacion_rechazada") {
+    } else if (n.tipo === "reservacion_confirmada" || n.tipo === "reservacion_rechazada" || n.tipo === "reservacion_cancelada_centro") {
       router.push("/sala-juntas");
     } else if (n.tipo === "baja_extension" || n.tipo === "nuevo_did") {
       router.push("/telefonia");

@@ -67,7 +67,7 @@ type Prospecto = {
   // confirmarProspectoPerdido más abajo).
   comentario_perdido?: string | null;
 };
-type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; para_nombre?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null };
+type Reservacion = { id: string; espacio: string; fecha: string; hora: string; estado: string; user_id: string; cliente_nombre?: string; fuera_horario?: boolean; horas_extra?: number; costo_extra?: number; cotizacion_id?: string | null; para_nombre?: string | null; paquete_label?: string | null; hora_inicio?: string | null; hora_fin?: string | null; contrato_id?: string | null; asistencia?: string | null; horas_cobradas?: number | null; para_cliente_id?: string | null; fecha_fin?: string | null };
 type Notificacion = { id: string; tipo: string; categoria: string | null; mensaje: string; leida: boolean; created_at: string; reservacion_id: string | null };
 type TipoSolicitudInvitado =
   | "sala_juntas"
@@ -344,6 +344,9 @@ export default function CentroPanel({
   // manda al cliente) — se mapea aquí también para que el propio admin lo
   // vea junto a la reservación, sin tener que recordarlo.
   const [motivosRechazoAdmin, setMotivosRechazoAdmin] = useState<Record<string, string>>({});
+  // Motivo que el CENTRO escribió al cancelar una reservación ya confirmada
+  // (ver confirmarCancelacionCentro) — el cliente lo ve en Mis reservaciones.
+  const [motivosCancelCentro, setMotivosCancelCentro] = useState<Record<string, string>>({});
   const [mostrarCalReservaciones, setMostrarCalReservaciones] = useState(false);
   const [calEspacio, setCalEspacio] = useState("");
   const [calInicioSemana, setCalInicioSemana] = useState(calLunesDeLaSemana(new Date()));
@@ -596,7 +599,7 @@ export default function CentroPanel({
       supabase.from("prospectos").select("*").order("created_at", { ascending: false }),
       supabase
         .from("reservaciones")
-        .select("id, espacio, fecha, fecha_fin, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas")
+        .select("id, espacio, fecha, fecha_fin, hora, estado, user_id, fuera_horario, horas_extra, costo_extra, cotizacion_id, para_nombre, hora_inicio, hora_fin, contrato_id, asistencia, horas_cobradas, para_cliente_id")
         .eq("centro", c)
         .order("fecha", { ascending: false }),
       supabase
@@ -706,7 +709,7 @@ export default function CentroPanel({
         ? supabase
             .from("notificaciones")
             .select("reservacion_id, mensaje, tipo")
-            .in("tipo", ["reservacion_cancelada_cliente", "reservacion_rechazada"])
+            .in("tipo", ["reservacion_cancelada_cliente", "reservacion_cancelada_centro", "reservacion_rechazada"])
             .in("reservacion_id", idsParaMotivos)
         : null,
     ]);
@@ -785,16 +788,20 @@ export default function CentroPanel({
       const notifsMotivos = motivosRes.data;
       const mapaCancel: Record<string, string> = {};
       const mapaRechazo: Record<string, string> = {};
+      const mapaCancelCentro: Record<string, string> = {};
       (notifsMotivos || []).forEach((n) => {
         if (!n.reservacion_id) return;
         if (n.tipo === "reservacion_cancelada_cliente") mapaCancel[n.reservacion_id] = n.mensaje;
+        else if (n.tipo === "reservacion_cancelada_centro") mapaCancelCentro[n.reservacion_id] = n.mensaje;
         else if (n.tipo === "reservacion_rechazada") mapaRechazo[n.reservacion_id] = n.mensaje;
       });
       setMotivosCancelacion(mapaCancel);
       setMotivosRechazoAdmin(mapaRechazo);
+      setMotivosCancelCentro(mapaCancelCentro);
     } else {
       setMotivosCancelacion({});
       setMotivosRechazoAdmin({});
+      setMotivosCancelCentro({});
     }
 
     const TIPOS_TICKET = ["nuevo_ticket", "ticket_en_proceso", "ticket_resuelto"];
@@ -1690,6 +1697,44 @@ export default function CentroPanel({
 
   const [rechazando, setRechazando] = useState<Reservacion | null>(null);
   const [motivoRechazo, setMotivoRechazo] = useState("");
+  // El centro cancela una reservación ya confirmada (p. ej. el cliente llamó
+  // y ya no puede cancelarla en línea). El motivo es obligatorio y le llega al
+  // cliente como aviso; en Mis reservaciones lo ve junto a la reservación.
+  const [cancelandoCentro, setCancelandoCentro] = useState<Reservacion | null>(null);
+  const [motivoCancelCentro, setMotivoCancelCentro] = useState("");
+  const [guardandoCancelCentro, setGuardandoCancelCentro] = useState(false);
+
+  async function confirmarCancelacionCentro() {
+    if (!cancelandoCentro || guardandoCancelCentro) return;
+    const reserva = cancelandoCentro;
+    const motivo = motivoCancelCentro.trim();
+    if (!motivo) {
+      alert("Escribe el motivo de la cancelación; el cliente lo verá.");
+      return;
+    }
+    setGuardandoCancelCentro(true);
+    const { error } = await supabase.from("reservaciones").update({ estado: "cancelada" }).eq("id", reserva.id);
+    if (error) {
+      setGuardandoCancelCentro(false);
+      alert("No se pudo cancelar la reservación: " + error.message);
+      return;
+    }
+    // Las que aparta el centro van a nombre de la admin con el cliente en para_cliente_id.
+    const { error: notifError } = await supabase.from("notificaciones").insert({
+      centro,
+      user_id: reserva.para_cliente_id || reserva.user_id,
+      tipo: "reservacion_cancelada_centro",
+      mensaje: `Tu reservación de ${reserva.espacio} el ${reserva.fecha} (${reserva.hora}) fue cancelada por el centro. Motivo: ${motivo}`,
+      reservacion_id: reserva.id,
+    });
+    setGuardandoCancelCentro(false);
+    if (notifError) {
+      alert("Se canceló la reservación, pero no se pudo avisar al cliente: " + notifError.message);
+    }
+    setCancelandoCentro(null);
+    setMotivoCancelCentro("");
+    fetchTodo(centro);
+  }
 
   // Recepción registra que el cliente llegó a usar sus Horas Cowork: las horas
   // agendadas (o las que ajuste recepción) pasan de apartadas a consumidas.
@@ -3051,7 +3096,24 @@ export default function CentroPanel({
                               ❌ Motivo del rechazo: {motivosRechazoAdmin[r.id]}
                             </p>
                           )}
+                          {r.estado === "cancelada" && motivosCancelCentro[r.id] && (
+                            <p style={{ fontSize: 12, color: "#A32D2D", margin: "4px 0 0" }}>
+                              ❌ Cancelada por el centro: {motivosCancelCentro[r.id].replace(/^.*Motivo: /, "")}
+                            </p>
+                          )}
                         </div>
+                        {rol !== "ventas" && r.estado === "confirmada" && (r.fecha_fin || r.fecha) >= hoyMexicoISO() && (
+                          <button
+                            className="btn-rechazar"
+                            style={{ flex: "none", width: "auto", padding: "6px 12px", fontSize: 12, marginLeft: "auto", marginRight: 8 }}
+                            onClick={() => {
+                              setMotivoCancelCentro("");
+                              setCancelandoCentro(r);
+                            }}
+                          >
+                            ✗ Cancelar
+                          </button>
+                        )}
                         <span
                           className="factura-badge"
                           style={{
@@ -4393,6 +4455,34 @@ export default function CentroPanel({
               </button>
               <button className="btn-rechazar" onClick={confirmarRechazo}>
                 Confirmar rechazo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelandoCentro && (
+        <div className="modal-overlay" onClick={() => setCancelandoCentro(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Cancelar reservación</p>
+            <p className="modal-email">
+              {cancelandoCentro.cliente_nombre ? `${cancelandoCentro.cliente_nombre} · ` : ""}
+              {cancelandoCentro.espacio} · {cancelandoCentro.fecha} · {cancelandoCentro.hora}
+            </p>
+            <p className="sub-label" style={{ marginTop: 8 }}>
+              Motivo de la cancelación (obligatorio, el cliente lo verá)
+            </p>
+            <textarea
+              placeholder="Ej. El cliente llamó para cancelar porque se le cruzó otra junta"
+              value={motivoCancelCentro}
+              onChange={(e) => setMotivoCancelCentro(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button className="tel-borrar-btn" onClick={() => setCancelandoCentro(null)}>
+                Regresar
+              </button>
+              <button className="btn-rechazar" onClick={confirmarCancelacionCentro} disabled={guardandoCancelCentro}>
+                {guardandoCancelCentro ? "Cancelando..." : "Confirmar cancelación"}
               </button>
             </div>
           </div>

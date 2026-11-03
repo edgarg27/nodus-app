@@ -95,6 +95,7 @@ export async function destinatariosDeAviso(admin: Admin, n: Aviso): Promise<stri
 export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPersonal: boolean): string {
   if (!esPersonal) {
     if (n.tipo === "paquete_recibido" || n.tipo === "nuevo_paquete") return "/mi-paqueteria";
+    if (["reservacion_confirmada", "reservacion_rechazada", "reservacion_cancelada_centro"].includes(n.tipo)) return "/reservaciones?tab=mis";
     if (["fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "cuenta_pausada", "pago_confirmado"].includes(n.tipo)) return "/estado-cuenta";
     return "/dashboard-cliente";
   }
@@ -102,6 +103,7 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
     case "nueva_reservacion":
     case "reservacion_confirmada":
     case "reservacion_rechazada":
+    case "reservacion_cancelada_centro":
     case "reservacion_cancelada_cliente":
       return "/sala-juntas";
     case "nuevo_tour":

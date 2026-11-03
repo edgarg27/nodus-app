@@ -108,13 +108,16 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
 
     // No hay columna `motivo_rechazo` en `reservaciones` — se resuelve desde
     // `notificaciones` (mismo criterio que CentroPanel.tsx del lado admin).
-    const rechazadaIds = (data || []).filter((r) => r.estado === "rechazada").map((r) => r.id);
+    // Igual el motivo cuando el centro cancela una reservación ya confirmada.
+    const rechazadaIds = (data || [])
+      .filter((r) => r.estado === "rechazada" || r.estado === "cancelada")
+      .map((r) => r.id);
     if (rechazadaIds.length > 0) {
       const { data: notifs } = await supabase
         .from("notificaciones")
         .select("reservacion_id, mensaje")
         .eq("user_id", user.id)
-        .eq("tipo", "reservacion_rechazada")
+        .in("tipo", ["reservacion_rechazada", "reservacion_cancelada_centro"])
         .in("reservacion_id", rechazadaIds);
       const mapa: Record<string, string> = {};
       (notifs || []).forEach((n) => {
@@ -215,7 +218,7 @@ export default function MisReservaciones({ onHacerReservacion }: { onHacerReserv
                 </span>
               </div>
 
-              {r.estado === "rechazada" && motivosRechazo[r.id] && (
+              {(r.estado === "rechazada" || r.estado === "cancelada") && motivosRechazo[r.id] && (
                 <p style={{ fontSize: 12, color: "#A32D2D", margin: "6px 0 0" }}>{motivosRechazo[r.id]}</p>
               )}
 

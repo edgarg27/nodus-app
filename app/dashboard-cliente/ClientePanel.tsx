@@ -268,7 +268,7 @@ export default function ClientePanel({
     setMenuNotifAbierto(false);
     if (n.tipo === "encuesta_pendiente") {
       router.push("/mis-encuestas");
-    } else if (n.tipo === "reservacion_rechazada" || n.tipo === "reservacion_confirmada") {
+    } else if (n.tipo === "reservacion_rechazada" || n.tipo === "reservacion_confirmada" || n.tipo === "reservacion_cancelada_centro") {
       router.push("/reservaciones?tab=mis");
     } else if (n.tipo === "nuevo_paquete") {
       router.push("/paqueteria");
