@@ -111,6 +111,36 @@ export default function EstadoDeCuentaPage() {
   const [cancelando, setCancelando] = useState(false);
   const [errorCan, setErrorCan] = useState("");
   const accionInicial = useRef(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // El menú Acciones se cierra al dar clic fuera, con Esc o al cambiar de pestaña/ventana
+  // (antes se quedaba abierto). El de cada fila ya se cierra con su fondo; aquí se cierra también al salir.
+  useEffect(() => {
+    if (!menu && !menuFila) return;
+    function cerrar() {
+      setMenu(false);
+      setMenuFila(null);
+    }
+    function clicFuera(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(false);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") cerrar();
+    }
+    function visibilidad() {
+      if (document.hidden) cerrar();
+    }
+    document.addEventListener("mousedown", clicFuera);
+    document.addEventListener("keydown", tecla);
+    document.addEventListener("visibilitychange", visibilidad);
+    window.addEventListener("blur", cerrar);
+    return () => {
+      document.removeEventListener("mousedown", clicFuera);
+      document.removeEventListener("keydown", tecla);
+      document.removeEventListener("visibilitychange", visibilidad);
+      window.removeEventListener("blur", cerrar);
+    };
+  }, [menu, menuFila]);
   const confeti = useMemo(
     () =>
       Array.from({ length: 26 }).map((_, i) => ({
@@ -528,7 +558,7 @@ export default function EstadoDeCuentaPage() {
                 <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e", fontSize: 18, margin: 0 }}>
                   Estado de cuenta
                 </p>
-                <div className="no-imprimir" style={{ position: "relative" }}>
+                <div className="no-imprimir" style={{ position: "relative" }} ref={menuRef}>
                   <button type="button" className="btn-exportar fac-naranja" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu}>
                     Acciones ▾
                   </button>
