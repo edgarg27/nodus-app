@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { recargoConIva } from "@/lib/formaPago";
+import { quitarIva, totalDesdeSubtotal } from "@/lib/adicionales";
 
 // Agregar a una factura sin timbrar una penalización por atraso u otro adicional del catálogo, con su clave del SAT.
-// Se usa en Integrar por cliente y en el estado de cuenta. El monto se captura con IVA incluido, como en Adicionales.
+// Se usa en Integrar por cliente y en el estado de cuenta. El monto se captura + IVA, como en Adicionales, y se
+// agrega con IVA.
 
 export const CLAVE_PENALIZACION = "penalizacion_mora";
 
@@ -29,14 +31,16 @@ export default function CargoFactura({
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [error, setError] = useState("");
+  // La penalización sugerida conserva su 3% exacto con IVA si no se cambió.
+  const montoConIva = totalDesdeSubtotal(monto, clave === CLAVE_PENALIZACION && base > 0 ? recargoConIva(base) : null);
 
   function elegir(lista: Servicio[], nuevaClave: string) {
     const s = lista.find((x) => x.clave === nuevaClave);
     setClave(nuevaClave);
     setDescripcion(s?.concepto || "");
     setError("");
-    if (nuevaClave === CLAVE_PENALIZACION) setMonto(base > 0 ? String(recargoConIva(base)) : "");
-    else setMonto(s?.precio != null ? String(s.precio) : "");
+    if (nuevaClave === CLAVE_PENALIZACION) setMonto(base > 0 ? String(quitarIva(recargoConIva(base))) : "");
+    else setMonto(s?.precio != null ? String(quitarIva(s.precio)) : "");
   }
 
   useEffect(() => {
@@ -52,7 +56,7 @@ export default function CargoFactura({
   }, []);
 
   function agregar() {
-    const m = Math.round(Number(monto) * 100) / 100;
+    const m = montoConIva;
     if (!clave) return setError("Elige el servicio");
     if (!descripcion.trim()) return setError("Escribe la descripción");
     if (!(m > 0)) return setError("Escribe un monto mayor a cero");
@@ -78,8 +82,9 @@ export default function CargoFactura({
           <input type="text" maxLength={200} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </div>
         <div>
-          <p className="sub-label">Monto con IVA incluido</p>
-          <input type="number" min={0} step="0.01" value={monto} onChange={(e) => setMonto(e.target.value)} />
+          <p className="sub-label">Monto + IVA</p>
+          <input type="number" min={0} step="0.01" placeholder="Sin IVA" value={monto} onChange={(e) => setMonto(e.target.value)} />
+          {montoConIva > 0 && <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>Con IVA: ${montoConIva.toLocaleString("es-MX")}</p>}
         </div>
       </div>
       {clave === CLAVE_PENALIZACION && (

@@ -6,6 +6,7 @@ import { CENTROS, useCentroAdmin } from "@/lib/useCentroAdmin";
 import { useCatalogoServicios } from "@/app/components/useCatalogoServicios";
 import AvisoExito from "@/app/components/AvisoExito";
 import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
+import { masIva } from "@/lib/adicionales";
 import Link from "next/link";
 
 // Adicionales: cobros sueltos que el admin le pone a un cliente fuera de su
@@ -144,7 +145,9 @@ export default function AdicionalesPage() {
       .slice(0, 6);
   }, [clientes, busqueda]);
 
-  const total = Math.round(aNumero(cantidad) * aNumero(precio) * 100) / 100;
+  // El precio se captura + IVA; se cobra con IVA (igual lo calcula /api/adicionales).
+  const subtotal = Math.round(aNumero(cantidad) * aNumero(precio) * 100) / 100;
+  const total = masIva(subtotal);
   const puedeCobrar = !!clienteSel && !!tipo && concepto.trim().length > 0 && aNumero(cantidad) > 0 && aNumero(precio) > 0;
 
   function elegirTipo(clave: string) {
@@ -346,7 +349,7 @@ export default function AdicionalesPage() {
                   <input type="text" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p className="sub-label" style={{ marginBottom: 6 }}>Precio c/u</p>
+                  <p className="sub-label" style={{ marginBottom: 6 }}>Precio c/u + IVA</p>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -357,6 +360,11 @@ export default function AdicionalesPage() {
                 </div>
               </div>
 
+              {subtotal > 0 && (
+                <p style={{ fontSize: 12, color: "#888", margin: 0, textAlign: "right" }}>
+                  Subtotal {fmtMoneda(subtotal)} + IVA {fmtMoneda(Math.round((total - subtotal) * 100) / 100)}
+                </p>
+              )}
               <div className="adicional-total">
                 <span>Total a cobrar</span>
                 <strong>{fmtMoneda(total)}</strong>

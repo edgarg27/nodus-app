@@ -20,6 +20,23 @@ export function sinIva(concepto: string, montoCapturado: number): number {
   return llevaIva(concepto) ? round2(montoCapturado / FACTOR_IVA) : montoCapturado;
 }
 
+// Renta del contrato, cobros adicionales y cargos al facturar: el staff captura el precio + IVA (sin IVA) y se
+// guarda y se cobra el total con IVA (contratos.renta_mensual y pagos.monto son totales).
+export function masIva(subtotal: number): number {
+  return round2(subtotal * FACTOR_IVA);
+}
+
+export function quitarIva(total: number): number {
+  return round2(total / FACTOR_IVA);
+}
+
+// Total a guardar desde lo capturado sin IVA. Si no se cambió lo que se mostró, se queda el total que ya estaba:
+// algunos totales (p. ej. $5,000.00) no salen exactos de un subtotal a dos decimales y no deben moverse solos.
+export function totalDesdeSubtotal(capturado: string, totalAnterior: number | null | undefined): number {
+  if (totalAnterior != null && capturado.trim() === String(quitarIva(Number(totalAnterior)))) return Number(totalAnterior);
+  return masIva(Number(capturado) || 0);
+}
+
 // Teléfono: el servicio de teléfono va incluido, pero si el cliente contrata
 // un número propio (DID) se cobra $100 extra al mes ("Teléfono (DID)" en el
 // catálogo de adicionales, $100 + IVA). La extensión para comunicarse con recepción es

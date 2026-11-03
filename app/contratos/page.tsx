@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
-import { conIva } from "@/lib/adicionales";
+import { conIva, quitarIva, totalDesdeSubtotal } from "@/lib/adicionales";
 import { etiquetaFormaPago } from "@/lib/formaPago";
 import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
@@ -434,6 +434,9 @@ export default function ContratosPage() {
     horas_sala_juntas: "",
     dia_pago: "",
   });
+  // La renta se captura + IVA; si viene de una cotización se guarda su total con IVA tal cual (ver totalDesdeSubtotal).
+  const [rentaCotizada, setRentaCotizada] = useState<number | null>(null);
+  const rentaContratoConIva = totalDesdeSubtotal(formContrato.renta_mensual, rentaCotizada);
   const [archivoContrato, setArchivoContrato] = useState<File | null>(null);
   const [mostrarFormContrato, setMostrarFormContrato] = useState(false);
   const [guardandoContrato, setGuardandoContrato] = useState(false);
@@ -508,6 +511,7 @@ export default function ContratosPage() {
   async function seleccionarCotizacionCandidata(cot: CotizacionCandidata) {
     setCotizacionSeleccionadaId(cot.id);
     setOficinaSeleccionadaId(cot.oficina_id || "");
+    setRentaCotizada(cot.precio_neto != null ? Number(cot.precio_neto) : null);
     let horasSala = 0;
     if (cot.paquete_id) {
       const { data: paq } = await supabase
@@ -521,7 +525,7 @@ export default function ContratosPage() {
       ...prev,
       fecha_inicio: cot.fecha_inicio || prev.fecha_inicio,
       fecha_vencimiento: cot.fecha_fin || prev.fecha_vencimiento,
-      renta_mensual: cot.precio_neto != null ? String(cot.precio_neto) : prev.renta_mensual,
+      renta_mensual: cot.precio_neto != null ? String(quitarIva(Number(cot.precio_neto))) : prev.renta_mensual,
       deposito_garantia: cot.deposito_garantia != null ? String(cot.deposito_garantia) : prev.deposito_garantia,
       horas_sala_juntas: horasSala ? String(horasSala) : prev.horas_sala_juntas,
     }));
@@ -565,7 +569,7 @@ export default function ContratosPage() {
       centro,
       fecha_inicio: formContrato.fecha_inicio,
       fecha_vencimiento: formContrato.fecha_vencimiento,
-      renta_mensual: Number(formContrato.renta_mensual),
+      renta_mensual: rentaContratoConIva,
       deposito_garantia: llevaDeposito ? Number(formContrato.deposito_garantia) || 0 : 0,
       horas_sala_juntas: Number(formContrato.horas_sala_juntas) || 0,
       dia_pago: formContrato.dia_pago ? Number(formContrato.dia_pago) : null,
@@ -590,6 +594,7 @@ export default function ContratosPage() {
       horas_sala_juntas: "",
       dia_pago: "",
     });
+    setRentaCotizada(null);
     setArchivoContrato(null);
     limpiarProspectoContrato();
     setMostrarFormContrato(false);
@@ -892,13 +897,17 @@ export default function ContratosPage() {
                     />
                   </div>
                   <div>
-                    <p className="sub-label">Renta mensual</p>
+                    <p className="sub-label">Renta mensual + IVA</p>
                     <input
                       type="number"
                       step="0.01"
+                      placeholder="Sin IVA"
                       value={formContrato.renta_mensual}
                       onChange={(e) => setFormContrato({ ...formContrato, renta_mensual: e.target.value })}
                     />
+                    {rentaContratoConIva > 0 && (
+                      <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>Con IVA: ${rentaContratoConIva.toLocaleString("es-MX")} al mes</p>
+                    )}
                   </div>
                   {llevaDeposito && (
                     <div>

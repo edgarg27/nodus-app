@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
-import { conIva, sinIva } from "@/lib/adicionales";
+import { conIva, quitarIva, sinIva, totalDesdeSubtotal } from "@/lib/adicionales";
 import PasosContrato from "./PasosContrato";
 
 type VersionContrato = {
@@ -72,7 +72,8 @@ export default function ContratoModal({
   const [form, setForm] = useState({
     fecha_inicio: contrato.fecha_inicio,
     fecha_vencimiento: contrato.fecha_vencimiento,
-    renta_mensual: String(contrato.renta_mensual ?? ""),
+    // Se muestra y se captura + IVA; en el contrato se guarda con IVA (ver rentaConIva).
+    renta_mensual: contrato.renta_mensual != null ? String(quitarIva(Number(contrato.renta_mensual))) : "",
     horas_sala_juntas: String(contrato.horas_sala_juntas ?? 0),
     dia_pago: contrato.dia_pago ? String(contrato.dia_pago) : "",
     deposito_garantia: contrato.deposito_garantia != null ? String(contrato.deposito_garantia) : "",
@@ -230,7 +231,8 @@ export default function ContratoModal({
   // Lo que se muestra y se cobra: el Estacionamiento ya con IVA incluido
   // (en la base se guarda sin IVA, ver lib/adicionales.ts).
   const totalAdicionales = useMemo(() => adicionales.reduce((s, a) => s + conIva(a.concepto, a.monto), 0), [adicionales]);
-  const totalContrato = (Number(form.renta_mensual) || 0) + totalAdicionales;
+  const rentaConIva = totalDesdeSubtotal(form.renta_mensual, contrato.renta_mensual);
+  const totalContrato = rentaConIva + totalAdicionales;
 
   const catalogoFiltrado = useMemo(() => {
     if (!busquedaAdicional.trim()) return catalogo;
@@ -382,7 +384,7 @@ export default function ContratoModal({
       .update({
         fecha_inicio: form.fecha_inicio,
         fecha_vencimiento: form.fecha_vencimiento,
-        renta_mensual: Number(form.renta_mensual) || 0,
+        renta_mensual: rentaConIva,
         horas_sala_juntas: Number(form.horas_sala_juntas) || 0,
         dia_pago: form.dia_pago ? Number(form.dia_pago) : null,
         deposito_garantia: form.deposito_garantia ? Number(form.deposito_garantia) : null,
@@ -401,7 +403,7 @@ export default function ContratoModal({
     const camposPrincipales: { campo: string; anterior: string; nuevo: string; dinero?: boolean }[] = [
       { campo: "Fecha de inicio", anterior: contrato.fecha_inicio || "", nuevo: form.fecha_inicio || "" },
       { campo: "Fecha de vencimiento", anterior: contrato.fecha_vencimiento || "", nuevo: form.fecha_vencimiento || "" },
-      { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(form.renta_mensual), dinero: true },
+      { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(rentaConIva), dinero: true },
       { campo: "Horas sala de juntas", anterior: num(contrato.horas_sala_juntas), nuevo: num(form.horas_sala_juntas) },
       { campo: "Depósito en garantía", anterior: num(contrato.deposito_garantia), nuevo: num(form.deposito_garantia), dinero: true },
     ];
@@ -443,7 +445,7 @@ export default function ContratoModal({
 
     // El pago de la renta se genera hasta ahora — al aprobar el contrato,
     // no al crearlo (nace en pre_aprobado y no debe cobrarse antes).
-    const renta = Number(form.renta_mensual) || 0;
+    const renta = rentaConIva;
     if (contrato.user_id && renta > 0) {
       try {
         await fetch("/api/pagos/crear", {
@@ -641,13 +643,15 @@ export default function ContratoModal({
             />
           </div>
           <div>
-            <p className="sub-label">Renta mensual</p>
+            <p className="sub-label">Renta mensual + IVA</p>
             <input
               type="number"
               step="0.01"
+              placeholder="Sin IVA"
               value={form.renta_mensual}
               onChange={(e) => setForm({ ...form, renta_mensual: e.target.value })}
             />
+            {rentaConIva > 0 && <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>Con IVA: ${rentaConIva.toLocaleString("es-MX")} al mes</p>}
           </div>
           <div>
             <p className="sub-label">Horas sala de juntas</p>
