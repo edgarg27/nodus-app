@@ -60,7 +60,15 @@ export async function subirArchivoFactura(admin: Admin, nombreBase: string, buff
   const { error } = await admin.storage
     .from("facturas")
     .upload(fileName, buffer, { contentType: ext === "xml" ? "text/xml" : "application/pdf", upsert: true });
-  if (error) return null;
+  if (error) {
+    // Ya pasó que el archivo sí quedó en Storage aunque la respuesta llegó como error (factura A405): si está, se usa.
+    const { data: existe } = await admin.storage.from("facturas").list("", { search: fileName, limit: 1 });
+    if (!existe?.some((f) => f.name === fileName)) {
+      console.error(`[facturapi] no se pudo guardar el ${ext.toUpperCase()} ${fileName}:`, error.message);
+      return null;
+    }
+    console.error(`[facturapi] la subida de ${fileName} respondió error pero el archivo sí quedó:`, error.message);
+  }
   const { data } = admin.storage.from("facturas").getPublicUrl(fileName);
   return data.publicUrl;
 }
