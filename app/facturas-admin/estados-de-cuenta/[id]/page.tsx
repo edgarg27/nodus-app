@@ -14,6 +14,8 @@ import type { PreviaFactura } from "@/lib/facturarCobro";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 import { numeroUsuarioVisible } from "@/lib/numeroUsuario";
 import Link from "next/link";
+import FileDropzone from "@/app/soporte/FileDropzone";
+import BotonArchivo from "@/app/components/BotonArchivo";
 
 // Estado de cuenta (como en ZORA): lo que se integró para un cliente, sus pagos y su historial. Desde "Acciones" se
 // timbra (aquí se elige el método y la forma de pago), se envía o imprime, se edita el concepto y la fecha, se registran
@@ -45,7 +47,7 @@ type Factura = {
   iva?: number | null;
   envios_estado?: number | null;
 };
-type Pago = { id: string; concepto: string | null; monto: number; estado: string; adicional_tipo: string | null; created_at: string };
+type Pago = { id: string; concepto: string | null; monto: number; estado: string; adicional_tipo: string | null; created_at: string; comprobante_url?: string | null; fecha_pago?: string | null };
 type Cliente = { numero_usuario?: string | number | null; nombre: string; email: string; empresa: string | null; nombre_fiscal: string | null; rfc: string | null; regimen_fiscal: string | null; cp_fiscal: string | null };
 type Complemento = { id: string; serie: string | null; folio_fiscal: string | null; fecha_pago: string; monto: number; uuid_cfdi: string | null; cancelacion_estatus: string | null; importe: number };
 
@@ -127,6 +129,7 @@ export default function EstadoDeCuentaPage() {
   const [modalPago, setModalPago] = useState(false);
   const [pagosSel, setPagosSel] = useState<string[]>([]);
   const [formaPagoReg, setFormaPagoReg] = useState("03");
+  const [comprobantePago, setComprobantePago] = useState<File[]>([]);
   const [errorModal, setErrorModal] = useState("");
 
   async function cargar() {
@@ -146,7 +149,7 @@ export default function EstadoDeCuentaPage() {
     }
     setFactura(f as Factura);
     const [{ data: ps }, { data: cl }, { data: filas }] = await Promise.all([
-      supabase.from("pagos").select("id, concepto, monto, estado, adicional_tipo, created_at").eq("factura_id", id).order("created_at", { ascending: true }),
+      supabase.from("pagos").select("id, concepto, monto, estado, adicional_tipo, created_at, comprobante_url, fecha_pago").eq("factura_id", id).order("created_at", { ascending: true }),
       f.user_id ? supabase.from("profiles").select("numero_usuario, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal").eq("id", f.user_id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from("complemento_pago_facturas").select("complemento_id, importe").eq("factura_id", id),
     ]);
@@ -397,6 +400,7 @@ export default function EstadoDeCuentaPage() {
   function abrirPago() {
     setPagosSel(pagosPendientes.map((p) => p.id));
     setFormaPagoReg("03");
+    setComprobantePago([]);
     setErrorModal("");
     setModalPago(true);
   }
@@ -405,7 +409,20 @@ export default function EstadoDeCuentaPage() {
     setErrorModal("");
     if (pagosSel.length === 0) return setErrorModal("Elige al menos un pago");
     setAccionando(true);
-    const { ok, data } = await llamar({ accion: "pago", pagoIds: pagosSel, formaPago: formaPagoReg });
+    // El comprobante va a la misma carpeta que los de Cobranza; se liga a los pagos que se registran.
+    let comprobanteUrl: string | null = null;
+    const archivo = comprobantePago[0];
+    if (archivo && factura) {
+      const ext = (archivo.name.split(".").pop() || "pdf").toLowerCase();
+      const ruta = `estados-de-cuenta/${factura.id}-${Date.now()}.${ext}`;
+      const { error: errSubida } = await supabase.storage.from("comprobantes").upload(ruta, archivo, { contentType: archivo.type, upsert: true });
+      if (errSubida) {
+        setAccionando(false);
+        return setErrorModal("No se pudo subir el comprobante: " + errSubida.message);
+      }
+      comprobanteUrl = supabase.storage.from("comprobantes").getPublicUrl(ruta).data.publicUrl;
+    }
+    const { ok, data } = await llamar({ accion: "pago", pagoIds: pagosSel, formaPago: formaPagoReg, comprobanteUrl });
     setAccionando(false);
     if (!ok) return setErrorModal(data.error || "No se pudo registrar el pago");
     setModalPago(false);
@@ -698,6 +715,7 @@ export default function EstadoDeCuentaPage() {
                           <th>Concepto</th>
                           <th>Registrado</th>
                           <th>Estado</th>
+                          <th>Comprobante</th>
                           <th className="fac-num">Monto</th>
                         </tr>
                       </thead>
@@ -706,7 +724,19 @@ export default function EstadoDeCuentaPage() {
                           <tr key={p.id}>
                             <td>{etiquetaPagoSuelto(p.concepto)}</td>
                             <td className="fac-nowrap">{p.created_at.slice(0, 10)}</td>
-                            <td>{ESTADO_PAGO[p.estado] || p.estado}</td>
+                            <td>
+                              {ESTADO_PAGO[p.estado] || p.estado}
+                              {p.estado === "pagado" && p.fecha_pago ? <span className="fac-sub">{p.fecha_pago}</span> : null}
+                            </td>
+                            <td>
+                              {p.comprobante_url ? (
+                                <BotonArchivo url={p.comprobante_url} bucket="comprobantes">
+                                  Ver comprobante
+                                </BotonArchivo>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
                             <td className="fac-num fac-nowrap">{dinero(Number(p.monto))}</td>
                           </tr>
                         ))}
@@ -1399,6 +1429,10 @@ export default function EstadoDeCuentaPage() {
               <option value="03">Transferencia electrónica</option>
               <option value="04">Tarjeta de crédito</option>
             </select>
+            <p className="sub-label" style={{ marginTop: 10 }}>
+              Comprobante (opcional)
+            </p>
+            <FileDropzone files={comprobantePago} onChange={setComprobantePago} maxFiles={1} etiquetaTipos="Foto o PDF de la transferencia" />
             {errorModal && <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>{errorModal}</p>}
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button className="btn-exportar fac-naranja" disabled={accionando} onClick={guardarPago}>

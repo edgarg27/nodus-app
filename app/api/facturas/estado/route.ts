@@ -9,6 +9,7 @@ import { conceptoLineaEditable, etiquetaPagoSuelto } from "@/lib/adicionales";
 import { complementoAlPagar } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
+import { parseStorageUrl } from "@/lib/storage";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
@@ -166,10 +167,20 @@ export async function POST(req: NextRequest) {
     const formaPago: string = typeof cuerpo.formaPago === "string" ? cuerpo.formaPago : "";
     if (pagoIds.length === 0) return NextResponse.json({ error: "Elige al menos un pago" }, { status: 400 });
     if (!FORMA_A_METODO[formaPago]) return NextResponse.json({ error: "Elige cómo pagó el cliente" }, { status: 400 });
+    // Comprobante opcional: solo un archivo de la carpeta "comprobantes" de este proyecto.
+    const comprobanteUrl = typeof cuerpo.comprobanteUrl === "string" && cuerpo.comprobanteUrl ? cuerpo.comprobanteUrl : null;
+    const destino = comprobanteUrl ? parseStorageUrl(comprobanteUrl) : null;
+    const urlBase = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/+$/, "");
+    if (comprobanteUrl && (!destino || destino.bucket !== "comprobantes" || !comprobanteUrl.startsWith(urlBase + "/"))) {
+      return NextResponse.json({ error: "El comprobante no es válido; vuelve a subirlo" }, { status: 400 });
+    }
     const { data: pagos } = await admin.from("pagos").select("id, estado").in("id", pagoIds).eq("factura_id", factura.id);
     const pendientes = (pagos || []).filter((p) => p.estado !== "pagado");
     if (pendientes.length === 0) return NextResponse.json({ error: "Esos pagos ya estaban pagados" }, { status: 409 });
-    const { error } = await admin.from("pagos").update({ estado: "pagado", fecha_pago: hoyMexicoISO() }).in("id", pendientes.map((p) => p.id));
+    const { error } = await admin
+      .from("pagos")
+      .update({ estado: "pagado", fecha_pago: hoyMexicoISO(), ...(comprobanteUrl ? { comprobante_url: comprobanteUrl } : {}) })
+      .in("id", pendientes.map((p) => p.id));
     if (error) return NextResponse.json({ error: "No se pudo registrar el pago" }, { status: 500 });
     // Si la factura ya se timbró a pago diferido, cada pago se cubre con su complemento de pago.
     if (factura.uuid_cfdi && factura.metodo_pago === "PPD" && !esFacturaSimulada(factura.uuid_cfdi)) {
