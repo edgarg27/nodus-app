@@ -88,7 +88,12 @@ export async function POST(req: NextRequest) {
     contratoId = creado.id;
     folioContrato = creado.folio;
     if (c.oficina_id) {
-      const { error: errOficina } = await admin.from("oficinas").update({ cliente_id: userId, estado: "ocupada" }).eq("id", c.oficina_id);
+      // Un lugar compartido (Coworking C3–C11) nunca se marca ocupado.
+      const { error: errOficina } = await admin
+        .from("oficinas")
+        .update({ cliente_id: userId, estado: "ocupada" })
+        .eq("id", c.oficina_id)
+        .eq("compartida", false);
       if (errOficina) avisos.push("El contrato quedó, pero no se pudo marcar la oficina como ocupada.");
     }
     if (c.dia_pago) await admin.from("profiles").update({ dia_pago: Number(c.dia_pago) }).eq("id", userId);

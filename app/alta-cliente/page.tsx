@@ -500,7 +500,9 @@ function AltaClienteInner() {
             const { error: oficinaError } = await supabase
               .from("oficinas")
               .update({ cliente_id: nuevoClienteId, estado: "ocupada" })
-              .eq("id", contrato.oficina_id);
+              .eq("id", contrato.oficina_id)
+              // Un lugar compartido (Coworking C3–C11) nunca se marca ocupado.
+              .eq("compartida", false);
             if (oficinaError) {
               aviso = "El cliente se registró y el contrato quedó ligado, pero no se pudo marcar la oficina como ocupada.";
             }

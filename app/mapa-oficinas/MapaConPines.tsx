@@ -11,6 +11,7 @@ type Oficina = {
   estado: string;
   mapa_x: number | null;
   mapa_y: number | null;
+  compartida?: boolean | null;
   paquete_default_id: string | null;
 };
 
@@ -68,7 +69,7 @@ export default function MapaConPines({
   async function fetchOficinas() {
     const { data } = await supabase
       .from("oficinas")
-      .select("id, numero, tipo, estado, mapa_x, mapa_y, paquete_default_id")
+      .select("id, numero, tipo, estado, mapa_x, mapa_y, paquete_default_id, compartida")
       .eq("centro", centro);
     // .order("numero") de Supabase ordena como texto (1, 10, 11, 2, 20...) —
     // aquí se ordena numéricamente (1, 2, 3...) y, si empatan, por tipo.
@@ -204,9 +205,9 @@ export default function MapaConPines({
   // por uno en el plano: si no tienen pin no se listan aquí ni en "Colocar
   // pines" (llenarían la pantalla). La ventana de disponibilidad sí sigue
   // recibiendo todas las oficinas, y cualquiera que ya tenga pin se sigue
-  // mostrando normal.
+  // mostrando normal. Los compartidos (C3–C11 de Bosques) sí se listan: son pocos.
   const oficinasVisibles = oficinas.filter(
-    (o) => !(o.tipo?.trim().toLowerCase() === "coworking" && (o.mapa_x == null || o.mapa_y == null))
+    (o) => o.compartida || !(o.tipo?.trim().toLowerCase() === "coworking" && (o.mapa_x == null || o.mapa_y == null))
   );
   const oficinasConPin = oficinasVisibles.filter((o) => o.mapa_x != null && o.mapa_y != null);
   const oficinasSinPin = oficinasVisibles.filter((o) => o.mapa_x == null || o.mapa_y == null);
