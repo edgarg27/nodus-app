@@ -3,6 +3,7 @@
 import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parsearCfdi, nombreBase, normalizarRfc, type CfdiParseado } from "@/lib/cfdi";
+import { masIva } from "@/lib/adicionales";
 
 // "Anexar contrato, pagos y facturas": para migrar clientes de ZORA (o dar de alta a alguien que ya tiene
 // historial) sin pasar por Cotizar. El contrato entra vigente y no genera cobros; los pagos se capturan como
@@ -126,7 +127,8 @@ export async function guardarAnexos(
       folio: c.folio,
       fecha_inicio: c.fecha_inicio,
       fecha_vencimiento: c.fecha_vencimiento,
-      renta_mensual: Number(c.renta_mensual),
+      // Se captura + IVA; en el contrato se guarda la renta con IVA, que es lo que se cobra y se factura.
+      renta_mensual: masIva(Number(c.renta_mensual)),
       deposito_garantia: Number(c.deposito_garantia) || 0,
       horas_sala_juntas: Number(c.horas_sala_juntas) || 0,
       dia_pago: diaPago ? Number(diaPago) : null,
@@ -260,8 +262,9 @@ export default function AnexosZora({
                 <input type="date" value={c.fecha_vencimiento} onChange={(e) => setContrato({ fecha_vencimiento: e.target.value })} />
               </div>
               <div>
-                <p className="sub-label">Renta mensual</p>
-                <input type="number" min="0" step="0.01" value={c.renta_mensual} onChange={(e) => setContrato({ renta_mensual: e.target.value })} />
+                <p className="sub-label">Renta mensual + IVA</p>
+                <input type="number" min="0" step="0.01" placeholder="Sin IVA" value={c.renta_mensual} onChange={(e) => setContrato({ renta_mensual: e.target.value })} />
+                {Number(c.renta_mensual) > 0 && <p className="zora-nota" style={{ margin: "4px 0 0" }}>Con IVA: {moneda(masIva(Number(c.renta_mensual)))} al mes</p>}
               </div>
               <div>
                 <p className="sub-label">Depósito en garantía</p>

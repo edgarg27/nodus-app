@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
-import { conceptoCobroAdicional } from "@/lib/adicionales";
+import { conceptoCobroAdicional, masIva } from "@/lib/adicionales";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
 // Cobros adicionales sueltos (pantalla /adicionales): una hora extra de sala,
@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El precio debe ser mayor a 0" }, { status: 400 });
   }
   const cantidadFinal = round2(cant);
-  const monto = round2(cantidadFinal * precio);
+  // El precio llega + IVA (sin IVA); el cobro se guarda con IVA, que es lo que se paga y se factura.
+  const monto = masIva(round2(cantidadFinal * precio));
   if (monto <= 0) return NextResponse.json({ error: "El total debe ser mayor a 0" }, { status: 400 });
 
   if (!clienteId) return NextResponse.json({ error: "Elige al cliente" }, { status: 400 });
