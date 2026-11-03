@@ -84,7 +84,7 @@ type Oficina = {
   deposito_garantia: number | null;
   cliente_id: string | null;
   paquete_default_id: string | null;
-  // Lugar compartido (Coworking C3–C11 de Bosques): caben varias empresas,
+  // Lugar compartido (Coworking C1–C11 de Bosques): caben varias empresas,
   // nunca se marca ocupado ni se bloquea.
   compartida?: boolean | null;
 };
@@ -2718,7 +2718,7 @@ export default function CotizarForm({
               );
             };
 
-            // Los lugares compartidos (C3–C11 de Bosques) son pocos: van sueltos, sin agrupar por letra.
+            // Los lugares compartidos (C1–C11 de Bosques) son pocos: van sueltos, sin agrupar por letra.
             if (!esCoworkingSel || visibles.every((o) => o.compartida))
               return <div style={gridStyle}>{visibles.map((o) => tarjeta(o))}</div>;
 

@@ -205,7 +205,7 @@ export default function MapaConPines({
   // por uno en el plano: si no tienen pin no se listan aquí ni en "Colocar
   // pines" (llenarían la pantalla). La ventana de disponibilidad sí sigue
   // recibiendo todas las oficinas, y cualquiera que ya tenga pin se sigue
-  // mostrando normal. Los compartidos (C3–C11 de Bosques) sí se listan: son pocos.
+  // mostrando normal. Los compartidos (C1–C11 de Bosques) sí se listan: son pocos.
   const oficinasVisibles = oficinas.filter(
     (o) => o.compartida || !(o.tipo?.trim().toLowerCase() === "coworking" && (o.mapa_x == null || o.mapa_y == null))
   );

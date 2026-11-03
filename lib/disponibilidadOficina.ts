@@ -15,7 +15,7 @@ export type ParametrosDisponibilidad = {
 
 // `ocupadoPor`: quién la tiene (nombre · empresa), para que el staff sepa
 // con quién choca sin ir a buscar el contrato.
-// `compartidoCon`: en un lugar compartido (Coworking C3–C11 de Bosques), las
+// `compartidoCon`: en un lugar compartido (Coworking C1–C11 de Bosques), las
 // empresas que ya están ahí; el lugar sigue disponible para una más.
 export type ResultadoDisponibilidad = { disponible: boolean; motivo?: string; ocupadoPor?: string; compartidoCon?: string };
 
