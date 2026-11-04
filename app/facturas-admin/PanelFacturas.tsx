@@ -546,6 +546,12 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   const paginaActual = Math.min(pagina, totalPaginas);
   const filasVisibles = todoVisible ? filasT : filasT.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
   const idsPaginaSeleccionables = filasVisibles.filter((d) => d.facturaId && d.seleccionable).map((d) => d.facturaId as string);
+  // Envío masivo: las facturas de la vista (con sus filtros) emitidas desde Nodus que todavía no se le mandan al cliente.
+  const idsPorEnviar = filasT
+    .filter((d) => d.tipo === "I" && d.facturaId && !d.enviada)
+    .map((d) => facturas.find((f) => f.id === d.facturaId))
+    .filter((f): f is Factura => !!f && f.fuente === "facturapi_auto" && !!f.uuid_cfdi && !!f.user_id && f.cancelacion_estatus !== "cancelada" && !esFacturaSimulada(f.uuid_cfdi))
+    .map((f) => f.id);
 
   function ordenarPor(col: string) {
     setOrden((o) => (o.col === col ? { col, dir: o.dir === "asc" ? "desc" : "asc" } : { col, dir: col === "fecha" || col === "total" ? "desc" : "asc" }));
@@ -784,14 +790,23 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   });
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
-  async function enviarPorCorreo(ids: string[]) {
-    if (!confirm(`¿Mandar por correo a cada cliente su factura (PDF y XML)? Son ${ids.length}.`)) return;
+  async function enviarPorCorreo(ids: string[], pregunta?: string) {
+    if (!confirm(pregunta || `¿Mandar por correo a cada cliente su factura (PDF y XML)? Son ${ids.length}.`)) return;
     setEnviandoCorreo(true);
-    const res = await fetch("/api/facturas/enviar-cfdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaIds: ids }) });
-    const data = await res.json().catch(() => ({}));
+    // De 50 en 50 (lo más que acepta /api/facturas/enviar-cfdi por llamada).
+    const resultados: { id: string; folio: string; ok: boolean; error?: string }[] = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      const res = await fetch("/api/facturas/enviar-cfdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaIds: ids.slice(i, i + 50) }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEnviandoCorreo(false);
+        setAvisoCancelar((resultados.length > 0 ? `✓ ${resultados.filter((r) => r.ok).length} enviada(s). ` : "") + "✗ " + (data.error || "No se pudieron enviar"));
+        if (centro) fetchTodo(centro);
+        return;
+      }
+      resultados.push(...(data.resultados || []));
+    }
     setEnviandoCorreo(false);
-    if (!res.ok) return setAvisoCancelar(data.error || "No se pudieron enviar");
-    const resultados: { id: string; folio: string; ok: boolean; error?: string }[] = data.resultados || [];
     const fallidos = resultados.filter((r) => !r.ok);
     const enviados = resultados.length - fallidos.length;
     setSeleccion((s) => s.filter((i) => !resultados.some((r) => r.id === i && r.ok)));
@@ -1725,6 +1740,22 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                     {puedoCancelar && seleccionComplementables.length > 0 && (
                       <button type="button" className="ft-btn-sec" onClick={() => abrirComplemento(seleccionComplementables)}>
                         Emitir complemento de pago ({seleccionComplementables.length})
+                      </button>
+                    )}
+                    {puedoCancelar && idsPorEnviar.length > 0 && (
+                      <button
+                        type="button"
+                        className="ft-btn-sec"
+                        disabled={enviandoCorreo}
+                        title="Manda a cada cliente su factura (PDF y XML): solo las de esta vista que todavía no se han enviado"
+                        onClick={() =>
+                          enviarPorCorreo(
+                            idsPorEnviar,
+                            `¿Mandar por correo las ${idsPorEnviar.length} factura(s) de esta vista que todavía no se han enviado? A cada cliente le llega la suya (PDF y XML).`
+                          )
+                        }
+                      >
+                        {enviandoCorreo ? "Enviando..." : `✉ Enviar todas las pendientes (${idsPorEnviar.length})`}
                       </button>
                     )}
                     {puedoCancelar && seleccionEnviables.length > 0 && (
