@@ -25,6 +25,8 @@ import {
   type CampoDomicilioFiscal,
 } from "@/lib/datosFiscales";
 import { MAXIMO_CORREOS_EXTRA, correosExtraDe } from "@/lib/correosFactura";
+import { METODOS_PAGO, textoPagoHabitual } from "@/lib/pagoHabitual";
+import { FORMAS_PAGO_SAT } from "@/lib/formasPagoSat";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
 import Link from "next/link";
@@ -52,6 +54,8 @@ type Cliente = {
   cp_fiscal?: string | null;
   uso_cfdi?: string | null;
   correos_factura?: string[] | null;
+  metodo_pago_habitual?: string | null;
+  forma_pago_habitual?: string | null;
 } & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
 // Ticket de conexión en el detalle del cliente: oculto mientras se define cómo quedará Vouchers.
@@ -520,10 +524,14 @@ export default function AdminPanel({
 
   const notifsSinLeer = notificaciones.filter((n) => !n.leida).length;
 
+  // Quien ve varios centros (Cobranza, gerencia) filtra la lista por centro.
+  const [centroClientes, setCentroClientes] = useState("");
+  const centrosDeClientes = useMemo(() => Array.from(new Set(clientes.map((c) => c.centro).filter(Boolean))).sort() as string[], [clientes]);
   const clientesFiltrados = useMemo(() => {
-    if (!busqueda.trim()) return clientes;
+    const delCentro = centroClientes ? clientes.filter((c) => c.centro === centroClientes) : clientes;
+    if (!busqueda.trim()) return delCentro;
     const q = busqueda.toLowerCase();
-    return clientes.filter(
+    return delCentro.filter(
       (c) =>
         c.nombre?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
@@ -532,7 +540,7 @@ export default function AdminPanel({
         c.centro?.toLowerCase().includes(q) ||
         c.empresa?.toLowerCase().includes(q)
     );
-  }, [busqueda, clientes]);
+  }, [busqueda, clientes, centroClientes]);
 
   // "Oficina 3" (o "Espacio A"): primero lo que dice el perfil; si está
   // vacío, lo que dice su contrato vigente.
@@ -573,6 +581,7 @@ export default function AdminPanel({
     setErrorDatos("");
     setEditandoFiscal(false);
     setErrorFiscal("");
+    setEditandoPago(false);
     setMensajeAcceso(null);
     setNuevaPassword("");
     setClienteSeleccionado(cliente);
@@ -691,6 +700,38 @@ export default function AdminPanel({
       setErrorFiscal("No se pudo conectar. Intenta de nuevo.");
     }
     setGuardandoFiscal(false);
+  }
+
+  // Pago habitual (también en Configuración fiscal): cómo paga normalmente; se propone al integrar por lote, timbrar
+  // y en Cobranza.
+  const [editandoPago, setEditandoPago] = useState(false);
+  const [formPago, setFormPago] = useState({ metodo: "", forma: "" });
+  const [guardandoPago, setGuardandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState("");
+
+  async function guardarPagoHabitual() {
+    if (!clienteSeleccionado) return;
+    setGuardandoPago(true);
+    setErrorPago("");
+    try {
+      const res = await fetch("/api/facturas/pago-habitual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: clienteSeleccionado.id, ...formPago }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorPago(data.error || "No se pudo guardar");
+      } else {
+        const actualizado: Cliente = { ...clienteSeleccionado, ...data.datos };
+        setClienteSeleccionado(actualizado);
+        setClientes((prev) => prev.map((x) => (x.id === actualizado.id ? actualizado : x)));
+        setEditandoPago(false);
+      }
+    } catch {
+      setErrorPago("No se pudo conectar. Intenta de nuevo.");
+    }
+    setGuardandoPago(false);
   }
 
   async function llamarGestionClientes(payload: Record<string, unknown>) {
@@ -1054,7 +1095,7 @@ export default function AdminPanel({
         </div>
       )}
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "cobranza" && rol !== "operaciones" && rol !== "ventas" && rol !== "ejecutiva_ventas" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "operaciones" && rol !== "ventas" && rol !== "ejecutiva_ventas" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -1062,7 +1103,7 @@ export default function AdminPanel({
           >
             Panel
           </button>
-          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && (
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "atencion_cliente" && (
             <button
               className={"panel-tab" + (tab === "clientes" ? " active" : "")}
               onClick={() => setTab("clientes")}
@@ -1872,6 +1913,17 @@ export default function AdminPanel({
             )}
           </div>
 
+          {centrosDeClientes.length > 1 && (
+            <select value={centroClientes} onChange={(e) => setCentroClientes(e.target.value)} style={{ maxWidth: 260 }}>
+              <option value="">Todos los centros ({clientes.length})</option>
+              {centrosDeClientes.map((c) => (
+                <option key={c} value={c}>
+                  {c} ({clientes.filter((x) => x.centro === c).length})
+                </option>
+              ))}
+            </select>
+          )}
+
           <button
             className="btn-exportar"
             style={{ alignSelf: "flex-start" }}
@@ -2262,6 +2314,64 @@ export default function AdminPanel({
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+              <p className="modal-seccion" style={{ margin: 0 }}>
+                💳 Pago habitual
+              </p>
+              {puedeEditarFiscal && !editandoPago && (
+                <button
+                  className="tel-borrar-btn"
+                  style={{ color: "#0d1b3e", fontWeight: 600 }}
+                  onClick={() => {
+                    setFormPago({ metodo: clienteSeleccionado.metodo_pago_habitual || "", forma: clienteSeleccionado.forma_pago_habitual || "" });
+                    setErrorPago("");
+                    setEditandoPago(true);
+                  }}
+                >
+                  ✎ Editar
+                </button>
+              )}
+            </div>
+            {editandoPago ? (
+              <div className="form-card" style={{ padding: 0, border: "none" }}>
+                <p className="sub-label">Método de pago</p>
+                <select value={formPago.metodo} onChange={(e) => setFormPago({ ...formPago, metodo: e.target.value })}>
+                  <option value="">Según su estado (pagado PUE · pendiente PPD)</option>
+                  {METODOS_PAGO.map((m) => (
+                    <option key={m.clave} value={m.clave}>
+                      {m.texto}
+                    </option>
+                  ))}
+                </select>
+                <p className="sub-label">Forma de pago</p>
+                <select value={formPago.forma} onChange={(e) => setFormPago({ ...formPago, forma: e.target.value })}>
+                  <option value="">Sin definir</option>
+                  {FORMAS_PAGO_SAT.filter((f) => f.clave !== "99").map((f) => (
+                    <option key={f.clave} value={f.clave}>
+                      {f.clave} · {f.texto}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ color: "#888", fontSize: 11, margin: "4px 0 0" }}>Se propone al integrar por lote, al timbrar y al registrar su pago en Cobranza.</p>
+                {errorPago && <p style={{ color: "#A32D2D", fontSize: 12, margin: "6px 0 0" }}>{errorPago}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button className="btn-enviar" style={{ flex: 1 }} onClick={guardarPagoHabitual} disabled={guardandoPago}>
+                    <span className="btn-enviar-text">{guardandoPago ? "Guardando..." : "Guardar pago habitual"}</span>
+                  </button>
+                  <button className="tel-borrar-btn" style={{ color: "#888" }} disabled={guardandoPago} onClick={() => setEditandoPago(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="modal-row">
+                <span className="modal-label">Método y forma</span>
+                <span className="modal-val" style={textoPagoHabitual(clienteSeleccionado) ? undefined : { color: "#888" }}>
+                  {textoPagoHabitual(clienteSeleccionado) || "Sin definir"}
+                </span>
               </div>
             )}
 
