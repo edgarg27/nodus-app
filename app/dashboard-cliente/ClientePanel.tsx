@@ -285,6 +285,9 @@ export default function ClientePanel({
   const hoyISO = new Date().toISOString().split("T")[0];
   const hayVencida = pagosPendientes.some((p) => p.fecha_limite && p.fecha_limite < hoyISO);
   const hayDeuda = pagosPendientes.length > 0;
+  // Paquete de horas de un mes (Coworking 30 horas): Horas Cowork con vigencia fija (lib/horasCowork.ts).
+  const contratoActual = contratos.find((c) => c.id === contratoId);
+  const esPaqueteHoras = !!contratoActual && Number(contratoActual.horas_bolsa) > 0 && ventanaHoras(contratoActual).porVigencia;
   const fechasLimite = pagosPendientes.map((p) => p.fecha_limite).filter((f): f is string => !!f);
   const proximaFechaLimite = fechasLimite.length > 0 ? fechasLimite.sort()[0] : null;
   const diaPagoContrato = (contratos.find((ct) => ct.id === contratoId) || contratos[0])?.dia_pago ?? null;
@@ -604,6 +607,7 @@ export default function ClientePanel({
         )}
 
         <p className="panel-section-label">Mi espacio</p>
+        {/* Paquete de horas de un mes (Coworking 30 horas): sin Soporte, Logros, Visitas ni Paquetería, que no le aplican. */}
         <div className="quick-grid">
           {/* WiFi (vouchers) oculto en todas las cuentas mientras se define cómo
               quedará; para volver a mostrarlo basta con quitar el "false &&". */}
@@ -638,16 +642,20 @@ export default function ClientePanel({
             <img src="/icons/contrato.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Contrato</span>
           </a>
+          {!esPaqueteHoras && (
           <a className="quick-card" href="/soporte">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/herramientas.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Soporte</span>
           </a>
+          )}
           <a className="quick-card" href="/quejas-sugerencias">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/queja.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Quejas y Sugerencias</span>
           </a>
+          {!esPaqueteHoras && (
+          <>
           <a className="quick-card" href="/logros">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/insignia.png" alt="" className="quick-icon icon-img-28" />
@@ -663,6 +671,8 @@ export default function ClientePanel({
             <img src="/icons/paqueteria-mensajeria.png" alt="" className="quick-icon icon-img-28" />
             <span className="quick-name">Paquetería y Mensajería</span>
           </a>
+          </>
+          )}
           <a className="quick-card" href="/calendario-eventos">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/calendario-eventos.png" alt="" className="quick-icon icon-img-28" />
