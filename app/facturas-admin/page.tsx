@@ -79,6 +79,7 @@ const MODULOS: Tarjeta[] = [
 const OTROS: Tarjeta[] = [
   { href: "/facturas-admin/importar", titulo: "Importar CFDI", texto: "Sube archivos XML o PDF de facturas emitidas por ZORA, Contpaq, el Portal del SAT, etc.", icono: <IconoSubir />, color: "verde" },
   { href: "/catalogo-servicios", titulo: "Catálogo de conceptos", texto: "Los servicios adicionales que se facturan, con su clave del SAT y descripción.", icono: <IconoCatalogo />, color: "morado" },
+  { href: "/facturas-admin/por-servicio", titulo: "Facturado por servicio", texto: "Cuánto se facturó en el mes de cada servicio: oficina privada, coworking, working desk y oficina virtual.", icono: <IconoLista />, color: "morado" },
   { href: "/facturas-admin/configuracion-fiscal", titulo: "Configuración fiscal", texto: "Datos fiscales de los clientes: razón social, RFC, régimen y código postal.", icono: <IconoFiscal />, color: "verde" },
 ];
 
