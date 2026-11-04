@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../soporte/FileDropzone";
+import MedidaBanner from "@/app/components/MedidaBanner";
 import Link from "next/link";
 
 type Logro = {
@@ -204,6 +205,7 @@ export default function DisenoPage() {
                   {abiertoId === l.id && (
                     <div className="form-card" style={{ marginTop: 4 }}>
                       <p className="sub-label">Banner (imagen)</p>
+                      <MedidaBanner />
                       <FileDropzone files={banner} onChange={setBanner} maxFiles={1} accept="image/*" />
                       <select value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)}>
                         {ESTADOS.map((e) => (

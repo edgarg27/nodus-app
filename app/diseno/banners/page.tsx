@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FileDropzone from "../../soporte/FileDropzone";
+import MedidaBanner from "@/app/components/MedidaBanner";
 import Link from "next/link";
 
 type Banner = {
@@ -259,6 +260,7 @@ export default function BannersPage() {
                   {reemplazandoId === b.id && (
                     <div className="form-card" style={{ marginTop: 8 }}>
                       <p className="sub-label">Nueva imagen</p>
+                      <MedidaBanner />
                       <FileDropzone files={imagenReemplazo} onChange={setImagenReemplazo} maxFiles={1} accept="image/*" />
                       <button
                         className={"btn-enviar" + (guardandoId === b.id ? " sending" : "")}
@@ -285,6 +287,7 @@ export default function BannersPage() {
             ) : (
             <div className="form-card">
               <p className="sub-label">Imagen</p>
+              <MedidaBanner />
               <FileDropzone files={nuevaImagen} onChange={setNuevaImagen} maxFiles={1} accept="image/*" />
               {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
               <button
