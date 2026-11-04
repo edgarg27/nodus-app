@@ -358,7 +358,8 @@ export default function CobranzaPage() {
       cliente,
       seleccion: soloIds || pendientes.map((x) => x.id),
       fecha: hoy,
-      forma: conComprobante ? "03" : "",
+      // Su forma habitual (Configuración fiscal) si es de las que se registran aquí.
+      forma: ["01", "02", "03", "04", "28"].includes(cliente.forma_pago_habitual || "") ? cliente.forma_pago_habitual! : conComprobante ? "03" : "",
       archivo: null,
       guardando: false,
       error: "",

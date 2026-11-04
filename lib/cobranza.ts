@@ -21,6 +21,7 @@ export type ClienteCobranza = {
   activo: boolean;
   numero_usuario: string | null;
   nombre_fiscal: string | null;
+  forma_pago_habitual?: string | null;
 };
 
 export type Cargo = {
@@ -66,7 +67,7 @@ async function enTrozos<T>(ids: string[], consulta: (trozo: string[]) => Promise
 
 // centro null = todos los centros. userIds = solo esos clientes (recordatorios).
 export async function cargarCobranza(admin: Admin, opts: { centro: string | null; userIds?: string[] }) {
-  let q = admin.from("profiles").select("id, nombre, email, empresa, telefono, centro, suspendido, activo, numero_usuario, nombre_fiscal").eq("rol", "cliente");
+  let q = admin.from("profiles").select("id, nombre, email, empresa, telefono, centro, suspendido, activo, numero_usuario, nombre_fiscal, forma_pago_habitual").eq("rol", "cliente");
   if (opts.centro) q = q.eq("centro", opts.centro);
   if (opts.userIds) q = q.in("id", opts.userIds);
   const { data: perfiles } = await q.order("nombre");

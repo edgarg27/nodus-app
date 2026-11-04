@@ -21,6 +21,8 @@ type Fila = {
   cliente: string;
   correo: string;
   rfc: string;
+  metodoHabitual?: string | null;
+  formaHabitual?: string | null;
   tipos: string[];
   completo: boolean;
   avisos: string[];
@@ -44,6 +46,16 @@ export default function IntegrarLotePage() {
   const [timbrando, setTimbrando] = useState(false);
   const [progreso, setProgreso] = useState("");
   const [resultado, setResultado] = useState("");
+
+  // Con qué método y forma sale cada factura. "Según su estado": el pago habitual del cliente si lo tiene, si no lo
+  // pagado PUE y lo pendiente PPD. Lo ya pagado nunca sale PPD (no hay nada que cobrar después). La forma de un PUE:
+  // la habitual del cliente o, si no tiene, la elegida aquí.
+  function planDe(f: Fila): { metodo: "PUE" | "PPD"; forma?: string } {
+    const pagada = f.estado === "pagada";
+    let m: "PUE" | "PPD" = metodo === "auto" ? (f.metodoHabitual === "PUE" || f.metodoHabitual === "PPD" ? f.metodoHabitual : pagada ? "PUE" : "PPD") : metodo;
+    if (pagada) m = "PUE";
+    return m === "PUE" ? { metodo: "PUE", forma: f.formaHabitual || formaPago } : { metodo: "PPD" };
+  }
 
   async function cargar(c: string) {
     setCargando(true);
@@ -93,16 +105,20 @@ export default function IntegrarLotePage() {
     setResultado("");
     let hechas = 0;
     const fallos: string[] = [];
-    // Grupos por método: con "según su estado", lo pagado va PUE y lo pendiente PPD.
-    const pagadas = new Set(filas.filter((f) => f.estado === "pagada").map((f) => f.id));
-    const tareas: { ids: string[]; metodo: "PUE" | "PPD" }[] = [];
-    const agregar = (ids: string[], m: "PUE" | "PPD") => {
-      for (let i = 0; i < ids.length; i += POR_LLAMADA) tareas.push({ ids: ids.slice(i, i + POR_LLAMADA), metodo: m });
-    };
-    if (metodo === "auto") {
-      agregar(seleccion.filter((id) => pagadas.has(id)), "PUE");
-      agregar(seleccion.filter((id) => !pagadas.has(id)), "PPD");
-    } else agregar(seleccion, metodo);
+    // Grupos por método y forma: cada factura sale con su plan (planDe), en llamadas de hasta POR_LLAMADA.
+    const grupos = new Map<string, { metodo: "PUE" | "PPD"; forma?: string; ids: string[] }>();
+    for (const id of seleccion) {
+      const f = filas.find((x) => x.id === id);
+      if (!f) continue;
+      const plan = planDe(f);
+      const clave = plan.metodo + "|" + (plan.forma || "");
+      if (!grupos.has(clave)) grupos.set(clave, { ...plan, ids: [] });
+      grupos.get(clave)!.ids.push(id);
+    }
+    const tareas: { ids: string[]; metodo: "PUE" | "PPD"; forma?: string }[] = [];
+    for (const g of Array.from(grupos.values())) {
+      for (let i = 0; i < g.ids.length; i += POR_LLAMADA) tareas.push({ ids: g.ids.slice(i, i + POR_LLAMADA), metodo: g.metodo, forma: g.forma });
+    }
     let hechasHasta = 0;
     for (const t of tareas) {
       const lote = t.ids;
@@ -111,7 +127,7 @@ export default function IntegrarLotePage() {
       const res = await fetch("/api/facturas/facturar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facturaIds: lote, metodo: t.metodo, formaPago: t.metodo === "PUE" ? formaPago : undefined, condicionesPago: "Contado" }),
+        body: JSON.stringify({ facturaIds: lote, metodo: t.metodo, formaPago: t.metodo === "PUE" ? t.forma : undefined, condicionesPago: "Contado" }),
       });
       const data = await res.json().catch(() => ({}));
       const resultados: { id: string; folio?: string; ok: boolean; error?: string }[] = data.resultados || [];
@@ -261,7 +277,11 @@ export default function IntegrarLotePage() {
                         <span className="fac-sub">{f.folio}</span>
                       </td>
                       <td className="fac-nowrap">{f.fechaEmision}</td>
-                      <td className="fac-nowrap">{f.estado === "pagada" ? "Pagado (PUE)" : "Pendiente (PPD)"}</td>
+                      <td className="fac-nowrap">
+                        {f.estado === "pagada" ? "Pagado" : "Pendiente"} · {planDe(f).metodo}
+                        {planDe(f).forma ? <span className="fac-sub">Forma {planDe(f).forma}{f.formaHabitual ? " (habitual)" : ""}</span> : null}
+                        {metodo === "auto" && f.metodoHabitual && <span className="fac-sub">Método habitual</span>}
+                      </td>
                       <td className="fac-num fac-nowrap">{dinero(f.monto)}</td>
                       <td>
                         {f.completo && f.avisos.length === 0 ? (
