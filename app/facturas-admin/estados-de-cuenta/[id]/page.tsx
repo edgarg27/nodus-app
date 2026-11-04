@@ -105,6 +105,8 @@ export default function EstadoDeCuentaPage() {
   // Vista previa del PDF de la factura de una fila del historial (opción "Ver").
   const [pdfVisor, setPdfVisor] = useState<{ id: string; titulo: string } | null>(null);
   const [exito, setExito] = useState(false);
+  // A dónde se mandó por correo la factura recién timbrada (o por qué no).
+  const [envioExito, setEnvioExito] = useState("");
   const [cancelar, setCancelar] = useState<Factura | null>(null);
   const [motivoCan, setMotivoCan] = useState("");
   const [folioSust, setFolioSust] = useState("");
@@ -345,6 +347,7 @@ export default function EstadoDeCuentaPage() {
     setTimbrandoLento(false);
     const r = (respuesta.data.resultados || [])[0];
     if (!respuesta.ok || (r && !r.ok)) return setErrorTimbrar(r?.error || respuesta.data.error || "No se pudo timbrar");
+    setEnvioExito(r?.correo ? `Se envió al cliente a ${r.correo}.` : r?.errorCorreo ? `No se envió por correo: ${r.errorCorreo}. Puedes reenviarla desde Acciones.` : "");
     setModalTimbrar(false);
     setExito(true);
     cargar();
@@ -417,6 +420,17 @@ export default function EstadoDeCuentaPage() {
     const res = await fetch("/api/facturas/estado", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaId: id, ...cuerpo }) });
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, data };
+  }
+
+  async function enviarFacturaCorreo() {
+    if (!factura || !cliente) return;
+    if (!confirm(`¿Enviar la factura (PDF y XML) a ${cliente.email}?`)) return;
+    setAccionando(true);
+    const res = await fetch("/api/facturas/enviar-cfdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaIds: [factura.id] }) });
+    const data = await res.json().catch(() => ({}));
+    setAccionando(false);
+    const r = (data.resultados || [])[0];
+    setAviso(r?.ok ? `✓ Factura enviada a ${r.correo}.` : `✗ ${r?.error || data.error || "No se pudo enviar"}`);
   }
 
   async function enviar() {
@@ -620,6 +634,15 @@ export default function EstadoDeCuentaPage() {
                           Descargar XML
                         </a>
                       )}
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!timbrada || simulada || factura.cancelacion_estatus === "cancelada" || !cliente?.email || !puedeTimbrar || accionando}
+                        title={!timbrada ? "Todavía no está timbrada" : !puedeTimbrar ? "Solo cobranza y administración pueden enviarla" : ""}
+                        onClick={enviarFacturaCorreo}
+                      >
+                        Enviar factura por correo (PDF y XML)
+                      </button>
                       <button
                         type="button"
                         role="menuitem"
@@ -1394,6 +1417,11 @@ export default function EstadoDeCuentaPage() {
               {factura?.folio_fiscal || factura?.folio}
               {simulada ? " · SIMULADA de prueba, sin valor fiscal" : ""}
             </p>
+            {envioExito && (
+              <p className="invitado-exito-mensaje" style={{ position: "relative", zIndex: 2, marginTop: 6 }}>
+                {envioExito}
+              </p>
+            )}
             <button
               className="invitado-exito-btn"
               onClick={() => {
