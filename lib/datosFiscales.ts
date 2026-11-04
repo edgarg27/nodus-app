@@ -194,11 +194,12 @@ export function avisosDatosFiscales(d: { rfc?: string | null; nombre_fiscal?: st
   if (nombre !== nombre.toUpperCase()) avisos.push("La razón social lleva minúsculas: el SAT la tiene en MAYÚSCULAS (escríbela como en la Constancia).");
 
   if (moral) {
-    // El RFC de una empresa empieza con la inicial de su razón social.
+    // El RFC de una empresa empieza con la inicial de su razón social. Si la razón social empieza con un número
+    // ("4PES CONSTRUC" → PCO…), el SAT no usa el número tal cual: ahí no se compara.
     const primera = sinAcentosMayus(nombre)
       .split(/\s+/)
       .find((p) => p && !ARTICULOS.has(p));
-    if (primera && primera[0] !== sinAcentosMayus(rfc)[0]) {
+    if (primera && /^[A-ZÑ&]/.test(primera) && primera[0] !== sinAcentosMayus(rfc)[0]) {
       avisos.push(`El RFC (de empresa) empieza con «${rfc[0]}» y la razón social con «${primera[0]}»: parece que no corresponden. Revisa ambos en la Constancia.`);
     }
   }
