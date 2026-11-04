@@ -1779,8 +1779,9 @@ export default function AdminPanel({
                 </Link>
               ) },
               // Expediente de clientes: admin, superadmin y gerente (mismas
-              // listas que su política RLS en migracion_expedientes_clientes.sql).
-              { grupo: 4, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "expedientes", tarjeta: (
+              // listas que su política RLS en migracion_expedientes_clientes.sql);
+              // cobranza solo consulta (migracion_expedientes_cobranza_consulta.sql).
+              { grupo: 4, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "cobranza", key: "expedientes", tarjeta: (
                 <Link className="modulo-card" href="/expedientes">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/expediente-clientes.svg" alt="" className="modulo-icon icon-img-32" />
