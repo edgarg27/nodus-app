@@ -55,6 +55,17 @@ export async function bufferDesdeUrlFirmada(url: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// Facturapi le manda al cliente el PDF y el XML de una factura ya timbrada.
+export async function enviarCfdiPorCorreo(facturapiId: string, correo: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await facturapi.invoices.sendByEmail(facturapiId, { email: correo });
+    return { ok: true };
+  } catch (err: any) {
+    console.error(`[facturapi] no se pudo enviar ${facturapiId} por correo:`, err?.message || err);
+    return { ok: false, error: err?.message || "error de Facturapi" };
+  }
+}
+
 export async function subirArchivoFactura(admin: Admin, nombreBase: string, buffer: Buffer, ext: "xml" | "pdf") {
   const fileName = `facturapi-${nombreBase}-${Date.now()}.${ext}`;
   const { error } = await admin.storage

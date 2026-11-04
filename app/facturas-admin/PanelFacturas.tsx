@@ -107,6 +107,8 @@ type DatoTimbrada = {
   simulada: boolean;
   metodo: string | null;
   tipo: "I" | "P";
+  // Cuándo se le mandó al cliente por correo (solo facturas emitidas desde Nodus).
+  enviada?: string | null;
 };
 
 // De dónde viene cada factura. Las emitidas desde Nodus cuentan como "Manual" (las hace el personal);
@@ -175,6 +177,7 @@ type Factura = {
   serie?: string | null;
   folio_fiscal?: string | null;
   rfc_receptor?: string | null;
+  cfdi_enviado_at?: string | null;
   cliente_nombre?: string;
   // Razón social (o empresa) del cliente: es lo que busca contabilidad.
   cliente_fiscal?: string;
@@ -528,6 +531,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
         simulada: esFacturaSimulada(f.uuid_cfdi),
         metodo: f.metodo_pago || null,
         tipo: "I",
+        enviada: f.cfdi_enviado_at || null,
       };
     })
     .filter((d) => (!filtroMetodo || d.metodo === filtroMetodo) && (!filtroTipo || d.tipo === filtroTipo))
@@ -773,6 +777,31 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     const f = facturas.find((x) => x.id === id);
     return !!f && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada" && !/^FAC-\d{6}-/.test(f.folio || "");
   });
+  // Facturas emitidas desde Nodus que se pueden mandar por correo al cliente (las de antes no se mandaron solas).
+  const seleccionEnviables = seleccion.filter((id) => {
+    const f = facturas.find((x) => x.id === id);
+    return !!f && f.fuente === "facturapi_auto" && !!f.uuid_cfdi && !!f.user_id && f.cancelacion_estatus !== "cancelada" && !esFacturaSimulada(f.uuid_cfdi);
+  });
+  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
+
+  async function enviarPorCorreo(ids: string[]) {
+    if (!confirm(`¿Mandar por correo a cada cliente su factura (PDF y XML)? Son ${ids.length}.`)) return;
+    setEnviandoCorreo(true);
+    const res = await fetch("/api/facturas/enviar-cfdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaIds: ids }) });
+    const data = await res.json().catch(() => ({}));
+    setEnviandoCorreo(false);
+    if (!res.ok) return setAvisoCancelar(data.error || "No se pudieron enviar");
+    const resultados: { id: string; folio: string; ok: boolean; error?: string }[] = data.resultados || [];
+    const fallidos = resultados.filter((r) => !r.ok);
+    const enviados = resultados.length - fallidos.length;
+    setSeleccion((s) => s.filter((i) => !resultados.some((r) => r.id === i && r.ok)));
+    setAvisoCancelar(
+      (enviados > 0 ? `✓ ${enviados} factura(s) enviada(s) por correo. ` : "") +
+        (fallidos.length > 0 ? "✗ No se envió: " + fallidos.map((r) => `${r.folio} (${r.error})`).join(" · ") : "")
+    );
+    if (centro) fetchTodo(centro);
+  }
+
   const [modalBorrar, setModalBorrar] = useState<string[] | null>(null);
   const [borrando, setBorrando] = useState(false);
   const [errorBorrar, setErrorBorrar] = useState("");
@@ -1698,6 +1727,11 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                         Emitir complemento de pago ({seleccionComplementables.length})
                       </button>
                     )}
+                    {puedoCancelar && seleccionEnviables.length > 0 && (
+                      <button type="button" className="ft-btn-sec" disabled={enviandoCorreo} onClick={() => enviarPorCorreo(seleccionEnviables)}>
+                        {enviandoCorreo ? "Enviando..." : `Enviar por correo (${seleccionEnviables.length})`}
+                      </button>
+                    )}
                     {puedoCancelar && seleccionCancelables.length > 0 && (
                       <button type="button" className="ft-btn-sec" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
                         Cancelar seleccionadas ({seleccionCancelables.length})
@@ -1786,6 +1820,11 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                                   </a>
                                 ) : (
                                   <b>{d.serieFolio}</b>
+                                )}
+                                {d.enviada && (
+                                  <span className="fac-sub" title={"Enviada al cliente el " + new Date(d.enviada).toLocaleString("es-MX")}>
+                                    ✉ Enviada
+                                  </span>
                                 )}
                               </td>
                               <td>{d.cliente}</td>

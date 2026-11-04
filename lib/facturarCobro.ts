@@ -12,10 +12,12 @@ import { explicarErrorFacturapi } from "@/lib/erroresFacturapi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
 import { esErrorSuscripcion, simularTimbrado } from "@/lib/facturaSimulada";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
+import { enviarFacturaAlCliente } from "@/lib/envioCfdi";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-export type ResultadoFacturar = { id: string; folio?: string; ok: boolean; uuid?: string; error?: string; simulada?: boolean };
+// correo / errorCorreo: a dónde se mandó la factura recién timbrada, o por qué no se mandó (la factura sí quedó).
+export type ResultadoFacturar = { id: string; folio?: string; ok: boolean; uuid?: string; error?: string; simulada?: boolean; correo?: string; errorCorreo?: string };
 
 // Facturas que ya no se pueden facturar a pago diferido porque no hay nada que cobrar después.
 const ESTADOS_NO_FACTURABLES = ["pagada", "cancelada"];
@@ -113,7 +115,9 @@ export async function facturarCobro(admin: Admin, facturaId: string, opts: Opcio
       console.error(`[facturar-cobro] ${f.id}: se timbró pero no se pudo guardar:`, error.message);
       return { id: f.id, folio: f.folio, ok: false, error: "Se timbró en Facturapi pero no se pudo guardar; revisa Facturapi antes de reintentar" };
     }
-    return { id: f.id, folio: f.folio, ok: true, uuid: datosFactura.uuid_cfdi };
+    // En cuanto se timbra, le llega al cliente por correo (PDF y XML). Si no se pudo, se avisa y se reenvía con el botón.
+    const envio = await enviarFacturaAlCliente(admin, f.id);
+    return { id: f.id, folio: f.folio, ok: true, uuid: datosFactura.uuid_cfdi, ...("error" in envio ? { errorCorreo: envio.error } : { correo: envio.correo }) };
   } catch (err: any) {
     if (!(err instanceof ErrorFacturacion)) console.error(`[facturar-cobro] ${f.id}:`, err?.message || err);
     // Facturapi sin suscripción: a los clientes de prueba se les simula el timbrado para poder probar el flujo.
