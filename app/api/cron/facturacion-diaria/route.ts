@@ -12,6 +12,7 @@ import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
 import { rolPuede } from "@/lib/permisosApi";
 import { apartarCargo, cargoDelPeriodo, estadoDelCargo, ligarCargoAFactura, periodoDe, soltarCargo } from "@/lib/cargosPeriodo";
 import { conceptoDelPeriodo } from "@/lib/conceptoFactura";
+import { correosExtraDe } from "@/lib/correosFactura";
 
 // El concepto de la renta del mes: el predefinido del cliente (Configuración fiscal) con el mes de hoy, o el de siempre.
 // Si la consulta falla, se queda el de siempre: nunca deja de generarse la renta por esto.
@@ -510,7 +511,7 @@ export async function POST(req: NextRequest) {
 
     const { data: cliente } = await admin
       .from("profiles")
-      .select("id, nombre, email, centro, activo, suspendido")
+      .select("id, nombre, email, centro, activo, suspendido, correos_factura")
       .eq("id", userId)
       .single();
 
@@ -545,7 +546,11 @@ export async function POST(req: NextRequest) {
       // ---------- Recordatorio X días antes ----------
       const diaRecordatorio = diaPago - DIAS_RECORDATORIO_ANTES;
       if (diaRecordatorio >= 1 && diaHoy === diaRecordatorio) {
-        const yaEnviado = await yaExisteNotifEsteMs(admin, userId, "recordatorio_pago");
+        // A quien ya pagó (o le cancelaron) la renta del mes no se le recuerda.
+        const rentaPrevia = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        const estadoPrevio = rentaPrevia ? await estadoDelCargo(admin, rentaPrevia) : null;
+        const yaEnviado =
+          (!!estadoPrevio && (estadoPrevio.liquidada || estadoPrevio.cancelada)) || (await yaExisteNotifEsteMs(admin, userId, "recordatorio_pago"));
         if (!yaEnviado) {
           await admin.from("notificaciones").insert({
             centro: cliente.centro,
@@ -560,6 +565,7 @@ export async function POST(req: NextRequest) {
             monto: montoMes,
             diaPago,
             diasFaltan: DIAS_RECORDATORIO_ANTES,
+            copias: correosExtraDe(cliente),
           });
           resumen.recordatorios++;
         }
@@ -569,6 +575,8 @@ export async function POST(req: NextRequest) {
       if (diaHoy === diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         let rentaYaResuelta = false;
+        // Lo que dice su estado de cuenta (si se integró a mano puede llevar más que la renta).
+        let montoAviso = montoMes;
 
         if (!rentaMes) {
           const cargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta", origen: "cron" });
@@ -591,6 +599,7 @@ export async function POST(req: NextRequest) {
         } else {
           const estadoRenta = await estadoDelCargo(admin, rentaMes);
           rentaYaResuelta = !!estadoRenta && (estadoRenta.liquidada || estadoRenta.cancelada);
+          if (estadoRenta) montoAviso = Number(estadoRenta.factura.monto);
           if (rentaMes.origen === "integrada" && !estadoRenta?.cancelada && conCoworking.has(userId)) {
             await voucherMensualSiFalta(admin, resumen, userId, cliente, inicioMes);
           }
@@ -605,7 +614,30 @@ export async function POST(req: NextRequest) {
             tipo: "pago_hoy",
             mensaje: `💰 Hoy es tu fecha de pago (día ${diaPago}).`,
           });
-          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoMes, diaPago });
+          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoAviso, diaPago, copias: correosExtraDe(cliente) });
+        }
+      }
+
+      // ---------- Día siguiente a la fecha límite: si no ha pagado, aviso de suspensión ----------
+      if (diaHoy === diaPago + 1) {
+        const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
+        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada && !(await yaExisteNotifEsteMs(admin, userId, "aviso_suspension"))) {
+          await admin.from("notificaciones").insert({
+            centro: cliente.centro,
+            user_id: userId,
+            tipo: "aviso_suspension",
+            mensaje: `⚠️ Tu fecha límite de pago fue ayer (día ${diaPago}). Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.`,
+          });
+          await enviarAvisoPago({
+            to: cliente.email,
+            nombre: cliente.nombre,
+            tipo: "suspension",
+            monto: Number(estadoRenta.factura.monto),
+            diaPago,
+            copias: correosExtraDe(cliente),
+          });
+          resumen.recordatorios++;
         }
       }
 

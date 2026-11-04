@@ -493,6 +493,7 @@ export default function AdminPanel({
       n.tipo === "fecha_pago_hoy" ||
       n.tipo === "pago_hoy" ||
       n.tipo === "recordatorio_pago" ||
+      n.tipo === "aviso_suspension" ||
       n.tipo === "cuenta_pausada"
     ) {
       router.push("/cobranza");

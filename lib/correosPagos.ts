@@ -30,7 +30,7 @@ function plantilla(titulo: string, parrafos: string[]) {
   </div>`;
 }
 
-export type TipoAvisoPago = "antes" | "hoy" | "ultimo_dia";
+export type TipoAvisoPago = "antes" | "hoy" | "ultimo_dia" | "suspension";
 
 // Aviso de cobro. "antes": se acerca la fecha; "hoy": es su día de pago;
 // "ultimo_dia": último día para pagar sin recargo (contratos mes a mes).
@@ -41,6 +41,8 @@ export async function enviarAvisoPago(datos: {
   monto?: number | null;
   diaPago?: number;
   diasFaltan?: number;
+  // Correos adicionales del cliente (Datos fiscales): también les llega.
+  copias?: string[];
 }) {
   if (!datos.to) return;
   const nombre = datos.nombre || "cliente";
@@ -61,12 +63,21 @@ export async function enviarAvisoPago(datos: {
       COMO_PAGAR,
     ];
   } else if (datos.tipo === "hoy") {
-    asunto = "Hoy es tu fecha de pago en Nodus";
-    titulo = "Hoy es tu fecha de pago";
+    asunto = "Hoy es tu fecha límite de pago en Nodus";
+    titulo = "Hoy es tu fecha límite de pago";
     parrafos = [
       `Hola ${nombre},`,
-      `Hoy es tu fecha de pago${montoTxt}.`,
+      `Hoy es tu fecha límite de pago${montoTxt}. No olvides hacerlo.`,
       COMO_PAGAR,
+    ];
+  } else if (datos.tipo === "suspension") {
+    asunto = "Tu pago en Nodus está pendiente";
+    titulo = "Tu pago está pendiente";
+    parrafos = [
+      `Hola ${nombre},`,
+      `Tu fecha límite de pago fue ayer${datos.diaPago ? ` (día ${datos.diaPago})` : ""} y todavía no tenemos registrado tu pago${montoTxt}.`,
+      "Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.",
+      COMO_PAGAR + " Si ya pagaste, envíanos tu comprobante para registrarlo.",
     ];
   } else {
     asunto = "Hoy es el último día para pagar sin recargo";
@@ -78,8 +89,11 @@ export async function enviarAvisoPago(datos: {
     ];
   }
 
-  const r = await enviarCorreo({ to: datos.to, subject: asunto, html: plantilla(titulo, parrafos) });
-  if (!r.ok) console.error(`[correosPagos] aviso "${datos.tipo}" a ${datos.to}: ${r.error}`);
+  const html = plantilla(titulo, parrafos);
+  for (const to of Array.from(new Set([datos.to, ...(datos.copias || [])].filter(Boolean)))) {
+    const r = await enviarCorreo({ to, subject: asunto, html });
+    if (!r.ok) console.error(`[correosPagos] aviso "${datos.tipo}" a ${to}: ${r.error}`);
+  }
 }
 
 // Gracias por pagar. Si el pago corresponde a una factura y llegó a más

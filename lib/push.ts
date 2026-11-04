@@ -96,7 +96,7 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
   if (!esPersonal) {
     if (n.tipo === "paquete_recibido" || n.tipo === "nuevo_paquete") return "/mi-paqueteria";
     if (["reservacion_confirmada", "reservacion_rechazada", "reservacion_cancelada_centro"].includes(n.tipo)) return "/reservaciones?tab=mis";
-    if (["fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "cuenta_pausada", "pago_confirmado"].includes(n.tipo)) return "/estado-cuenta";
+    if (["fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "aviso_suspension", "cuenta_pausada", "pago_confirmado"].includes(n.tipo)) return "/estado-cuenta";
     return "/dashboard-cliente";
   }
   switch (n.tipo) {
@@ -132,6 +132,7 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
     case "fecha_pago_hoy":
     case "pago_hoy":
     case "recordatorio_pago":
+    case "aviso_suspension":
     case "cuenta_pausada":
       return "/cobranza";
     case "nueva_solicitud_invitado":
