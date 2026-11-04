@@ -1547,31 +1547,31 @@ export default function CentroPanel({
     setDayPassGenerado(nuevoPase);
     fetchTodo(centro);
 
-    // Best-effort: si dejaron un correo, le mandamos el Day Pass por ahí
-    // (usa la misma función "send-email" que ya usa el resto de la app).
-    // El link de /day-pass siempre queda disponible como respaldo por si
-    // esta función no soporta todavía este tipo de correo.
-    const correoInvitado = dayPassForm.email.trim();
-    if (correoInvitado) {
-      const link = `${window.location.origin}/day-pass/${nuevoPase.id}`;
-      try {
-        const { error: emailError } = await supabase.functions.invoke("send-email", {
-          body: {
-            tipo: "day_pass_generado",
-            clienteEmail: correoInvitado,
-            clienteNombre: dayPassForm.nombre.trim(),
-            tipoDayPass: dayPassForm.tipo,
-            centro,
-            fecha: dayPassForm.fecha,
-            folio: nuevoPase.folio,
-            link,
-          },
-        });
-        setDayPassCorreoEstado(emailError ? "error" : "enviado");
-      } catch {
-        setDayPassCorreoEstado("error");
-      }
+    // Si dejaron un correo, le llega su Day Pass (con el link para verlo y descargarlo). Lo manda la app
+    // (/api/day-pass/enviar-correo) y si falla lo dice; el WhatsApp y el PDF quedan de respaldo.
+    if (dayPassForm.email.trim()) setDayPassCorreoEstado((await enviarCorreoDayPass(nuevoPase.id)) ? "enviado" : "error");
+  }
+
+  async function enviarCorreoDayPass(id: string): Promise<boolean> {
+    try {
+      const res = await fetch("/api/day-pass/enviar-correo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dayPassId: id }),
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
+  }
+
+  const [reenviandoDayPass, setReenviandoDayPass] = useState<string | null>(null);
+  async function reenviarCorreoDayPass(dp: DayPass) {
+    if (reenviandoDayPass) return;
+    setReenviandoDayPass(dp.id);
+    const ok = await enviarCorreoDayPass(dp.id);
+    setReenviandoDayPass(null);
+    alert(ok ? `✓ Day Pass enviado a ${dp.email}` : "No se pudo enviar el correo. Revisa el correo del invitado o mándalo por WhatsApp.");
   }
 
   // Mensaje de WhatsApp al número que dejó el invitado, con el link a su pase.
@@ -3368,6 +3368,11 @@ export default function CentroPanel({
                                   <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => descargarPdfDe(dp)}>
                                     📄 PDF
                                   </button>
+                                  {dp.email && !dp.usado && dp.fecha >= hoyDp && (
+                                    <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} disabled={reenviandoDayPass === dp.id} onClick={() => reenviarCorreoDayPass(dp)}>
+                                      {reenviandoDayPass === dp.id ? "Enviando..." : "✉ Reenviar correo"}
+                                    </button>
+                                  )}
                                   {wa && !dp.usado && dp.fecha >= hoyDp && (
                                     <a className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} href={wa} target="_blank" rel="noopener noreferrer">
                                       💬 WhatsApp
@@ -4795,7 +4800,7 @@ export default function CentroPanel({
                 )}
                 {dayPassCorreoEstado === "error" && (
                   <p style={{ fontSize: 12, color: "#A32D2D", textAlign: "center", margin: "4px 0 0", fontWeight: 600 }}>
-                    ⚠️ No se pudo enviar el correo — usa el link de abajo para compartirlo manualmente.
+                    ⚠️ No se pudo enviar el correo a {dayPassForm.email}: mándalo por WhatsApp o descarga el PDF.
                   </p>
                 )}
                 <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
