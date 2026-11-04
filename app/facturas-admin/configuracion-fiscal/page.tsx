@@ -16,6 +16,8 @@ import {
 } from "@/lib/datosFiscales";
 import Link from "next/link";
 import { conceptoDelPeriodo, tieneMes } from "@/lib/conceptoFactura";
+import { MAXIMO_CORREOS_EXTRA, correosExtraDe } from "@/lib/correosFactura";
+import { correoVisible } from "@/lib/correoFicticio";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Configuración fiscal: los datos fiscales de cada cliente, con los que se timbran sus facturas. La administradora los
@@ -36,6 +38,7 @@ type ClienteFiscal = {
   cp_fiscal: string | null;
   uso_cfdi: string | null;
   concepto_factura?: string | null;
+  correos_factura?: string[] | null;
   porContrato?: boolean;
 } & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
@@ -48,7 +51,7 @@ export default function ConfiguracionFiscalPage() {
   const [busqueda, setBusqueda] = useState("");
   const [soloConPendientes, setSoloConPendientes] = useState(false);
   const [editando, setEditando] = useState<ClienteFiscal | null>(null);
-  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03", concepto_factura: "", ...DOMICILIO_FISCAL_VACIO });
+  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03", concepto_factura: "", correos_factura: "", ...DOMICILIO_FISCAL_VACIO });
   // Cómo saldría el concepto el mes que entra, para que se vea que el mes cambia solo.
   const hoy = hoyMexicoISO();
   const mesSiguiente = Number(hoy.slice(5, 7)) === 12 ? { mes: 1, anio: Number(hoy.slice(0, 4)) + 1 } : { mes: Number(hoy.slice(5, 7)) + 1, anio: Number(hoy.slice(0, 4)) };
@@ -110,6 +113,7 @@ export default function ConfiguracionFiscalPage() {
       cp_fiscal: c.cp_fiscal || "",
       uso_cfdi: c.uso_cfdi || "G03",
       concepto_factura: c.concepto_factura || "",
+      correos_factura: correosExtraDe(c).join("\n"),
       ...domicilioDePerfil(c),
     });
     setError("");
@@ -208,6 +212,7 @@ export default function ConfiguracionFiscalPage() {
                         <td>
                           <b>{c.nombre}</b>
                           <span className="fac-sub">{c.email}</span>
+                          {correosExtraDe(c).length > 0 && <span className="fac-sub">+ {correosExtraDe(c).join(", ")}</span>}
                           {c.porContrato && <span className="fac-sub">Contrato en este centro</span>}
                         </td>
                         <td>
@@ -314,6 +319,21 @@ export default function ConfiguracionFiscalPage() {
                 </div>
               </div>
             ))}
+            <p className="fac-facturar-seccion">Correos para sus facturas</p>
+            <div className="fac-facturar-fila">
+              <label>Correos adicionales</label>
+              <div>
+                <textarea
+                  rows={2}
+                  placeholder="Opcional: uno por renglón (ej. contabilidad@empresa.com)"
+                  value={form.correos_factura}
+                  onChange={(e) => setForm({ ...form, correos_factura: e.target.value })}
+                />
+                <p className="fac-facturar-nota">
+                  La factura y el estado de cuenta siempre van a {correoVisible(editando.email) || "su correo"}; además, a estos (hasta {MAXIMO_CORREOS_EXTRA}).
+                </p>
+              </div>
+            </div>
             <p className="fac-facturar-seccion">Concepto de sus facturas</p>
             <div className="fac-facturar-fila">
               <label>Concepto predefinido</label>

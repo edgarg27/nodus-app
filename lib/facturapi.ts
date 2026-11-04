@@ -56,7 +56,7 @@ export async function bufferDesdeUrlFirmada(url: string): Promise<Buffer> {
 }
 
 // Facturapi le manda al cliente el PDF y el XML de una factura ya timbrada.
-export async function enviarCfdiPorCorreo(facturapiId: string, correo: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function enviarCfdiPorCorreo(facturapiId: string, correo: string | string[]): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await facturapi.invoices.sendByEmail(facturapiId, { email: correo });
     return { ok: true };

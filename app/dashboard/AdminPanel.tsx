@@ -24,6 +24,7 @@ import {
   usosParaTipo,
   type CampoDomicilioFiscal,
 } from "@/lib/datosFiscales";
+import { MAXIMO_CORREOS_EXTRA, correosExtraDe } from "@/lib/correosFactura";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
 import { espaciosDeClientes } from "@/lib/coworking";
 import Link from "next/link";
@@ -50,6 +51,7 @@ type Cliente = {
   regimen_fiscal?: string | null;
   cp_fiscal?: string | null;
   uso_cfdi?: string | null;
+  correos_factura?: string[] | null;
 } & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
 // Ticket de conexión en el detalle del cliente: oculto mientras se define cómo quedará Vouchers.
@@ -268,7 +270,7 @@ export default function AdminPanel({
   // validan completos y los guarda quien puede facturar (la misma API de Configuración fiscal).
   const puedeEditarFiscal = rolPuede(rol, "facturaEmitir");
   const [editandoFiscal, setEditandoFiscal] = useState(false);
-  const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT, ...DOMICILIO_FISCAL_VACIO });
+  const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT, correos_factura: "", ...DOMICILIO_FISCAL_VACIO });
   const [guardandoFiscal, setGuardandoFiscal] = useState(false);
   const [errorFiscal, setErrorFiscal] = useState("");
   const tipoFiscal = normalizarRfc(formFiscal.rfc).length === 12 ? "moral" : "fisica";
@@ -657,6 +659,7 @@ export default function AdminPanel({
       regimen_fiscal: c.regimen_fiscal || "",
       cp_fiscal: c.cp_fiscal || "",
       uso_cfdi: c.uso_cfdi || USO_CFDI_DEFAULT,
+      correos_factura: correosExtraDe(c).join("\n"),
       ...domicilioDePerfil(c),
     });
     setErrorFiscal("");
@@ -2206,6 +2209,16 @@ export default function AdminPanel({
                     />
                   </Fragment>
                 ))}
+                <p className="sub-label" style={{ marginTop: 10 }}>
+                  Correos adicionales para facturas (opcional)
+                </p>
+                <textarea
+                  rows={2}
+                  placeholder="Uno por renglón (ej. contabilidad@empresa.com)"
+                  value={formFiscal.correos_factura}
+                  onChange={(e) => setFormFiscal({ ...formFiscal, correos_factura: e.target.value })}
+                />
+                <p style={{ color: "#888", fontSize: 11, margin: "4px 0 0" }}>La factura siempre va a su correo de la cuenta; además, a estos (hasta {MAXIMO_CORREOS_EXTRA}).</p>
                 {avisosDatosFiscales(formFiscal).length > 0 && (
                   <p style={{ color: "#854F0B", fontSize: 12, margin: "6px 0 0" }}>{avisosDatosFiscales(formFiscal)[0]}</p>
                 )}
@@ -2231,6 +2244,7 @@ export default function AdminPanel({
                       [clienteSeleccionado.regimen_fiscal, REGIMENES_FISCALES.find((r) => r.clave === clienteSeleccionado.regimen_fiscal)?.nombre].filter(Boolean).join(" · "),
                   },
                   { label: "C.P. fiscal", valor: clienteSeleccionado.cp_fiscal },
+                  ...(correosExtraDe(clienteSeleccionado).length > 0 ? [{ label: "Correos adicionales", valor: correosExtraDe(clienteSeleccionado).join(", ") }] : []),
                   { label: "Domicilio", valor: textoDomicilioFiscal(clienteSeleccionado) },
                   {
                     label: "Uso del CFDI",

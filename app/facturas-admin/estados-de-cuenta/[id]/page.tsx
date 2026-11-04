@@ -424,7 +424,7 @@ export default function EstadoDeCuentaPage() {
 
   async function enviarFacturaCorreo() {
     if (!factura || !cliente) return;
-    if (!confirm(`¿Enviar la factura (PDF y XML) a ${cliente.email}?`)) return;
+    if (!confirm("¿Enviar la factura (PDF y XML) al correo del cliente y a sus correos adicionales?")) return;
     setAccionando(true);
     const res = await fetch("/api/facturas/enviar-cfdi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ facturaIds: [factura.id] }) });
     const data = await res.json().catch(() => ({}));
@@ -435,7 +435,7 @@ export default function EstadoDeCuentaPage() {
 
   async function enviar() {
     if (!factura || !cliente) return;
-    if (!confirm(`¿Enviar este estado de cuenta a ${cliente.email}?`)) return;
+    if (!confirm("¿Enviar este estado de cuenta al correo del cliente y a sus correos adicionales?")) return;
     setAccionando(true);
     const { ok, data } = await llamar({ accion: "enviar" });
     setAccionando(false);

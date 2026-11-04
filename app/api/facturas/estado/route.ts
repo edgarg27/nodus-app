@@ -10,6 +10,7 @@ import { complementoAlPagar } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 import { parseStorageUrl } from "@/lib/storage";
+import { correosExtraDe } from "@/lib/correosFactura";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const SITIO = (process.env.NEXT_PUBLIC_SITE_URL || "https://app.nodusbc.mx").replace(/\/+$/, "");
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
   // ---- Enviar el estado de cuenta al correo del cliente ----
   if (accion === "enviar") {
     if (!factura.user_id) return NextResponse.json({ error: "Este estado de cuenta no tiene cliente" }, { status: 400 });
-    const { data: cliente } = await admin.from("profiles").select("nombre, email, empresa, nombre_fiscal").eq("id", factura.user_id).maybeSingle();
+    const { data: cliente } = await admin.from("profiles").select("nombre, email, empresa, nombre_fiscal, correos_factura").eq("id", factura.user_id).maybeSingle();
     if (!cliente?.email) return NextResponse.json({ error: "El cliente no tiene correo registrado" }, { status: 400 });
     const { data: pagos } = await admin.from("pagos").select("concepto, monto, estado").eq("factura_id", factura.id).order("created_at", { ascending: true });
     const filas = (pagos && pagos.length > 0 ? pagos.map((p) => ({ d: etiquetaPagoSuelto(p.concepto), m: Number(p.monto) })) : [{ d: factura.concepto, m: Number(factura.monto) }])
@@ -81,9 +82,15 @@ export async function POST(req: NextRequest) {
   </div>`;
     const r = await enviarCorreo({ to: cliente.email, subject: `Tu estado de cuenta ${factura.folio} - Nodus`, html });
     if (!r.ok) return NextResponse.json({ error: r.error || "No se pudo enviar el correo" }, { status: 502 });
+    // También a sus correos adicionales para facturas (si tiene).
+    const enviados = [cliente.email];
+    for (const extra of correosExtraDe(cliente).filter((c) => c !== cliente.email)) {
+      const rx = await enviarCorreo({ to: extra, subject: `Tu estado de cuenta ${factura.folio} - Nodus`, html });
+      if (rx.ok) enviados.push(extra);
+    }
     // Cuenta el envío (columna nueva: si todavía no existe, no pasa nada).
     await admin.from("facturas").update({ envios_estado: Number((factura as any).envios_estado || 0) + 1 }).eq("id", factura.id);
-    return NextResponse.json({ ok: true, correo: cliente.email });
+    return NextResponse.json({ ok: true, correo: enviados.join(", ") });
   }
 
   // ---- Editar concepto y fecha (solo mientras no esté timbrada) ----

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { accesoCliente } from "@/lib/facturasAcceso";
+import { leerCorreosExtra } from "@/lib/correosFactura";
 import { RFC_PUBLICO_GENERAL, domicilioParaGuardar, normalizarRfc, validarDatosFiscales, type TipoPersonaFiscal } from "@/lib/datosFiscales";
 
 // Configuración fiscal (Facturación): finanzas corrige los datos fiscales de un cliente (los que se capturaron al
@@ -49,11 +50,19 @@ export async function POST(req: NextRequest) {
   // Concepto predefinido de sus facturas: solo si viene (el modal del cliente en el panel no lo manda). Vacío = el del sistema.
   const concepto =
     body && "concepto_factura" in body ? { concepto_factura: String(body.concepto_factura || "").trim().replace(/\s+/g, " ").slice(0, 200) || null } : {};
-  const { error } = await admin.from("profiles").update({ ...datos, ...domicilio, ...concepto }).eq("id", userId);
+  // Correos adicionales para sus facturas (opcionales): solo si vienen.
+  let correos: { correos_factura?: string[] | null } = {};
+  if (body && "correos_factura" in body) {
+    const { data: cuenta } = await admin.from("profiles").select("email").eq("id", userId).maybeSingle();
+    const leidos = leerCorreosExtra(body.correos_factura, cuenta?.email);
+    if ("error" in leidos) return NextResponse.json({ error: "Correos adicionales: " + leidos.error }, { status: 400 });
+    correos = { correos_factura: leidos.correos.length > 0 ? leidos.correos : null };
+  }
+  const { error } = await admin.from("profiles").update({ ...datos, ...domicilio, ...concepto, ...correos }).eq("id", userId);
   if (error) return NextResponse.json({ error: "No se pudieron guardar los datos fiscales: " + error.message }, { status: 500 });
 
   // Contratos sin RFC real (vacío o público en general): se ponen al día. Los que ya traen un RFC van con el documento firmado.
   await admin.from("contratos").update(datos).eq("user_id", userId).or(`rfc.is.null,rfc.eq.,rfc.eq.${RFC_PUBLICO_GENERAL}`);
 
-  return NextResponse.json({ ok: true, datos: { ...datos, ...domicilio, ...concepto } });
+  return NextResponse.json({ ok: true, datos: { ...datos, ...domicilio, ...concepto, ...correos } });
 }
