@@ -107,6 +107,9 @@ type DayPass = {
   emitido_por_nombre: string | null;
   telefono?: string | null;
   email?: string | null;
+  usado?: boolean | null;
+  usado_en?: string | null;
+  aceptado_por_nombre?: string | null;
   created_at: string;
 };
 type SolicitudCliente = {
@@ -1572,26 +1575,74 @@ export default function CentroPanel({
   }
 
   // Mensaje de WhatsApp al número que dejó el invitado, con el link a su pase.
-  function whatsappDayPass() {
-    if (!dayPassGenerado) return "";
-    const link = `${window.location.origin}/day-pass/${dayPassGenerado.id}`;
+  function whatsappDeDayPass(dp: DayPass | null) {
+    if (!dp) return "";
+    const link = `${window.location.origin}/day-pass/${dp.id}`;
     return linkWhatsApp(
-      dayPassGenerado.telefono,
-      `Hola ${dayPassGenerado.nombre}, tu Day Pass para el ${dayPassGenerado.fecha} en Nodus Flex Center ${dayPassGenerado.centro} está listo (folio NODUS-${String(dayPassGenerado.folio).padStart(3, "0")}). Preséntalo en recepción: ${link}`
+      dp.telefono,
+      `Hola ${dp.nombre}, tu Day Pass para el ${dp.fecha} en Nodus Flex Center ${dp.centro} está listo (folio NODUS-${String(dp.folio).padStart(3, "0")}). Preséntalo en recepción: ${link}`
     );
+  }
+  const whatsappDayPass = () => whatsappDeDayPass(dayPassGenerado);
+
+  // PDF del boleto; el QR (check-in) se arma si no está a la mano.
+  async function descargarPdfDe(dp: DayPass, qr?: string) {
+    let codigo = qr || "";
+    if (!codigo) {
+      try {
+        codigo = await QRCode.toDataURL(`${window.location.origin}/day-pass/${dp.id}/checkin`, { margin: 0, width: 200 });
+      } catch {
+        codigo = "";
+      }
+    }
+    await descargarDayPassPdf({
+      nombre: dp.nombre,
+      fecha: dp.fecha,
+      centro: dp.centro,
+      emitidoPor: dp.emitido_por_nombre,
+      tipo: dp.tipo,
+      folio: dp.folio,
+      qr: codigo,
+    });
   }
 
   function descargarDayPass() {
-    if (!dayPassGenerado) return;
-    descargarDayPassPdf({
-      nombre: dayPassGenerado.nombre,
-      fecha: dayPassGenerado.fecha,
-      centro: dayPassGenerado.centro,
-      emitidoPor: dayPassGenerado.emitido_por_nombre,
-      tipo: dayPassGenerado.tipo,
-      folio: dayPassGenerado.folio,
-      qr: dayPassQR,
-    });
+    if (dayPassGenerado) descargarPdfDe(dayPassGenerado, dayPassQR);
+  }
+
+  // Ver un Day Pass ya emitido (el mismo cuadro del boleto).
+  function verDayPass(dp: DayPass) {
+    setErrorDayPass("");
+    setDayPassCorreoEstado(null);
+    setDayPassPrevioUsado(null);
+    setDayPassGenerado(dp);
+    setMostrarGeneradorDayPass(true);
+  }
+
+  // Registrar la llegada sin escanear el QR: igual que el check-in del QR (/day-pass/[id]/checkin). Ya registrado, el
+  // pase no se puede volver a usar.
+  const [registrandoDayPass, setRegistrandoDayPass] = useState<string | null>(null);
+  const registrandoDayPassRef = useRef(false);
+  async function registrarLlegadaDayPass(dp: DayPass) {
+    if (registrandoDayPassRef.current) return;
+    if (!(await confirmar("Registrar llegada", `¿${dp.nombre} ya llegó? Su Day Pass NODUS-${String(dp.folio).padStart(3, "0")} queda usado y ya no se puede volver a usar.`, "Sí, ya llegó"))) return;
+    registrandoDayPassRef.current = true;
+    setRegistrandoDayPass(dp.id);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("day_passes")
+      .update({ usado: true, usado_en: new Date().toISOString(), aceptado_por: user?.id, aceptado_por_nombre: nombre })
+      .eq("id", dp.id)
+      .eq("usado", false);
+    registrandoDayPassRef.current = false;
+    setRegistrandoDayPass(null);
+    if (error) {
+      alert("No se pudo registrar la llegada: " + error.message);
+      return;
+    }
+    fetchTodo(centro);
   }
 
   // Recepción marca que el visitante de un cliente ya llegó.
@@ -3267,26 +3318,74 @@ export default function CentroPanel({
                         ))
                       )}
 
-                      {dayPasses.length > 0 && (
-                        <>
-                          <p className="panel-section-label" style={{ marginTop: 16 }}>
-                            Day Passes emitidos recientemente
-                          </p>
-                          {dayPasses.map((dp) => (
-                            <div className="item-card" key={dp.id}>
-                              <div className="item-card-info">
-                                <p className="item-card-titulo">
-                                  #{String(dp.folio).padStart(3, "0")} · {dp.nombre}
-                                </p>
-                                <p className="item-card-sub">
-                                  {LABEL_TIPO_DAYPASS[dp.tipo]} · {dp.fecha} · emitió{" "}
-                                  {dp.emitido_por_nombre || "—"}
-                                </p>
+                      {dayPasses.length > 0 &&
+                        (() => {
+                          // Quién viene hoy y después, y lo ya pasado (llegó / no vino). Mismo estado que el check-in del QR.
+                          const hoyDp = hoyMexicoISO();
+                          const porVenir = dayPasses.filter((dp) => !dp.usado && dp.fecha >= hoyDp).sort((a, b) => a.fecha.localeCompare(b.fecha));
+                          const pasados = dayPasses.filter((dp) => dp.usado || dp.fecha < hoyDp);
+                          const tarjeta = (dp: DayPass) => {
+                            const estado = dp.usado
+                              ? { texto: `✓ Llegó${dp.usado_en ? " · " + new Date(dp.usado_en).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}${dp.aceptado_por_nombre ? " · registró " + dp.aceptado_por_nombre : ""}`, bg: "#E1F5EE", color: "#0F6E56" }
+                              : dp.fecha < hoyDp
+                                ? { texto: "No vino", bg: "#FCEBEB", color: "#A32D2D" }
+                                : dp.fecha === hoyDp
+                                  ? { texto: "Viene hoy", bg: "#FAEEDA", color: "#854F0B" }
+                                  : { texto: "Programado", bg: "#F0F0F0", color: "#555" };
+                            const wa = whatsappDeDayPass(dp);
+                            return (
+                              <div className="item-card" key={dp.id} style={{ flexWrap: "wrap", gap: 8 }}>
+                                <div className="item-card-info">
+                                  <p className="item-card-titulo">
+                                    #{String(dp.folio).padStart(3, "0")} · {dp.nombre}
+                                  </p>
+                                  <p className="item-card-sub">
+                                    {LABEL_TIPO_DAYPASS[dp.tipo]} · {dp.fecha} · emitió {dp.emitido_por_nombre || "—"}
+                                  </p>
+                                  <span className="factura-badge" style={{ background: estado.bg, marginTop: 4 }}>
+                                    <span className="factura-badge-text" style={{ color: estado.color }}>
+                                      {estado.texto}
+                                    </span>
+                                  </span>
+                                </div>
+                                <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                                  {!dp.usado && dp.fecha === hoyDp && (
+                                    <button className="btn-aceptar" disabled={registrandoDayPass === dp.id} onClick={() => registrarLlegadaDayPass(dp)}>
+                                      {registrandoDayPass === dp.id ? "Registrando..." : "✓ Registrar llegada"}
+                                    </button>
+                                  )}
+                                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => verDayPass(dp)}>
+                                    Ver
+                                  </button>
+                                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => descargarPdfDe(dp)}>
+                                    📄 PDF
+                                  </button>
+                                  {wa && !dp.usado && dp.fecha >= hoyDp && (
+                                    <a className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600 }} href={wa} target="_blank" rel="noopener noreferrer">
+                                      💬 WhatsApp
+                                    </a>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
+                            );
+                          };
+                          return (
+                            <>
+                              <p className="panel-section-label" style={{ marginTop: 16 }}>
+                                Day Passes · quién viene ({porVenir.length})
+                              </p>
+                              {porVenir.length === 0 ? <div className="empty-card">Nadie con Day Pass para hoy ni los próximos días</div> : porVenir.map(tarjeta)}
+                              {pasados.length > 0 && (
+                                <>
+                                  <p className="panel-section-label" style={{ marginTop: 16 }}>
+                                    Day Passes · ya pasaron ({pasados.length})
+                                  </p>
+                                  {pasados.map(tarjeta)}
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                     </>
                   );
                 })()}
