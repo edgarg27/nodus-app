@@ -633,7 +633,9 @@ function ReservacionesInner() {
 
       <div className="sub-content">
         {tabsVista}
-        {puedeMostrarSala && puedeMostrarBolsa && (
+        {/* Hasta saber su centro y las horas de su contrato no se muestran pestañas ni calendario: antes salían las dos
+            pestañas (Sala de Juntas y Horas Cowork) un momento y luego desaparecía la que no tiene. */}
+        {!loading && puedeMostrarSala && puedeMostrarBolsa && (
           <div className="cal-espacio-tabs">
             <button
               className={"cal-espacio-tab" + (categoria === "sala" ? " active" : "")}
@@ -650,7 +652,16 @@ function ReservacionesInner() {
           </div>
         )}
 
-        {categoriaNoDisponible ? (
+        {loading ? (
+          <div className="nodus-inline-loading">
+            <div className="nodus-spinner nodus-spinner-sm">
+              <span className="nodus-spinner-petal"></span>
+              <span className="nodus-spinner-petal"></span>
+              <span className="nodus-spinner-petal"></span>
+              <span className="nodus-spinner-petal"></span>
+            </div>
+          </div>
+        ) : categoriaNoDisponible ? (
           <div className="empty-card">
             {categoria === "sala"
               ? "Tu contrato no incluye horas de Sala de Juntas en este centro."
