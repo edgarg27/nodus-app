@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import QRCode from "qrcode";
+import { descargarDayPassPdf } from "@/lib/dayPassPdf";
 
 type DayPassPublico = {
   folio: number;
@@ -146,8 +147,22 @@ export default function DayPassPublicoPage() {
           </div>
         </div>
 
-        <button className="reservar-btn" onClick={() => window.print()} style={{ marginTop: 16 }}>
-          🖨 Guardar / Imprimir
+        <button
+          className="reservar-btn"
+          style={{ marginTop: 16 }}
+          onClick={() =>
+            descargarDayPassPdf({
+              nombre: pase.nombre,
+              fecha: pase.fecha,
+              centro: pase.centro,
+              emitidoPor: pase.emitido_por_nombre,
+              tipo: pase.tipo,
+              folio: pase.folio,
+              qr,
+            })
+          }
+        >
+          📄 Descargar PDF
         </button>
       </div>
     </div>

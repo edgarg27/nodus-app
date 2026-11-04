@@ -2,9 +2,10 @@
 
 import { MEDIOS_CONTACTO } from "@/lib/mediosContacto";
 import { soltarDispositivoNativo } from "@/lib/appNativa";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { descargarDayPassPdf, linkWhatsApp } from "@/lib/dayPassPdf";
 import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
@@ -104,6 +105,8 @@ type DayPass = {
   nombre: string;
   fecha: string;
   emitido_por_nombre: string | null;
+  telefono?: string | null;
+  email?: string | null;
   created_at: string;
 };
 type SolicitudCliente = {
@@ -402,7 +405,8 @@ export default function CentroPanel({
   const [dayPassCorreoEstado, setDayPassCorreoEstado] = useState<"enviado" | "error" | null>(null);
   const [rechazandoInvitado, setRechazandoInvitado] = useState<SolicitudInvitado | null>(null);
   const [motivoRechazoInvitado, setMotivoRechazoInvitado] = useState("");
-  const [linkDayPassCopiado, setLinkDayPassCopiado] = useState(false);
+  // Evita generar dos Day Pass con un doble clic.
+  const generandoDayPassRef = useRef(false);
   const [solicitudesCliente, setSolicitudesCliente] = useState<SolicitudCliente[]>([]);
   const [visitasCliente, setVisitasCliente] = useState<VisitaCliente[]>([]);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -1472,12 +1476,22 @@ export default function CentroPanel({
   }
 
   async function generarDayPass() {
+    if (generandoDayPassRef.current) return;
     if (!dayPassForm.nombre.trim() || !centro || !dayPassForm.fecha) {
       setErrorDayPass("Falta el nombre de quien va a usar el pase, o la fecha");
       return;
     }
     setErrorDayPass("");
+    generandoDayPassRef.current = true;
     setGenerandoDayPass(true);
+    try {
+      await generarDayPassUnaVez();
+    } finally {
+      generandoDayPassRef.current = false;
+    }
+  }
+
+  async function generarDayPassUnaVez() {
     // Verificación "fresca" justo antes de generar — no nos confiamos del
     // todo del aviso que se calcula mientras escribe (ese tiene un
     // pequeño retraso a propósito para no consultar la base en cada
@@ -1557,16 +1571,27 @@ export default function CentroPanel({
     }
   }
 
-  async function copiarLinkDayPass() {
-    if (!dayPassGenerado) return;
+  // Mensaje de WhatsApp al número que dejó el invitado, con el link a su pase.
+  function whatsappDayPass() {
+    if (!dayPassGenerado) return "";
     const link = `${window.location.origin}/day-pass/${dayPassGenerado.id}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      setLinkDayPassCopiado(true);
-      setTimeout(() => setLinkDayPassCopiado(false), 2500);
-    } catch {
-      alert(link);
-    }
+    return linkWhatsApp(
+      dayPassGenerado.telefono,
+      `Hola ${dayPassGenerado.nombre}, tu Day Pass para el ${dayPassGenerado.fecha} en Nodus Flex Center ${dayPassGenerado.centro} está listo (folio NODUS-${String(dayPassGenerado.folio).padStart(3, "0")}). Preséntalo en recepción: ${link}`
+    );
+  }
+
+  function descargarDayPass() {
+    if (!dayPassGenerado) return;
+    descargarDayPassPdf({
+      nombre: dayPassGenerado.nombre,
+      fecha: dayPassGenerado.fecha,
+      centro: dayPassGenerado.centro,
+      emitidoPor: dayPassGenerado.emitido_por_nombre,
+      tipo: dayPassGenerado.tipo,
+      folio: dayPassGenerado.folio,
+      qr: dayPassQR,
+    });
   }
 
   // Recepción marca que el visitante de un cliente ya llegó.
@@ -4661,21 +4686,20 @@ export default function CentroPanel({
                     ⚠️ No se pudo enviar el correo — usa el link de abajo para compartirlo manualmente.
                   </p>
                 )}
-                <p style={{ fontSize: 12, color: "#666", textAlign: "center", margin: "4px 0 0" }}>
-                  El invitado no tiene cuenta — para que vea su pase en su celular, copia el link y mándaselo por
-                  WhatsApp, SMS o correo.
-                </p>
-
-                <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
                   <button className="tel-borrar-btn" onClick={() => setMostrarGeneradorDayPass(false)}>
                     Cerrar
                   </button>
-                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={copiarLinkDayPass}>
-                    {linkDayPassCopiado ? "✓ Link copiado" : "🔗 Copiar link para el invitado"}
+                  <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={descargarDayPass}>
+                    📄 Descargar PDF
                   </button>
-                  <button className="reservar-btn" onClick={() => window.print()}>
-                    🖨 Imprimir
-                  </button>
+                  {whatsappDayPass() ? (
+                    <a className="reservar-btn" href={whatsappDayPass()} target="_blank" rel="noopener noreferrer" style={{ textAlign: "center", textDecoration: "none" }}>
+                      💬 Enviar por WhatsApp
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#888" }}>Sin teléfono válido para WhatsApp</span>
+                  )}
                 </div>
               </>
             )}
