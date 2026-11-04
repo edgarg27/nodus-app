@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { accesoCliente } from "@/lib/facturasAcceso";
 import type { CfdiParseado } from "@/lib/cfdi";
+import { esTipoServicio } from "@/lib/tipoServicio";
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const FORMAS = ["01", "02", "03", "04", "28"];
@@ -17,6 +18,7 @@ type ContratoAnexo = {
   horas_sala_juntas?: number;
   dia_pago?: number | null;
   oficina_id?: string | null;
+  tipo_servicio?: string | null;
   archivo_url?: string | null;
 };
 type PagoAnexo = { concepto: string; monto: number; fecha: string; estado: "pagado" | "pendiente"; formaPago?: string; comprobanteUrl?: string | null };
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
         horas_sala_juntas: Number(c.horas_sala_juntas) || 0,
         dia_pago: c.dia_pago ? Number(c.dia_pago) : null,
         oficina_id: c.oficina_id || null,
+        // Vacío con oficina: la base lo toma de la oficina (migracion_tipo_servicio.sql).
+        tipo_servicio: esTipoServicio(c.tipo_servicio) ? c.tipo_servicio : null,
         archivo_url: c.archivo_url || null,
         firmado: !!c.archivo_url,
         estatus: "vigente",

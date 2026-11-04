@@ -7,6 +7,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import type { Contrato } from "./page";
 import FileDropzone from "@/app/soporte/FileDropzone";
 import { conIva, quitarIva, sinIva, totalDesdeSubtotal } from "@/lib/adicionales";
+import { TIPOS_SERVICIO, esTipoServicio, etiquetaTipoServicio } from "@/lib/tipoServicio";
 import PasosContrato from "./PasosContrato";
 
 type VersionContrato = {
@@ -77,6 +78,7 @@ export default function ContratoModal({
     horas_sala_juntas: String(contrato.horas_sala_juntas ?? 0),
     dia_pago: contrato.dia_pago ? String(contrato.dia_pago) : "",
     deposito_garantia: contrato.deposito_garantia != null ? String(contrato.deposito_garantia) : "",
+    tipo_servicio: contrato.tipo_servicio || "",
   });
   const [archivosNuevos, setArchivosNuevos] = useState<File[]>([]);
   const [versiones, setVersiones] = useState<VersionContrato[]>([]);
@@ -388,6 +390,8 @@ export default function ContratoModal({
         horas_sala_juntas: Number(form.horas_sala_juntas) || 0,
         dia_pago: form.dia_pago ? Number(form.dia_pago) : null,
         deposito_garantia: form.deposito_garantia ? Number(form.deposito_garantia) : null,
+        // Vacío con oficina: la base lo toma de la oficina (migracion_tipo_servicio.sql).
+        tipo_servicio: esTipoServicio(form.tipo_servicio) ? form.tipo_servicio : null,
       })
       .eq("id", contrato.id);
 
@@ -406,6 +410,7 @@ export default function ContratoModal({
       { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(rentaConIva), dinero: true },
       { campo: "Horas sala de juntas", anterior: num(contrato.horas_sala_juntas), nuevo: num(form.horas_sala_juntas) },
       { campo: "Depósito en garantía", anterior: num(contrato.deposito_garantia), nuevo: num(form.deposito_garantia), dinero: true },
+      { campo: "Tipo de servicio", anterior: contrato.tipo_servicio ? etiquetaTipoServicio(contrato.tipo_servicio) : "", nuevo: form.tipo_servicio ? etiquetaTipoServicio(form.tipo_servicio) : "" },
     ];
     const cambiosPrincipales = camposPrincipales
       .filter((c) => c.anterior !== c.nuevo)
@@ -669,6 +674,17 @@ export default function ContratoModal({
               value={form.deposito_garantia}
               onChange={(e) => setForm({ ...form, deposito_garantia: e.target.value })}
             />
+          </div>
+          <div>
+            <p className="sub-label">Tipo de servicio</p>
+            <select value={form.tipo_servicio} onChange={(e) => setForm({ ...form, tipo_servicio: e.target.value })}>
+              <option value="">{contrato.oficina_id ? "El de su oficina" : "Elige el tipo"}</option>
+              {TIPOS_SERVICIO.map((t) => (
+                <option key={t.clave} value={t.clave}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

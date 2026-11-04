@@ -60,6 +60,9 @@ export type Contrato = {
   cliente_nombre_historico: string | null;
   cliente_email_historico: string | null;
   cliente_empresa_historico: string | null;
+  // Oficina privada, Coworking, Working desk u Oficina virtual (migracion_tipo_servicio.sql).
+  tipo_servicio?: string | null;
+  oficina_id?: string | null;
   monto_adeudado: number | null;
   fecha_baja: string | null;
   dia_pago: number | null;

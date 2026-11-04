@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parsearCfdi, nombreBase, normalizarRfc, type CfdiParseado } from "@/lib/cfdi";
 import { masIva } from "@/lib/adicionales";
+import { TIPOS_SERVICIO } from "@/lib/tipoServicio";
 
 // "Anexar contrato, pagos y facturas": para migrar clientes de ZORA (o dar de alta a alguien que ya tiene
 // historial) sin pasar por Cotizar. El contrato entra vigente y no genera cobros; los pagos se capturan como
@@ -36,6 +37,8 @@ export type ContratoZora = {
   deposito_garantia: string;
   horas_sala_juntas: string;
   oficina_id: string;
+  // Vacío con oficina: sale de la oficina. Sin oficina (oficina virtual…) se elige.
+  tipo_servicio: string;
   archivo: File | null;
 };
 
@@ -57,6 +60,7 @@ export const ANEXOS_VACIOS: Anexos = {
     deposito_garantia: "",
     horas_sala_juntas: "",
     oficina_id: "",
+    tipo_servicio: "",
     archivo: null,
   },
   pagos: [],
@@ -133,6 +137,7 @@ export async function guardarAnexos(
       horas_sala_juntas: Number(c.horas_sala_juntas) || 0,
       dia_pago: diaPago ? Number(diaPago) : null,
       oficina_id: c.oficina_id || null,
+      tipo_servicio: c.tipo_servicio || null,
       archivo_url: archivoUrl,
     };
   }
@@ -249,6 +254,17 @@ export default function AnexosZora({
                   {oficinas.map((o) => (
                     <option key={o.id} value={o.id} disabled={o.estado === "ocupada"}>
                       {o.numero || "Oficina"} {o.tipo ? `· ${o.tipo}` : ""} {o.estado === "ocupada" ? "· ocupada" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <p className="sub-label">Tipo de servicio</p>
+                <select value={c.tipo_servicio} onChange={(e) => setContrato({ tipo_servicio: e.target.value })} style={estiloInput}>
+                  <option value="">{c.oficina_id ? "El de la oficina" : "Elige el tipo"}</option>
+                  {TIPOS_SERVICIO.map((t) => (
+                    <option key={t.clave} value={t.clave}>
+                      {t.etiqueta}
                     </option>
                   ))}
                 </select>
