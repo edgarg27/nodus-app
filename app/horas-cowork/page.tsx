@@ -8,7 +8,9 @@ import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, ty
 
 // Horas Cowork (p. ej. el paquete de 30 horas): quién tiene horas, cuántas lleva usadas y el calendario de la semana
 // para confirmar, registrar llegadas (las horas pasan de apartadas a consumidas) y marcar quien no llegó. Mismas reglas
-// que el Panel de Centro y que lo que ve el cliente en Reservar espacio (lib/horasCowork.ts).
+// que el Panel de Centro y que lo que ve el cliente en Reservar espacio (lib/horasCowork.ts). Las Horas Cowork se
+// pueden usar en cualquier centro: el calendario muestra también a clientes de otros centros que reservaron aquí
+// (migracion_cowork_otros_centros.sql deja ver su nombre).
 
 type Reserva = {
   id: string;

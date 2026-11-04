@@ -119,6 +119,9 @@ function ReservacionesInner() {
   const [precioHoraExtra, setPrecioHoraExtra] = useState(150);
   const [miCentro, setMiCentro] = useState<string | null>(null);
   const [miUserId, setMiUserId] = useState<string | null>(null);
+  // Horas Cowork se pueden usar en cualquier centro con coworking: espacios de cada centro y el elegido.
+  const [bolsaPorCentro, setBolsaPorCentro] = useState<Record<string, { id: string; icono: string }[]>>({});
+  const [centroCowork, setCentroCowork] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -192,7 +195,11 @@ function ReservacionesInner() {
   // (caso Bosques: solo tiene "Sala de 10 personas"), se arma dinámicamente
   // desde oficinas reales de tipo Coworking/Sala de Capacitación.
   const bolsaEspaciosEstaticos = useMemo(() => espaciosDelCentro.filter((e) => !esSalaDeJuntas(e.id)), [espaciosDelCentro]);
-  const bolsaEspacios = bolsaEspaciosEstaticos.length > 0 ? bolsaEspaciosEstaticos : oficinasBolsaDelCentro;
+  const centrosConCowork = Object.keys(bolsaPorCentro).sort();
+  const bolsaEspacios =
+    bolsaEspaciosEstaticos.length > 0 ? bolsaEspaciosEstaticos : (centroCowork && bolsaPorCentro[centroCowork]) || oficinasBolsaDelCentro;
+  // Centro donde se ve y se guarda la reservación: Horas Cowork, el elegido; Sala de Juntas, el suyo.
+  const centroDeLaVista = categoria === "bolsa" ? centroCowork || miCentro : miCentro;
   const espaciosDeLaCategoria = categoria === "sala" ? salaEspacios : bolsaEspacios;
 
   const sinHorasDefinidas = horasSalaTotales === 0 && horasBolsaTotales === 0;
@@ -232,7 +239,7 @@ function ReservacionesInner() {
     cargarReservasSemana();
     setSeleccion(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [espacio, inicioSemana]);
+  }, [espacio, inicioSemana, centroDeLaVista]);
 
   // Tiempo real: si otro cliente reserva/cancela algo mientras tienes el
   // calendario abierto, se actualiza solo sin tener que recargar la página.
@@ -272,16 +279,26 @@ function ReservacionesInner() {
     const espaciosDelCentroLocal = (c && ESPACIOS_POR_CENTRO[c]) || ESPACIOS_DEFAULT;
     const tieneBolsaEstatica = espaciosDelCentroLocal.some((e) => !esSalaDeJuntas(e.id));
     if (c && !tieneBolsaEstatica) {
-      const { data: oficinasData } = await supabase.from("oficinas").select("numero, tipo").eq("centro", c).order("numero");
+      // Coworking y salas de capacitación de TODOS los centros: las Horas Cowork se pueden usar en cualquiera.
+      const { data: oficinasData } = await supabase
+        .from("oficinas")
+        .select("centro, numero, tipo")
+        .or("tipo.ilike.Coworking%,tipo.ilike.Sala de Capacitación%")
+        .order("numero");
       // Los lugares de Coworking (C3, C4… compartidos) se reservan como UN solo espacio "Coworking" sin cupo:
       // varios clientes pueden apartar la misma hora (migracion_coworking_sin_cupo.sql). Las salas de capacitación
       // sí se reservan una por una.
-      const filas = (oficinasData || []).filter((o) => o.tipo && !esSalaDeJuntas(o.tipo));
-      const dinamicos = [
-        ...(filas.some((o) => String(o.tipo).startsWith("Coworking")) ? [{ id: ESPACIO_COWORKING, icono: "💻" }] : []),
-        ...filas.filter((o) => !String(o.tipo).startsWith("Coworking")).map((o) => ({ id: `${o.tipo} ${o.numero}`, icono: "💻" })),
-      ];
-      setOficinasBolsaDelCentro(dinamicos);
+      const porCentro: Record<string, { id: string; icono: string }[]> = {};
+      for (const centroOf of Array.from(new Set((oficinasData || []).map((o) => o.centro).filter(Boolean))) as string[]) {
+        const filas = (oficinasData || []).filter((o) => o.centro === centroOf && o.tipo && !esSalaDeJuntas(o.tipo));
+        porCentro[centroOf] = [
+          ...(filas.some((o) => String(o.tipo).startsWith("Coworking")) ? [{ id: ESPACIO_COWORKING, icono: "💻" }] : []),
+          ...filas.filter((o) => !String(o.tipo).startsWith("Coworking")).map((o) => ({ id: `${o.tipo} ${o.numero}`, icono: "💻" })),
+        ];
+      }
+      setBolsaPorCentro(porCentro);
+      setCentroCowork(porCentro[c] ? c : Object.keys(porCentro).sort()[0] || c);
+      setOficinasBolsaDelCentro(porCentro[c] || []);
     }
 
     // Resuelve el contrato: el de la URL si es vigente y del cliente, si no
@@ -368,6 +385,8 @@ function ReservacionesInner() {
       .from("reservaciones")
       .select("id, user_id, espacio, fecha, hora_inicio, hora_fin, estado")
       .eq("espacio", espacio)
+      // El mismo nombre de espacio ("Coworking") existe en varios centros: solo los del centro que se está viendo.
+      .eq("centro", centroDeLaVista || "")
       .gte("fecha", desde)
       .lte("fecha", hasta)
       .in("estado", ["pendiente", "confirmada"]);
@@ -478,7 +497,8 @@ function ReservacionesInner() {
       .eq("id", user.id)
       .single();
 
-    const centro = profile?.centro || "Aguascalientes";
+    // Horas Cowork: en el centro que eligió (se descuentan de su mismo paquete); Sala de Juntas: el suyo.
+    const centro = (esBolsaActual && centroCowork) || profile?.centro || "Aguascalientes";
     const horarioTexto = `${formatHora(seleccion.horaInicio)} - ${formatHora(seleccion.horaFin)}`;
 
     const { data: nuevaReserva, error: insertError } = await supabase
@@ -641,7 +661,7 @@ function ReservacionesInner() {
           ← Regresar
         </Link>
         <p className="rep-title">Reservar espacio</p>
-        <p className="rep-sub">{miCentro || "Selecciona tu horario"}</p>
+        <p className="rep-sub">{centroDeLaVista || "Selecciona tu horario"}</p>
       </div>
 
       <div className="sub-content">
@@ -662,6 +682,29 @@ function ReservacionesInner() {
             >
               🎟️ Horas Cowork
             </button>
+          </div>
+        )}
+
+        {!loading && categoria === "bolsa" && centrosConCowork.length > 1 && (
+          <div className="form-card" style={{ padding: "12px 16px", marginBottom: 10 }}>
+            <p className="sub-label" style={{ margin: "0 0 6px" }}>
+              ¿En qué centro vas a usar tus horas?
+            </p>
+            <select
+              value={centroCowork || ""}
+              onChange={(e) => {
+                setCentroCowork(e.target.value);
+                setSeleccion(null);
+              }}
+            >
+              {centrosConCowork.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                  {c === miCentro ? " (tu centro)" : ""}
+                </option>
+              ))}
+            </select>
+            <p style={{ fontSize: 12, color: "#888", margin: "6px 0 0" }}>Tus Horas Cowork valen en cualquier centro: se descuentan del mismo paquete.</p>
           </div>
         )}
 
