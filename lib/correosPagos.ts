@@ -30,7 +30,7 @@ function plantilla(titulo: string, parrafos: string[]) {
   </div>`;
 }
 
-export type TipoAvisoPago = "antes" | "hoy" | "ultimo_dia";
+export type TipoAvisoPago = "antes" | "hoy" | "ultimo_dia" | "suspension";
 
 // Aviso de cobro. "antes": se acerca la fecha; "hoy": es su día de pago;
 // "ultimo_dia": último día para pagar sin recargo (contratos mes a mes).
@@ -41,6 +41,10 @@ export async function enviarAvisoPago(datos: {
   monto?: number | null;
   diaPago?: number;
   diasFaltan?: number;
+  // Recargo (mora) que se generó por pagar tarde, para decirlo en el aviso.
+  recargo?: number;
+  // Correos adicionales del cliente (Datos fiscales): también les llega.
+  copias?: string[];
 }) {
   if (!datos.to) return;
   const nombre = datos.nombre || "cliente";
@@ -58,15 +62,27 @@ export async function enviarAvisoPago(datos: {
       `Te recordamos que tu pago${montoTxt} vence ${
         datos.diasFaltan ? `en ${datos.diasFaltan} días` : "pronto"
       }${datos.diaPago ? ` (día ${datos.diaPago} del mes)` : ""}.`,
+      datos.diaPago ? `Tienes del día 1 al ${datos.diaPago} para pagar; a partir del día ${datos.diaPago + 1} se cobra un recargo (mora) del 3%.` : "",
       COMO_PAGAR,
     ];
   } else if (datos.tipo === "hoy") {
-    asunto = "Hoy es tu fecha de pago en Nodus";
-    titulo = "Hoy es tu fecha de pago";
+    asunto = "Hoy es tu fecha límite de pago en Nodus";
+    titulo = "Hoy es tu fecha límite de pago";
     parrafos = [
       `Hola ${nombre},`,
-      `Hoy es tu fecha de pago${montoTxt}.`,
+      `Hoy es tu fecha límite de pago${montoTxt}. No olvides hacerlo.`,
+      datos.diaPago ? `A partir de mañana (día ${datos.diaPago + 1}) se cobra un recargo (mora) del 3%.` : "",
       COMO_PAGAR,
+    ];
+  } else if (datos.tipo === "suspension") {
+    asunto = "Tu pago en Nodus está pendiente";
+    titulo = "Tu pago está pendiente";
+    parrafos = [
+      `Hola ${nombre},`,
+      `Tu fecha límite de pago fue el día ${datos.diaPago || 10} y todavía no tenemos registrado tu pago${montoTxt}.`,
+      datos.recargo ? `Por pagar después de la fecha límite se generó un recargo (mora) del 3% por <strong>${moneda(datos.recargo)}</strong>.` : "",
+      "Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.",
+      COMO_PAGAR + " Si ya pagaste, envíanos tu comprobante para registrarlo.",
     ];
   } else {
     asunto = "Hoy es el último día para pagar sin recargo";
@@ -78,8 +94,11 @@ export async function enviarAvisoPago(datos: {
     ];
   }
 
-  const r = await enviarCorreo({ to: datos.to, subject: asunto, html: plantilla(titulo, parrafos) });
-  if (!r.ok) console.error(`[correosPagos] aviso "${datos.tipo}" a ${datos.to}: ${r.error}`);
+  const html = plantilla(titulo, parrafos.filter(Boolean));
+  for (const to of Array.from(new Set([datos.to, ...(datos.copias || [])].filter(Boolean)))) {
+    const r = await enviarCorreo({ to, subject: asunto, html });
+    if (!r.ok) console.error(`[correosPagos] aviso "${datos.tipo}" a ${to}: ${r.error}`);
+  }
 }
 
 // Gracias por pagar. Si el pago corresponde a una factura y llegó a más

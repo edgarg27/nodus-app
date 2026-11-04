@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoSPEI } from "@/lib/openpay";
 import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
-import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
+import { centroTieneUnifi, generarVoucherReal } from "@/lib/unifi";
 import { clientesConCoworking } from "@/lib/coworking";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
@@ -12,6 +12,7 @@ import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
 import { rolPuede } from "@/lib/permisosApi";
 import { apartarCargo, cargoDelPeriodo, estadoDelCargo, ligarCargoAFactura, periodoDe, soltarCargo } from "@/lib/cargosPeriodo";
 import { conceptoDelPeriodo } from "@/lib/conceptoFactura";
+import { correosExtraDe } from "@/lib/correosFactura";
 
 // El concepto de la renta del mes: el predefinido del cliente (Configuración fiscal) con el mes de hoy, o el de siempre.
 // Si la consulta falla, se queda el de siempre: nunca deja de generarse la renta por esto.
@@ -510,7 +511,7 @@ export async function POST(req: NextRequest) {
 
     const { data: cliente } = await admin
       .from("profiles")
-      .select("id, nombre, email, centro, activo, suspendido")
+      .select("id, nombre, email, centro, activo, suspendido, correos_factura")
       .eq("id", userId)
       .single();
 
@@ -545,7 +546,11 @@ export async function POST(req: NextRequest) {
       // ---------- Recordatorio X días antes ----------
       const diaRecordatorio = diaPago - DIAS_RECORDATORIO_ANTES;
       if (diaRecordatorio >= 1 && diaHoy === diaRecordatorio) {
-        const yaEnviado = await yaExisteNotifEsteMs(admin, userId, "recordatorio_pago");
+        // A quien ya pagó (o le cancelaron) la renta del mes no se le recuerda.
+        const rentaPrevia = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        const estadoPrevio = rentaPrevia ? await estadoDelCargo(admin, rentaPrevia) : null;
+        const yaEnviado =
+          (!!estadoPrevio && (estadoPrevio.liquidada || estadoPrevio.cancelada)) || (await yaExisteNotifEsteMs(admin, userId, "recordatorio_pago"));
         if (!yaEnviado) {
           await admin.from("notificaciones").insert({
             centro: cliente.centro,
@@ -560,6 +565,7 @@ export async function POST(req: NextRequest) {
             monto: montoMes,
             diaPago,
             diasFaltan: DIAS_RECORDATORIO_ANTES,
+            copias: correosExtraDe(cliente),
           });
           resumen.recordatorios++;
         }
@@ -569,6 +575,8 @@ export async function POST(req: NextRequest) {
       if (diaHoy === diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         let rentaYaResuelta = false;
+        // Lo que dice su estado de cuenta (si se integró a mano puede llevar más que la renta).
+        let montoAviso = montoMes;
 
         if (!rentaMes) {
           const cargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta", origen: "cron" });
@@ -591,6 +599,7 @@ export async function POST(req: NextRequest) {
         } else {
           const estadoRenta = await estadoDelCargo(admin, rentaMes);
           rentaYaResuelta = !!estadoRenta && (estadoRenta.liquidada || estadoRenta.cancelada);
+          if (estadoRenta) montoAviso = Number(estadoRenta.factura.monto);
           if (rentaMes.origen === "integrada" && !estadoRenta?.cancelada && conCoworking.has(userId)) {
             await voucherMensualSiFalta(admin, resumen, userId, cliente, inicioMes);
           }
@@ -605,19 +614,68 @@ export async function POST(req: NextRequest) {
             tipo: "pago_hoy",
             mensaje: `💰 Hoy es tu fecha de pago (día ${diaPago}).`,
           });
-          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoMes, diaPago });
+          await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoAviso, diaPago, copias: correosExtraDe(cliente) });
         }
       }
 
-      // ---------- Después de la gracia: pausar si no pagó ----------
-      const diaLimiteGracia = diaPago + DIAS_GRACIA_DESPUES;
-      if (diaHoy === diaLimiteGracia) {
-        // Solo cuenta la renta de este contrato y mes, no cualquier factura del cliente (una
-        // sala de juntas no suspende a nadie). Y no antes de su vencimiento: una integrada a
-        // mano puede traer otra fecha.
+      // ---------- Desde el día siguiente al día de pago, si no ha pagado: mora y aviso (una vez al mes) ----------
+      // Se paga del 1 al día de pago; desde el día siguiente se cobra mora (3% de la renta, como los contratos mes a
+      // mes). Va en su propio estado de cuenta, que vence con la renta del mes siguiente. Si un día no corre el cobro,
+      // el siguiente lo pone igual (las marcas evitan repetirlo).
+      if (diaHoy > diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
+        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada) {
+          const renta = Number(contrato.renta_mensual) || 0;
+          let recargo = 0;
+          if (renta > 0 && !(await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" }))) {
+            const cargoRecargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo", origen: "cron" });
+            if (cargoRecargoId) {
+              const nombreMes = hoy.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+              const siguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, Math.min(diaPago, new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0).getDate()));
+              const vencimientoSiguiente = `${siguiente.getFullYear()}-${String(siguiente.getMonth() + 1).padStart(2, "0")}-${String(siguiente.getDate()).padStart(2, "0")}`;
+              const facturaRecargoId = await crearFacturaConSpei(admin, resumen, {
+                userId,
+                cargoId: cargoRecargoId,
+                cliente,
+                monto: recargoConIva(renta),
+                concepto: `Recargo 3% por pago tardío - ${nombreMes}`,
+                folio: `REC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
+                hoyISO,
+                fechaVencimiento: vencimientoSiguiente,
+                notaSpei: "Cargo SPEI generado automático (recargo por pago tardío)",
+              });
+              if (facturaRecargoId) recargo = recargoConIva(renta);
+            }
+          }
+          if (!(await yaExisteNotifEsteMs(admin, userId, "aviso_suspension"))) {
+            await admin.from("notificaciones").insert({
+              centro: cliente.centro,
+              user_id: userId,
+              tipo: "aviso_suspension",
+              mensaje: `⚠️ Tu fecha límite de pago fue el día ${diaPago}${recargo ? " y se generó un recargo del 3% por pago tardío" : ""}. Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.`,
+            });
+            await enviarAvisoPago({
+              to: cliente.email,
+              nombre: cliente.nombre,
+              tipo: "suspension",
+              monto: Number(estadoRenta.factura.monto),
+              diaPago,
+              recargo,
+              copias: correosExtraDe(cliente),
+            });
+            resumen.recordatorios++;
+          }
+        }
+      }
 
+      // ---------- Después de la gracia: la renta sin pagar queda vencida ----------
+      // Ya no se suspende solo: lo deciden la admin o Cobranza (Cobranza → ⋯ → Suspender servicios). Al cliente se le
+      // avisó el día de pago y el día siguiente.
+      const diaLimiteGracia = diaPago + DIAS_GRACIA_DESPUES;
+      if (diaHoy === diaLimiteGracia) {
+        const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
+        const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
         if (
           estadoRenta &&
           !estadoRenta.liquidada &&
@@ -625,49 +683,6 @@ export async function POST(req: NextRequest) {
           (!estadoRenta.factura.fecha_vencimiento || hoyISO > estadoRenta.factura.fecha_vencimiento)
         ) {
           await admin.from("facturas").update({ estado: "vencida" }).eq("id", estadoRenta.factura.id);
-          await admin
-            .from("profiles")
-            .update({ suspendido: true, suspendido_desde: hoyISO })
-            .eq("id", userId);
-
-          // Revocar su voucher activo (si tenía uno real)
-          const { data: voucherActivo } = await admin
-            .from("vouchers")
-            .select("id, unifi_id, centro")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (voucherActivo?.unifi_id && voucherActivo.centro) {
-            try {
-              await eliminarVoucherReal(voucherActivo.centro, voucherActivo.unifi_id);
-            } catch (err: any) {
-              resumen.errores.push(`Revocar voucher ${cliente.email}: ${err.message}`);
-            }
-          }
-
-          await admin.from("notificaciones").insert({
-            centro: cliente.centro,
-            user_id: userId,
-            tipo: "cuenta_pausada",
-            mensaje: `⚠️ Tu fecha límite de pago fue el día ${diaPago}. Comunícate con el administrador — tus servicios han sido pausados.`,
-          });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "cuenta_pausada",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  diaPago,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
-          resumen.suspendidos++;
         }
       }
     } catch (err: any) {

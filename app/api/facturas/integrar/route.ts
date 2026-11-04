@@ -7,6 +7,7 @@ import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { accesoCliente } from "@/lib/facturasAcceso";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 import { rentaOcupada } from "@/lib/cargosPeriodo";
+import { DIA_LIMITE_PAGO_MENSUAL } from "@/lib/formaPago";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const DIAS_PARA_PAGAR = 10;
@@ -112,6 +113,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // La renta se paga del 1 al día de pago de su contrato (hoy el 10): ahí vence, y desde el día siguiente corre la mora.
+  // Si se integra ya pasado ese día, vence el mismo día. Sin renta, como antes: a 10 días.
+  let vencimiento = sumarDias(fecha, DIAS_PARA_PAGAR);
+  if (rentas.length > 0) {
+    const { data: diasPago } = await admin.from("contratos").select("id, dia_pago").in("id", rentas.map((l) => l.rentaContratoId as string));
+    const limites = rentas.map((l) => {
+      const [a, m] = String(l.rentaPeriodo).split("-").map(Number);
+      const dia = Math.min(Number((diasPago || []).find((c) => c.id === l.rentaContratoId)?.dia_pago) || DIA_LIMITE_PAGO_MENSUAL, new Date(a, m, 0).getDate());
+      return `${a}-${String(m).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+    });
+    const limite = limites.sort()[0];
+    vencimiento = limite < fecha ? fecha : limite;
+  }
+
   const serie = serieCentro(centro);
   const folio = `${serie || "FAC"}-${Date.now().toString().slice(-6)}`;
   const { data: factura, error: errFactura } = await admin
@@ -122,7 +137,7 @@ export async function POST(req: NextRequest) {
       concepto,
       monto: total,
       fecha_emision: fecha,
-      fecha_vencimiento: sumarDias(fecha, DIAS_PARA_PAGAR),
+      fecha_vencimiento: vencimiento,
       // Si todo lo que se integra ya está pagado (sin líneas nuevas), el estado de cuenta nace pagado y se factura PUE.
       estado: nuevas.length === 0 && (pagosExistentes || []).length > 0 && (pagosExistentes || []).every((p) => p.estado === "pagado") ? "pagada" : "pendiente",
       centro,
