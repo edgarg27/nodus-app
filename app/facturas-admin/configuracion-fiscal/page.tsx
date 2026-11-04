@@ -18,6 +18,8 @@ import Link from "next/link";
 import { conceptoDelPeriodo, tieneMes } from "@/lib/conceptoFactura";
 import { MAXIMO_CORREOS_EXTRA, correosExtraDe } from "@/lib/correosFactura";
 import { correoVisible } from "@/lib/correoFicticio";
+import { METODOS_PAGO, textoPagoHabitual } from "@/lib/pagoHabitual";
+import { FORMAS_PAGO_SAT } from "@/lib/formasPagoSat";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Configuración fiscal: los datos fiscales de cada cliente, con los que se timbran sus facturas. La administradora los
@@ -39,6 +41,8 @@ type ClienteFiscal = {
   uso_cfdi: string | null;
   concepto_factura?: string | null;
   correos_factura?: string[] | null;
+  metodo_pago_habitual?: string | null;
+  forma_pago_habitual?: string | null;
   porContrato?: boolean;
 } & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
@@ -58,6 +62,33 @@ export default function ConfiguracionFiscalPage() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
+  // "Pago habitual": cómo paga normalmente el cliente; se propone al integrar por lote, al timbrar y en Cobranza.
+  const [editandoPago, setEditandoPago] = useState<ClienteFiscal | null>(null);
+  const [formPago, setFormPago] = useState({ metodo: "", forma: "" });
+  const [guardandoPago, setGuardandoPago] = useState(false);
+  const [errorPago, setErrorPago] = useState("");
+
+  function abrirPago(c: ClienteFiscal) {
+    setEditandoPago(c);
+    setFormPago({ metodo: c.metodo_pago_habitual || "", forma: c.forma_pago_habitual || "" });
+    setErrorPago("");
+  }
+
+  async function guardarPago() {
+    if (!editandoPago) return;
+    setGuardandoPago(true);
+    setErrorPago("");
+    const res = await fetch("/api/facturas/pago-habitual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: editandoPago.id, ...formPago }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setGuardandoPago(false);
+    if (!res.ok) return setErrorPago(data.error || "No se pudo guardar");
+    setClientes((cs) => cs.map((x) => (x.id === editandoPago.id ? { ...x, ...data.datos } : x)));
+    setEditandoPago(null);
+  }
 
   const esGlobal = ROLES_GLOBALES.includes(rol);
   const puedeEditar = rolPuede(rol, "facturaEmitir");
@@ -200,6 +231,7 @@ export default function ConfiguracionFiscalPage() {
                     <th>C.P.</th>
                     <th>Domicilio</th>
                     <th>Uso CFDI</th>
+                    <th>Pago habitual</th>
                     <th>Estado</th>
                     <th></th>
                   </tr>
@@ -225,6 +257,15 @@ export default function ConfiguracionFiscalPage() {
                         <td>{textoDomicilioFiscal(c) || "—"}</td>
                         <td className="ft-nowrap">{c.uso_cfdi || "—"}</td>
                         <td>
+                          {puedeEditar ? (
+                            <button type="button" className="ft-btn-sec" style={{ whiteSpace: "normal", textAlign: "left" }} onClick={() => abrirPago(c)}>
+                              {textoPagoHabitual(c) || "Elegir"}
+                            </button>
+                          ) : (
+                            textoPagoHabitual(c) || "—"
+                          )}
+                        </td>
+                        <td>
                           <span className={"ft-chip ft-chip-" + e.tipo} title={e.detalle || ""}>
                             {e.texto}
                           </span>
@@ -245,6 +286,54 @@ export default function ConfiguracionFiscalPage() {
           )}
         </div>
       </div>
+
+      {editandoPago && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => !guardandoPago && setEditandoPago(null)}
+        >
+          <div className="form-card fac-facturar" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="fac-facturar-cerrar" aria-label="Cerrar" disabled={guardandoPago} onClick={() => setEditandoPago(null)}>
+              ×
+            </button>
+            <h2 className="fac-facturar-titulo">Pago habitual</h2>
+            <p className="fac-facturar-sub">{editandoPago.nombre_fiscal || editandoPago.empresa || editandoPago.nombre}</p>
+            <div className="fac-facturar-fila">
+              <label>Método de pago</label>
+              <div>
+                <select value={formPago.metodo} onChange={(e) => setFormPago({ ...formPago, metodo: e.target.value })}>
+                  <option value="">Según su estado (pagado PUE · pendiente PPD)</option>
+                  {METODOS_PAGO.map((m) => (
+                    <option key={m.clave} value={m.clave}>
+                      {m.texto}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="fac-facturar-fila">
+              <label>Forma de pago</label>
+              <div>
+                <select value={formPago.forma} onChange={(e) => setFormPago({ ...formPago, forma: e.target.value })}>
+                  <option value="">Sin definir</option>
+                  {FORMAS_PAGO_SAT.filter((f) => f.clave !== "99").map((f) => (
+                    <option key={f.clave} value={f.clave}>
+                      {f.clave} · {f.texto}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="fac-facturar-nota">Se propone al integrar por lote, al timbrar desde su estado de cuenta y al registrar su pago en Cobranza; ahí se puede cambiar.</p>
+            {errorPago && <p style={{ fontSize: 13, color: "#A32D2D", margin: "8px 0 0" }}>{errorPago}</p>}
+            <div className="fac-facturar-botones">
+              <button type="button" className="btn-exportar fac-naranja" disabled={guardandoPago} onClick={guardarPago}>
+                {guardandoPago ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editando && (
         <div

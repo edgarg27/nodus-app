@@ -50,10 +50,10 @@ export async function GET(req: NextRequest) {
 
   const userIds = Array.from(new Set((cobros || []).map((c) => c.user_id as string)));
   const tiposPorUsuario = new Map<string, Set<string>>();
-  let perfiles: { id: string; nombre: string | null; email: string | null; empresa: string | null; rfc: string | null; nombre_fiscal: string | null; regimen_fiscal: string | null; cp_fiscal: string | null }[] = [];
+  let perfiles: { id: string; nombre: string | null; email: string | null; empresa: string | null; rfc: string | null; nombre_fiscal: string | null; regimen_fiscal: string | null; cp_fiscal: string | null; metodo_pago_habitual?: string | null; forma_pago_habitual?: string | null }[] = [];
   if (userIds.length > 0) {
     const [{ data: p }, { data: contratos }] = await Promise.all([
-      admin.from("profiles").select("id, nombre, email, empresa, rfc, nombre_fiscal, regimen_fiscal, cp_fiscal").in("id", userIds),
+      admin.from("profiles").select("id, nombre, email, empresa, rfc, nombre_fiscal, regimen_fiscal, cp_fiscal, metodo_pago_habitual, forma_pago_habitual").in("id", userIds),
       admin.from("contratos").select("user_id, oficina_id, paquete_id").eq("estatus", "vigente").in("user_id", userIds),
     ]);
     perfiles = p || [];
@@ -90,6 +90,9 @@ export async function GET(req: NextRequest) {
         cliente: p?.nombre_fiscal || p?.empresa || p?.nombre || "Cliente",
         correo: p?.email || "",
         rfc: p?.rfc || "",
+        // Cómo paga normalmente (Configuración fiscal → Pago habitual).
+        metodoHabitual: p?.metodo_pago_habitual || null,
+        formaHabitual: p?.forma_pago_habitual || null,
         tipos,
         completo,
         avisos,

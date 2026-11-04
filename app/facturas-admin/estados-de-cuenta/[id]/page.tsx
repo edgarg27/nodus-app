@@ -48,7 +48,18 @@ type Factura = {
   envios_estado?: number | null;
 };
 type Pago = { id: string; concepto: string | null; monto: number; estado: string; adicional_tipo: string | null; created_at: string; comprobante_url?: string | null; fecha_pago?: string | null };
-type Cliente = { numero_usuario?: string | number | null; nombre: string; email: string; empresa: string | null; nombre_fiscal: string | null; rfc: string | null; regimen_fiscal: string | null; cp_fiscal: string | null };
+type Cliente = {
+  numero_usuario?: string | number | null;
+  nombre: string;
+  email: string;
+  empresa: string | null;
+  nombre_fiscal: string | null;
+  rfc: string | null;
+  regimen_fiscal: string | null;
+  cp_fiscal: string | null;
+  metodo_pago_habitual?: string | null;
+  forma_pago_habitual?: string | null;
+};
 type Complemento = { id: string; serie: string | null; folio_fiscal: string | null; fecha_pago: string; monto: number; uuid_cfdi: string | null; cancelacion_estatus: string | null; importe: number };
 
 const ESTADO_PAGO: Record<string, string> = { pendiente: "Pendiente", pagado: "Pagado", cancelado: "Cancelado" };
@@ -183,7 +194,7 @@ export default function EstadoDeCuentaPage() {
     setFactura(f as Factura);
     const [{ data: ps }, { data: cl }, { data: filas }] = await Promise.all([
       supabase.from("pagos").select("id, concepto, monto, estado, adicional_tipo, created_at, comprobante_url, fecha_pago").eq("factura_id", id).order("created_at", { ascending: true }),
-      f.user_id ? supabase.from("profiles").select("numero_usuario, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal").eq("id", f.user_id).maybeSingle() : Promise.resolve({ data: null }),
+      f.user_id ? supabase.from("profiles").select("numero_usuario, nombre, email, empresa, nombre_fiscal, rfc, regimen_fiscal, cp_fiscal, metodo_pago_habitual, forma_pago_habitual").eq("id", f.user_id).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from("complemento_pago_facturas").select("complemento_id, importe").eq("factura_id", id),
     ]);
     setPagos((ps as Pago[]) || []);
@@ -521,8 +532,10 @@ export default function EstadoDeCuentaPage() {
   }
 
   function abrirTimbrar() {
-    setMetodo(factura?.estado === "pagada" ? "PUE" : "PPD");
-    setFormaPago("03");
+    // Su pago habitual (Configuración fiscal), si lo tiene. Lo ya pagado siempre es PUE.
+    const habitual = cliente?.metodo_pago_habitual === "PUE" || cliente?.metodo_pago_habitual === "PPD" ? cliente.metodo_pago_habitual : null;
+    setMetodo(factura?.estado === "pagada" ? "PUE" : habitual || "PPD");
+    setFormaPago(cliente?.forma_pago_habitual || "03");
     setCondiciones("Contado");
     setCuentaPago("");
     setTipoRelacion("");
