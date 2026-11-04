@@ -897,6 +897,16 @@ export default function CotizarForm({
   const [fechaFin, setFechaFin] = useState("");
   const [horaInicio, setHoraInicio] = useState(HORAS[0]);
 
+  // Paquete de horas (Coworking 30 horas): las horas valen un mes, así que solo se cotiza por Mes y por 1 mes; la fecha
+  // final sale sola (lib/horasCowork.ts lo cuenta como banco único de su vigencia).
+  const esPaqueteHoras = !!paquete && Number(paquete.horas_bolsa) > 0;
+  useEffect(() => {
+    if (!esPaqueteHoras) return;
+    if (modalidadPaquete !== "Mes") setModalidadPaquete("Mes");
+    if (cantidadPeriodo !== "1") setCantidadPeriodo("1");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esPaqueteHoras, modalidadPaquete, cantidadPeriodo]);
+
   useEffect(() => {
     if (modalidadEfectiva === "Hora") {
       setFechaFin(fechaInicio);
@@ -1836,6 +1846,13 @@ export default function CotizarForm({
         estatus: esCambioDeEspacio ? "vigente" : "pre_aprobado",
         archivo_url: null,
         cotizacion_id: cotizacion.id,
+        // Mientras no tenga cuenta, el contrato muestra el nombre del prospecto (si no, en Contratos salía "Cliente").
+        ...(clienteIdEfectivo
+          ? {}
+          : {
+              cliente_nombre_historico: nombreContesta.trim() || null,
+              cliente_email_historico: correoContesta.trim() || null,
+            }),
       })
       .select()
       .single();
@@ -2872,12 +2889,17 @@ export default function CotizarForm({
                 {MODALIDADES.map((m) => {
                   const tarifa = tarifaPaquete(paquete, m);
                   return (
-                    <option key={m} value={m} disabled={tarifa == null}>
+                    <option key={m} value={m} disabled={tarifa == null || (esPaqueteHoras && m !== "Mes")}>
                       {m} {tarifa != null ? `· $${tarifa.toLocaleString("es-MX")}` : "· No disponible"}
                     </option>
                   );
                 })}
               </select>
+              {esPaqueteHoras && (
+                <p style={{ fontSize: 12, color: "#854F0B", margin: "6px 0 0" }}>
+                  Paquete de {paquete.horas_bolsa} horas: se cotiza solo por 1 mes y las horas se usan dentro de ese mes (en cualquier centro con coworking).
+                </p>
+              )}
               {!MODALIDADES.some((m) => tarifaPaquete(paquete, m) != null) && (
                 <p style={{ fontSize: 12, color: "#A32D2D", margin: "6px 0 0" }}>
                   Este paquete no tiene tarifas configuradas. Agrégalas desde el módulo Paquetes.
@@ -3130,11 +3152,11 @@ export default function CotizarForm({
                   <p className="sub-label">
                     {modalidadEfectiva ? `Cantidad de ${LABEL_MODALIDAD_PLURAL[modalidadEfectiva]}` : "Duración (meses)"}
                   </p>
-                  <input type="number" min={0} value={cantidadPeriodo} onChange={(e) => setCantidadPeriodo(e.target.value)} />
+                  <input type="number" min={0} value={cantidadPeriodo} disabled={esPaqueteHoras} onChange={(e) => setCantidadPeriodo(e.target.value)} />
                 </div>
                 <div>
                   <p className="sub-label">Fecha final</p>
-                  <input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
+                  <input type="date" value={fechaFin} readOnly={esPaqueteHoras} onChange={(e) => setFechaFin(e.target.value)} />
                 </div>
               </>
             )}
