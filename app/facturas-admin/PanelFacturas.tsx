@@ -767,6 +767,39 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     const f = facturas.find((x) => x.id === id);
     return !!f && sePuedeCancelar(f);
   });
+  // Integraciones sin timbrar ni cobrar: se pueden borrar (la base revisa lo demás, ver /api/facturas/borrar).
+  // Las del cobro diario (folio FAC-AAAAMM-…) no: el cobro diario las volvería a generar.
+  const seleccionBorrables = seleccion.filter((id) => {
+    const f = facturas.find((x) => x.id === id);
+    return !!f && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada" && !/^FAC-\d{6}-/.test(f.folio || "");
+  });
+  const [modalBorrar, setModalBorrar] = useState<string[] | null>(null);
+  const [borrando, setBorrando] = useState(false);
+  const [errorBorrar, setErrorBorrar] = useState("");
+
+  async function confirmarBorrar() {
+    if (!modalBorrar) return;
+    setBorrando(true);
+    setErrorBorrar("");
+    const res = await fetch("/api/facturas/borrar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ facturaIds: modalBorrar }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setBorrando(false);
+    if (!res.ok) return setErrorBorrar(data.error || "No se pudieron borrar");
+    const resultados: { folio: string; ok: boolean; error?: string }[] = data.resultados || [];
+    const borrados = resultados.filter((r) => r.ok).length;
+    const fallidos = resultados.filter((r) => !r.ok);
+    setModalBorrar(null);
+    setSeleccion([]);
+    setAvisoCancelar(
+      (borrados > 0 ? `✓ ${borrados} estado(s) de cuenta borrado(s). ` : "") +
+        (fallidos.length > 0 ? "✗ No se borró: " + fallidos.map((r) => `${r.folio} (${r.error})`).join(" · ") : "")
+    );
+    if (centro) fetchTodo(centro);
+  }
 
   function abrirCancelar(ids: string[]) {
     setTipoCancelar("factura");
@@ -921,6 +954,18 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                 {puedoCancelar && seleccionCancelables.length > 0 && (
                   <button className="btn-exportar" style={{ color: "#A32D2D" }} onClick={() => abrirCancelar(seleccionCancelables)}>
                     Cancelar seleccionadas ({seleccionCancelables.length})
+                  </button>
+                )}
+                {puedoCancelar && seleccionBorrables.length > 0 && (
+                  <button
+                    className="btn-exportar"
+                    style={{ color: "#A32D2D" }}
+                    onClick={() => {
+                      setErrorBorrar("");
+                      setModalBorrar(seleccionBorrables);
+                    }}
+                  >
+                    Borrar seleccionadas ({seleccionBorrables.length})
                   </button>
                 )}
                 <button
@@ -1325,6 +1370,38 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                   <div className="fac-facturar-botones">
                     <button type="button" className="btn-exportar fac-naranja" disabled={facturando || !condLote.trim()} onClick={() => facturarCobros(loteFacturar)}>
                       {facturando ? "Timbrando..." : `Timbrar ${loteFacturar.length}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {modalBorrar && (
+              <div
+                style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+                onClick={() => !borrando && setModalBorrar(null)}
+              >
+                <div className="form-card" style={{ maxWidth: 460, width: "100%", maxHeight: "90vh", overflow: "auto" }} onClick={(e) => e.stopPropagation()}>
+                  <p className="contrato-cliente-nombre">
+                    ¿Borrar {modalBorrar.length === 1 ? "este estado de cuenta" : `estos ${modalBorrar.length} estados de cuenta`}?
+                  </p>
+                  <p style={{ fontSize: 13, color: "#555", margin: "4px 0 6px" }}>
+                    {modalBorrar
+                      .map((id) => facturas.find((f) => f.id === id)?.folio)
+                      .filter(Boolean)
+                      .join(", ")}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#555", margin: "0 0 6px" }}>
+                    Los adicionales que se habían ligado vuelven a quedar por integrar y la renta del mes vuelve a salir en Previa. Solo se borran los que no están timbrados ni tienen pagos.
+                  </p>
+                  <p style={{ fontSize: 12, color: "#A32D2D", margin: "0 0 10px" }}>Esta acción no se puede deshacer.</p>
+                  {errorBorrar && <p style={{ fontSize: 12, color: "#A32D2D", marginTop: 8 }}>{errorBorrar}</p>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button className="tel-borrar-btn" style={{ color: "#A32D2D", fontWeight: 700 }} disabled={borrando} onClick={confirmarBorrar}>
+                      {borrando ? "Borrando..." : "Sí, borrar"}
+                    </button>
+                    <button className="tel-borrar-btn" disabled={borrando} onClick={() => setModalBorrar(null)}>
+                      No, volver
                     </button>
                   </div>
                 </div>

@@ -46,11 +46,14 @@ export async function POST(req: NextRequest) {
 
   // El domicilio solo va en el perfil: los contratos no tienen esas columnas.
   const domicilio = domicilioParaGuardar(body);
-  const { error } = await admin.from("profiles").update({ ...datos, ...domicilio }).eq("id", userId);
+  // Concepto predefinido de sus facturas: solo si viene (el modal del cliente en el panel no lo manda). Vacío = el del sistema.
+  const concepto =
+    body && "concepto_factura" in body ? { concepto_factura: String(body.concepto_factura || "").trim().replace(/\s+/g, " ").slice(0, 200) || null } : {};
+  const { error } = await admin.from("profiles").update({ ...datos, ...domicilio, ...concepto }).eq("id", userId);
   if (error) return NextResponse.json({ error: "No se pudieron guardar los datos fiscales: " + error.message }, { status: 500 });
 
   // Contratos sin RFC real (vacío o público en general): se ponen al día. Los que ya traen un RFC van con el documento firmado.
   await admin.from("contratos").update(datos).eq("user_id", userId).or(`rfc.is.null,rfc.eq.,rfc.eq.${RFC_PUBLICO_GENERAL}`);
 
-  return NextResponse.json({ ok: true, datos: { ...datos, ...domicilio } });
+  return NextResponse.json({ ok: true, datos: { ...datos, ...domicilio, ...concepto } });
 }

@@ -5,6 +5,7 @@ import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { UBICACION_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { avisosDatosFiscales } from "@/lib/datosFiscales";
 import CargoFactura, { CLAVE_PENALIZACION, type CargoNuevo } from "./CargoFactura";
+import { conceptoDelPeriodo } from "@/lib/conceptoFactura";
 
 // Integrar por cliente (como en ZORA): centro, cliente, contrato, fecha y periodo, qué incluir (recurrentes y
 // adicionales) y el concepto. "Previa" trae lo que se le puede cobrar ese mes; se marca lo que va en la factura
@@ -22,6 +23,7 @@ type ClienteForm = {
   rfc: string | null;
   regimen_fiscal: string | null;
   cp_fiscal: string | null;
+  concepto_factura?: string | null;
   porContrato?: boolean;
 };
 type ContratoOpc = { id: string; folio: string | null; centro: string; estatus: string; renta: number; tipo: string; etiqueta: string };
@@ -74,8 +76,10 @@ export default function IntegrarPorCliente({ centroInicial, onIntegrada }: { cen
   const elegidasParaConcepto = (lineas || []).filter((l) => marcadas.includes(l.key));
   const nombresServicio = Array.from(new Set(elegidasParaConcepto.map((l) => l.servicio).filter(Boolean)));
   const periodo = `${MESES[mes - 1].toLowerCase()} ${anio}`;
-  const conceptoSugerido =
-    nombresServicio.length === 0
+  // Si Finanzas le dejó un concepto predefinido (Configuración fiscal), ese, con el mes y año elegidos.
+  const conceptoSugerido = cliente?.concepto_factura
+    ? conceptoDelPeriodo(cliente.concepto_factura, mes, anio)
+    : nombresServicio.length === 0
       ? `Prestación de servicios ${periodo}`
       : nombresServicio.length <= 3
         ? `Prestación de servicios de ${nombresServicio.length > 1 ? nombresServicio.slice(0, -1).join(", ") + " y " + nombresServicio[nombresServicio.length - 1] : nombresServicio[0]} ${periodo}`

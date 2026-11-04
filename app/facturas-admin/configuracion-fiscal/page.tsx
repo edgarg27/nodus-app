@@ -15,6 +15,8 @@ import {
   type CampoDomicilioFiscal,
 } from "@/lib/datosFiscales";
 import Link from "next/link";
+import { conceptoDelPeriodo, tieneMes } from "@/lib/conceptoFactura";
+import { hoyMexicoISO } from "@/lib/fechaMexico";
 
 // Configuración fiscal: los datos fiscales de cada cliente, con los que se timbran sus facturas. La administradora los
 // captura en el alta o aquí; Finanzas los revisa y los corrige si vienen con errores o si la empresa los cambió.
@@ -33,6 +35,7 @@ type ClienteFiscal = {
   regimen_fiscal: string | null;
   cp_fiscal: string | null;
   uso_cfdi: string | null;
+  concepto_factura?: string | null;
   porContrato?: boolean;
 } & Partial<Record<CampoDomicilioFiscal, string | null>>;
 
@@ -45,7 +48,10 @@ export default function ConfiguracionFiscalPage() {
   const [busqueda, setBusqueda] = useState("");
   const [soloConPendientes, setSoloConPendientes] = useState(false);
   const [editando, setEditando] = useState<ClienteFiscal | null>(null);
-  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03", ...DOMICILIO_FISCAL_VACIO });
+  const [form, setForm] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: "G03", concepto_factura: "", ...DOMICILIO_FISCAL_VACIO });
+  // Cómo saldría el concepto el mes que entra, para que se vea que el mes cambia solo.
+  const hoy = hoyMexicoISO();
+  const mesSiguiente = Number(hoy.slice(5, 7)) === 12 ? { mes: 1, anio: Number(hoy.slice(0, 4)) + 1 } : { mes: Number(hoy.slice(5, 7)) + 1, anio: Number(hoy.slice(0, 4)) };
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
@@ -103,6 +109,7 @@ export default function ConfiguracionFiscalPage() {
       regimen_fiscal: c.regimen_fiscal || "",
       cp_fiscal: c.cp_fiscal || "",
       uso_cfdi: c.uso_cfdi || "G03",
+      concepto_factura: c.concepto_factura || "",
       ...domicilioDePerfil(c),
     });
     setError("");
@@ -203,7 +210,10 @@ export default function ConfiguracionFiscalPage() {
                           <span className="fac-sub">{c.email}</span>
                           {c.porContrato && <span className="fac-sub">Contrato en este centro</span>}
                         </td>
-                        <td>{c.nombre_fiscal || "—"}</td>
+                        <td>
+                          {c.nombre_fiscal || "—"}
+                          {c.concepto_factura && <span className="fac-sub">Concepto: {c.concepto_factura}</span>}
+                        </td>
                         <td className="ft-nowrap">{c.rfc || "—"}</td>
                         <td>{c.regimen_fiscal || "—"}</td>
                         <td className="ft-nowrap">{c.cp_fiscal || "—"}</td>
@@ -304,6 +314,26 @@ export default function ConfiguracionFiscalPage() {
                 </div>
               </div>
             ))}
+            <p className="fac-facturar-seccion">Concepto de sus facturas</p>
+            <div className="fac-facturar-fila">
+              <label>Concepto predefinido</label>
+              <div>
+                <textarea
+                  rows={2}
+                  maxLength={200}
+                  placeholder="Ej. Prestación de servicios de OFICINA 4, Noviembre del 2026"
+                  value={form.concepto_factura}
+                  onChange={(e) => setForm({ ...form, concepto_factura: e.target.value })}
+                />
+                <p className="fac-facturar-nota">
+                  {!form.concepto_factura.trim()
+                    ? "Vacío: se usa el concepto que arma el sistema."
+                    : tieneMes(form.concepto_factura)
+                      ? `El mes cambia solo en cada factura. El mes que entra: "${conceptoDelPeriodo(form.concepto_factura, mesSiguiente.mes, mesSiguiente.anio)}"`
+                      : "No lleva mes: todas sus facturas saldrán con este mismo texto. Si escribes el mes (ej. Noviembre del 2026), cambia solo cada mes."}
+                </p>
+              </div>
+            </div>
             {avisosForm.length > 0 && <p style={{ fontSize: 12, color: "#854F0B", margin: "6px 0 0" }}>{avisosForm[0]}</p>}
             {error && <p style={{ fontSize: 13, color: "#A32D2D", margin: "8px 0 0" }}>{error}</p>}
             <p className="fac-facturar-nota">Aplica a las facturas que se emitan desde ahora. Las ya timbradas no cambian: si estaban mal, se cancelan y se vuelven a emitir.</p>

@@ -528,6 +528,9 @@ export default function EstadoDeCuentaPage() {
         <Link className="rep-back" href="/facturas-admin/estados-de-cuenta">
           ← Estados de cuenta
         </Link>
+        <Link className="rep-back" style={{ marginLeft: 18 }} href="/facturas-admin/integrar-cliente">
+          ← Regresar a integrar
+        </Link>
         <p className="rep-title">Estado de cuenta</p>
         <p className="rep-sub">{factura ? factura.folio : "Cargando..."}</p>
       </div>
@@ -1395,11 +1398,27 @@ export default function EstadoDeCuentaPage() {
               className="invitado-exito-btn"
               onClick={() => {
                 setExito(false);
-                setPestana("historial");
+                setPestana("info");
               }}
             >
-              Ir a factura generada
+              Ver estado de cuenta
             </button>
+            <div style={{ position: "relative", zIndex: 2, display: "flex", gap: 18, justifyContent: "center", marginTop: 12, fontSize: 13 }}>
+              <button
+                type="button"
+                className="tel-borrar-btn"
+                style={{ color: "#0d1b3e", fontWeight: 600, padding: 0 }}
+                onClick={() => {
+                  setExito(false);
+                  setPestana("historial");
+                }}
+              >
+                Ir a factura generada
+              </button>
+              <a className="tel-borrar-btn" style={{ color: "#0F6E56", fontWeight: 600, padding: 0 }} href="/facturas-admin/integrar-cliente">
+                Regresar a integrar
+              </a>
+            </div>
           </div>
         </div>
       )}

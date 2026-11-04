@@ -11,6 +11,15 @@ import { enviarAvisoPago } from "@/lib/correosPagos";
 import { intentarCobroAutomatico } from "@/lib/cobroAutomatico";
 import { rolPuede } from "@/lib/permisosApi";
 import { apartarCargo, cargoDelPeriodo, estadoDelCargo, ligarCargoAFactura, periodoDe, soltarCargo } from "@/lib/cargosPeriodo";
+import { conceptoDelPeriodo } from "@/lib/conceptoFactura";
+
+// El concepto de la renta del mes: el predefinido del cliente (Configuración fiscal) con el mes de hoy, o el de siempre.
+// Si la consulta falla, se queda el de siempre: nunca deja de generarse la renta por esto.
+async function conceptoRentaDe(admin: Admin, userId: string, hoy: Date, porDefecto: string) {
+  const { data } = await admin.from("profiles").select("concepto_factura").eq("id", userId).maybeSingle();
+  const plantilla = (data as { concepto_factura?: string | null } | null)?.concepto_factura;
+  return plantilla && plantilla.trim() ? conceptoDelPeriodo(plantilla, hoy.getMonth() + 1, hoy.getFullYear()) : porDefecto;
+}
 
 const DIAS_RECORDATORIO_ANTES = 3;
 const DIAS_GRACIA_DESPUES = 3;
@@ -239,7 +248,7 @@ async function procesarMensual(
       cargoId,
       cliente,
       monto: montoMes,
-      concepto: conceptoRenta,
+      concepto: await conceptoRentaDe(admin, userId, hoy, conceptoRenta),
       folio: `FAC-${sufijoFolio}`,
       hoyISO,
       fechaVencimiento: fechaLimiteISO,
@@ -570,7 +579,7 @@ export async function POST(req: NextRequest) {
               cargoId,
               cliente,
               monto: montoMes,
-              concepto: `Renta mensual - ${nombreMes}`,
+              concepto: await conceptoRentaDe(admin, userId, hoy, `Renta mensual - ${nombreMes}`),
               folio: `FAC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
               hoyISO,
               fechaVencimiento: hoyISO,
