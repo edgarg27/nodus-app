@@ -206,8 +206,11 @@ export default function IngresosCentroPage() {
 
     // Y que el cliente siga activo (no dado de baja ni suspendido) — mismo
     // criterio que usa el cron de facturación para decidir a quién cobrar.
+    // Nombre del cliente: el de su cuenta (los contratos migrados no traen el nombre histórico).
+    const nombrePorUser = new Map<string, { nombre: string; empresa: string | null }>();
     if (userIds.length > 0) {
-      const { data: perfiles } = await supabase.from("profiles").select("id, activo, suspendido").in("id", userIds);
+      const { data: perfiles } = await supabase.from("profiles").select("id, activo, suspendido, nombre, empresa, nombre_fiscal").in("id", userIds);
+      for (const p of perfiles || []) nombrePorUser.set(p.id, { nombre: p.nombre_fiscal || p.empresa || p.nombre || "", empresa: p.nombre_fiscal ? p.empresa : null });
       const activos = new Set((perfiles || []).filter((p) => p.activo && !p.suspendido).map((p) => p.id));
       contratosLista = contratosLista.filter((ct) => activos.has(ct.user_id));
     } else {
@@ -230,6 +233,35 @@ export default function IngresosCentroPage() {
             .lte("created_at", `${finMes}T23:59:59`),
         ])
       : [{ data: [] as any[] }, { data: [] as any[] }];
+
+    // La renta del mes de cada contrato: la marca de cargos_periodo dice en qué estado de cuenta quedó (integrada a mano
+    // o generada por el cobro diario), diga lo que diga su concepto. Si no se puede leer, se usa lo de antes (pagos).
+    const rentaPorContrato = new Map<string, { monto: number; cubierta: boolean }>();
+    if (ids.length > 0) {
+      const { data: marcas, error: errMarcas } = await supabase
+        .from("cargos_periodo")
+        .select("contrato_id, factura_id, pago_id")
+        .eq("periodo", inicioMes)
+        .eq("tipo", "renta")
+        .in("contrato_id", ids);
+      const facturaIds = Array.from(new Set((marcas || []).map((m) => m.factura_id).filter(Boolean))) as string[];
+      if (!errMarcas && facturaIds.length > 0) {
+        const [{ data: facturasMes }, { data: pagosFacturas }] = await Promise.all([
+          supabase.from("facturas").select("id, monto, estado, cancelacion_estatus").in("id", facturaIds),
+          supabase.from("pagos").select("id, factura_id, monto, estado").in("factura_id", facturaIds),
+        ]);
+        for (const m of marcas || []) {
+          const f = (facturasMes || []).find((x) => x.id === m.factura_id);
+          if (!f || f.estado === "cancelada" || f.cancelacion_estatus === "cancelada") continue;
+          const lineas = (pagosFacturas || []).filter((p) => p.factura_id === f.id);
+          const pagado = lineas.filter((p) => pagoEstaCubierto(p.estado)).reduce((s, p) => s + Number(p.monto), 0);
+          const cubierta =
+            pagoEstaCubierto(f.estado) ||
+            (m.pago_id ? lineas.some((p) => p.id === m.pago_id && pagoEstaCubierto(p.estado)) : lineas.length > 0 && pagado >= Number(f.monto) - 0.01);
+          rentaPorContrato.set(m.contrato_id, { monto: Number(f.monto) || 0, cubierta });
+        }
+      }
+    }
 
     const adicionalesPorContrato = new Map<string, { concepto: string; monto: number }[]>();
     for (const a of adicionalesData || []) {
@@ -263,8 +295,12 @@ export default function IngresosCentroPage() {
 
       let estadoMes: ClienteIngreso["estadoMes"];
       let montoRelevante = esperado;
+      const rentaMes = rentaPorContrato.get(ct.id);
       if (ct.forma_pago === "adelantado") {
         estadoMes = "adelantado";
+      } else if (rentaMes) {
+        estadoMes = rentaMes.cubierta ? "cubierto" : "pendiente";
+        montoRelevante = rentaMes.monto || esperado;
       } else if (pagado) {
         estadoMes = "cubierto";
         montoRelevante = Number(pagado.monto) || esperado;
@@ -277,8 +313,8 @@ export default function IngresosCentroPage() {
 
       return {
         contratoId: ct.id,
-        nombre: ct.cliente_nombre_historico || "Cliente",
-        empresa: ct.cliente_empresa_historico,
+        nombre: nombrePorUser.get(ct.user_id)?.nombre || ct.cliente_nombre_historico || "Cliente",
+        empresa: nombrePorUser.get(ct.user_id)?.empresa ?? ct.cliente_empresa_historico,
         renta,
         adicionales: adicionalesMensuales,
         totalAdicionales,
