@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const RESEND_API_KEY = 're_Vx19uLSf_9FAFTMekj9S2SbHmmBRJXbAZ';
+// La llave va en los secretos de la función (Supabase → Edge Functions → Secrets → RESEND_API_KEY), nunca en el código.
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 
 const EMAILS: { [key: string]: string | string[] } = {
   sistemas: ['it.aux@nodusbc.mx', 'it.admin@nodusbc.mx'],
