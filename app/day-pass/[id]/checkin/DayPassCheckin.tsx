@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type DayPassRow = {
@@ -27,6 +27,10 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [aceptando, setAceptando] = useState(false);
+  // Al escanear el QR la llegada se registra sola (una vez); si ya estaba usado, se avisa que no se puede reutilizar.
+  const [registradoAhora, setRegistradoAhora] = useState(false);
+  const autoIntentado = useRef(false);
+  const aceptandoRef = useRef(false);
 
   useEffect(() => {
     cargar();
@@ -51,7 +55,8 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
   }
 
   async function aceptar() {
-    if (!pase) return;
+    if (!pase || aceptandoRef.current) return;
+    aceptandoRef.current = true;
     setAceptando(true);
     const {
       data: { user },
@@ -68,13 +73,25 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
       })
       .eq("id", pase.id)
       .eq("usado", false);
+    aceptandoRef.current = false;
     setAceptando(false);
     if (updateError) {
-      setError("No se pudo aceptar el Day Pass. Intenta de nuevo.");
+      setError("No se pudo registrar la llegada. Toca el botón para intentar de nuevo.");
       return;
     }
+    setRegistradoAhora(true);
     cargar();
   }
+
+  // Escanear = registrar: en cuanto carga un pase válido para hoy y sin usar, se marca su llegada.
+  useEffect(() => {
+    if (!pase || autoIntentado.current) return;
+    if (!pase.usado && pase.fecha === hoyISO()) {
+      autoIntentado.current = true;
+      aceptar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pase]);
 
   if (loading) {
     return (
@@ -136,10 +153,15 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
             <strong>{pase.fecha}</strong>
           </div>
 
-          {estado === "usado" && (
+          {estado === "usado" && registradoAhora && (
             <p className="checkin-msg checkin-msg-ok">
-              ✅ Aceptado{pase.aceptado_por_nombre ? ` por ${pase.aceptado_por_nombre}` : ""}
-              {pase.usado_en ? ` · ${new Date(pase.usado_en).toLocaleString("es-MX")}` : ""}
+              ✅ Llegada registrada{pase.usado_en ? ` · ${new Date(pase.usado_en).toLocaleString("es-MX")}` : ""}. Este Day Pass ya no se puede volver a usar.
+            </p>
+          )}
+          {estado === "usado" && !registradoAhora && (
+            <p className="checkin-msg checkin-msg-warn">
+              ⚠️ Este Day Pass ya se usó: lo registró {pase.aceptado_por_nombre || "el centro"}
+              {pase.usado_en ? ` el ${new Date(pase.usado_en).toLocaleString("es-MX")}` : ""}. No se puede volver a usar.
             </p>
           )}
           {estado === "vencido" && (
@@ -156,7 +178,7 @@ export default function DayPassCheckin({ id, miNombre }: { id: string; miNombre:
 
           {estado === "listo" && (
             <button className="checkin-btn-aceptar" onClick={aceptar} disabled={aceptando}>
-              {aceptando ? "Aceptando..." : "✅ Aceptar llegada"}
+              {aceptando ? "Registrando llegada..." : "✅ Registrar llegada"}
             </button>
           )}
         </div>

@@ -1622,10 +1622,18 @@ export default function CentroPanel({
   // Registrar la llegada sin escanear el QR: igual que el check-in del QR (/day-pass/[id]/checkin). Ya registrado, el
   // pase no se puede volver a usar.
   const [registrandoDayPass, setRegistrandoDayPass] = useState<string | null>(null);
+  // "No puedo usar el escáner": buscar el pase por su folio (NODUS-019 o 19) y registrar su llegada a mano.
+  const [manualDayPass, setManualDayPass] = useState<{ folio: string; pase: DayPass | null; buscado: boolean } | null>(null);
+  function buscarDayPassPorFolio(texto: string) {
+    const n = parseInt(texto.replace(/\D/g, ""), 10);
+    const pase = Number.isFinite(n) ? dayPasses.find((dp) => Number(dp.folio) === n) || null : null;
+    setManualDayPass({ folio: texto, pase, buscado: true });
+  }
   const registrandoDayPassRef = useRef(false);
-  async function registrarLlegadaDayPass(dp: DayPass) {
+  // sinConfirmar: desde el registro manual por folio, que ya es un paso explícito.
+  async function registrarLlegadaDayPass(dp: DayPass, sinConfirmar = false) {
     if (registrandoDayPassRef.current) return;
-    if (!(await confirmar("Registrar llegada", `¿${dp.nombre} ya llegó? Su Day Pass NODUS-${String(dp.folio).padStart(3, "0")} queda usado y ya no se puede volver a usar.`, "Sí, ya llegó"))) return;
+    if (!sinConfirmar && !(await confirmar("Registrar llegada", `¿${dp.nombre} ya llegó? Su Day Pass NODUS-${String(dp.folio).padStart(3, "0")} queda usado y ya no se puede volver a usar.`, "Sí, ya llegó"))) return;
     registrandoDayPassRef.current = true;
     setRegistrandoDayPass(dp.id);
     const {
@@ -3371,9 +3379,14 @@ export default function CentroPanel({
                           };
                           return (
                             <>
-                              <p className="panel-section-label" style={{ marginTop: 16 }}>
-                                Day Passes · quién viene ({porVenir.length})
-                              </p>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, gap: 8, flexWrap: "wrap" }}>
+                                <p className="panel-section-label" style={{ margin: 0 }}>
+                                  Day Passes · quién viene ({porVenir.length})
+                                </p>
+                                <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => setManualDayPass({ folio: "", pase: null, buscado: false })}>
+                                  📷 No puedo usar el escáner · registrar manual
+                                </button>
+                              </div>
                               {porVenir.length === 0 ? <div className="empty-card">Nadie con Day Pass para hoy ni los próximos días</div> : porVenir.map(tarjeta)}
                               {pasados.length > 0 && (
                                 <>
@@ -4802,6 +4815,70 @@ export default function CentroPanel({
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {manualDayPass && (
+        <div className="modal-overlay" onClick={() => setManualDayPass(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <p className="modal-nombre">Registrar llegada manual</p>
+            <p style={{ fontSize: 13, color: "#666", margin: "4px 0 10px" }}>Escribe el folio que trae el invitado en su pase (por ejemplo NODUS-019 o 19).</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text"
+                placeholder="Folio"
+                value={manualDayPass.folio}
+                onChange={(e) => setManualDayPass({ folio: e.target.value, pase: null, buscado: false })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") buscarDayPassPorFolio(manualDayPass.folio);
+                }}
+              />
+              <button className="reservar-btn" style={{ width: "auto" }} onClick={() => buscarDayPassPorFolio(manualDayPass.folio)}>
+                Buscar
+              </button>
+            </div>
+            {manualDayPass.buscado && !manualDayPass.pase && (
+              <p style={{ fontSize: 13, color: "#A32D2D", margin: "10px 0 0" }}>No encontré ese folio entre los Day Passes recientes de {centro}.</p>
+            )}
+            {manualDayPass.pase &&
+              (() => {
+                const dp = manualDayPass.pase;
+                const hoyDp = hoyMexicoISO();
+                return (
+                  <div className="form-card" style={{ marginTop: 10 }}>
+                    <p style={{ margin: 0, fontWeight: 700 }}>
+                      #{String(dp.folio).padStart(3, "0")} · {dp.nombre}
+                    </p>
+                    <p style={{ margin: "2px 0 8px", fontSize: 12, color: "#888" }}>
+                      {LABEL_TIPO_DAYPASS[dp.tipo]} · válido el {dp.fecha}
+                    </p>
+                    {dp.usado ? (
+                      <p style={{ margin: 0, fontSize: 13, color: "#A32D2D" }}>
+                        ⚠️ Ya se usó{dp.aceptado_por_nombre ? ` (lo registró ${dp.aceptado_por_nombre})` : ""}: no se puede volver a usar.
+                      </p>
+                    ) : dp.fecha !== hoyDp ? (
+                      <p style={{ margin: 0, fontSize: 13, color: "#854F0B" }}>
+                        ⚠️ Este pase es para el {dp.fecha}: {dp.fecha < hoyDp ? "ya venció" : "todavía no aplica"}.
+                      </p>
+                    ) : (
+                      <button
+                        className="btn-aceptar"
+                        disabled={registrandoDayPass === dp.id}
+                        onClick={async () => {
+                          await registrarLlegadaDayPass(dp, true);
+                          setManualDayPass(null);
+                        }}
+                      >
+                        {registrandoDayPass === dp.id ? "Registrando..." : "✓ Registrar llegada"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            <button className="tel-borrar-btn" style={{ marginTop: 10 }} onClick={() => setManualDayPass(null)}>
+              Cerrar
+            </button>
           </div>
         </div>
       )}
