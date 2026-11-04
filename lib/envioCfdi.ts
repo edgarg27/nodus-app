@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { enviarCfdiPorCorreo } from "@/lib/facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { correoVisible } from "@/lib/correoFicticio";
+import { correosExtraDe } from "@/lib/correosFactura";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -19,11 +20,13 @@ export async function enviarFacturaAlCliente(admin: Admin, facturaId: string): P
   if (!f.facturapi_id) return { ok: false, error: "no se emitió desde Nodus (importada): mándala desde donde se emitió" };
   if (!f.user_id) return { ok: false, error: "no tiene cliente" };
 
-  const { data: cliente } = await admin.from("profiles").select("email").eq("id", f.user_id).maybeSingle();
-  const correo = correoVisible(cliente?.email).trim();
-  if (!correo) return { ok: false, error: "el cliente no tiene correo registrado" };
+  // Al correo de su cuenta y a sus correos adicionales para facturas (Datos fiscales).
+  const { data: cliente } = await admin.from("profiles").select("email, correos_factura").eq("id", f.user_id).maybeSingle();
+  const destinos = Array.from(new Set([correoVisible(cliente?.email).trim(), ...correosExtraDe(cliente)].filter(Boolean)));
+  if (destinos.length === 0) return { ok: false, error: "el cliente no tiene correo registrado" };
+  const correo = destinos.join(", ");
 
-  const r = await enviarCfdiPorCorreo(f.facturapi_id, correo);
+  const r = await enviarCfdiPorCorreo(f.facturapi_id, destinos);
   if ("error" in r) return { ok: false, error: "no se pudo enviar el correo: " + r.error };
   await admin.from("facturas").update({ cfdi_enviado_at: new Date().toISOString() }).eq("id", f.id);
   return { ok: true, correo };
