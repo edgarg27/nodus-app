@@ -501,6 +501,34 @@ export default function ClientePanel({
           </div>
         )}
 
+        {/* Horas Cowork (p. ej. el paquete de 30 horas): cuántas le quedan y hasta cuándo, con acceso directo a reservar. */}
+        {horasBolsaTotales > 0 && saldoBolsa && (() => {
+          const contratoBolsa = contratos.find((c) => c.id === contratoId);
+          const vence = contratoBolsa ? ventanaHoras(contratoBolsa).hasta : "";
+          const venceTexto = vence ? vence.split("-").reverse().join("/") : "";
+          const quedan = saldoBolsa.disponibles;
+          return (
+            <div className="cli-estado-card">
+              <div>
+                <p className="cli-estado-label">Horas de Coworking</p>
+                <p className="cli-estado-monto" style={{ fontSize: 20 }}>
+                  {quedan > 0 ? `Te quedan ${fmtHoras(quedan)} hora${quedan === 1 ? "" : "s"} de coworking` : "Ya usaste todas tus horas de coworking"}
+                </p>
+                <p className="cli-estado-fecha">
+                  {fmtHoras(quedan)} de {fmtHoras(saldoBolsa.totales)} disponibles
+                  {saldoBolsa.apartadas > 0 ? ` · ${fmtHoras(saldoBolsa.apartadas)} apartadas` : ""}
+                  {venceTexto ? ` · vigentes hasta el ${venceTexto}` : ""}
+                </p>
+              </div>
+              {quedan > 0 && (
+                <a className="pay-btn" href={`/reservaciones?categoria=bolsa${contratoId ? `&contratoId=${contratoId}` : ""}`}>
+                  <span className="btn-text">Reservar</span>
+                </a>
+              )}
+            </div>
+          );
+        })()}
+
         {horasSalaTotales > 0 && (
           <div className="horas-banco-card">
             <div>
