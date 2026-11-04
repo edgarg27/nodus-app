@@ -166,6 +166,13 @@ function ReservacionesInner() {
 
   function abrirModalCoffee() {
     if (!seleccion) return;
+    // Horas Cowork no lleva Coffee Break: se reserva directo.
+    if (categoria === "bolsa") {
+      setQuiereCoffee(null);
+      setPaqueteCoffeeId(null);
+      confirmarReserva();
+      return;
+    }
     setQuiereCoffee(null);
     setPaqueteCoffeeId(null);
     setPersonasCoffee("");
