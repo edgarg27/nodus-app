@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { crearCargoSPEI } from "@/lib/openpay";
 import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
-import { centroTieneUnifi, generarVoucherReal, eliminarVoucherReal } from "@/lib/unifi";
+import { centroTieneUnifi, generarVoucherReal } from "@/lib/unifi";
 import { clientesConCoworking } from "@/lib/coworking";
 import { DIA_LIMITE_PAGO_MENSUAL, recargoConIva } from "@/lib/formaPago";
 import { totalAdicionalesMensuales } from "@/lib/adicionales";
@@ -641,15 +641,13 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ---------- Después de la gracia: pausar si no pagó ----------
+      // ---------- Después de la gracia: la renta sin pagar queda vencida ----------
+      // Ya no se suspende solo: lo deciden la admin o Cobranza (Cobranza → ⋯ → Suspender servicios). Al cliente se le
+      // avisó el día de pago y el día siguiente.
       const diaLimiteGracia = diaPago + DIAS_GRACIA_DESPUES;
       if (diaHoy === diaLimiteGracia) {
-        // Solo cuenta la renta de este contrato y mes, no cualquier factura del cliente (una
-        // sala de juntas no suspende a nadie). Y no antes de su vencimiento: una integrada a
-        // mano puede traer otra fecha.
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
-
         if (
           estadoRenta &&
           !estadoRenta.liquidada &&
@@ -657,49 +655,6 @@ export async function POST(req: NextRequest) {
           (!estadoRenta.factura.fecha_vencimiento || hoyISO > estadoRenta.factura.fecha_vencimiento)
         ) {
           await admin.from("facturas").update({ estado: "vencida" }).eq("id", estadoRenta.factura.id);
-          await admin
-            .from("profiles")
-            .update({ suspendido: true, suspendido_desde: hoyISO })
-            .eq("id", userId);
-
-          // Revocar su voucher activo (si tenía uno real)
-          const { data: voucherActivo } = await admin
-            .from("vouchers")
-            .select("id, unifi_id, centro")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (voucherActivo?.unifi_id && voucherActivo.centro) {
-            try {
-              await eliminarVoucherReal(voucherActivo.centro, voucherActivo.unifi_id);
-            } catch (err: any) {
-              resumen.errores.push(`Revocar voucher ${cliente.email}: ${err.message}`);
-            }
-          }
-
-          await admin.from("notificaciones").insert({
-            centro: cliente.centro,
-            user_id: userId,
-            tipo: "cuenta_pausada",
-            mensaje: `⚠️ Tu fecha límite de pago fue el día ${diaPago}. Comunícate con el administrador — tus servicios han sido pausados.`,
-          });
-          if (cliente.email) {
-            try {
-              await admin.functions?.invoke?.("send-email", {
-                body: {
-                  tipo: "cuenta_pausada",
-                  clienteEmail: cliente.email,
-                  clienteNombre: cliente.nombre,
-                  diaPago,
-                },
-              });
-            } catch {
-              /* no crítico */
-            }
-          }
-          resumen.suspendidos++;
         }
       }
     } catch (err: any) {

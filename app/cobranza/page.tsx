@@ -463,6 +463,29 @@ export default function CobranzaPage() {
     setDatos((prev) => (prev ? { ...prev, promesas: prev.promesas.map((p) => (p.id === id ? { ...p, estado } : p)) } : prev));
   }
 
+  // ---------- Suspender / reactivar (lo deciden la admin o Cobranza; ya no es automático) ----------
+  async function cambiarSuspension(c: { id: string; suspendido?: boolean | null }, nombre: string) {
+    setMenu(null);
+    const suspender = !c.suspendido;
+    if (
+      !confirm(
+        suspender
+          ? `¿Suspender los servicios de ${nombre}? Se le avisa en su panel. Al registrar su pago se reactiva sola.`
+          : `¿Reactivar los servicios de ${nombre}?`
+      )
+    )
+      return;
+    const res = await fetch("/api/cobranza/suspension", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: c.id, suspender }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) return setAviso(d.error || "No se pudo actualizar");
+    setAviso(suspender ? `Servicios de ${nombre} suspendidos` : `Servicios de ${nombre} reactivados`);
+    cargar();
+  }
+
   // ---------- Recordatorios ----------
   function abrirRecordatorio(userIds?: string[]) {
     setMenu(null);
@@ -951,6 +974,9 @@ export default function CobranzaPage() {
             </button>
             <button type="button" disabled={!puedeRegistrar || !correoVisible(menuFila.c.email)} onClick={() => abrirRecordatorio([menuFila.c.id])}>
               Enviar recordatorio
+            </button>
+            <button type="button" disabled={!puedeRegistrar} onClick={() => cambiarSuspension(menuFila.c, nombreDe(menuFila.c))}>
+              {menuFila.c.suspendido ? "Reactivar servicios" : "Suspender servicios"}
             </button>
             <a href={`/facturas-admin/estados-de-cuenta?cliente=${menuFila.c.id}`}>Ver estados de cuenta</a>
             <a href={`/facturas-admin/timbradas?cliente=${menuFila.c.id}${menuFila.c.centro ? "&centro=" + encodeURIComponent(menuFila.c.centro) : ""}`}>
