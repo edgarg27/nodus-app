@@ -208,10 +208,11 @@ export default function ContratosPage() {
       new Set((conts || []).map((ct) => ct.cotizacion_id).filter((id): id is string => !!id))
     );
     const labelPorCotizacion: Record<string, string> = {};
+    const prospectoPorCotizacion: Record<string, { nombre: string | null; email: string | null }> = {};
     if (cotizacionIds.length > 0) {
       const { data: cots } = await supabase
         .from("cotizaciones_comerciales")
-        .select("id, paquete_id, oficina_id, modalidad_paquete")
+        .select("id, paquete_id, oficina_id, modalidad_paquete, nombre_contesta_telefono, correo_contesta")
         .in("id", cotizacionIds);
       const paqueteIds = Array.from(new Set((cots || []).map((c) => c.paquete_id).filter((id): id is string => !!id)));
       const oficinaIds = Array.from(new Set((cots || []).map((c) => c.oficina_id).filter((id): id is string => !!id)));
@@ -238,15 +239,21 @@ export default function ContratosPage() {
           c.oficina_id ? `Oficina ${numeroOficinaPorId[c.oficina_id] || ""}` : null,
         ].filter(Boolean);
         labelPorCotizacion[c.id] = partes.join(" · ");
+        prospectoPorCotizacion[c.id] = { nombre: c.nombre_contesta_telefono || null, email: c.correo_contesta || null };
       });
     }
 
     setContratos(
       (conts || []).map((ct) => ({
         ...ct,
-        cliente_nombre: ct.user_id ? nombrePorId[ct.user_id] : ct.cliente_nombre_historico,
+        // Sin cuenta todavía: el nombre guardado en el contrato o, si no, el del prospecto de su cotización.
+        cliente_nombre: ct.user_id
+          ? nombrePorId[ct.user_id]
+          : ct.cliente_nombre_historico || (ct.cotizacion_id ? prospectoPorCotizacion[ct.cotizacion_id]?.nombre : null) || null,
         cliente_empresa: ct.user_id ? empresaPorId[ct.user_id] : ct.cliente_empresa_historico,
-        cliente_email: ct.user_id ? emailPorId[ct.user_id] : ct.cliente_email_historico,
+        cliente_email: ct.user_id
+          ? emailPorId[ct.user_id]
+          : ct.cliente_email_historico || (ct.cotizacion_id ? prospectoPorCotizacion[ct.cotizacion_id]?.email : null) || undefined,
         cliente_telefono: ct.user_id ? telefonoPorId[ct.user_id] : null,
         plan_nombre: ct.cotizacion_id ? labelPorCotizacion[ct.cotizacion_id] || null : null,
       }))
