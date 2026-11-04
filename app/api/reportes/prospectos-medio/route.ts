@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-const ROLES = ["admin", "gerente", "gerente_ventas", "superadmin", "sistemas", "ceo", "captive"];
-const ROLES_GLOBALES = ["gerente", "gerente_ventas", "superadmin", "sistemas", "ceo", "captive"];
+// Diseño (marketing) lo ve de todos los centros: cuánto entra por la página web, redes sociales, etc.
+const ROLES = ["admin", "gerente", "gerente_ventas", "superadmin", "sistemas", "ceo", "captive", "diseno"];
+const ROLES_GLOBALES = ["gerente", "gerente_ventas", "superadmin", "sistemas", "ceo", "captive", "diseno"];
 // Contratos que todavía no son venta (en espera de aprobar) o que se cayeron.
 const NO_VENDIDOS = ["pre_aprobado", "rechazado", "cancelado"];
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;

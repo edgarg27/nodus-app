@@ -44,7 +44,8 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/horas-cowork", roles: ["admin", "gerente"] },
   { prefijo: "/adicionales", roles: ["admin", "gerente", "gerente_ventas", "cobranza"] },
   { prefijo: "/fidelidad-admin", roles: ["admin", "gerente"] },
-  { prefijo: "/reportes", roles: ["admin", "gerente", "gerente_ventas"] },
+  // Diseño (marketing) solo ve el reporte de prospectos y ventas por medio (app/reportes/page.tsx).
+  { prefijo: "/reportes", roles: ["admin", "gerente", "gerente_ventas", "diseno"] },
   { prefijo: "/precios-sala-juntas", roles: ["admin", "gerente", "sistemas"] },
   { prefijo: "/sala-juntas", roles: ["admin", "gerente", "ventas"] },
   { prefijo: "/correos", roles: ["admin", "gerente", "ventas", "gerente_ventas"] },

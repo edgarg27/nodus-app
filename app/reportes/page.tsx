@@ -23,6 +23,25 @@ export default async function ReportesPage() {
 
   if (profile?.rol === "cliente") redirect("/dashboard-cliente");
 
+  // Diseño (marketing): solo el reporte de prospectos y ventas por medio de contacto, de todos los centros.
+  if (profile?.rol === "diseno") {
+    return (
+      <div className="panel">
+        <div className="rep-header">
+          <Link className="rep-back" href="/dashboard">
+            ← Regresar
+          </Link>
+          <p className="rep-title">Reportes</p>
+          <p className="rep-sub">Prospectos y ventas por medio de contacto</p>
+        </div>
+        <div className="rep-content">
+          <p className="rep-section-label">📣 Prospectos y ventas por medio</p>
+          <ProspectosPorMedio esGlobal />
+        </div>
+      </div>
+    );
+  }
+
   const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas"];
   const esGlobal = ROLES_GLOBALES.includes(profile?.rol || "");
   const miCentro = profile?.centro || null;
