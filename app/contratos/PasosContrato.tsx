@@ -189,7 +189,13 @@ export default function PasosContrato({
               {abriendo === urlMachote ? "Abriendo…" : "📥 Descargar machote"}
             </button>
           ) : (
-            <p className="paso-aviso">Todavía no hay machote generado para este contrato.</p>
+            <p className="paso-aviso">
+              Todavía no hay machote: se genera al aceptar su cotización en{" "}
+              <a href="/cotizaciones" style={{ color: "inherit", fontWeight: 700, textDecoration: "underline" }}>
+                Cotizaciones → ✓ Aceptar
+              </a>{" "}
+              (ahí se capturan sus datos fiscales).
+            </p>
           )}
         </div>
       </div>

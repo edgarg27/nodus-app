@@ -725,7 +725,11 @@ export default function ContratoModal({
           </div>
         ) : (
           <p className="empty-card" style={{ margin: 0 }}>
-            Todavía no hay machote generado para este contrato.
+            Todavía no hay machote: se genera al aceptar su cotización en{" "}
+            <a href="/cotizaciones" style={{ color: "#0d1b3e", fontWeight: 700, textDecoration: "underline" }}>
+              Cotizaciones → ✓ Aceptar
+            </a>{" "}
+            (ahí se capturan sus datos fiscales).
           </p>
         )}
 
