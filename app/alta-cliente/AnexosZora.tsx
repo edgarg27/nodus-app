@@ -36,6 +36,8 @@ export type ContratoZora = {
   renta_mensual: string;
   deposito_garantia: string;
   horas_sala_juntas: string;
+  // Horas Cowork del contrato (p. ej. el paquete de 30 horas).
+  horas_bolsa: string;
   oficina_id: string;
   // Vacío con oficina: sale de la oficina. Sin oficina (oficina virtual…) se elige.
   tipo_servicio: string;
@@ -59,6 +61,7 @@ export const ANEXOS_VACIOS: Anexos = {
     renta_mensual: "",
     deposito_garantia: "",
     horas_sala_juntas: "",
+    horas_bolsa: "",
     oficina_id: "",
     tipo_servicio: "",
     archivo: null,
@@ -135,6 +138,7 @@ export async function guardarAnexos(
       renta_mensual: masIva(Number(c.renta_mensual)),
       deposito_garantia: Number(c.deposito_garantia) || 0,
       horas_sala_juntas: Number(c.horas_sala_juntas) || 0,
+      horas_bolsa: Number(c.horas_bolsa) || 0,
       dia_pago: diaPago ? Number(diaPago) : null,
       oficina_id: c.oficina_id || null,
       tipo_servicio: c.tipo_servicio || null,
@@ -289,6 +293,10 @@ export default function AnexosZora({
               <div>
                 <p className="sub-label">Horas de sala de juntas al mes</p>
                 <input type="number" min="0" value={c.horas_sala_juntas} onChange={(e) => setContrato({ horas_sala_juntas: e.target.value })} />
+              </div>
+              <div>
+                <p className="sub-label">Horas Cowork (p. ej. paquete de 30 horas)</p>
+                <input type="number" min="0" value={c.horas_bolsa} onChange={(e) => setContrato({ horas_bolsa: e.target.value })} />
               </div>
               <div>
                 <p className="sub-label">Contrato firmado (PDF)</p>

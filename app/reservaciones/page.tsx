@@ -61,8 +61,12 @@ function formatHora(h: number) {
   return `${h - 12}:00 PM`;
 }
 
+// Espacio compartido de Coworking (sin cupo): ver migracion_coworking_sin_cupo.sql.
+const ESPACIO_COWORKING = "Coworking";
+
 type Reservacion = {
   id: string;
+  user_id?: string | null;
   espacio: string;
   fecha: string;
   hora_inicio: string;
@@ -114,6 +118,7 @@ function ReservacionesInner() {
   const [oficinasBolsaDelCentro, setOficinasBolsaDelCentro] = useState<{ id: string; icono: string }[]>([]);
   const [precioHoraExtra, setPrecioHoraExtra] = useState(150);
   const [miCentro, setMiCentro] = useState<string | null>(null);
+  const [miUserId, setMiUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -256,6 +261,7 @@ function ReservacionesInner() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
+    setMiUserId(user.id);
     const { data: profile } = await supabase.from("profiles").select("centro").eq("id", user.id).single();
     const c = profile?.centro || null;
     setMiCentro(c);
@@ -267,9 +273,14 @@ function ReservacionesInner() {
     const tieneBolsaEstatica = espaciosDelCentroLocal.some((e) => !esSalaDeJuntas(e.id));
     if (c && !tieneBolsaEstatica) {
       const { data: oficinasData } = await supabase.from("oficinas").select("numero, tipo").eq("centro", c).order("numero");
-      const dinamicos = (oficinasData || [])
-        .filter((o) => o.tipo && !esSalaDeJuntas(o.tipo))
-        .map((o) => ({ id: `${o.tipo} ${o.numero}`, icono: "💻" }));
+      // Los lugares de Coworking (C3, C4… compartidos) se reservan como UN solo espacio "Coworking" sin cupo:
+      // varios clientes pueden apartar la misma hora (migracion_coworking_sin_cupo.sql). Las salas de capacitación
+      // sí se reservan una por una.
+      const filas = (oficinasData || []).filter((o) => o.tipo && !esSalaDeJuntas(o.tipo));
+      const dinamicos = [
+        ...(filas.some((o) => String(o.tipo).startsWith("Coworking")) ? [{ id: ESPACIO_COWORKING, icono: "💻" }] : []),
+        ...filas.filter((o) => !String(o.tipo).startsWith("Coworking")).map((o) => ({ id: `${o.tipo} ${o.numero}`, icono: "💻" })),
+      ];
       setOficinasBolsaDelCentro(dinamicos);
     }
 
@@ -355,7 +366,7 @@ function ReservacionesInner() {
     const hasta = formatFechaISO(new Date(inicioSemana.getTime() + 6 * 86400000));
     const { data } = await supabase
       .from("reservaciones")
-      .select("id, espacio, fecha, hora_inicio, hora_fin, estado")
+      .select("id, user_id, espacio, fecha, hora_inicio, hora_fin, estado")
       .eq("espacio", espacio)
       .gte("fecha", desde)
       .lte("fecha", hasta)
@@ -370,6 +381,8 @@ function ReservacionesInner() {
   function estaOcupado(fechaISO: string, hora: number) {
     return reservas.some((r) => {
       if (r.fecha !== fechaISO || !r.hora_inicio || !r.hora_fin) return false;
+      // Coworking no tiene cupo: solo cuenta lo que ya apartó el propio cliente.
+      if (espacio === ESPACIO_COWORKING && r.user_id !== miUserId) return false;
       const ini = parseInt(r.hora_inicio.split(":")[0]);
       const fin = parseInt(r.hora_fin.split(":")[0]);
       return hora >= ini && hora < fin;
