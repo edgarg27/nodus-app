@@ -76,6 +76,7 @@ export default function ContratoModal({
     // Se muestra y se captura + IVA; en el contrato se guarda con IVA (ver rentaConIva).
     renta_mensual: contrato.renta_mensual != null ? String(quitarIva(Number(contrato.renta_mensual))) : "",
     horas_sala_juntas: String(contrato.horas_sala_juntas ?? 0),
+    horas_bolsa: String(contrato.horas_bolsa ?? 0),
     dia_pago: contrato.dia_pago ? String(contrato.dia_pago) : "",
     deposito_garantia: contrato.deposito_garantia != null ? String(contrato.deposito_garantia) : "",
     tipo_servicio: contrato.tipo_servicio || "",
@@ -388,6 +389,7 @@ export default function ContratoModal({
         fecha_vencimiento: form.fecha_vencimiento,
         renta_mensual: rentaConIva,
         horas_sala_juntas: Number(form.horas_sala_juntas) || 0,
+        horas_bolsa: Number(form.horas_bolsa) || 0,
         dia_pago: form.dia_pago ? Number(form.dia_pago) : null,
         deposito_garantia: form.deposito_garantia ? Number(form.deposito_garantia) : null,
         // Vacío con oficina: la base lo toma de la oficina (migracion_tipo_servicio.sql).
@@ -409,6 +411,7 @@ export default function ContratoModal({
       { campo: "Fecha de vencimiento", anterior: contrato.fecha_vencimiento || "", nuevo: form.fecha_vencimiento || "" },
       { campo: "Renta mensual", anterior: num(contrato.renta_mensual), nuevo: num(rentaConIva), dinero: true },
       { campo: "Horas sala de juntas", anterior: num(contrato.horas_sala_juntas), nuevo: num(form.horas_sala_juntas) },
+      { campo: "Horas Cowork", anterior: num(contrato.horas_bolsa ?? 0), nuevo: num(form.horas_bolsa) },
       { campo: "Depósito en garantía", anterior: num(contrato.deposito_garantia), nuevo: num(form.deposito_garantia), dinero: true },
       { campo: "Tipo de servicio", anterior: contrato.tipo_servicio ? etiquetaTipoServicio(contrato.tipo_servicio) : "", nuevo: form.tipo_servicio ? etiquetaTipoServicio(form.tipo_servicio) : "" },
     ];
@@ -665,6 +668,10 @@ export default function ContratoModal({
               value={form.horas_sala_juntas}
               onChange={(e) => setForm({ ...form, horas_sala_juntas: e.target.value })}
             />
+          </div>
+          <div>
+            <p className="sub-label">Horas Cowork</p>
+            <input type="number" min="0" value={form.horas_bolsa} onChange={(e) => setForm({ ...form, horas_bolsa: e.target.value })} />
           </div>
           <div>
             <p className="sub-label">Depósito de garantía</p>

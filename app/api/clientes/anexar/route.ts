@@ -16,6 +16,7 @@ type ContratoAnexo = {
   renta_mensual: number;
   deposito_garantia?: number;
   horas_sala_juntas?: number;
+  horas_bolsa?: number;
   dia_pago?: number | null;
   oficina_id?: string | null;
   tipo_servicio?: string | null;
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
         renta_mensual: Number(c.renta_mensual),
         deposito_garantia: Number(c.deposito_garantia) || 0,
         horas_sala_juntas: Number(c.horas_sala_juntas) || 0,
+        horas_bolsa: Number(c.horas_bolsa) || 0,
         dia_pago: c.dia_pago ? Number(c.dia_pago) : null,
         oficina_id: c.oficina_id || null,
         // Vacío con oficina: la base lo toma de la oficina (migracion_tipo_servicio.sql).

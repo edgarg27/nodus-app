@@ -1657,6 +1657,13 @@ export default function AdminPanel({
                   <span className="modulo-name">Sala de Juntas</span>
                 </Link>
               ) },
+              // Horas Cowork (paquete de 30 horas): saldo de cada cliente y calendario para registrar llegadas.
+              { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "horas-cowork", tarjeta: (
+                <Link className="modulo-card" href="/horas-cowork">
+                  <span className="modulo-icon">🎟️</span>
+                  <span className="modulo-name">Horas Cowork</span>
+                </Link>
+              ) },
               // Lo que antes eran pestañas del Panel de Centro: cada uno tiene
               // su propia pantalla (/centro/<módulo>), con el mismo acceso.
               { grupo: 2, ver: rol === "admin" || rol === "superadmin" || rol === "gerente", key: "invitados", tarjeta: (
