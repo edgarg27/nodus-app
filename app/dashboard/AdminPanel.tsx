@@ -1797,7 +1797,8 @@ export default function AdminPanel({
               ) },
 
               // ---------- 5. Reportes y administración ----------
-              { grupo: 4, ver: esVentasCom, key: "reportes", tarjeta: (
+              // Diseño entra a Reportes solo para "Prospectos y ventas por medio" (app/reportes/page.tsx).
+              { grupo: 4, ver: esVentasCom || rol === "diseno", key: "reportes", tarjeta: (
                 <Link className="modulo-card" href="/reportes">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/reportes.png" alt="" className="modulo-icon icon-img-32" />
