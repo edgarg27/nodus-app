@@ -778,7 +778,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     return !!f && sePuedeCancelar(f);
   });
   // Integraciones sin timbrar ni cobrar: se pueden borrar (la base revisa lo demás, ver /api/facturas/borrar).
-  // Las del cobro diario (folio FAC-AAAAMM-…) no: el cobro diario las volvería a generar.
+  // Las rentas del cobro diario (folio FAC-AAAAMM-…) no: el cobro diario las volvería a generar. Los recargos sí.
   const seleccionBorrables = seleccion.filter((id) => {
     const f = facturas.find((x) => x.id === id);
     return !!f && !f.uuid_cfdi && f.estado !== "pagada" && f.estado !== "cancelada" && !/^FAC-\d{6}-/.test(f.folio || "");

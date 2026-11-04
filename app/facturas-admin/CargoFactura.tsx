@@ -89,7 +89,7 @@ export default function CargoFactura({
       </div>
       {clave === CLAVE_PENALIZACION && (
         <p style={{ fontSize: 12, color: "#854F0B", margin: "8px 0 0" }}>
-          El monto sugerido es el 3% y se puede cambiar. Los contratos mes a mes ya generan solos un recargo del 3% pasado el día 10: revisa sus estados de cuenta para no
+          El monto sugerido es el 3% y se puede cambiar. El cobro diario ya genera solo un recargo del 3% a partir del día siguiente al día de pago (el 11): revisa sus estados de cuenta para no
           cobrarlo dos veces.
         </p>
       )}

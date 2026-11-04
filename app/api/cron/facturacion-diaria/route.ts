@@ -618,26 +618,54 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ---------- Día siguiente a la fecha límite: si no ha pagado, aviso de suspensión ----------
-      if (diaHoy === diaPago + 1) {
+      // ---------- Desde el día siguiente al día de pago, si no ha pagado: mora y aviso (una vez al mes) ----------
+      // Se paga del 1 al día de pago; desde el día siguiente se cobra mora (3% de la renta, como los contratos mes a
+      // mes). Va en su propio estado de cuenta, que vence con la renta del mes siguiente. Si un día no corre el cobro,
+      // el siguiente lo pone igual (las marcas evitan repetirlo).
+      if (diaHoy > diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
-        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada && !(await yaExisteNotifEsteMs(admin, userId, "aviso_suspension"))) {
-          await admin.from("notificaciones").insert({
-            centro: cliente.centro,
-            user_id: userId,
-            tipo: "aviso_suspension",
-            mensaje: `⚠️ Tu fecha límite de pago fue ayer (día ${diaPago}). Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.`,
-          });
-          await enviarAvisoPago({
-            to: cliente.email,
-            nombre: cliente.nombre,
-            tipo: "suspension",
-            monto: Number(estadoRenta.factura.monto),
-            diaPago,
-            copias: correosExtraDe(cliente),
-          });
-          resumen.recordatorios++;
+        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada) {
+          const renta = Number(contrato.renta_mensual) || 0;
+          let recargo = 0;
+          if (renta > 0 && !(await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" }))) {
+            const cargoRecargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo", origen: "cron" });
+            if (cargoRecargoId) {
+              const nombreMes = hoy.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+              const siguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, Math.min(diaPago, new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0).getDate()));
+              const vencimientoSiguiente = `${siguiente.getFullYear()}-${String(siguiente.getMonth() + 1).padStart(2, "0")}-${String(siguiente.getDate()).padStart(2, "0")}`;
+              const facturaRecargoId = await crearFacturaConSpei(admin, resumen, {
+                userId,
+                cargoId: cargoRecargoId,
+                cliente,
+                monto: recargoConIva(renta),
+                concepto: `Recargo 3% por pago tardío - ${nombreMes}`,
+                folio: `REC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
+                hoyISO,
+                fechaVencimiento: vencimientoSiguiente,
+                notaSpei: "Cargo SPEI generado automático (recargo por pago tardío)",
+              });
+              if (facturaRecargoId) recargo = recargoConIva(renta);
+            }
+          }
+          if (!(await yaExisteNotifEsteMs(admin, userId, "aviso_suspension"))) {
+            await admin.from("notificaciones").insert({
+              centro: cliente.centro,
+              user_id: userId,
+              tipo: "aviso_suspension",
+              mensaje: `⚠️ Tu fecha límite de pago fue el día ${diaPago}${recargo ? " y se generó un recargo del 3% por pago tardío" : ""}. Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.`,
+            });
+            await enviarAvisoPago({
+              to: cliente.email,
+              nombre: cliente.nombre,
+              tipo: "suspension",
+              monto: Number(estadoRenta.factura.monto),
+              diaPago,
+              recargo,
+              copias: correosExtraDe(cliente),
+            });
+            resumen.recordatorios++;
+          }
         }
       }
 
