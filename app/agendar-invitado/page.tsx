@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ConsultaTarjetaFidelidad from "@/app/components/ConsultaTarjetaFidelidad";
 import { WHATSAPP_MOSTRAR, whatsappUrl } from "@/lib/contacto";
@@ -103,7 +103,19 @@ export default function AgendarInvitadoPage() {
   const [notas, setNotas] = useState("");
 
   const [enviando, setEnviando] = useState(false);
+  // Evita mandar la solicitud dos veces con un doble clic (antes llegaban dos solicitudes y dos avisos).
+  const enviandoRef = useRef(false);
   const [error, setError] = useState("");
+
+  // Hoy solo se ofrecen las horas que todavía no pasan.
+  const horasDisponibles = useMemo(() => {
+    if (fechaDeseada !== hoyISO()) return HORAS;
+    const ahora = new Date().getHours();
+    return HORAS.filter((h) => h > ahora);
+  }, [fechaDeseada]);
+  useEffect(() => {
+    if (horasDisponibles.length > 0 && !horasDisponibles.includes(horaLlegada)) setHoraLlegada(horasDisponibles[0]);
+  }, [horasDisponibles, horaLlegada]);
 
   const tipoInfo = DAY_PASSES.find((t) => t.id === tipo) || null;
 
@@ -138,11 +150,16 @@ export default function AgendarInvitadoPage() {
   }
 
   async function enviarSolicitud() {
-    if (!tipo) return;
+    if (!tipo || enviandoRef.current) return;
     setError("");
+    if (!horasDisponibles.includes(horaLlegada)) {
+      setError(horasDisponibles.length === 0 ? "Ya no hay horarios para hoy: elige otra fecha." : "Esa hora ya pasó: elige otra.");
+      return;
+    }
 
     const horaInicio = `${String(horaLlegada).padStart(2, "0")}:00`;
 
+    enviandoRef.current = true;
     setEnviando(true);
     const { error: insertError } = await supabase.from("solicitudes_invitados").insert({
       tipo,
@@ -160,9 +177,9 @@ export default function AgendarInvitadoPage() {
       notas: notas.trim() || null,
       estado: "pendiente",
     });
-    setEnviando(false);
-
     if (insertError) {
+      enviandoRef.current = false;
+      setEnviando(false);
       setError("No se pudo enviar tu solicitud. Intenta de nuevo en un momento.");
       return;
     }
@@ -191,10 +208,12 @@ export default function AgendarInvitadoPage() {
       // no crítico
     }
 
+    setEnviando(false);
     setPaso("enviado");
   }
 
   function reiniciar() {
+    enviandoRef.current = false;
     setPaso("menu");
     setTipo(null);
     setForm({ nombre: "", telefono: "", email: "", empresa: "", centro: CENTROS[0] });
@@ -371,25 +390,29 @@ export default function AgendarInvitadoPage() {
             <input type="date" min={hoyISO()} value={fechaDeseada} onChange={(e) => setFechaDeseada(e.target.value)} />
 
             <p className="sub-label">Hora de llegada aproximada</p>
-            <select value={horaLlegada} onChange={(e) => setHoraLlegada(Number(e.target.value))}>
-              {HORAS.map((h) => (
+            <select value={horaLlegada} onChange={(e) => setHoraLlegada(Number(e.target.value))} disabled={horasDisponibles.length === 0}>
+              {horasDisponibles.map((h) => (
                 <option key={h} value={h}>
                   {formatHora(h)}
                 </option>
               ))}
             </select>
 
+            {horasDisponibles.length === 0 && (
+              <p style={{ color: "#A32D2D", fontSize: 13, margin: "6px 0 0" }}>Ya no hay horarios para hoy: elige otra fecha.</p>
+            )}
+
             <p className="sub-label">¿Algo más que debamos saber? (opcional)</p>
             <textarea placeholder="Comentarios" value={notas} onChange={(e) => setNotas(e.target.value)} />
 
             <div className="nota-info">
-              ⏳ Esto es una solicitud, no una reservación confirmada. El centro revisará disponibilidad y te
-              contactará para confirmar.
+              ⏳ Esto es una solicitud, no una reservación confirmada. El centro revisará disponibilidad y, al
+              confirmarla, te llegará tu Day Pass por correo{form.email.trim() ? ` a ${form.email.trim()}` : ""}.
             </div>
 
             {error && <p style={{ color: "#A32D2D", fontSize: 13 }}>{error}</p>}
 
-            <button className="reservar-btn" onClick={enviarSolicitud} disabled={enviando}>
+            <button className="reservar-btn" onClick={enviarSolicitud} disabled={enviando || horasDisponibles.length === 0}>
               {enviando ? "Enviando..." : "Enviar solicitud"}
             </button>
           </div>
@@ -420,8 +443,8 @@ export default function AgendarInvitadoPage() {
               </div>
               <p className="exito-titulo">¡Listo, {form.nombre.split(" ")[0]}!</p>
               <p className="exito-mensaje">
-                Tu solicitud llegó a {form.centro}. Te contactaremos al {form.telefono || form.email} para confirmar
-                todos los detalles.
+                Tu solicitud llegó a {form.centro}. Cuando el centro la confirme, te llegará tu Day Pass por correo
+                {form.email ? ` a ${form.email}` : ""}.
               </p>
               <button className="exito-btn" onClick={reiniciar}>
                 Hacer otra solicitud
