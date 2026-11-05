@@ -53,9 +53,10 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
           convertidos: t.convertidos + f.convertidos,
           contratos: t.contratos + f.contratos,
           rentaMensual: t.rentaMensual + f.rentaMensual,
+          montoTotal: t.montoTotal + (f.montoTotal || 0),
           cobrado: t.cobrado + f.cobrado,
         }),
-        { prospectos: 0, convertidos: 0, contratos: 0, rentaMensual: 0, cobrado: 0 }
+        { prospectos: 0, convertidos: 0, contratos: 0, rentaMensual: 0, montoTotal: 0, cobrado: 0 }
       ),
     [filas]
   );
@@ -72,6 +73,7 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
         "Conversión %": pct(f.convertidos, f.prospectos),
         "Contratos cerrados": f.contratos,
         "Renta mensual vendida": f.rentaMensual,
+        "Monto total de los contratos": f.montoTotal,
         "Cobrado en el periodo": f.cobrado,
       })),
       Ventas: ventas.map((v) => ({
@@ -84,6 +86,8 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
         "Registró el prospecto": v.registroProspecto,
         Medio: v.medio,
         "Renta mensual": v.rentaMensual,
+        Meses: v.meses,
+        "Monto total del contrato": v.montoTotal,
         "Cobrado en el periodo": v.cobrado,
         Estatus: v.estatus,
       })),
@@ -151,6 +155,7 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
                 <th className="pm-num">Conversión</th>
                 <th className="pm-num">Contratos</th>
                 <th className="pm-num">Renta mensual vendida</th>
+                <th className="pm-num">Monto total del contrato</th>
                 <th className="pm-num">Cobrado</th>
               </tr>
             </thead>
@@ -175,6 +180,9 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
                   <td className="pm-num">
                     <strong>{moneda(f.rentaMensual)}</strong>
                   </td>
+                  <td className="pm-num">
+                    <strong>{moneda(f.montoTotal || 0)}</strong>
+                  </td>
                   <td className="pm-num">{moneda(f.cobrado)}</td>
                 </tr>
               ))}
@@ -187,6 +195,7 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
                 <td className="pm-num">{totales.prospectos ? `${pct(totales.convertidos, totales.prospectos)}%` : "—"}</td>
                 <td className="pm-num">{totales.contratos}</td>
                 <td className="pm-num">{moneda(totales.rentaMensual)}</td>
+                <td className="pm-num">{moneda(totales.montoTotal)}</td>
                 <td className="pm-num">{moneda(totales.cobrado)}</td>
               </tr>
             </tfoot>
@@ -215,6 +224,7 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
                   <th>Vendió</th>
                   <th>Medio</th>
                   <th className="pm-num">Renta mensual</th>
+                  <th className="pm-num">Monto total del contrato</th>
                   <th className="pm-num">Cobrado</th>
                 </tr>
               </thead>
@@ -239,6 +249,10 @@ export default function ProspectosPorMedio({ esGlobal, centroFijo }: { esGlobal:
                     <td>{v.medio}</td>
                     <td className="pm-num">
                       <strong>{moneda(v.rentaMensual)}</strong>
+                    </td>
+                    <td className="pm-num">
+                      <strong>{moneda(v.montoTotal || 0)}</strong>
+                      {v.meses ? <div className="pm-mini">{v.meses} mes{v.meses === 1 ? "" : "es"}</div> : null}
                     </td>
                     <td className="pm-num">{moneda(v.cobrado)}</td>
                   </tr>

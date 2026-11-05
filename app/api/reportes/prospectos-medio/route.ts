@@ -24,6 +24,8 @@ export type Venta = {
   registroProspecto: string;
   estatus: string;
   rentaMensual: number;
+  meses: number;
+  montoTotal: number;
   cobrado: number;
 };
 
@@ -33,12 +35,27 @@ export type FilaMedio = {
   convertidos: number;
   contratos: number;
   rentaMensual: number;
+  montoTotal: number;
   cobrado: number;
 };
 
+// Meses que dura un contrato, de su fecha de inicio a su vencimiento (ej. 1 nov → 28 feb = 4 meses;
+// 4 nov → 4 dic = 1 mes). Sin vencimiento se usa la duración de la cotización.
+function mesesDeContrato(inicio: string | null, vencimiento: string | null, duracionCotizacion?: number | null) {
+  if (inicio && vencimiento && FECHA.test(inicio) && FECHA.test(vencimiento.slice(0, 10))) {
+    const [y1, m1, d1] = inicio.split("-").map(Number);
+    const [y2, m2, d2] = vencimiento.slice(0, 10).split("-").map(Number);
+    const fin = new Date(Date.UTC(y2, m2 - 1, d2 + 1)); // el día del vencimiento cuenta completo
+    const meses = (fin.getUTCFullYear() - y1) * 12 + (fin.getUTCMonth() + 1 - m1) + (fin.getUTCDate() - d1) / 30;
+    if (meses > 0) return Math.max(1, Math.round(meses));
+  }
+  return Number(duracionCotizacion) > 0 ? Number(duracionCotizacion) : 1;
+}
+
 // Reporte "Prospectos y ventas por medio de contacto" (Reportes y Panel de Dirección): por cada medio, cuántos
 // prospectos llegaron en el periodo, cuántos se convirtieron en cliente, cuántos contratos se cerraron (inicio en el
-// periodo), su renta mensual y lo que ya se cobró de esos contratos en el periodo.
+// periodo), su renta mensual, el monto total de esos contratos (renta × meses que duran) y lo que ya se cobró de
+// esos contratos en el periodo.
 // El medio de una venta es el de su cotización; si la cotización no lo tiene, el del prospecto.
 export async function GET(req: NextRequest) {
   const supabase = createClient();
@@ -59,7 +76,7 @@ export async function GET(req: NextRequest) {
   let qProspectos = admin.from("prospectos").select("id, medio, estado, centro, created_at").gte("created_at", `${desde}T00:00:00-06:00`).lte("created_at", `${hasta}T23:59:59-06:00`);
   let qContratos = admin
     .from("contratos")
-    .select("id, folio, cotizacion_id, estatus, renta_mensual, fecha_inicio, centro, user_id, paquete_id, oficina_id, cliente_nombre_historico, cliente_empresa_historico")
+    .select("id, folio, cotizacion_id, estatus, renta_mensual, fecha_inicio, fecha_vencimiento, centro, user_id, paquete_id, oficina_id, cliente_nombre_historico, cliente_empresa_historico")
     .gte("fecha_inicio", desde)
     .lte("fecha_inicio", hasta)
     .not("estatus", "in", `(${NO_VENDIDOS.join(",")})`);
@@ -97,7 +114,7 @@ export async function GET(req: NextRequest) {
   const filas = new Map<string, FilaMedio>();
   const fila = (medio: string | null | undefined) => {
     const k = (medio || "").trim() || "Sin medio";
-    if (!filas.has(k)) filas.set(k, { medio: k, prospectos: 0, convertidos: 0, contratos: 0, rentaMensual: 0, cobrado: 0 });
+    if (!filas.has(k)) filas.set(k, { medio: k, prospectos: 0, convertidos: 0, contratos: 0, rentaMensual: 0, montoTotal: 0, cobrado: 0 });
     return filas.get(k) as FilaMedio;
   };
   for (const p of prospectos || []) {
@@ -105,15 +122,20 @@ export async function GET(req: NextRequest) {
     f.prospectos++;
     if (p.estado === "convertido") f.convertidos++;
   }
+  const duracionCotizacion = new Map((cotizaciones || []).map((q) => [q.id, q.duracion_meses as number | null]));
+  const mesesPorContrato = new Map(
+    (contratos || []).map((c) => [c.id, mesesDeContrato(c.fecha_inicio, c.fecha_vencimiento, c.cotizacion_id ? duracionCotizacion.get(c.cotizacion_id) : null)])
+  );
   for (const c of contratos || []) {
     const f = fila(c.cotizacion_id ? medioCotizacion.get(c.cotizacion_id) : null);
     f.contratos++;
     f.rentaMensual += Number(c.renta_mensual) || 0;
+    f.montoTotal += (Number(c.renta_mensual) || 0) * (mesesPorContrato.get(c.id) || 1);
     f.cobrado += cobradoPorContrato.get(c.id) || 0;
   }
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const resultado = Array.from(filas.values())
-    .map((f) => ({ ...f, rentaMensual: r2(f.rentaMensual), cobrado: r2(f.cobrado) }))
+    .map((f) => ({ ...f, rentaMensual: r2(f.rentaMensual), montoTotal: r2(f.montoTotal), cobrado: r2(f.cobrado) }))
     .sort((a, b) => b.rentaMensual - a.rentaMensual || b.prospectos - a.prospectos);
 
   // ---------- Detalle de cada venta ----------
@@ -175,6 +197,8 @@ export async function GET(req: NextRequest) {
         registroProspecto: (pr?.registrado_por && personaPorId.get(pr.registrado_por)?.nombre) || "",
         estatus: c.estatus,
         rentaMensual: r2(Number(c.renta_mensual) || 0),
+        meses: mesesPorContrato.get(c.id) || 1,
+        montoTotal: r2((Number(c.renta_mensual) || 0) * (mesesPorContrato.get(c.id) || 1)),
         cobrado: r2(cobradoPorContrato.get(c.id) || 0),
       };
     })
