@@ -9625,6 +9625,30 @@ a.stat-card {
   white-space: nowrap;
 }
 
+/* Estatus de prospectos por centro (Reportes): chips de estado y celdas con clic. */
+.pe-estado {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pe-celda {
+  cursor: pointer;
+  font-weight: 700;
+}
+.pe-celda.cero {
+  cursor: default;
+  color: #c3c8d4;
+  font-weight: 400;
+}
+.pe-celda:not(.cero):hover,
+.pe-celda.activa {
+  background: #fff7f2;
+  color: var(--orange);
+}
+
 /* Depósito en garantía: a qué cuenta cayó (IT CREATIVE / Nova Holding). */
 .dep-cuentas {
   display: grid;
