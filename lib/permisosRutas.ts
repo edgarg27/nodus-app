@@ -26,6 +26,7 @@ export const ROLES_PERSONAL = [
   "ejecutiva_ventas",
   "ceo",
   "captive",
+  "gastos",
 ];
 
 // superadmin (y gerente, que tiene sus mismos privilegios) puede abrir todo, así
@@ -101,6 +102,10 @@ const REGLAS_ORDENADAS = [...REGLAS].sort((a, b) => b.prefijo.length - a.prefijo
 // pantalla nueva no le queda abierta por omisión.
 const RUTAS_CEO = ["/dashboard"];
 
+// Gastos (contabilidad): solo la pantalla de Gastos, de todos los centros y de solo
+// consulta. /dashboard la manda directo a /gastos (app/dashboard/page.tsx).
+const RUTAS_GASTOS = ["/dashboard", "/gastos"];
+
 // Ejecutiva de Ventas: también lista cerrada. Al darle más módulos se agregan aquí (y en
 // su bloque de AdminPanel.tsx). Contratos lo ve de solo consulta.
 const RUTAS_EJECUTIVA_VENTAS = [
@@ -123,6 +128,7 @@ const RUTAS_EJECUTIVA_VENTAS = [
 export function rutaPermitida(rol: string, ruta: string): boolean {
   if (esSuperadmin(rol)) return true;
   if (rol === "ceo" || rol === "captive") return RUTAS_CEO.some((r) => ruta === r || ruta.startsWith(r + "/"));
+  if (rol === "gastos") return RUTAS_GASTOS.some((r) => ruta === r || ruta.startsWith(r + "/"));
   if (rol === "ejecutiva_ventas") return RUTAS_EJECUTIVA_VENTAS.some((r) => ruta === r || ruta.startsWith(r + "/"));
   if (CHECKIN_DAY_PASS.test(ruta)) return ROLES_CHECKIN.includes(rol);
   const regla = REGLAS_ORDENADAS.find((r) => ruta === r.prefijo || ruta.startsWith(r.prefijo + "/"));

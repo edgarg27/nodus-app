@@ -50,11 +50,20 @@ export const AVISOS_POR_ROL: Record<string, string[]> = {
   gerente_ventas: [...PERSONAL.tours, ...PERSONAL.contratosAFirma, ...PERSONAL.cobros],
   // Ejecutiva de Ventas (León): por ahora solo Prospectos; sus tours los agenda desde el seguimiento.
   ejecutiva_ventas: [...PERSONAL.tours],
+  // Contabilidad: los gastos que registran los centros, para pagarlos.
+  gastos: [...PERSONAL.gastos],
 };
 
 // Respuestas a algo que pidió esa misma persona (p. ej. una reservación de
 // sala que solicitó Ventas): le llegan a quien la pidió, sea cual sea su rol.
-export const AVISOS_PROPIOS = ["reservacion_confirmada", "reservacion_rechazada", "reservacion_cancelada_centro"];
+// Lo mismo con los gastos: a quien lo registró le avisa contabilidad si ya se pagó o no.
+export const AVISOS_PROPIOS = [
+  "reservacion_confirmada",
+  "reservacion_rechazada",
+  "reservacion_cancelada_centro",
+  "gasto_pagado",
+  "gasto_no_pagado",
+];
 
 const TICKETS = PERSONAL.tickets;
 

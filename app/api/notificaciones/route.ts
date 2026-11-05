@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza", "gastos"];
 
 // Descartar (✕) o marcar como leído un aviso de la campana. Se hace aquí con la llave de servicio porque la base no
 // deja al personal borrar avisos directo: el ✕ los quitaba de la pantalla pero regresaban al recargar.

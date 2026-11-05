@@ -487,7 +487,7 @@ export default function AdminPanel({
       router.push(n.mensaje?.includes("📶") ? "/centro/vouchers" : rol === "ejecutiva_ventas" ? "/soporte" : "/tickets");
     } else if (n.tipo === "proximo_mantenimiento") {
       router.push("/mantenimiento");
-    } else if (n.tipo === "nuevo_gasto") {
+    } else if (n.tipo === "nuevo_gasto" || n.tipo === "gasto_pagado" || n.tipo === "gasto_no_pagado") {
       // La pestaña de gastos en /cobranza solo renderiza contenido para roles
       // con alcance global (esGlobal); admin (alcance de un solo centro) debe
       // ir a /gastos, que sí muestra los gastos de su centro.
@@ -1666,9 +1666,9 @@ export default function AdminPanel({
                   <span className="modulo-name">Ingresos por Centro</span>
                 </Link>
               ) },
-              // Cobranza ya no ve este acceso directo: sus gastos los ve
-              // dentro de "Ingresos por Centro".
-              { grupo: 1, ver: rol === "superadmin" || rol === "gerente", key: "gastos", tarjeta: (
+              // La admin del centro registra aquí sus gastos con factura y semáforo para que
+              // contabilidad los pague. Cobranza los consulta (ya no hay pestaña en Ingresos por Centro).
+              { grupo: 1, ver: rol === "superadmin" || rol === "gerente" || rol === "admin" || rol === "cobranza", key: "gastos", tarjeta: (
                 <Link className="modulo-card" href="/gastos">
                   <span className="modulo-icon">💸</span>
                   <span className="modulo-name">Gastos</span>

@@ -16,6 +16,7 @@ export const ROL_LABEL: Record<string, string> = {
   ejecutiva_ventas: "Ejecutiva de Ventas",
   ceo: "CEO",
   captive: "Captive",
+  gastos: "Gastos",
 };
 
 export function labelRol(rol: string): string {
