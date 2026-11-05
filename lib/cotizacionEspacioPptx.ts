@@ -63,6 +63,8 @@ export type DatosCotizacionEspacio = {
   tipoEspacio: string; // "Coworking" | "Oficina Privada" (como esté escrito en oficinas.tipo)
   descripcion: string;
   cantidad?: number; // solo lo usa Oficina Privada
+  // Texto de la columna Cantidad con su unidad ("2 meses"); si no viene, se pone solo el número.
+  cantidadTexto?: string;
   personas?: number; // solo lo usa Oficina Privada
   horasSalaJuntas?: number; // solo lo usa Oficina Privada
   precioUnitario: number;
@@ -193,6 +195,9 @@ async function generarCoworking(datos: DatosCotizacionEspacio): Promise<Buffer> 
     slide = reemplazarTodas(slide, "4,494", "");
     slide = reemplazarTodas(slide, ".00 MXN", "");
     slide = reemplazarSecuencia(slide, "$", [fmtMoneda(datos.precioUnitario), fmtMoneda(datos.totalFila ?? datos.precioUnitario)]);
+    // Item y Cantidad de la fila traen "1" de ejemplo (en ese orden): el Item se queda en 1 y la Cantidad lleva
+    // los periodos cotizados con su unidad ("1 mes", "3 meses"…).
+    slide = reemplazarSecuencia(slide, "1", ["1", datos.cantidadTexto || String(datos.cantidad ?? 1)]);
     // Subtotal / IVA / Total del resumen — valores de ejemplo ya
     // completos en la plantilla, se reemplazan tal cual.
     slide = reemplazarTodas(slide, "$4,498.00", fmtMoneda(datos.subtotal));
@@ -240,7 +245,7 @@ async function generarOficinaPrivada(datos: DatosCotizacionEspacio): Promise<Buf
     // ellas puede coincidir con el placeholder "1" (ej. 1 persona, 1 mes)
     // — con reemplazos uno por uno esa coincidencia rompería el orden.
     slide = reemplazarSecuencia(slide, "1", [
-      String(datos.cantidad ?? 1),
+      datos.cantidadTexto || String(datos.cantidad ?? 1),
       String(datos.personas ?? 1),
       String(datos.horasSalaJuntas ?? 0),
       fmtMoneda(datos.precioUnitario),

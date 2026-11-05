@@ -30,6 +30,7 @@ const estiloSelect: CSSProperties = {
 // y app/centro/CentroPanel.tsx.
 import { HORAS_CALENDARIO as HORAS, esFueraDeHorario } from "@/lib/horarioSala";
 import { fechaLocal } from "@/lib/fechaMexico";
+import { textoCantidadPeriodo } from "@/lib/cantidadPeriodo";
 const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 function lunesDeLaSemana(fecha: Date) {
@@ -2014,6 +2015,8 @@ export default function CotizarForm({
             tipoEspacio,
             descripcion: nombreEspacio,
             cantidad: esMensual ? 1 : cantidadPeriodo ? Number(cantidadPeriodo) : 1,
+            // "1 mes", "2 meses", "3 semanas"… en vez de solo el número.
+            cantidadTexto: textoCantidadPeriodo(esMensual ? 1 : Number(cantidadPeriodo) || 1, modalidadEfectiva || "Mes"),
             personas: numeroPersonas ? Number(numeroPersonas) : 1,
             horasSalaJuntas: esRenovacion ? Number(horasSalaJuntasManual) || 0 : paquete?.incluye_horas_sala_juntas ?? 0,
             precioUnitario: esMensual ? precioPactadoPptx : tarifaUnitaria ?? precioPactadoNum,
