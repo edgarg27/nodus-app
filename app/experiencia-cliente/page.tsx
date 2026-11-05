@@ -1043,13 +1043,10 @@ function TarjetaEncuesta({
 
       const link = `${window.location.origin}/encuesta/${nuevoEnvio.token}`;
       try {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            tipo: "comunicado",
-            destinatarios: [d.email],
-            asunto: `Encuesta: ${encuesta.titulo}`,
-            cuerpo: `<p>Hola ${d.nombre},</p><p>Nos gustaría conocer tu opinión. Responde aquí:</p><p><a href="${link}">${link}</a></p>`,
-          },
+        await fetch("/api/correo/aviso", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: "comunicado", destinatarios: [d.email], asunto: `Encuesta: ${encuesta.titulo}`, cuerpo: `<p>Hola ${d.nombre},</p><p>Nos gustaría conocer tu opinión. Responde aquí:</p><p><a href="${link}">${link}</a></p>`, }),
         });
       } catch {
         // best-effort — el envío ya quedó guardado, se puede reenviar el link manualmente
