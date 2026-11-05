@@ -1400,6 +1400,32 @@ export default function AdminPanel({
               {/* Asesora de Ventas: SOLO estos módulos. Va aparte a propósito:
                   las condiciones de la lista general son "a quién no se le
                   muestra" y un rol nuevo recibiría todo lo de la admin. */}
+              <Link className="modulo-card" href="/prospectos">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/prospectos.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Prospectos</span>
+              </Link>
+              <Link className="modulo-card" href="/registrar-plan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizar.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizar</span>
+              </Link>
+              <Link className="modulo-card" href="/cotizaciones">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/cotizaciones.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Cotizaciones</span>
+              </Link>
+              <Link className="modulo-card" href="/tours">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tours.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tours</span>
+              </Link>
+              {/* Planes: solo consulta (crear/editar es de gerencia, app/paquetes/page.tsx). */}
+              <Link className="modulo-card" href="/paquetes">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/planes.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Planes</span>
+              </Link>
               <Link className="modulo-card" href="/contratos">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/contrato.png" alt="" className="modulo-icon icon-img-32" />
