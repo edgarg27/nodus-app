@@ -1,5 +1,6 @@
 import { calcularOcupacionPorCentro } from "@/lib/ocupacion";
 import ProspectosPorMedio from "@/app/components/ProspectosPorMedio";
+import EstatusProspectosCentro from "@/app/components/EstatusProspectosCentro";
 import VentasPorCentro from "@/app/components/VentasPorCentro";
 import SeguimientoEquipo from "@/app/components/SeguimientoEquipo";
 import HistorialFacturas from "@/app/components/HistorialFacturas";
@@ -23,7 +24,7 @@ export default async function ReportesPage() {
 
   if (profile?.rol === "cliente") redirect("/dashboard-cliente");
 
-  // Diseño (marketing): solo el reporte de prospectos y ventas por medio de contacto, de todos los centros.
+  // Diseño (marketing): solo los reportes de prospectos (por medio de contacto y estatus por centro), de todos los centros.
   if (profile?.rol === "diseno") {
     return (
       <div className="panel">
@@ -32,11 +33,14 @@ export default async function ReportesPage() {
             ← Regresar
           </Link>
           <p className="rep-title">Reportes</p>
-          <p className="rep-sub">Prospectos y ventas por medio de contacto</p>
+          <p className="rep-sub">Prospectos y ventas de todos los centros</p>
         </div>
         <div className="rep-content">
           <p className="rep-section-label">📣 Prospectos y ventas por medio</p>
           <ProspectosPorMedio esGlobal />
+
+          <p className="rep-section-label">🎯 Estatus de prospectos por centro</p>
+          <EstatusProspectosCentro esGlobal />
         </div>
       </div>
     );
@@ -175,6 +179,9 @@ export default async function ReportesPage() {
 
         <p className="rep-section-label">📣 Prospectos y ventas por medio</p>
         <ProspectosPorMedio esGlobal={esGlobal} centroFijo={miCentro} />
+
+        <p className="rep-section-label">🎯 Estatus de prospectos por centro</p>
+        <EstatusProspectosCentro esGlobal={esGlobal} centroFijo={miCentro} />
 
         <p className="rep-section-label">📋 Seguimiento de prospectos del equipo</p>
         <SeguimientoEquipo esGlobal={esGlobal} centroFijo={miCentro} />
