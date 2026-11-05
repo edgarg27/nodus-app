@@ -82,9 +82,9 @@ const ESTATUS_CONTRATO: Record<string, string> = {
   inactivo_debe: "Baja (con adeudo)",
 };
 
-// Tamaño máximo por archivo (el límite de subida de Supabase Storage del proyecto). Si se sube ese límite en
-// Supabase → Storage → Settings, se cambia aquí también.
-const MAXIMO_MB = 50;
+// Tamaño máximo por archivo: debe ser igual al límite de subida de Supabase (Storage → Settings → Upload file size
+// limit, 200 MB). Las actas constitutivas escaneadas llegan a pesar ~180 MB. Si se cambia allá, se cambia aquí.
+const MAXIMO_MB = 200;
 
 // Mensaje claro cuando un archivo pesa más de lo permitido (antes salía el error en inglés de Storage).
 function mensajeArchivoPesado(etiqueta: string, archivo: File) {
