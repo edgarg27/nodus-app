@@ -36,7 +36,7 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/registrar-plan", roles: ["admin", "gerente", "gerente_ventas", "ventas"] },
   { prefijo: "/cotizaciones", roles: ["admin", "gerente", "gerente_ventas", "ventas"] },
   { prefijo: "/prospectos", roles: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas", "ventas"] },
-  { prefijo: "/paquetes", roles: ["admin", "gerente", "gerente_ventas"] },
+  { prefijo: "/paquetes", roles: ["admin", "gerente", "gerente_ventas", "ventas"] },
   { prefijo: "/alta-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/baja-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/deposito-garantia", roles: ["admin", "gerente", "gerente_ventas", "cobranza"] },
