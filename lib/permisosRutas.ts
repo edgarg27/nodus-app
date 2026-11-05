@@ -53,7 +53,7 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/paqueteria", roles: ["admin", "gerente", "atencion_cliente"] },
   { prefijo: "/mapa-oficinas", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "ventas"] },
   { prefijo: "/experiencia-cliente", roles: ["admin", "gerente", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas"] },
-  { prefijo: "/documentacion-centro", roles: ["admin", "atencion_cliente", "diseno"] },
+  { prefijo: "/documentacion-centro", roles: ["admin", "atencion_cliente"] },
   { prefijo: "/inventario", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente"] },
 
   // ----- Panel de Centro -----

@@ -50,7 +50,7 @@ function iconoArchivo(a: Archivo) {
 export default function DocumentacionCentroPage() {
   const supabase = createClient();
   const { cargando, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(
-    ["diseno", "atencion_cliente", "ejecutiva_ventas"],
+    ["atencion_cliente", "ejecutiva_ventas"],
     ["atencion_cliente"]
   );
 
