@@ -556,29 +556,15 @@ function ReservacionesInner() {
       reservacion_id: nuevaReserva.id,
     });
 
-    const { data: admins } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("rol", "admin")
-      .eq("centro", centro);
-    const emailsAdmin = (admins || []).map((a) => a.email).filter(Boolean);
-
-    if (emailsAdmin.length > 0) {
-      try {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            tipo: "nueva_reservacion",
-            to: emailsAdmin,
-            espacio,
-            fecha: seleccion.fecha,
-            horario: seleccionFueraHorario ? `${horarioTexto} (FUERA DE HORARIO — cotizar)` : horarioTexto,
-            clienteNombre: profile?.nombre,
-            centro,
-          },
-        });
-      } catch {
-        // no crítico
-      }
+    // Correo a las admins del centro (lo arma el servidor: /api/correo/aviso).
+    try {
+      await fetch("/api/correo/aviso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "nueva_reservacion", reservacionId: nuevaReserva.id }),
+      });
+    } catch {
+      // no crítico
     }
 
     setEnviando(false);

@@ -233,20 +233,10 @@ export default function SoportePage() {
 
     // Notificación por correo (best-effort, no bloquea si falla)
     try {
-      await supabase.functions.invoke("send-email", {
-        body: {
-          tipo: "nuevo_ticket",
-          categoria,
-          urgencia,
-          folio,
-          asunto,
-          descripcion,
-          clienteNombre: profile?.nombre,
-          clienteEmail: profile?.email,
-          centro: profile?.centro,
-          fotoUrl,
-          fotoUrls: fotosUrls,
-        },
+      await fetch("/api/correo/aviso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "nuevo_ticket", folio }),
       });
     } catch {
       // no crítico

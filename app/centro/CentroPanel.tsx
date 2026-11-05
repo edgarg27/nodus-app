@@ -1886,15 +1886,10 @@ export default function CentroPanel({
 
     if (cliente?.email) {
       try {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            tipo: "reservacion_confirmada",
-            clienteEmail: cliente.email,
-            clienteNombre: cliente.nombre,
-            espacio: reserva.espacio,
-            fecha: reserva.fecha,
-            horario: reserva.hora,
-          },
+        await fetch("/api/correo/aviso", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: "reservacion_confirmada", reservacionId: reserva.id }),
         });
       } catch {
         // no crítico
@@ -1936,16 +1931,10 @@ export default function CentroPanel({
 
     if (cliente?.email) {
       try {
-        await supabase.functions.invoke("send-email", {
-          body: {
-            tipo: "reservacion_rechazada",
-            clienteEmail: cliente.email,
-            clienteNombre: cliente.nombre,
-            espacio: reserva.espacio,
-            fecha: reserva.fecha,
-            horario: reserva.hora,
-            motivo,
-          },
+        await fetch("/api/correo/aviso", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: "reservacion_rechazada", reservacionId: reserva.id, motivo }),
         });
       } catch {
         // no crítico

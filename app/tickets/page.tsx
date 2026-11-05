@@ -331,16 +331,10 @@ export default function TicketsPage() {
 
       if (modalNuevoEstado === "cerrado" && modalTicket.cliente_email) {
         try {
-          await supabase.functions.invoke("send-email", {
-            body: {
-              tipo: "ticket_resuelto",
-              folio: modalTicket.folio,
-              asunto: modalTicket.asunto,
-              clienteEmail: modalTicket.cliente_email,
-              clienteNombre: modalTicket.cliente_nombre,
-              nota: mensaje || undefined,
-              fotoUrls: fotosUrls,
-            },
+          await fetch("/api/correo/aviso", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tipo: "ticket_resuelto", folio: modalTicket.folio, nota: mensaje || undefined }),
           });
         } catch {
           // no crítico
@@ -423,18 +417,10 @@ export default function TicketsPage() {
 
     // Igual que cuando lo levanta un cliente, se avisa por correo al área correspondiente
     try {
-      await supabase.functions.invoke("send-email", {
-        body: {
-          tipo: "nuevo_ticket",
-          categoria: formReporte.categoria,
-          folio,
-          asunto: formReporte.asunto,
-          descripcion: formReporte.descripcion,
-          clienteNombre: miNombre,
-          centro: miCentro,
-          fotoUrl: fotosUrls[0] || null,
-          fotoUrls: fotosUrls,
-        },
+      await fetch("/api/correo/aviso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "nuevo_ticket", folio }),
       });
     } catch {
       // no crítico
