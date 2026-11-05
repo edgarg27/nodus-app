@@ -33,9 +33,9 @@ export const ROLES_PERSONAL = [
 const REGLAS: { prefijo: string; roles: string[] }[] = [
   // ----- Administración del centro -----
   { prefijo: "/contratos", roles: ["admin", "gerente", "ventas", "gerente_ventas"] },
-  { prefijo: "/registrar-plan", roles: ["admin", "gerente", "gerente_ventas"] },
-  { prefijo: "/cotizaciones", roles: ["admin", "gerente", "gerente_ventas"] },
-  { prefijo: "/prospectos", roles: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas"] },
+  { prefijo: "/registrar-plan", roles: ["admin", "gerente", "gerente_ventas", "ventas"] },
+  { prefijo: "/cotizaciones", roles: ["admin", "gerente", "gerente_ventas", "ventas"] },
+  { prefijo: "/prospectos", roles: ["admin", "gerente", "gerente_ventas", "ejecutiva_ventas", "ventas"] },
   { prefijo: "/paquetes", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/alta-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
   { prefijo: "/baja-cliente", roles: ["admin", "gerente", "gerente_ventas"] },
