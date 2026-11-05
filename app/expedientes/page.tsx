@@ -82,6 +82,17 @@ const ESTATUS_CONTRATO: Record<string, string> = {
   inactivo_debe: "Baja (con adeudo)",
 };
 
+// Tamaño máximo por archivo: debe ser igual al límite de subida de Supabase (Storage → Settings → Upload file size
+// limit, 200 MB). Las actas constitutivas escaneadas llegan a pesar ~180 MB. Si se cambia allá, se cambia aquí.
+const MAXIMO_MB = 200;
+
+// Mensaje claro cuando un archivo pesa más de lo permitido (antes salía el error en inglés de Storage).
+function mensajeArchivoPesado(etiqueta: string, archivo: File) {
+  const mb = (archivo.size / (1024 * 1024)).toFixed(0);
+  return `"${etiqueta}" pesa ${mb} MB y el máximo es ${MAXIMO_MB} MB. Redúcelo (por ejemplo en ilovepdf.com → Comprimir PDF, o escaneándolo en menor resolución) y vuelve a subirlo.`;
+}
+const esErrorDeTamano = (mensaje: string) => /maximum allowed size|exceeded|too large|payload/i.test(mensaje);
+
 function formatBytes(b: number | null) {
   if (!b) return "";
   if (b < 1024) return `${b} B`;
@@ -236,11 +247,15 @@ export default function ExpedientesPage() {
     for (let i = 0; i < total; i++) {
       const archivo = archivosNuevos[i];
       setSubiendo({ actual: i + 1, total });
+      if (archivo.size > MAXIMO_MB * 1024 * 1024) {
+        fallidos.push(`${archivo.name} (pesa ${(archivo.size / (1024 * 1024)).toFixed(0)} MB; máximo ${MAXIMO_MB} MB)`);
+        continue;
+      }
       const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "bin";
       const ruta = `${clienteSel.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(ruta, archivo, { contentType: archivo.type });
       if (upErr) {
-        fallidos.push(archivo.name);
+        fallidos.push(esErrorDeTamano(upErr.message) ? `${archivo.name} (muy pesado; máximo ${MAXIMO_MB} MB)` : archivo.name);
         continue;
       }
       const { error: insErr } = await supabase.from("expediente_archivos").insert({
@@ -293,20 +308,26 @@ export default function ExpedientesPage() {
       return;
     }
 
-    const existente = archivos.find((a) => a.tipo_documento === clave);
-    if (existente) {
-      await supabase.from("expediente_archivos").delete().eq("id", existente.id);
-      await supabase.storage.from(BUCKET).remove([existente.archivo_path]);
+    if (archivo.size > MAXIMO_MB * 1024 * 1024) {
+      setSubiendoClave(null);
+      setError(mensajeArchivoPesado(etiqueta, archivo));
+      return;
     }
 
+    // Primero se sube el nuevo; el anterior se quita solo si la subida salió bien (antes se borraba primero y, si
+    // la subida fallaba, el cliente se quedaba sin el documento).
     const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "bin";
     const ruta = `${clienteSel.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const { error: upErr } = await supabase.storage.from(BUCKET).upload(ruta, archivo, { contentType: archivo.type });
     if (upErr) {
       setSubiendoClave(null);
-      setError(`No se pudo subir "${etiqueta}": ${upErr.message}`);
-      await fetchDetalle(clienteSel.id);
+      setError(esErrorDeTamano(upErr.message) ? mensajeArchivoPesado(etiqueta, archivo) : `No se pudo subir "${etiqueta}": ${upErr.message}`);
       return;
+    }
+
+    const existente = archivos.find((a) => a.tipo_documento === clave);
+    if (existente) {
+      await supabase.from("expediente_archivos").delete().eq("id", existente.id);
     }
 
     const { error: insErr } = await supabase.from("expediente_archivos").insert({
@@ -328,6 +349,8 @@ export default function ExpedientesPage() {
       return;
     }
 
+    // El archivo anterior se borra de Storage hasta que el nuevo ya quedó registrado.
+    if (existente) await supabase.storage.from(BUCKET).remove([existente.archivo_path]);
     if (!existente) {
       setConteoPorCliente((prev) => ({ ...prev, [clienteSel.id]: (prev[clienteSel.id] || 0) + 1 }));
     }
@@ -624,7 +647,7 @@ export default function ExpedientesPage() {
                   files={archivosNuevos}
                   onChange={setArchivosNuevos}
                   maxFiles={15}
-                  maxSizeMB={25}
+                  maxSizeMB={MAXIMO_MB}
                   accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
                   etiquetaTipos="Fotos, PDF, Word, Excel…"
                 />
