@@ -1819,9 +1819,8 @@ export default function AdminPanel({
                   <span className="modulo-name">Logros</span>
                 </Link>
               ) },
-              // Documentación: admin, superadmin, gerente, atencion_cliente y diseno
-              // (mismas listas que sus políticas RLS).
-              { grupo: 4, ver: rol === "admin" || esSuperadmin(rol) || rol === "atencion_cliente" || rol === "diseno", key: "documentacion", tarjeta: (
+              // Documentación: admin, superadmin, gerente y atencion_cliente (Diseño ya no la usa).
+              { grupo: 4, ver: rol === "admin" || esSuperadmin(rol) || rol === "atencion_cliente", key: "documentacion", tarjeta: (
                 <Link className="modulo-card" href="/documentacion-centro">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/documentacion-centro.png" alt="" className="modulo-icon icon-img-32" />
