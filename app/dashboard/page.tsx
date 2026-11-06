@@ -32,6 +32,9 @@ export default async function DashboardPage() {
   if (!profile?.rol) redirect("/login");
   if (profile.rol === "cliente") redirect("/dashboard-cliente");
 
+  // Gastos (contabilidad): su única pantalla es Gastos, con todos los centros.
+  if (profile.rol === "gastos") redirect("/gastos");
+
   // CEO y Captive: su propio panel de números (Panel de Dirección), solo
   // consulta. Captive además ve los precios de los espacios disponibles.
   if (profile.rol === "ceo" || profile.rol === "captive") {

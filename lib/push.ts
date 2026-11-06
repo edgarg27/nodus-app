@@ -65,7 +65,7 @@ export async function enviarPush(admin: Admin, userIds: string[], aviso: AvisoPu
 // ---- A quién le toca cada aviso (mismas reglas que la campana del panel) ----
 
 // Roles del personal con alcance de todos los centros (igual que `esGlobal` de AdminPanel).
-const ROLES_ALCANCE_GLOBAL = ["sistemas", "superadmin", "gerente", "gerente_ventas", "operaciones", "cobranza", "atencion_cliente", "diseno"];
+const ROLES_ALCANCE_GLOBAL = ["sistemas", "superadmin", "gerente", "gerente_ventas", "operaciones", "cobranza", "atencion_cliente", "diseno", "gastos"];
 
 const TIPOS_DE_PERSONAL = new Set(Object.values(AVISOS_POR_ROL).flat());
 
@@ -97,6 +97,8 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
     if (n.tipo === "paquete_recibido" || n.tipo === "nuevo_paquete") return "/mi-paqueteria";
     if (["reservacion_confirmada", "reservacion_rechazada", "reservacion_cancelada_centro"].includes(n.tipo)) return "/reservaciones?tab=mis";
     if (["fecha_pago_hoy", "pago_hoy", "recordatorio_pago", "aviso_suspension", "cuenta_pausada", "pago_confirmado"].includes(n.tipo)) return "/estado-cuenta";
+    // Respuesta de contabilidad a un gasto que registró alguien del personal.
+    if (n.tipo === "gasto_pagado" || n.tipo === "gasto_no_pagado") return "/gastos";
     return "/dashboard-cliente";
   }
   switch (n.tipo) {
@@ -123,6 +125,8 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
     case "proximo_mantenimiento":
       return "/mantenimiento";
     case "nuevo_gasto":
+    case "gasto_pagado":
+    case "gasto_no_pagado":
       return "/gastos";
     case "factura_automatica_fallida":
     case "complemento_pago_pendiente":

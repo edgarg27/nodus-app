@@ -9799,3 +9799,200 @@ a.stat-card {
 .login-aviso:hover {
   text-decoration: underline;
 }
+
+/* ---------- Gastos: modal de contabilidad (marcar pagado / no se paga) ---------- */
+/* Mismos campos que los formularios de la app (.form-card), con el naranja de la marca. */
+.gasto-revision input[type="date"],
+.gasto-revision textarea {
+  border: 1px solid #e3e6ee;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #0d1b3e;
+  background: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  accent-color: #f07e3a;
+  color-scheme: light;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.gasto-revision textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.gasto-revision input[type="date"]:focus,
+.gasto-revision textarea:focus {
+  border-color: #f07e3a;
+  box-shadow: 0 0 0 3px rgba(240, 126, 58, 0.15);
+  background: #fff;
+}
+.gasto-revision input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+.gasto-revision input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Zona de carga de una sola línea (FileDropzone compacto). */
+.dropzone.dropzone-compacto {
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.dropzone.dropzone-compacto .dropzone-icon {
+  margin: 0;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+}
+
+/* Gastos: factura y comprobante lado a lado (uno debajo del otro en celular). */
+.gasto-archivos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.gasto-archivos .sub-label {
+  margin-top: 0;
+}
+@media (max-width: 640px) {
+  .gasto-archivos {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Gastos: resumen en recuadros (app/gastos/ResumenGastos.tsx) ---------- */
+.rg-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.rg-kpi,
+.rg-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(13, 27, 62, 0.06);
+}
+.rg-kpi-valor {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+.rg-kpi-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  margin: 4px 0 0;
+}
+.rg-kpi-det {
+  font-size: 11px;
+  color: #8a93a8;
+  margin: 2px 0 0;
+}
+.rg-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.rg-card-titulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d1b3e;
+  margin: 0 0 8px;
+}
+.rg-meses {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6px;
+  align-items: end;
+}
+.rg-mes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.rg-mes-valor {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0f6e56;
+  white-space: nowrap;
+  min-height: 13px;
+}
+.rg-mes-barra-wrap {
+  width: 100%;
+  height: 90px;
+  background: #f0f2f6;
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.rg-mes-barra {
+  width: 100%;
+  background: #0f6e56;
+  border-radius: 6px;
+  min-height: 4px;
+}
+.rg-mes-lbl {
+  font-size: 11px;
+  color: #6b7897;
+}
+@media (max-width: 720px) {
+  .rg-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rg-fila {
+    grid-template-columns: 1fr;
+  }
+  .rg-mes-valor {
+    display: none;
+  }
+}
+
+/* Gastos, resumen: elegir el centro (todos o uno). */
+.rg-centros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.rg-centro {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0d1b3e;
+  background: #fff;
+  border: 1px solid #e3e6ee;
+  border-radius: 20px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.rg-centro:hover {
+  border-color: #f0b98a;
+}
+.rg-centro.activo {
+  background: #0d1b3e;
+  border-color: #0d1b3e;
+  color: #fff;
+}
+
+/* Resumen de gastos con el recuadro "Por área" (todos los centros y Bosques). */
+.rg-fila.rg-fila-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 900px) {
+  .rg-fila.rg-fila-3 {
+    grid-template-columns: 1fr;
+  }
+}

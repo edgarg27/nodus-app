@@ -10,6 +10,8 @@ type FileDropzoneProps = {
   maxSizeMB?: number;
   // Texto que se muestra como tipos permitidos (por defecto "Fotos o PDF").
   etiquetaTipos?: string;
+  // Versión de una sola línea (ícono a la izquierda), para formularios con varios archivos.
+  compacto?: boolean;
 };
 
 function formatBytes(bytes: number) {
@@ -28,6 +30,7 @@ export default function FileDropzone({
   accept = "image/*,.pdf",
   maxSizeMB = 8,
   etiquetaTipos,
+  compacto = false,
 }: FileDropzoneProps) {
   const [dragActive, setDragActive] = useState(false);
   const [aviso, setAviso] = useState("");
@@ -78,7 +81,7 @@ export default function FileDropzone({
   return (
     <div>
       <div
-        className={"dropzone" + (dragActive ? " drag-active" : "")}
+        className={"dropzone" + (compacto ? " dropzone-compacto" : "") + (dragActive ? " drag-active" : "")}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
@@ -106,12 +109,25 @@ export default function FileDropzone({
           <path d="M7 8l5-5 5 5" />
           <path d="M4 15v3a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-3" />
         </svg>
-        <p className="dropzone-text">
-          <span>Arrastra tus archivos aquí</span> o haz clic para elegirlos
-        </p>
-        <p className="dropzone-sub">
-          {etiquetaTipos || (accept.includes("pdf") ? "Fotos o PDF" : "Fotos")} · hasta {maxSizeMB}MB c/u · máximo {maxFiles}
-        </p>
+        {compacto ? (
+          <div>
+            <p className="dropzone-text">
+              <span>Elegir archivo</span> o arrástralo aquí
+            </p>
+            <p className="dropzone-sub">
+              {etiquetaTipos || (accept.includes("pdf") ? "PDF o foto" : "Foto")} · hasta {maxSizeMB}MB
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="dropzone-text">
+              <span>Arrastra tus archivos aquí</span> o haz clic para elegirlos
+            </p>
+            <p className="dropzone-sub">
+              {etiquetaTipos || (accept.includes("pdf") ? "Fotos o PDF" : "Fotos")} · hasta {maxSizeMB}MB c/u · máximo {maxFiles}
+            </p>
+          </>
+        )}
         <input
           ref={inputRef}
           type="file"
