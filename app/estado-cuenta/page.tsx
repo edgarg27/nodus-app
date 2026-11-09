@@ -4,7 +4,6 @@ import { BotonPagoProximamente } from "@/app/components/PagosProximamente";
 import { PAGOS_EN_LINEA_ACTIVOS } from "@/lib/pagosEnLinea";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import BotonArchivo from "@/app/components/BotonArchivo";
 import { conceptoParaCliente } from "@/lib/adicionales";
 import { fechaLocal } from "@/lib/fechaMexico";
 import { esClienteCoworking } from "@/lib/coworking";
@@ -36,9 +35,9 @@ function ArchivosFactura({ f }: { f: Factura }) {
         <span style={{ fontSize: 12, fontWeight: 600, color: "#854F0B" }}>Cancelación en proceso</span>
       )}
       {f.archivo_url && (
-        <BotonArchivo url={f.archivo_url} bucket="facturas">
+        <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=pdf&ver=1`} target="_blank" rel="noopener noreferrer">
           📄 Ver factura
-        </BotonArchivo>
+        </a>
       )}
       {f.archivo_url && (
         <a className="ver-pdf-btn" href={`/api/facturas/descargar?id=${f.id}&tipo=pdf`}>

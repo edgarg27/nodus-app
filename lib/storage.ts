@@ -50,13 +50,13 @@ export async function getSignedFileUrl(
 // permisos de servidor. Así funciona igual con buckets públicos o privados.
 export async function pedirLinkFirmado(
   url: string,
-  opciones: { descargar?: boolean; expiresIn?: number } = {}
+  opciones: { descargar?: boolean; expiresIn?: number; nombre?: string } = {}
 ): Promise<{ url: string | null; error: string | null }> {
   try {
     const res = await fetch("/api/archivos/firmar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, descargar: opciones.descargar === true, expiresIn: opciones.expiresIn }),
+      body: JSON.stringify({ url, descargar: opciones.descargar === true, expiresIn: opciones.expiresIn, nombre: opciones.nombre }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.url) return { url: null, error: data.error || "No se pudo abrir el archivo" };

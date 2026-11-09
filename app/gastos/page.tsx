@@ -91,9 +91,18 @@ export default function GastosPage() {
   const [guardandoRevision, setGuardandoRevision] = useState(false);
   const [errorRevision, setErrorRevision] = useState("");
 
-  async function abrirArchivo(archivoUrl: string, descargar = false) {
+  // Nombre de la descarga: el original del archivo (va en la ruta después de "__"); los que se subieron antes de
+  // eso se bajan como "Factura - concepto - fecha".
+  function nombreDescarga(archivoUrl: string, g: Gasto, tipo: string) {
+    const archivo = decodeURIComponent(archivoUrl.split("?")[0].split("/").pop() || "");
+    const ext = archivo.includes(".") ? archivo.split(".").pop() : "pdf";
+    const original = archivo.includes("__") ? archivo.slice(archivo.indexOf("__") + 2) : "";
+    return original || `${tipo} - ${g.concepto} - ${g.fecha}.${ext}`;
+  }
+
+  async function abrirArchivo(archivoUrl: string, descargar = false, nombre?: string) {
     setAbriendoArchivoUrl(archivoUrl);
-    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl, { descargar });
+    const { url, error: signErr } = await pedirLinkFirmado(archivoUrl, { descargar, nombre });
     setAbriendoArchivoUrl(null);
     if (!url) {
       alert("No se pudo abrir el archivo: " + (signErr || "intenta de nuevo"));
@@ -452,14 +461,14 @@ export default function GastosPage() {
                         <button type="button" onClick={() => abrirArchivo(g.factura_url!)} disabled={abriendoArchivoUrl === g.factura_url} style={linkBtn}>
                           {abriendoArchivoUrl === g.factura_url ? "Abriendo…" : "📎 Ver factura"}
                         </button>
-                        <button type="button" onClick={() => abrirArchivo(g.factura_url!, true)} disabled={abriendoArchivoUrl === g.factura_url} style={linkBtn}>
+                        <button type="button" onClick={() => abrirArchivo(g.factura_url!, true, nombreDescarga(g.factura_url!, g, "Factura"))} disabled={abriendoArchivoUrl === g.factura_url} style={linkBtn}>
                           ⬇️ Descargar factura
                         </button>
                       </>
                     )}
                     {!g.factura_url && <span style={{ fontSize: 12, color: "#9aa3b5" }}>Sin factura adjunta</span>}
                     {g.xml_url && (
-                      <button type="button" onClick={() => abrirArchivo(g.xml_url!, true)} disabled={abriendoArchivoUrl === g.xml_url} style={linkBtn}>
+                      <button type="button" onClick={() => abrirArchivo(g.xml_url!, true, nombreDescarga(g.xml_url!, g, "Factura"))} disabled={abriendoArchivoUrl === g.xml_url} style={linkBtn}>
                         {abriendoArchivoUrl === g.xml_url ? "Abriendo…" : "⬇️ XML"}
                       </button>
                     )}

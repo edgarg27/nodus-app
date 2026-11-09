@@ -75,6 +75,18 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const url = typeof body?.url === "string" ? body.url : "";
   const descargar = body?.descargar === true;
+  // Nombre con el que se guarda al descargar (ej. el nombre original de la factura). Sin acentos ni símbolos:
+  // Supabase codifica dos veces los caracteres especiales y saldrían como "Compa%C3%B1ia".
+  const nombreDescarga =
+    typeof body?.nombre === "string"
+      ? body.nombre
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^A-Za-z0-9 ._()-]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 150)
+      : "";
   const expiresIn = Math.min(Math.max(Number(body?.expiresIn) || 300, 60), 3600);
 
   // Solo URLs del almacenamiento de este proyecto, de buckets permitidos.
@@ -94,7 +106,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await admin.storage
     .from(ubicacion.bucket)
-    .createSignedUrl(ubicacion.path, expiresIn, descargar ? { download: true } : undefined);
+    .createSignedUrl(ubicacion.path, expiresIn, descargar ? { download: nombreDescarga || true } : undefined);
   if (error || !data?.signedUrl) {
     return NextResponse.json({ error: "No se pudo generar el link" }, { status: 500 });
   }
