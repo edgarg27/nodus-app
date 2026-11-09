@@ -26,12 +26,17 @@ export async function GET(req: NextRequest) {
   const esComplemento = req.nextUrl.searchParams.get("origen") === "complemento";
   const { data: fila } = esComplemento
     ? await admin.from("complementos_pago").select("id, user_id, serie, folio_fiscal, archivo_url, xml_url").eq("id", id).maybeSingle()
-    : await admin.from("facturas").select("id, user_id, folio, archivo_url, xml_url").eq("id", id).maybeSingle();
+    : await admin.from("facturas").select("id, user_id, folio, serie, folio_fiscal, nombre_receptor, archivo_url, xml_url").eq("id", id).maybeSingle();
   if (!fila) return NextResponse.json({ error: "Factura no encontrada" }, { status: 404 });
+  // El nombre del archivo es el folio que trae el CFDI (serie + folio, ej. "A425"), no el folio interno de la app
+  // ("A-228476"); si la factura todavía no tiene folio fiscal, se usa el interno.
+  const f = fila as any;
+  const folioCfdi = f.folio_fiscal ? `${f.serie || ""}${f.folio_fiscal}` : "";
   const factura = {
     ...fila,
-    folio: esComplemento ? `${(fila as any).serie || ""}${(fila as any).folio_fiscal || ""}` : (fila as any).folio,
-  } as { id: string; user_id: string | null; folio: string; archivo_url: string | null; xml_url: string | null };
+    folio: folioCfdi || (esComplemento ? "" : f.folio),
+    receptor: esComplemento ? "" : f.nombre_receptor || "",
+  } as { id: string; user_id: string | null; folio: string; receptor: string; archivo_url: string | null; xml_url: string | null };
 
   if (factura.user_id !== session.user.id) {
     const { data: perfil } = await admin.from("profiles").select("rol").eq("id", session.user.id).maybeSingle();
@@ -56,11 +61,18 @@ export async function GET(req: NextRequest) {
   if (descargaError || !blob) return NextResponse.json({ error: "No se pudo obtener el archivo" }, { status: 502 });
   const contenido = await blob.arrayBuffer();
 
-  const nombre = String(factura.folio || (esComplemento ? "complemento" : "factura")).replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-|-$/g, "") || "factura";
+  // "Factura A425 - CLIENTE SA DE CV.pdf". filename lleva la versión sin acentos (navegadores viejos) y filename*
+  // la completa en UTF-8.
+  const limpio = (s: string) => s.replace(/[\\/:*?"<>|\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  const nombreBase = limpio(
+    `${esComplemento ? "Complemento" : "Factura"} ${factura.folio || ""}${factura.receptor ? ` - ${factura.receptor}` : ""}`
+  ).slice(0, 150) || (esComplemento ? "Complemento" : "Factura");
+  const nombreArchivo = `${nombreBase}.${tipo}`;
+  const nombreAscii = nombreArchivo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\x20-\x7E]/g, "");
   return new NextResponse(contenido, {
     headers: {
       "Content-Type": tipo === "xml" ? "application/xml" : "application/pdf",
-      "Content-Disposition": `${enLinea ? "inline" : "attachment"}; filename="${esComplemento ? "Complemento" : "Factura"}-${nombre}.${tipo}"`,
+      "Content-Disposition": `${enLinea ? "inline" : "attachment"}; filename="${nombreAscii}"; filename*=UTF-8''${encodeURIComponent(nombreArchivo)}`,
       "Cache-Control": "private, no-store",
     },
   });

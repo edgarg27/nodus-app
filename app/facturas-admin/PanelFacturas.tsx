@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel } from "@/lib/exportExcel";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
@@ -1648,9 +1647,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                               <td>
                                 <div className="fac-acciones">
                                   {f.archivo_url && (
-                                    <BotonArchivo url={f.archivo_url} bucket="facturas">
+                                    <a className="ver-pdf-btn" href={"/api/facturas/descargar?id=" + f.id + "&tipo=pdf&ver=1"} target="_blank" rel="noopener noreferrer">
                                       Ver PDF
-                                    </BotonArchivo>
+                                    </a>
                                   )}
                                   <button className="tel-borrar-btn" style={{ color: "#0d1b3e", fontWeight: 600 }} onClick={() => toggleFactura(f)}>
                                     {abierta ? "Ocultar pagos" : "Pagos"}

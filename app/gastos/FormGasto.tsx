@@ -40,7 +40,16 @@ export default function FormGasto({
   const [error, setError] = useState("");
 
   async function subirArchivo(archivo: File, prefijo: string) {
-    const fileName = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${archivo.name.split(".").pop() || "pdf"}`;
+    // El nombre original (sin acentos ni símbolos) va después de "__" para descargarlo con ese mismo nombre.
+    const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "pdf";
+    const original = archivo.name
+      .replace(/\.[^.]+$/, "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9 ._-]+/g, "-")
+      .trim()
+      .slice(0, 80);
+    const fileName = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${original ? `__${original}` : ""}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("comprobantes")
       .upload(fileName, archivo, { contentType: archivo.type || undefined, upsert: true });
