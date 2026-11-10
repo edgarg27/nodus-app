@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
 import { enviarGraciasPorPago } from "@/lib/correosPagos";
 import { complementoAlPagar } from "@/lib/facturapi";
+import { registrarBitacora } from "@/lib/bitacora";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "cobranza", "gerente_ventas"];
 const FORMAS = ["01", "02", "03", "04", "28"];
@@ -47,10 +48,19 @@ export async function POST(req: NextRequest) {
     if (p.estado === "pagado") continue;
     const { error } = await admin
       .from("pagos")
-      .update({ estado: "pagado", fecha_pago: fecha, ...(comprobanteUrl ? { comprobante_url: comprobanteUrl } : {}) })
+      .update({ estado: "pagado", fecha_pago: fecha, registrado_por: session.user.id, ...(comprobanteUrl ? { comprobante_url: comprobanteUrl } : {}) })
       .eq("id", p.id);
     if (error) continue;
     registrados++;
+    await registrarBitacora(admin, {
+      actorId: session.user.id,
+      accion: "pago_marcado_pagado",
+      entidad: "pago",
+      entidadId: p.id,
+      clienteId: p.user_id,
+      centro: p.centro,
+      detalle: `Forma de pago ${formaPago}`,
+    });
     // Forma de pago (columna de migracion_cobranza_promesas.sql; si aún no existe, no pasa nada).
     await admin.from("pagos").update({ forma_pago: formaPago }).eq("id", p.id);
     // Pagar lo que se debe (no un adicional) reactiva una cuenta suspendida, igual que "marcar pagado".
@@ -61,7 +71,17 @@ export async function POST(req: NextRequest) {
   for (const f of facturas || []) {
     if (f.estado === "pagada") continue;
     const { error } = await admin.from("facturas").update({ estado: "pagada" }).eq("id", f.id);
-    if (!error) registrados++;
+    if (error) continue;
+    registrados++;
+    await registrarBitacora(admin, {
+      actorId: session.user.id,
+      accion: "factura_pagada",
+      entidad: "factura",
+      entidadId: f.id,
+      clienteId: f.user_id,
+      centro: f.centro,
+      detalle: `Forma de pago ${formaPago}`,
+    });
   }
   return NextResponse.json({ ok: true, registrados });
 }

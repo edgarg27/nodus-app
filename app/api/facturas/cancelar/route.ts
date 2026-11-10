@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { registrarBitacora } from "@/lib/bitacora";
 import { cancelarFactura, MOTIVOS_CANCELACION } from "@/lib/facturapiCancelacion";
 
 const REGEX_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -81,6 +82,25 @@ export async function POST(req: NextRequest) {
   const resultados = [];
   for (const id of facturaIds) {
     resultados.push(await cancelarFactura(admin, id, { motivo, sustitutaUuid: sustitutaUuidFinal || null, usuarioId: session.user.id }));
+  }
+
+  // Bitácora: quién canceló y cuándo.
+  const okIds = resultados.filter((r) => r.ok).map((r) => r.id);
+  if (okIds.length) {
+    const { data: fs } = await admin.from("facturas").select("id, folio, user_id, centro, monto").in("id", okIds);
+    for (const f of fs || []) {
+      await registrarBitacora(admin, {
+        actorId: session.user.id,
+        accion: "factura_cancelada",
+        entidad: "factura",
+        entidadId: f.id,
+        folio: f.folio,
+        clienteId: f.user_id,
+        centro: f.centro,
+        monto: f.monto,
+        detalle: `Motivo ${motivo}`,
+      });
+    }
   }
 
   const fallidas = resultados.filter((r) => !r.ok);

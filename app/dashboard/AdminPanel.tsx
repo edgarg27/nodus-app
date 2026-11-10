@@ -273,6 +273,9 @@ export default function AdminPanel({
   // Datos fiscales del cliente: con estos se timbran sus facturas. Van aparte de los datos generales porque se
   // validan completos y los guarda quien puede facturar (la misma API de Configuración fiscal).
   const puedeEditarFiscal = rolPuede(rol, "facturaEmitir");
+  // Bitácora de pagos y facturas: los mismos roles que Facturas/Cobranza (igual que la política RLS de la tabla).
+  const puedeVerBitacora =
+    rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "gerente_ventas" || rol === "cobranza";
   const [editandoFiscal, setEditandoFiscal] = useState(false);
   const [formFiscal, setFormFiscal] = useState({ rfc: "", nombre_fiscal: "", regimen_fiscal: "", cp_fiscal: "", uso_cfdi: USO_CFDI_DEFAULT, correos_factura: "", ...DOMICILIO_FISCAL_VACIO });
   const [guardandoFiscal, setGuardandoFiscal] = useState(false);
@@ -1512,6 +1515,12 @@ export default function AdminPanel({
                 <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Facturas</span>
               </Link>
+              {puedeVerBitacora && (
+                <Link className="modulo-card" href="/bitacora">
+                  <span className="modulo-icon" style={{ fontSize: 28, lineHeight: "32px" }}>📒</span>
+                  <span className="modulo-name">Bitácora</span>
+                </Link>
+              )}
               <Link className="modulo-card" href="/adicionales">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/adicionales.svg" alt="" className="modulo-icon icon-img-32" />
@@ -1633,6 +1642,12 @@ export default function AdminPanel({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icons/factura.png" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Facturas</span>
+                </Link>
+              ) },
+              { grupo: 1, ver: puedeVerBitacora, key: "bitacora", tarjeta: (
+                <Link className="modulo-card" href="/bitacora">
+                  <span className="modulo-icon" style={{ fontSize: 28, lineHeight: "32px" }}>📒</span>
+                  <span className="modulo-name">Bitácora</span>
                 </Link>
               ) },
               // Mismos roles que pueden editarlos (facturaEmitir, ver lib/permisosApi.ts).

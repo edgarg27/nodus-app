@@ -6,6 +6,7 @@ import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { rolPuede } from "@/lib/permisosApi";
 import { complementoAlPagar } from "@/lib/facturapi";
 import { esCuentaDeposito } from "@/lib/cuentasDeposito";
+import { registrarBitacora } from "@/lib/bitacora";
 
 // Requiere sesión de staff. Puede marcar pagado CUALQUIER pago, con o sin
 // factura_id. Lo usa /pagos (botón "✓ Marcar como pagado"), tanto para
@@ -33,13 +34,16 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data: pago } = await admin.from("pagos").select("id, user_id, estado, adicional_tipo").eq("id", pagoId).maybeSingle();
+  const { data: pago } = await admin.from("pagos").select("id, user_id, estado, adicional_tipo, centro").eq("id", pagoId).maybeSingle();
 
   if (cuentaDestino !== undefined && !esCuentaDeposito(cuentaDestino)) {
     return NextResponse.json({ error: "Cuenta no válida" }, { status: 400 });
   }
 
-  const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string; cuenta_destino?: string } = { estado: "pagado" };
+  const datosActualizar: { estado: string; comprobante_url?: string; fecha_pago?: string; cuenta_destino?: string; registrado_por?: string } = {
+    estado: "pagado",
+    registrado_por: session.user.id,
+  };
   if (comprobanteUrl) datosActualizar.comprobante_url = comprobanteUrl;
   if (cuentaDestino) datosActualizar.cuenta_destino = cuentaDestino;
   // Solo la primera vez: si ya estaba pagado y lo vuelven a mandar (doble
@@ -57,6 +61,14 @@ export async function POST(req: NextRequest) {
   }
   // Solo la primera vez que pasa a pagado (evita dos correos por doble clic).
   if (pago && pago.estado !== "pagado") {
+    await registrarBitacora(admin, {
+      actorId: session.user.id,
+      accion: "pago_marcado_pagado",
+      entidad: "pago",
+      entidadId: pago.id,
+      clienteId: pago.user_id,
+      centro: pago.centro,
+    });
     await enviarGraciasPorPago(admin, pagoId);
     // La factura la hace finanzas (como en ZORA); si el cobro ya era PPD se emite su complemento.
     // Pago marcado a mano: con comprobante se asume transferencia, sin él, efectivo.

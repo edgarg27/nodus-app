@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { registrarBitacora } from "@/lib/bitacora";
 import { facturarCobro, facturarPagoSuelto } from "@/lib/facturarCobro";
 import { FORMAS_PAGO_SAT, PERIODICIDADES, REGEX_UUID, TIPOS_RELACION } from "@/lib/formasPagoSat";
 
@@ -76,6 +77,40 @@ export async function POST(req: NextRequest) {
   }
   for (const id of pagoIds) {
     resultados.push(await facturarPagoSuelto(admin, id));
+  }
+
+  // Bitácora: deja constancia de quién timbró cada factura y cuándo. Los primeros resultados corresponden a
+  // facturaIds y los siguientes a pagoIds, en el mismo orden en que se recorrieron.
+  const okFacturaIds = resultados.slice(0, facturaIds.length).filter((r) => r.ok).map((r) => r.id);
+  const okPagoIds = resultados.slice(facturaIds.length).filter((r) => r.ok).map((r) => r.id);
+  if (okFacturaIds.length) {
+    const { data: fs } = await admin.from("facturas").select("id, folio, user_id, centro, monto").in("id", okFacturaIds);
+    for (const f of fs || []) {
+      await registrarBitacora(admin, {
+        actorId: session.user.id,
+        accion: "factura_timbrada",
+        entidad: "factura",
+        entidadId: f.id,
+        folio: f.folio,
+        clienteId: f.user_id,
+        centro: f.centro,
+        monto: f.monto,
+      });
+    }
+  }
+  if (okPagoIds.length) {
+    const { data: ps } = await admin.from("pagos").select("id, user_id, centro, monto, factura_id").in("id", okPagoIds);
+    for (const p of ps || []) {
+      await registrarBitacora(admin, {
+        actorId: session.user.id,
+        accion: "factura_timbrada",
+        entidad: "factura",
+        entidadId: p.factura_id || p.id,
+        clienteId: p.user_id,
+        centro: p.centro,
+        monto: p.monto,
+      });
+    }
   }
 
   const fallidas = resultados.filter((r) => !r.ok);
