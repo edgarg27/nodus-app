@@ -23,7 +23,16 @@ async function conceptoRentaDe(admin: Admin, userId: string, hoy: Date, porDefec
 }
 
 const DIAS_RECORDATORIO_ANTES = 3;
-const DIAS_GRACIA_DESPUES = 3;
+// Desde 2026-11-10: cada estado de cuenta de renta vence 10 días después de generarse (su emisión),
+// y la mora del 3% corre a partir del día 11. El día de pago del contrato solo marca cuándo se genera.
+const DIAS_PARA_PAGAR_RENTA = 10;
+
+// Suma días a una fecha ISO (YYYY-MM-DD). Se ancla al mediodía para no cruzar de día por el huso horario.
+function sumarDiasISO(iso: string, dias: number): string {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + dias);
+  return d.toLocaleDateString("en-CA");
+}
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Resumen = {
@@ -590,7 +599,8 @@ export async function POST(req: NextRequest) {
               concepto: await conceptoRentaDe(admin, userId, hoy, `Renta mensual - ${nombreMes}`),
               folio: `FAC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
               hoyISO,
-              fechaVencimiento: hoyISO,
+              // 10 días para pagar desde que se genera (antes vencía el mismo día que se emitía).
+              fechaVencimiento: sumarDiasISO(hoyISO, DIAS_PARA_PAGAR_RENTA),
               notaSpei: "Cargo SPEI generado automático (cobranza mensual)",
               autopago: true,
             });
@@ -612,28 +622,27 @@ export async function POST(req: NextRequest) {
             centro: cliente.centro,
             user_id: userId,
             tipo: "pago_hoy",
-            mensaje: `💰 Hoy es tu fecha de pago (día ${diaPago}).`,
+            mensaje: `💰 Tu renta de este mes ya está lista. Tienes ${DIAS_PARA_PAGAR_RENTA} días para pagarla.`,
           });
           await enviarAvisoPago({ to: cliente.email, nombre: cliente.nombre, tipo: "hoy", monto: montoAviso, diaPago, copias: correosExtraDe(cliente) });
         }
       }
 
-      // ---------- Desde el día siguiente al día de pago, si no ha pagado: mora y aviso (una vez al mes) ----------
-      // Se paga del 1 al día de pago; desde el día siguiente se cobra mora (3% de la renta, como los contratos mes a
-      // mes). Va en su propio estado de cuenta, que vence con la renta del mes siguiente. Si un día no corre el cobro,
-      // el siguiente lo pone igual (las marcas evitan repetirlo).
+      // ---------- Pasado el vencimiento (emisión + 10 días) sin pagar: mora, marcar vencida y avisar ----------
+      // La renta vence 10 días después de generarse; desde el día 11 corre la mora (3% de la renta). El filtro por
+      // diaPago solo evita trabajo antes de que exista la renta del mes; lo que manda es fecha_vencimiento. La marca
+      // del recargo y el "una vez al mes" del aviso evitan repetirlos si el cron corre varios días seguidos.
       if (diaHoy > diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
-        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada) {
+        const vencimiento = estadoRenta?.factura.fecha_vencimiento || null;
+        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada && vencimiento && hoyISO > vencimiento) {
           const renta = Number(contrato.renta_mensual) || 0;
           let recargo = 0;
           if (renta > 0 && !(await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" }))) {
             const cargoRecargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo", origen: "cron" });
             if (cargoRecargoId) {
               const nombreMes = hoy.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-              const siguiente = new Date(hoy.getFullYear(), hoy.getMonth() + 1, Math.min(diaPago, new Date(hoy.getFullYear(), hoy.getMonth() + 2, 0).getDate()));
-              const vencimientoSiguiente = `${siguiente.getFullYear()}-${String(siguiente.getMonth() + 1).padStart(2, "0")}-${String(siguiente.getDate()).padStart(2, "0")}`;
               const facturaRecargoId = await crearFacturaConSpei(admin, resumen, {
                 userId,
                 cargoId: cargoRecargoId,
@@ -642,18 +651,23 @@ export async function POST(req: NextRequest) {
                 concepto: `Recargo 3% por pago tardío - ${nombreMes}`,
                 folio: `REC-${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}-${userId.slice(0, 6)}`,
                 hoyISO,
-                fechaVencimiento: vencimientoSiguiente,
+                // El recargo también se cobra con 10 días para pagar.
+                fechaVencimiento: sumarDiasISO(hoyISO, DIAS_PARA_PAGAR_RENTA),
                 notaSpei: "Cargo SPEI generado automático (recargo por pago tardío)",
               });
               if (facturaRecargoId) recargo = recargoConIva(renta);
             }
+          }
+          // La renta sin pagar y vencida queda marcada como "vencida" (idempotente).
+          if (estadoRenta.factura.estado !== "vencida") {
+            await admin.from("facturas").update({ estado: "vencida" }).eq("id", estadoRenta.factura.id);
           }
           if (!(await yaExisteNotifEsteMs(admin, userId, "aviso_suspension"))) {
             await admin.from("notificaciones").insert({
               centro: cliente.centro,
               user_id: userId,
               tipo: "aviso_suspension",
-              mensaje: `⚠️ Tu fecha límite de pago fue el día ${diaPago}${recargo ? " y se generó un recargo del 3% por pago tardío" : ""}. Por favor, apóyanos con tu pago hoy; de lo contrario, mañana se suspenderán tus servicios.`,
+              mensaje: `⚠️ Venció tu renta (fecha límite ${vencimiento})${recargo ? " y se generó un recargo del 3% por pago tardío" : ""}. Por favor, apóyanos con tu pago lo antes posible.`,
             });
             await enviarAvisoPago({
               to: cliente.email,
@@ -666,23 +680,6 @@ export async function POST(req: NextRequest) {
             });
             resumen.recordatorios++;
           }
-        }
-      }
-
-      // ---------- Después de la gracia: la renta sin pagar queda vencida ----------
-      // Ya no se suspende solo: lo deciden la admin o Cobranza (Cobranza → ⋯ → Suspender servicios). Al cliente se le
-      // avisó el día de pago y el día siguiente.
-      const diaLimiteGracia = diaPago + DIAS_GRACIA_DESPUES;
-      if (diaHoy === diaLimiteGracia) {
-        const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
-        const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
-        if (
-          estadoRenta &&
-          !estadoRenta.liquidada &&
-          !estadoRenta.cancelada &&
-          (!estadoRenta.factura.fecha_vencimiento || hoyISO > estadoRenta.factura.fecha_vencimiento)
-        ) {
-          await admin.from("facturas").update({ estado: "vencida" }).eq("id", estadoRenta.factura.id);
         }
       }
     } catch (err: any) {
