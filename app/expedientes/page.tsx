@@ -132,11 +132,10 @@ function oficinaDe(c: Cliente) {
 export default function ExpedientesPage() {
   const supabase = createClient();
   const { cargando, rol, nombre, userId, centro, setCentro, esGlobal, permitido, centrosDisponibles } = useCentroAdmin(["gerente", "gerente_ventas", "ejecutiva_ventas", "cobranza"], ["gerente", "gerente_ventas", "cobranza"]);
-  // La Gerente de Ventas solo consulta: ve y abre lo que sube la admin, pero
-  // no sube, reemplaza, renombra ni borra (también lo impide la base, ver
-  // migracion_expedientes_gerente_ventas_consulta.sql).
-  // Cobranza (la contadora) también solo consulta: migracion_expedientes_cobranza_consulta.sql.
-  const soloConsulta = rol === "gerente_ventas" || rol === "cobranza";
+  // La admin (su centro) y la Gerente de Ventas (todos los centros) suben, reemplazan,
+  // renombran y borran (migracion_expedientes_gerente_ventas_edita.sql).
+  // Cobranza (la contadora) solo consulta: migracion_expedientes_cobranza_consulta.sql.
+  const soloConsulta = rol === "cobranza";
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [conteoPorCliente, setConteoPorCliente] = useState<Record<string, number>>({});
