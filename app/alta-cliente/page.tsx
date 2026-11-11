@@ -373,7 +373,11 @@ function AltaClienteInner() {
     rfc: rfcDesdeUrl,
     telefono: telefonoDesdeUrl,
     diaPago: diaPagoDesdeUrl,
+    notas: "",
   });
+  // Promoción / cortesía del cliente (ej. primer mes gratis). Se guarda dentro de las notas con una marca 🎁.
+  const [tienePromocion, setTienePromocion] = useState(false);
+  const [promocionDetalle, setPromocionDetalle] = useState("");
   // Con qué datos se le factura. Opcional al crear la cuenta: si faltan, Finanzas lo ve como "Faltan datos" en
   // Configuración fiscal y se pueden completar ahí.
   const [fiscal, setFiscal] = useState(FISCAL_VACIO);
@@ -410,6 +414,10 @@ function AltaClienteInner() {
     const esMensualLigado =
       modoContrato === "ligar" && contratosPendientes.find((c) => c.id === contratoSeleccionadoId)?.forma_pago === "mensual";
     const diaPagoEfectivo = esMensualLigado ? "1" : formCliente.diaPago;
+    // La promoción se antepone a las notas con una marca, para que resalte en Cobranza.
+    const notasFinal = [tienePromocion && promocionDetalle.trim() ? `🎁 Promoción: ${promocionDetalle.trim()}` : null, formCliente.notas.trim() || null]
+      .filter(Boolean)
+      .join("\n");
     // Sin contrato (solo sala de juntas, day pass) no hay día de pago fijo.
     if (modoContrato !== "ninguno" && !diaPagoEfectivo.trim()) {
       setErrorCliente("El día del mes que paga es obligatorio");
@@ -451,6 +459,7 @@ function AltaClienteInner() {
           ...domicilioFiscal,
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
+          notas: notasFinal,
           centro,
           sinCorreo,
         }),
@@ -535,7 +544,10 @@ function AltaClienteInner() {
         rfc: "",
         telefono: "",
         diaPago: "",
+        notas: "",
       });
+      setTienePromocion(false);
+      setPromocionDetalle("");
       setFiscal(FISCAL_VACIO);
       setDomicilioFiscal(DOMICILIO_FISCAL_VACIO);
       limpiarProspecto();
@@ -749,6 +761,38 @@ function AltaClienteInner() {
                   />
                 )}
               </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#333", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={tienePromocion}
+                  onChange={(e) => setTienePromocion(e.target.checked)}
+                  style={{ width: "auto" }}
+                />
+                ¿Tiene promoción o mes de cortesía?
+              </label>
+              {tienePromocion && (
+                <input
+                  value={promocionDetalle}
+                  onChange={(e) => setPromocionDetalle(e.target.value)}
+                  placeholder="¿En qué consiste? Ej. Primer mes gratis · Contrato 6 meses, el último no se cobra"
+                  style={{ marginTop: 6 }}
+                />
+              )}
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <p className="sub-label">Notas internas (opcional)</p>
+              <textarea
+                value={formCliente.notas}
+                onChange={(e) => setFormCliente({ ...formCliente, notas: e.target.value })}
+                placeholder="Ej. Contrato 6 meses, el último no se cobra · Observaciones del cliente"
+                rows={2}
+                style={{ width: "100%", resize: "vertical" }}
+              />
+              <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>Solo lo ve el personal. Aparece en Cobranza para identificar al cliente.</p>
             </div>
 
             <p className="panel-section-label" style={{ marginTop: 14 }}>

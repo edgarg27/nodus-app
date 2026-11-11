@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
       numero_oficina: String(body.numeroOficina ?? "").trim() || null,
       ocupantes_oficina: String(body.ocupantes ?? "").trim() || null,
       dia_pago: diaPago,
+      notas: String(body.notas ?? "").trim().slice(0, 1000) || null,
       activo: body.activo === false ? false : true,
     };
     const { error: profileError } = await admin.from("profiles").update(cambios).eq("id", userId);

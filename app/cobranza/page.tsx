@@ -544,6 +544,7 @@ export default function CobranzaPage() {
       filasPestana.map((f) => ({
         Cliente: nombreDe(f.c),
         Contacto: f.c.nombre,
+        Notas: f.c.notas || "",
         "No. cliente": f.c.numero_usuario || "",
         Centro: f.c.centro || "",
         Correo: correoVisible(f.c.email),
@@ -820,6 +821,11 @@ export default function CobranzaPage() {
                               <div className="cb-cliente-sub">
                                 {[f.c.numero_usuario, nombreDe(f.c) !== f.c.nombre ? f.c.nombre : null].filter(Boolean).join(" · ") || correoVisible(f.c.email)}
                               </div>
+                              {f.c.notas && (
+                                <div style={{ fontSize: 12, color: "#6b21a8", background: "#f3e8ff", borderRadius: 6, padding: "2px 8px", marginTop: 4, display: "inline-block", whiteSpace: "pre-wrap" }}>
+                                  📝 {f.c.notas}
+                                </div>
+                              )}
                             </td>
                             {datos.esGlobal && !centro && <td className="ft-nowrap">{f.c.centro || "—"}</td>}
                             <td className="ft-num ft-nowrap">

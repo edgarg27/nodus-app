@@ -48,6 +48,7 @@ type Cliente = {
   empresa: string | null;
   telefono: string | null;
   ocupantes_oficina: string | null;
+  notas?: string | null;
   dia_pago?: number | null;
   nombre_fiscal?: string | null;
   regimen_fiscal?: string | null;
@@ -284,6 +285,7 @@ export default function AdminPanel({
   const [formDiaPago, setFormDiaPago] = useState("");
   const [formCentro, setFormCentro] = useState("");
   const [formActivo, setFormActivo] = useState(true);
+  const [formNotas, setFormNotas] = useState("");
   const [errorDatos, setErrorDatos] = useState("");
   const [enviandoReset, setEnviandoReset] = useState(false);
   const [nuevaPassword, setNuevaPassword] = useState("");
@@ -581,6 +583,7 @@ export default function AdminPanel({
     setFormDiaPago(cliente.dia_pago != null ? String(cliente.dia_pago) : "");
     setFormCentro(cliente.centro || "");
     setFormActivo(cliente.activo !== false);
+    setFormNotas(cliente.notas || "");
     setErrorDatos("");
     setEditandoFiscal(false);
     setErrorFiscal("");
@@ -764,6 +767,7 @@ export default function AdminPanel({
         numeroOficina: formOficina,
         ocupantes: formOcupantes,
         activo: formActivo,
+        notas: formNotas,
       });
       if (!ok) {
         setErrorDatos(data.error || "No se pudieron guardar los cambios");
@@ -781,6 +785,7 @@ export default function AdminPanel({
           ocupantes_oficina: c.ocupantes_oficina,
           dia_pago: c.dia_pago,
           activo: c.activo,
+          notas: formNotas.trim().slice(0, 1000) || null,
         };
         setClienteSeleccionado(actualizado);
         setClientes((prev) => prev.map((x) => (x.id === actualizado.id ? actualizado : x)));
@@ -2138,6 +2143,19 @@ export default function AdminPanel({
                   onChange={(e) => setFormOcupantes(e.target.value)}
                   placeholder="Ej. Juan Pérez, María López"
                 />
+                {puedeGestionarClientes && (
+                  <>
+                    <p className="sub-label">Notas internas (cobranza)</p>
+                    <textarea
+                      value={formNotas}
+                      onChange={(e) => setFormNotas(e.target.value)}
+                      placeholder="Ej. Mes gratis por promoción · Contrato 6 meses, el último no se cobra"
+                      rows={2}
+                      style={{ resize: "vertical" }}
+                    />
+                    <p style={{ fontSize: 11, color: "#aaa", margin: "2px 0 0" }}>Solo lo ve el personal. Aparece en Cobranza para identificar al cliente.</p>
+                  </>
+                )}
                 {puedeGestionarClientes && (
                   <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#555", marginTop: 8 }}>
                     <input
