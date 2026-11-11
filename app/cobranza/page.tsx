@@ -59,7 +59,7 @@ type Datos = {
 };
 
 type Estado = "al_corriente" | "pendiente" | "por_vencer" | "vencido";
-type Pestana = "todos" | "corriente" | "por_vencer" | "vencidos" | "sin_pago" | "promesa" | "suspendidos" | "bajas" | "revisar";
+type Pestana = "todos" | "corriente" | "por_vencer" | "vencidos" | "sin_pago" | "falta_factura" | "promesa" | "suspendidos" | "bajas" | "revisar";
 
 type Fila = {
   c: ClienteCobranza;
@@ -72,6 +72,8 @@ type Fila = {
   promesa: Promesa | null;
   porRevisar: number;
   sinPago: boolean;
+  // Debe algo que todavía no tiene CFDI timbrado: hay que facturarlo antes de cobrarlo.
+  faltaFactura: boolean;
   baja: Baja | null;
 };
 
@@ -260,6 +262,8 @@ export default function CobranzaPage() {
           promesa: promesaActiva.get(c.id) || null,
           porRevisar: suyos.filter((x) => x.estado === "en_revision").length,
           sinPago: saldo > 0 && !conPagos.has(c.id),
+          // Debe algo sin CFDI timbrado (cargo suelto o estado de cuenta integrado pero no timbrado).
+          faltaFactura: saldo > 0 && suyos.some((x) => !x.facturado),
           baja: c.activo ? null : bajaPorCliente.get(c.id) || { userId: c.id, fechaBaja: null, montoAdeudado: 0 },
         };
       });
@@ -287,12 +291,16 @@ export default function CobranzaPage() {
     switch (p) {
       case "corriente":
         return f.estado === "al_corriente" && f.c.activo;
+      // Las pestañas de cobro muestran solo a quienes YA tienen factura (CFDI); los que deben pero
+      // falta facturarlos salen aparte, en "Falta factura".
       case "por_vencer":
-        return f.estado === "por_vencer";
+        return f.estado === "por_vencer" && !f.faltaFactura;
       case "vencidos":
-        return f.estado === "vencido";
+        return f.estado === "vencido" && !f.faltaFactura;
       case "sin_pago":
-        return f.sinPago;
+        return f.sinPago && !f.faltaFactura;
+      case "falta_factura":
+        return f.faltaFactura;
       case "promesa":
         return !!f.promesa;
       case "suspendidos":
@@ -532,7 +540,7 @@ export default function CobranzaPage() {
         "Por vencer (7 días)": f.porVencer,
         "Fecha límite": f.fechaLimite || "",
         "Días de atraso": f.diasAtraso,
-        Estado: ESTADO_INFO[f.estado].label + (f.c.suspendido ? " · Suspendido" : "") + (f.baja ? " · Baja" : ""),
+        Estado: ESTADO_INFO[f.estado].label + (f.faltaFactura ? " · Falta factura" : "") + (f.c.suspendido ? " · Suspendido" : "") + (f.baja ? " · Baja" : ""),
         "Promesa de pago": f.promesa ? f.promesa.fecha_promesa : "",
       }))
     );
@@ -748,6 +756,7 @@ export default function CobranzaPage() {
                     ["por_vencer", "Por vencer"],
                     ["vencidos", "Vencidos"],
                     ["sin_pago", "Sin pago registrado"],
+                    ["falta_factura", "Falta factura"],
                     ["promesa", "Con promesa"],
                     ["revisar", "Comprobantes por revisar"],
                     ["suspendidos", "Suspendidos"],
@@ -802,6 +811,11 @@ export default function CobranzaPage() {
                             <td>
                               <div className="cb-chips">
                                 <span className={"ft-chip " + ESTADO_INFO[f.estado].clase}>{ESTADO_INFO[f.estado].label}</span>
+                                {f.faltaFactura && (
+                                  <span className="ft-chip" style={{ background: "#f3e8ff", color: "#6b21a8" }}>
+                                    Falta factura
+                                  </span>
+                                )}
                                 {f.promesa && <span className="ft-chip ft-chip-ambar">Promesa {fechaCorta(f.promesa.fecha_promesa)}</span>}
                                 {f.porRevisar > 0 &&
                                   (puedeRegistrar ? (
