@@ -245,9 +245,11 @@ export default function CobranzaPage() {
       .map((c) => {
         const suyos = cargosPorCliente.get(c.id) || [];
         const saldo = suyos.reduce((s, x) => s + x.monto, 0);
-        const vencidos = suyos.filter((x) => x.fechaLimite < hoy);
+        // "Vencido" y "por vencer" solo aplican a cargos YA timbrados (con CFDI): el plazo de 10 días corre desde el
+        // timbrado. Un cargo sin CFDI no está vencido, es "falta factura".
+        const vencidos = suyos.filter((x) => x.facturado && x.fechaLimite < hoy);
         const vencido = vencidos.reduce((s, x) => s + x.monto, 0);
-        const porVencer = suyos.filter((x) => x.fechaLimite >= hoy && x.fechaLimite <= en7).reduce((s, x) => s + x.monto, 0);
+        const porVencer = suyos.filter((x) => x.facturado && x.fechaLimite >= hoy && x.fechaLimite <= en7).reduce((s, x) => s + x.monto, 0);
         const fechaLimite = suyos.map((x) => x.fechaLimite).sort()[0] || null;
         const masViejo = vencidos.map((x) => x.fechaLimite).sort()[0];
         const estado: Estado = saldo <= 0 ? "al_corriente" : vencido > 0 ? "vencido" : porVencer > 0 ? "por_vencer" : "pendiente";
@@ -277,8 +279,9 @@ export default function CobranzaPage() {
     const pagos = pagadosF.filter((p) => idsVisibles.has(p.userId));
     const suma = (xs: { monto: number }[]) => xs.reduce((s, x) => s + x.monto, 0);
     const clientesDe = (xs: { userId: string }[]) => new Set(xs.map((x) => x.userId)).size;
-    const vencidos = deVisibles.filter((c) => c.fechaLimite < hoy);
-    const porVencer = deVisibles.filter((c) => c.fechaLimite >= hoy && c.fechaLimite <= en7);
+    // "Vencido" y "por vencer" solo cuentan cargos timbrados (con CFDI); los sin factura van en "falta factura".
+    const vencidos = deVisibles.filter((c) => c.facturado && c.fechaLimite < hoy);
+    const porVencer = deVisibles.filter((c) => c.facturado && c.fechaLimite >= hoy && c.fechaLimite <= en7);
     // Del total por cobrar, cuánto ya tiene factura (CFDI) y cuánto falta facturar, por monto y por clientes.
     const conFactura = deVisibles.filter((c) => c.facturado);
     const faltaFactura = deVisibles.filter((c) => !c.facturado);
