@@ -59,7 +59,7 @@ type Datos = {
 };
 
 type Estado = "al_corriente" | "pendiente" | "por_vencer" | "vencido";
-type Pestana = "todos" | "corriente" | "por_vencer" | "vencidos" | "sin_pago" | "falta_factura" | "promesa" | "suspendidos" | "bajas" | "revisar";
+type Pestana = "todos" | "corriente" | "por_vencer" | "vencidos" | "sin_pago" | "con_factura" | "falta_factura" | "promesa" | "suspendidos" | "bajas" | "revisar";
 
 type Fila = {
   c: ClienteCobranza;
@@ -74,6 +74,8 @@ type Fila = {
   sinPago: boolean;
   // Debe algo que todavía no tiene CFDI timbrado: hay que facturarlo antes de cobrarlo.
   faltaFactura: boolean;
+  // Debe algo que YA tiene CFDI timbrado (listo para cobrar). Un cliente mixto puede tener las dos.
+  tieneFactura: boolean;
   baja: Baja | null;
 };
 
@@ -266,6 +268,7 @@ export default function CobranzaPage() {
           sinPago: saldo > 0 && !conPagos.has(c.id),
           // Debe algo sin CFDI timbrado (cargo suelto o estado de cuenta integrado pero no timbrado).
           faltaFactura: saldo > 0 && suyos.some((x) => !x.facturado),
+          tieneFactura: saldo > 0 && suyos.some((x) => x.facturado),
           baja: c.activo ? null : bajaPorCliente.get(c.id) || { userId: c.id, fechaBaja: null, montoAdeudado: 0 },
         };
       });
@@ -307,6 +310,8 @@ export default function CobranzaPage() {
         return f.estado === "vencido" && !f.faltaFactura;
       case "sin_pago":
         return f.sinPago && !f.faltaFactura;
+      case "con_factura":
+        return f.tieneFactura;
       case "falta_factura":
         return f.faltaFactura;
       case "promesa":
@@ -716,11 +721,11 @@ export default function CobranzaPage() {
                 <span className="cb-kpi-val">{moneda(kpis.porCobrar.monto)}</span>
                 <span className="cb-kpi-sub">{kpis.porCobrar.clientes} cliente(s) con saldo</span>
               </button>
-              <div className="cb-kpi">
+              <button type="button" className={"cb-kpi" + (pestana === "con_factura" ? " activa" : "")} onClick={() => setPestana("con_factura")}>
                 <span className="cb-kpi-lbl">Por cobrar · con factura</span>
                 <span className="cb-kpi-val">{moneda(kpis.conFactura.monto)}</span>
                 <span className="cb-kpi-sub">{kpis.conFactura.clientes} cliente(s) con CFDI</span>
-              </div>
+              </button>
               <button type="button" className={"cb-kpi" + (pestana === "falta_factura" ? " activa" : "")} onClick={() => setPestana("falta_factura")}>
                 <span className="cb-kpi-lbl">Por cobrar · falta factura</span>
                 <span className="cb-kpi-val" style={{ color: "#6b21a8" }}>{moneda(kpis.faltaFactura.monto)}</span>
@@ -774,6 +779,7 @@ export default function CobranzaPage() {
                     ["por_vencer", "Por vencer"],
                     ["vencidos", "Vencidos"],
                     ["sin_pago", "Sin pago registrado"],
+                    ["con_factura", "Con factura"],
                     ["falta_factura", "Falta factura"],
                     ["promesa", "Con promesa"],
                     ["revisar", "Comprobantes por revisar"],
