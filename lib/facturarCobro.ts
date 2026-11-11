@@ -102,6 +102,14 @@ export async function previaPdfCobro(admin: Admin, facturaId: string, opts: Opci
   }
 }
 
+// El plazo de 10 días para pagar arranca al TIMBRAR el CFDI (no cuando se generó el estado de cuenta): por eso
+// el vencimiento se fija en timbrado + 10 días. Antes de timbrar el cargo cuenta como "falta factura", no vencido.
+function vencimientoDesdeTimbrado(): string {
+  const d = new Date(hoyMexicoISO() + "T12:00:00");
+  d.setDate(d.getDate() + 10);
+  return d.toLocaleDateString("en-CA");
+}
+
 export async function facturarCobro(admin: Admin, facturaId: string, opts: OpcionesFactura = {}): Promise<ResultadoFacturar> {
   const prep = await parametrosDeCobro(admin, facturaId, opts);
   if (!("params" in prep)) return prep.resultado;
@@ -110,7 +118,8 @@ export async function facturarCobro(admin: Admin, facturaId: string, opts: Opcio
   try {
     const { datosFactura } = await timbrarCfdi(admin, prep.params);
     // Solo si sigue sin CFDI: evita pisar el de otra persona que facturó al mismo tiempo.
-    const { error } = await admin.from("facturas").update(datosFactura).eq("id", f.id).is("uuid_cfdi", null);
+    // Se re-fija el vencimiento a timbrado + 10 días (el plazo corre desde el timbrado).
+    const { error } = await admin.from("facturas").update({ ...datosFactura, fecha_vencimiento: vencimientoDesdeTimbrado() }).eq("id", f.id).is("uuid_cfdi", null);
     if (error) {
       console.error(`[facturar-cobro] ${f.id}: se timbró pero no se pudo guardar:`, error.message);
       return { id: f.id, folio: f.folio, ok: false, error: "Se timbró en Facturapi pero no se pudo guardar; revisa Facturapi antes de reintentar" };
@@ -131,7 +140,11 @@ export async function facturarCobro(admin: Admin, facturaId: string, opts: Opcio
         metodo: prep.params.metodo,
         formaPago: prep.params.formaPago,
       });
-      if (sim) return { id: f.id, folio: f.folio, ok: true, uuid: sim.uuid, simulada: true };
+      if (sim) {
+        // Mismo criterio que el timbrado real: el plazo corre desde el timbrado.
+        await admin.from("facturas").update({ fecha_vencimiento: vencimientoDesdeTimbrado() }).eq("id", f.id);
+        return { id: f.id, folio: f.folio, ok: true, uuid: sim.uuid, simulada: true };
+      }
     }
     // La llave de idempotencia ya usada significa que este cobro ya se facturó (o se está facturando).
     if (/idempotencia|idempotency/i.test(err?.message || "")) {
