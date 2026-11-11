@@ -486,7 +486,7 @@ function AltaClienteInner() {
         // contrato para que no queden desincronizados.
         const { error: updateError } = await supabase
           .from("contratos")
-          .update({ user_id: nuevoClienteId, dia_pago: Number(diaPagoEfectivo) })
+          .update({ user_id: nuevoClienteId, dia_pago: Number(diaPagoEfectivo), ultimo_mes_gratis: tienePromocion })
           .eq("id", contratoSeleccionadoId);
 
         if (updateError) {
@@ -771,15 +771,20 @@ function AltaClienteInner() {
                   onChange={(e) => setTienePromocion(e.target.checked)}
                   style={{ width: "auto" }}
                 />
-                ¿Tiene promoción o mes de cortesía?
+                ¿Tiene promoción (último mes de cortesía)?
               </label>
               {tienePromocion && (
-                <input
-                  value={promocionDetalle}
-                  onChange={(e) => setPromocionDetalle(e.target.value)}
-                  placeholder="¿En qué consiste? Ej. Primer mes gratis · Contrato 6 meses, el último no se cobra"
-                  style={{ marginTop: 6 }}
-                />
+                <>
+                  <input
+                    value={promocionDetalle}
+                    onChange={(e) => setPromocionDetalle(e.target.value)}
+                    placeholder="¿En qué consiste? Ej. Último mes del contrato gratis por promoción"
+                    style={{ marginTop: 6 }}
+                  />
+                  <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>
+                    El sistema NO cobrará la renta del <b>último mes</b> del contrato (el de su fecha de fin). Solo aplica al contrato que se ligue aquí.
+                  </p>
+                </>
               )}
             </div>
 

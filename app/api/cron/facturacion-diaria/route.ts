@@ -34,6 +34,12 @@ function sumarDiasISO(iso: string, dias: number): string {
   return d.toLocaleDateString("en-CA");
 }
 
+// Promoción "mes de cortesía": el ÚLTIMO mes del contrato (el de su fecha_vencimiento) no se cobra, solo si el
+// contrato trae la marca. Compara el mes que se cobraría (hoy) contra el mes de fin del contrato.
+function esMesDeCortesia(contrato: { ultimo_mes_gratis?: boolean | null; fecha_vencimiento?: string | null }, hoyISO: string): boolean {
+  return !!contrato.ultimo_mes_gratis && !!contrato.fecha_vencimiento && String(contrato.fecha_vencimiento).slice(0, 7) === hoyISO.slice(0, 7);
+}
+
 type Admin = ReturnType<typeof createAdminClient>;
 type Resumen = {
   recordatorios: number;
@@ -220,7 +226,7 @@ async function procesarMensual(
   resumen: Resumen,
   ctx: {
     userId: string;
-    contrato: { id: string; renta_mensual: number | null; fecha_inicio: string | null; fecha_vencimiento: string | null };
+    contrato: { id: string; renta_mensual: number | null; fecha_inicio: string | null; fecha_vencimiento: string | null; ultimo_mes_gratis?: boolean | null };
     cliente: { nombre: string | null; email: string | null; centro: string | null };
     // Solo Coworking recibe voucher de WiFi (ver lib/coworking.ts).
     esCoworking: boolean;
@@ -248,7 +254,7 @@ async function procesarMensual(
   const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
 
   // ---------- Días 1 al 10: facturar la renta del mes (una sola vez) ----------
-  if (!rentaMes && diaHoy <= DIA_LIMITE_PAGO_MENSUAL) {
+  if (!rentaMes && diaHoy <= DIA_LIMITE_PAGO_MENSUAL && !esMesDeCortesia(contrato, hoyISO)) {
     const cargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta", origen: "cron" });
     if (!cargoId) return;
     // Renta + adicionales de cobro mensual (Estacionamiento).
@@ -495,7 +501,7 @@ export async function POST(req: NextRequest) {
   // Todos los contratos vigentes con día de pago definido
   const { data: contratos } = await admin
     .from("contratos")
-    .select("id, user_id, renta_mensual, dia_pago, estatus, forma_pago, fecha_inicio, fecha_vencimiento")
+    .select("id, user_id, renta_mensual, dia_pago, estatus, forma_pago, fecha_inicio, fecha_vencimiento, ultimo_mes_gratis")
     .eq("estatus", "vigente")
     .not("dia_pago", "is", null)
     .order("fecha_inicio", { ascending: false, nullsFirst: false })
@@ -582,7 +588,8 @@ export async function POST(req: NextRequest) {
       }
 
       // ---------- Día de pago: generar factura + SPEI + voucher ----------
-      if (diaHoy === diaPago) {
+      // En el mes de cortesía (promoción: último mes del contrato) no se genera renta: ese mes es gratis.
+      if (diaHoy === diaPago && !esMesDeCortesia(contrato, hoyISO)) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         let rentaYaResuelta = false;
         // Lo que dice su estado de cuenta (si se integró a mano puede llevar más que la renta).
