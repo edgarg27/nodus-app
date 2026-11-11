@@ -99,7 +99,7 @@ export async function estadoDelCargo(admin: Admin, cargo: CargoPeriodo) {
   if (!cargo.factura_id) return null;
   const { data: factura, error } = await admin
     .from("facturas")
-    .select("id, folio, concepto, monto, estado, fecha_vencimiento, cancelacion_estatus")
+    .select("id, folio, concepto, monto, estado, fecha_vencimiento, cancelacion_estatus, uuid_cfdi")
     .eq("id", cargo.factura_id)
     .maybeSingle();
   if (error) throw new Error(`No se pudo leer la factura del cargo: ${error.message}`);
