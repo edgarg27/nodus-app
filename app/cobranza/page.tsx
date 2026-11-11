@@ -282,10 +282,15 @@ export default function CobranzaPage() {
     // "Vencido" y "por vencer" solo cuentan cargos timbrados (con CFDI); los sin factura van en "falta factura".
     const vencidos = deVisibles.filter((c) => c.facturado && c.fechaLimite < hoy);
     const porVencer = deVisibles.filter((c) => c.facturado && c.fechaLimite >= hoy && c.fechaLimite <= en7);
+    // Del total por cobrar, cuánto ya tiene factura (CFDI) y cuánto falta facturar, por monto y por clientes.
+    const conFactura = deVisibles.filter((c) => c.facturado);
+    const faltaFactura = deVisibles.filter((c) => !c.facturado);
     return {
       porCobrar: { monto: suma(deVisibles), clientes: clientesDe(deVisibles) },
       vencido: { monto: suma(vencidos), clientes: clientesDe(vencidos) },
       porVencer: { monto: suma(porVencer), clientes: clientesDe(porVencer) },
+      conFactura: { monto: suma(conFactura), clientes: clientesDe(conFactura) },
+      faltaFactura: { monto: suma(faltaFactura), clientes: clientesDe(faltaFactura) },
       pagado: { monto: suma(pagos), pagos: pagos.length },
     };
   }, [cargosF, pagadosF, idsVisibles, hoy, en7]);
@@ -710,6 +715,16 @@ export default function CobranzaPage() {
                 <span className="cb-kpi-lbl">Por cobrar</span>
                 <span className="cb-kpi-val">{moneda(kpis.porCobrar.monto)}</span>
                 <span className="cb-kpi-sub">{kpis.porCobrar.clientes} cliente(s) con saldo</span>
+              </button>
+              <div className="cb-kpi">
+                <span className="cb-kpi-lbl">Por cobrar · con factura</span>
+                <span className="cb-kpi-val">{moneda(kpis.conFactura.monto)}</span>
+                <span className="cb-kpi-sub">{kpis.conFactura.clientes} cliente(s) con CFDI</span>
+              </div>
+              <button type="button" className={"cb-kpi" + (pestana === "falta_factura" ? " activa" : "")} onClick={() => setPestana("falta_factura")}>
+                <span className="cb-kpi-lbl">Por cobrar · falta factura</span>
+                <span className="cb-kpi-val" style={{ color: "#6b21a8" }}>{moneda(kpis.faltaFactura.monto)}</span>
+                <span className="cb-kpi-sub">{kpis.faltaFactura.clientes} cliente(s) sin CFDI</span>
               </button>
               <button type="button" className={"cb-kpi cb-kpi-roja" + (pestana === "vencidos" ? " activa" : "")} onClick={() => setPestana("vencidos")}>
                 <span className="cb-kpi-lbl">Vencido</span>
