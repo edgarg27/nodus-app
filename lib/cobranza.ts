@@ -36,6 +36,9 @@ export type Cargo = {
   comprobanteUrl: string | null;
   folio: string | null;
   centro: string | null;
+  // true solo si el cargo ya está respaldado por un CFDI timbrado (uuid_cfdi). Si el estado de cuenta solo se
+  // integró pero no se timbró, o es un cargo suelto sin factura, es false ("falta factura").
+  facturado: boolean;
 };
 
 export type Pagado = { userId: string; monto: number; fecha: string; tipo: TipoCargo; centro: string | null };
@@ -78,7 +81,7 @@ export async function cargarCobranza(admin: Admin, opts: { centro: string | null
     admin.from("pagos").select("id, user_id, concepto, monto, estado, adicional_tipo, factura_id, created_at, fecha_pago, comprobante_url, centro").in("user_id", t)
   );
   const facturas = await enTrozos<any>(ids, (t) =>
-    admin.from("facturas").select("id, user_id, folio, concepto, monto, estado, fecha_emision, fecha_vencimiento, cancelacion_estatus, centro").in("user_id", t)
+    admin.from("facturas").select("id, user_id, folio, concepto, monto, estado, fecha_emision, fecha_vencimiento, cancelacion_estatus, centro, uuid_cfdi").in("user_id", t)
   );
   const facturaPorId = new Map(facturas.map((f) => [f.id, f]));
   const facturasConPagos = new Set(pagos.map((p) => p.factura_id).filter(Boolean));
@@ -106,6 +109,8 @@ export async function cargarCobranza(admin: Admin, opts: { centro: string | null
       comprobanteUrl: p.comprobante_url || null,
       folio: f?.folio || null,
       centro: p.centro || null,
+      // Facturado solo si su estado de cuenta ya se timbró (tiene CFDI).
+      facturado: !!(f && f.uuid_cfdi),
     });
   }
   for (const f of facturas) {
@@ -123,6 +128,7 @@ export async function cargarCobranza(admin: Admin, opts: { centro: string | null
       comprobanteUrl: null,
       folio: f.folio,
       centro: f.centro || null,
+      facturado: !!f.uuid_cfdi,
     });
   }
 
