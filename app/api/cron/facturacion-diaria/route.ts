@@ -350,9 +350,10 @@ async function procesarMensual(
     resumen.recordatorios++;
   }
 
-  // ---------- Pasado el día 10 sin pagar: recargo del 3% (una sola vez) ----------
-  // Si finanzas le movió la fecha a la factura, se respeta su vencimiento.
-  if (diaHoy > DIA_LIMITE_PAGO_MENSUAL && (!facturaRenta.fecha_vencimiento || hoyISO > facturaRenta.fecha_vencimiento)) {
+  // ---------- Pasado el vencimiento sin pagar: recargo del 3% (una sola vez) ----------
+  // La mora solo corre si la renta ya está timbrada (CFDI) y pasaron sus 10 días desde el timbrado. Sin CFDI no
+  // hay recargo: el cliente todavía no tiene su factura.
+  if (facturaRenta.uuid_cfdi && diaHoy > DIA_LIMITE_PAGO_MENSUAL && (!facturaRenta.fecha_vencimiento || hoyISO > facturaRenta.fecha_vencimiento)) {
     if (await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" })) return;
     const cargoRecargoId = await apartarCargo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo", origen: "cron" });
     if (!cargoRecargoId) return;
@@ -628,15 +629,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ---------- Pasado el vencimiento (emisión + 10 días) sin pagar: mora, marcar vencida y avisar ----------
-      // La renta vence 10 días después de generarse; desde el día 11 corre la mora (3% de la renta). El filtro por
-      // diaPago solo evita trabajo antes de que exista la renta del mes; lo que manda es fecha_vencimiento. La marca
+      // ---------- Pasado el vencimiento (timbrado + 10 días) sin pagar: mora, marcar vencida y avisar ----------
+      // La mora del 3% solo corre si la renta YA está timbrada (CFDI) y pasaron sus 10 días desde el timbrado
+      // (fecha_vencimiento = timbrado + 10). Sin CFDI no hay mora: el cliente todavía no tiene su factura. La marca
       // del recargo y el "una vez al mes" del aviso evitan repetirlos si el cron corre varios días seguidos.
       if (diaHoy > diaPago) {
         const rentaMes = await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "renta" });
         const estadoRenta = rentaMes ? await estadoDelCargo(admin, rentaMes) : null;
         const vencimiento = estadoRenta?.factura.fecha_vencimiento || null;
-        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada && vencimiento && hoyISO > vencimiento) {
+        if (estadoRenta && !estadoRenta.liquidada && !estadoRenta.cancelada && estadoRenta.factura.uuid_cfdi && vencimiento && hoyISO > vencimiento) {
           const renta = Number(contrato.renta_mensual) || 0;
           let recargo = 0;
           if (renta > 0 && !(await cargoDelPeriodo(admin, { userId, contratoId: contrato.id, periodo, tipo: "recargo" }))) {
