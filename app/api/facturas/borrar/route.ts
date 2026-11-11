@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { registrarBitacora } from "@/lib/bitacora";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza"];
 const MAXIMO_POR_LLAMADA = 50;
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (facturaIds.length > MAXIMO_POR_LLAMADA) return NextResponse.json({ error: `Máximo ${MAXIMO_POR_LLAMADA} por vez` }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: filas } = await admin.from("facturas").select("id, folio, centro").in("id", facturaIds);
+  const { data: filas } = await admin.from("facturas").select("id, folio, centro, user_id").in("id", facturaIds);
   if (!ROLES_GLOBALES.includes(miProfile!.rol) && !(filas || []).every((f) => f.centro === miProfile!.centro)) {
     return NextResponse.json({ error: "No puedes borrar estados de cuenta de otro centro" }, { status: 403 });
   }
@@ -47,5 +48,20 @@ export async function POST(req: NextRequest) {
     else if (data !== "ok") resultados.push({ id, folio, ok: false, error: MOTIVO[String(data)] || String(data) });
     else resultados.push({ id, folio, ok: true });
   }
+
+  // Bitácora: quién borró el estado de cuenta y cuándo (se registra después, aunque la factura ya no exista).
+  for (const r of resultados.filter((x) => x.ok)) {
+    const f = (filas || []).find((x) => x.id === r.id);
+    await registrarBitacora(admin, {
+      actorId: session.user.id,
+      accion: "factura_borrada",
+      entidad: "factura",
+      entidadId: r.id,
+      folio: r.folio,
+      clienteId: f?.user_id || null,
+      centro: f?.centro || null,
+    });
+  }
+
   return NextResponse.json({ ok: true, resultados });
 }

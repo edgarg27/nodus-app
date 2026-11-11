@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { registrarBitacora } from "@/lib/bitacora";
 import { conceptoCobroAdicional, masIva } from "@/lib/adicionales";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
 
@@ -78,11 +79,21 @@ export async function POST(req: NextRequest) {
       estado: "pendiente",
       adicional_tipo: tipoInfo.clave,
       creado_por: s.userId,
+      registrado_por: s.userId,
     })
     .select("id, user_id, monto, concepto, estado, created_at")
     .single();
 
   if (error || !pago) return NextResponse.json({ error: "No se pudo generar el cobro" }, { status: 500 });
+  await registrarBitacora(admin, {
+    actorId: s.userId,
+    accion: "pago_registrado",
+    entidad: "pago",
+    entidadId: pago.id,
+    clienteId: cliente.id,
+    centro: cliente.centro,
+    monto,
+  });
   return NextResponse.json({ ok: true, pago });
 }
 

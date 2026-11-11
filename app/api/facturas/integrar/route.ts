@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { rolPuede } from "@/lib/permisosApi";
+import { registrarBitacora } from "@/lib/bitacora";
 import { SERIE_POR_CENTRO, serieCentro } from "@/lib/centros";
 import { accesoCliente } from "@/lib/facturasAcceso";
 import { servicioActivoPorClave } from "@/lib/catalogoServicios";
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest) {
       // Si todo lo que se integra ya está pagado (sin líneas nuevas), el estado de cuenta nace pagado y se factura PUE.
       estado: nuevas.length === 0 && (pagosExistentes || []).length > 0 && (pagosExistentes || []).every((p) => p.estado === "pagado") ? "pagada" : "pendiente",
       centro,
+      registrado_por: session.user.id,
     })
     .select("id, folio")
     .single();
@@ -148,6 +150,7 @@ export async function POST(req: NextRequest) {
           monto: Number(l.monto),
           factura_id: factura.id,
           adicional_tipo: l.adicionalTipo || null,
+          registrado_por: session.user.id,
         }))
       )
       .select("id");
@@ -193,6 +196,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No se pudieron ligar los pagos a la factura" }, { status: 500 });
     }
   }
+
+  await registrarBitacora(admin, {
+    actorId: session.user.id,
+    accion: "factura_integrada",
+    entidad: "factura",
+    entidadId: factura.id,
+    folio: factura.folio,
+    clienteId: userId,
+    centro,
+    monto: total,
+  });
 
   return NextResponse.json({ ok: true, id: factura.id, folio: factura.folio, total });
 }
