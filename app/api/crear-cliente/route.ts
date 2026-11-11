@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { nombre, empresa, rfc, telefono, centro: centroBody, diaPago, nombre_fiscal, regimen_fiscal, cp_fiscal, uso_cfdi } = body;
+  const notas = typeof body.notas === "string" && body.notas.trim() ? body.notas.trim().slice(0, 1000) : null;
   // sinCorreo: la cuenta se crea con una contraseña generada y NO se le manda correo (quien solo renta una sala de
   // juntas, o clientes que se migran de ZORA). Si no dio correo se le pone uno ficticio y entra con su número N-.
   const sinCorreo = body.sinCorreo === true;
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
     numero_usuario: numeroUsuario,
     telefono: telefono || null,
     dia_pago: diaPago ? Number(diaPago) : null,
+    notas,
     activo: true,
     registrado_por: session.user.id,
   });

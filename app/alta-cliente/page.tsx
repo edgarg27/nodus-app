@@ -373,6 +373,7 @@ function AltaClienteInner() {
     rfc: rfcDesdeUrl,
     telefono: telefonoDesdeUrl,
     diaPago: diaPagoDesdeUrl,
+    notas: "",
   });
   // Con qué datos se le factura. Opcional al crear la cuenta: si faltan, Finanzas lo ve como "Faltan datos" en
   // Configuración fiscal y se pueden completar ahí.
@@ -451,6 +452,7 @@ function AltaClienteInner() {
           ...domicilioFiscal,
           telefono: formCliente.telefono,
           diaPago: diaPagoEfectivo,
+          notas: formCliente.notas,
           centro,
           sinCorreo,
         }),
@@ -535,6 +537,7 @@ function AltaClienteInner() {
         rfc: "",
         telefono: "",
         diaPago: "",
+        notas: "",
       });
       setFiscal(FISCAL_VACIO);
       setDomicilioFiscal(DOMICILIO_FISCAL_VACIO);
@@ -749,6 +752,18 @@ function AltaClienteInner() {
                   />
                 )}
               </div>
+            </div>
+
+            <div style={{ marginTop: 12 }}>
+              <p className="sub-label">Notas internas (opcional)</p>
+              <textarea
+                value={formCliente.notas}
+                onChange={(e) => setFormCliente({ ...formCliente, notas: e.target.value })}
+                placeholder="Ej. Mes gratis por promoción · Contrato 6 meses, el último no se cobra"
+                rows={2}
+                style={{ width: "100%", resize: "vertical" }}
+              />
+              <p style={{ fontSize: 11, color: "#888", margin: "4px 0 0" }}>Solo lo ve el personal. Aparece en Cobranza para identificar al cliente.</p>
             </div>
 
             <p className="panel-section-label" style={{ marginTop: 14 }}>
