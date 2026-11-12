@@ -128,6 +128,13 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
     case "gasto_pagado":
     case "gasto_no_pagado":
       return "/gastos";
+    case "propuesta_layout":
+    case "propuesta_layout_respuesta":
+      return "/propuestas-layout";
+    case "comparativo_nuevo":
+      return "/precios-cotizacion";
+    case "comparativo_elegido":
+      return "/precios-cotizacion?ver=elegido";
     case "factura_automatica_fallida":
     case "complemento_pago_pendiente":
     case "cancelacion_factura":

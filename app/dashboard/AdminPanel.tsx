@@ -492,6 +492,13 @@ export default function AdminPanel({
       router.push(n.mensaje?.includes("📶") ? "/centro/vouchers" : rol === "ejecutiva_ventas" ? "/soporte" : "/tickets");
     } else if (n.tipo === "proximo_mantenimiento") {
       router.push("/mantenimiento");
+    } else if (n.tipo === "propuesta_layout" || n.tipo === "propuesta_layout_respuesta") {
+      router.push("/propuestas-layout");
+    } else if (n.tipo === "comparativo_nuevo") {
+      router.push("/precios-cotizacion");
+    } else if (n.tipo === "comparativo_elegido") {
+      // La decisión ya no está "por decidir": se abre en la lista de elegidas.
+      router.push("/precios-cotizacion?ver=elegido");
     } else if (n.tipo === "nuevo_gasto" || n.tipo === "gasto_pagado" || n.tipo === "gasto_no_pagado") {
       // La pestaña de gastos en /cobranza solo renderiza contenido para roles
       // con alcance global (esGlobal); admin (alcance de un solo centro) debe
@@ -982,7 +989,8 @@ export default function AdminPanel({
             {rol === "sistemas"
               ? "Panel de Sistemas"
               : rol === "operaciones"
-              ? "Panel de Operaciones"
+              ? // Operaciones es una sola cuenta: la de la arquitecta.
+                "Hola, Arqui"
               : rol === "atencion_cliente"
               ? "Panel de Atención al Cliente"
               : rol === "diseno"
@@ -1832,6 +1840,18 @@ export default function AdminPanel({
                 <Link className="modulo-card" href="/equipos">
                   <span className="modulo-icon">💻</span>
                   <span className="modulo-name">Equipos</span>
+                </Link>
+              ) },
+              { grupo: 3, ver: rol === "superadmin" || rol === "gerente" || rol === "operaciones", key: "precios-cotizacion", tarjeta: (
+                <Link className="modulo-card" href="/precios-cotizacion">
+                  <span className="modulo-icon">🧾</span>
+                  <span className="modulo-name">Precios de cotización</span>
+                </Link>
+              ) },
+              { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "operaciones", key: "propuestas-layout", tarjeta: (
+                <Link className="modulo-card" href="/propuestas-layout">
+                  <span className="modulo-icon">📐</span>
+                  <span className="modulo-name">Propuesta de layout</span>
                 </Link>
               ) },
               { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "sistemas" || rol === "operaciones", key: "proveedores", tarjeta: (

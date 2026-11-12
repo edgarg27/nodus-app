@@ -56,6 +56,10 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/experiencia-cliente", roles: ["admin", "gerente", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas"] },
   { prefijo: "/documentacion-centro", roles: ["admin", "atencion_cliente"] },
   { prefijo: "/inventario", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente"] },
+  // Propuesta de layout: la arquitecta (operaciones) sube y edita; la admin solo ve y descarga.
+  { prefijo: "/propuestas-layout", roles: ["admin", "gerente", "operaciones"] },
+  // Precios de cotización: la arquitecta sube 3 cotizaciones; gerencia elige.
+  { prefijo: "/precios-cotizacion", roles: ["gerente", "operaciones"] },
 
   // ----- Panel de Centro -----
   { prefijo: "/centro/resumen", roles: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"] },

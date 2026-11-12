@@ -27,6 +27,13 @@ const PERSONAL = {
     "visita_cliente",
     "nueva_tarjeta_fidelidad",
   ],
+  // Propuesta de layout: lo que sube o comenta Operaciones le llega a la admin del centro;
+  // lo que comenta la admin (o gerencia) le llega a Operaciones.
+  layout: ["propuesta_layout"],
+  layoutRespuesta: ["propuesta_layout_respuesta"],
+  // Precios de cotización: las cotizaciones nuevas le llegan a gerencia; la decisión, a Operaciones.
+  cotizacionNueva: ["comparativo_nuevo"],
+  cotizacionElegida: ["comparativo_elegido"],
   quejas: ["nueva_queja"],
   logros: ["nuevo_logro"],
 };
@@ -37,12 +44,12 @@ const sin = (lista: string[], quitar: string[]) => lista.filter((t) => !quitar.i
 // "Contrato a firma" es solo de Ventas; quejas y logros solo del superadmin
 // (y de Atención al Cliente / Diseño, que son sus módulos).
 export const AVISOS_POR_ROL: Record<string, string[]> = {
-  superadmin: sin(todosLosDePersonal, PERSONAL.contratosAFirma),
+  superadmin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida]),
   // Gerente = superadmin con otro nombre.
-  gerente: sin(todosLosDePersonal, PERSONAL.contratosAFirma),
-  admin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros]),
+  gerente: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida]),
+  admin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionNueva, ...PERSONAL.cotizacionElegida]),
   sistemas: [...PERSONAL.tickets, ...PERSONAL.telefonia, ...PERSONAL.vouchers],
-  operaciones: [...PERSONAL.tickets, ...PERSONAL.mantenimiento],
+  operaciones: [...PERSONAL.tickets, ...PERSONAL.mantenimiento, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionElegida],
   cobranza: [...PERSONAL.cobros, ...PERSONAL.gastos],
   atencion_cliente: [...PERSONAL.quejas, ...PERSONAL.tours],
   diseno: [...PERSONAL.logros],

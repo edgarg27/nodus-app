@@ -19,6 +19,7 @@ type GastoResumen = {
   estado_pago?: string | null;
   categoria?: string | null;
   concepto?: string | null;
+  proveedor_id?: string | null;
 };
 
 // "¿En qué se gasta?": se agrupa por la categoría que ponen al registrar o, si no la
@@ -110,10 +111,24 @@ function Barras({
   );
 }
 
-export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[] }) {
+export default function ResumenGastos({
+  gastos: todos,
+  ocultarArea = false,
+  nombreProveedor,
+  centroFijo,
+}: {
+  gastos: GastoResumen[];
+  // Pagos a proveedores de Operaciones (app/centro/PagosProveedores.tsx): todos son de una sola
+  // área, así que en lugar de "Por área" se muestra "Por proveedor".
+  ocultarArea?: boolean;
+  nombreProveedor?: (id: string | null) => string | undefined;
+  // El centro lo elige la pantalla que lo contiene ("" = todos): sin botones de centro aquí.
+  centroFijo?: string;
+}) {
   const [anio, setAnio] = useState(new Date().getFullYear());
   // "" = todos los centros. Con un centro elegido, todo el resumen es de ese centro.
-  const [centroSel, setCentroSel] = useState("");
+  const [centroSelLocal, setCentroSel] = useState("");
+  const centroSel = centroFijo ?? centroSelLocal;
   const gastos = centroSel ? todos.filter((g) => (g.centro || "Sin centro") === centroSel) : todos;
 
   const estado = (g: GastoResumen) => g.estado_pago || "pendiente";
@@ -130,7 +145,11 @@ export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[
   const rubros = porRubro(gastos);
   // Sistemas y Operaciones solo registran gastos en Bosques: el recuadro por área sale
   // en el resumen de todos los centros y en el de Bosques, no en los demás.
-  const verArea = !centroSel || centroSel === "Bosques";
+  const verArea = !ocultarArea && (!centroSel || centroSel === "Bosques");
+  const porProveedor = nombreProveedor
+    ? porRubro(gastos.map((g) => ({ ...g, categoria: nombreProveedor(g.proveedor_id ?? null) || "Sin proveedor", concepto: null })))
+    : [];
+  const verProveedor = porProveedor.length > 0;
   const porArea = ["admin", "sistemas", "operaciones"].map((t) => ({
     etiqueta: t === "sistemas" ? "Sistemas" : t === "operaciones" ? "Operaciones" : "Administración",
     valor: suma(gastos.filter((g) => (g.tipo || "admin") === t)),
@@ -151,6 +170,7 @@ export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[
 
   return (
     <div style={{ marginBottom: 16 }}>
+      {centroFijo === undefined && (
       <div className="rg-centros">
         {["", ...centros].map((c) => (
           <button key={c || "todos"} type="button" className={"rg-centro" + (centroSel === c ? " activo" : "")} onClick={() => setCentroSel(c)}>
@@ -158,6 +178,7 @@ export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[
           </button>
         ))}
       </div>
+      )}
 
       <div className="rg-kpis">
         <Kpi valor={pesos(suma(gastos))} etiqueta="Total de gastos" detalle={`${cuenta(gastos.length)} · ${centroSel || "todos los centros"}`} color="#0d1b3e" />
@@ -166,13 +187,13 @@ export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[
         <Kpi valor={pesos(suma(rechazados))} etiqueta="No se paga" detalle={cuenta(rechazados.length)} color="#A32D2D" />
       </div>
 
-      <div className={"rg-fila" + (verArea ? " rg-fila-3" : "")}>
+      <div className={"rg-fila" + (verArea || verProveedor ? " rg-fila-3" : "")}>
         <Barras
           titulo="Por centro"
           datos={porCentro}
           color="#F07E3A"
           seleccionado={centroSel}
-          onElegir={(c) => setCentroSel(centroSel === c ? "" : c)}
+          onElegir={centroFijo === undefined ? (c) => setCentroSel(centroSel === c ? "" : c) : undefined}
         />
         {rubros.length > 0 ? (
           <Barras titulo={centroSel ? `¿En qué se gasta? · ${centroSel}` : "¿En qué se gasta?"} datos={rubros} color="#185FA5" />
@@ -183,6 +204,7 @@ export default function ResumenGastos({ gastos: todos }: { gastos: GastoResumen[
           </div>
         )}
         {verArea && <Barras titulo={centroSel ? `Por área · ${centroSel}` : "Por área"} datos={porArea} color="#0F6E56" />}
+        {verProveedor && <Barras titulo={centroSel ? `Por proveedor · ${centroSel}` : "Por proveedor"} datos={porProveedor} color="#0F6E56" />}
       </div>
 
       <div className="rg-card">

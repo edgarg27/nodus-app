@@ -9996,3 +9996,469 @@ a.stat-card {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Pagos a proveedores de Operaciones (app/centro/PagosProveedores.tsx) ---------- */
+.pp-centro {
+  background: #fff;
+  border: 1px solid #e3e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.pp-centro-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0d1b3e;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  padding: 10px 16px;
+  text-transform: uppercase;
+}
+.pp-gran-total {
+  border-radius: 14px;
+  background: #0f6e56;
+}
+.pp-tabla {
+  min-width: 900px;
+  font-size: 12.5px;
+}
+.pp-tabla td {
+  vertical-align: top;
+}
+.pp-tabla tbody tr:hover {
+  background: #fafbfd;
+}
+.pp-folio {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-link {
+  font: inherit;
+  font-size: 12.5px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #185fa5;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pp-estado {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.pp-modal {
+  max-width: 560px;
+  gap: 10px;
+}
+.pp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+.pp-grid label,
+.pp-check {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5b6478;
+}
+.pp-grid .pp-ancho {
+  grid-column: 1 / -1;
+}
+.pp-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.pp-check input {
+  width: auto;
+  margin: 0;
+}
+.pp-urgencia {
+  flex: 1 1 0;
+  min-width: 100px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  color: #0d1b3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+@media (max-width: 560px) {
+  .pp-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Propuesta de layout (app/propuestas-layout) ---------- */
+.pl-card {
+  background: #fff;
+  border: 1px solid #e6eaf2;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(13, 27, 62, 0.04);
+}
+.pl-encabezado {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.pl-cliente {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+.pl-meta {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #7a8399;
+}
+.pl-descripcion {
+  margin: -4px 0 0;
+  font-size: 13.5px;
+  color: #3b4660;
+  white-space: pre-wrap;
+}
+.pl-acciones {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pl-acciones button {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5b6478;
+  background: #f3f5f9;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.pl-acciones button:hover {
+  background: #e8ecf3;
+}
+.pl-acciones .pl-accion-borrar {
+  color: #a32d2d;
+  background: transparent;
+}
+.pl-acciones .pl-accion-borrar:hover {
+  background: #fbe4e4;
+}
+
+.pl-cuerpo {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px;
+}
+.pl-bloque {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.pl-bloque-titulo {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #7a8399;
+}
+.pl-bloque-cotizacion {
+  background: #f0faf5;
+  border-color: #cdebdc;
+}
+.pl-bloque-vacio {
+  border-style: dashed;
+  background: #fafbfd;
+}
+.pl-monto {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f6e56;
+}
+.pl-btn-cotizacion {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #f07e3a;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.pl-archivo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.pl-mini {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #eef1f7;
+}
+.pl-mini-doc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 10px;
+  color: #a32d2d;
+  background: #fbe9e9;
+}
+.pl-nombre {
+  flex: 1;
+  min-width: 0;
+  color: #1f2a44;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pl-seccion-comentarios {
+  border-top: 1px solid #eef1f6;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pl-comentarios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pl-comentario {
+  background: #f5f7fb;
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: #1f2a44;
+}
+.pl-comentario-arqui {
+  background: #fff4ea;
+}
+.pl-comentario-autor {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #5b6478;
+}
+.pl-comentar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #f5f7fb;
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 4px 4px 4px 12px;
+}
+.pl-comentar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 0;
+  margin: 0;
+  box-shadow: none;
+}
+.pl-comentar button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #0d1b3e;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.pl-comentar button:disabled {
+  background: #c9cfdb;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .pl-cuerpo {
+    grid-template-columns: 1fr;
+  }
+  .pl-card {
+    padding: 14px;
+  }
+}
+
+/* Modales de Propuesta de layout y Pagos a proveedores: campos y botones con el estilo de la app
+   (sin los bordes negros del navegador). */
+.pp-modal input:not([type="checkbox"]),
+.pp-modal select,
+.pp-modal textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e6eaf2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: #f5f7fb;
+  outline: none;
+  margin: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pp-modal input:not([type="checkbox"]):focus,
+.pp-modal select:focus,
+.pp-modal textarea:focus {
+  border-color: #f0b98a;
+  background: #fff;
+}
+.pp-modal textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.pp-modal .modal-nombre {
+  font-size: 18px;
+}
+.pp-modal .btn-aceptar {
+  background: #f07e3a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 11px;
+  border-radius: 10px;
+}
+.pp-modal .btn-aceptar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.pp-modal .tel-borrar-btn {
+  color: #5b6478;
+  background: #f3f5f9;
+  border-radius: 10px;
+  padding: 11px 18px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.pp-modal .tel-borrar-btn:hover {
+  background: #e8ecf3;
+}
+
+/* ---------- Precios de cotización (app/precios-cotizacion) ---------- */
+.pc-foto {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #eef1f7;
+}
+.pc-opciones {
+  display: grid;
+  gap: 10px;
+}
+.pc-opcion {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  background: #fff;
+}
+.pc-elegida {
+  border: 2px solid #0f6e56;
+  background: #f0faf5;
+}
+.pc-descartada {
+  opacity: 0.55;
+}
+.pc-proveedor {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+  color: #0d1b3e;
+  overflow-wrap: anywhere;
+}
+.pc-monto {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+.pc-tag {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #e6f1fb;
+  color: #185fa5;
+  white-space: nowrap;
+}
+.pc-tag-elegida {
+  background: #0f6e56;
+  color: #fff;
+}
+.pc-decision {
+  background: #e3f5ec;
+  color: #0f6e56;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.pc-form-opciones {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.pc-form-opcion {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .pc-opciones,
+  .pc-form-opciones {
+    grid-template-columns: 1fr !important;
+  }
+}

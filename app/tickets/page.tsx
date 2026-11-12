@@ -55,6 +55,9 @@ const CATEGORIAS = [
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
 const ROLES_EDITAN_ESTATUS = ["sistemas", "operaciones", "superadmin", "gerente"];
+// Operaciones (la arquitecta) ve un centro a la vez y lo cambia con el
+// selector del encabezado, igual que en Mapa de Oficinas.
+const CENTROS_SELECTOR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 export default function TicketsPage() {
   const supabase = createClient();
@@ -69,6 +72,8 @@ export default function TicketsPage() {
   const [miRol, setMiRol] = useState("");
 
   const puedeEditarEstatus = ROLES_EDITAN_ESTATUS.includes(miRol);
+  const conSelectorCentro = miRol === "operaciones";
+  const [centroSel, setCentroSel] = useState<string | null>(null);
 
   const [mostrarFormReporte, setMostrarFormReporte] = useState(false);
   const [formReporte, setFormReporte] = useState({ asunto: "", descripcion: "", categoria: "sistemas" });
@@ -133,6 +138,7 @@ export default function TicketsPage() {
       setMiRol(rolActual);
       setMiId(user.id);
       setMiNombre(miProfile?.nombre || "");
+      if (rolActual === "operaciones") setCentroSel((prev) => prev || centroActual || CENTROS_SELECTOR[0]);
     }
 
     let query = supabase
@@ -183,17 +189,23 @@ export default function TicketsPage() {
     setLoading(false);
   }
 
-  const filtrados = useMemo(() => {
+  // Tickets del centro elegido (solo cuando hay selector) y de la categoría.
+  const delCentro = useMemo(() => {
     let lista = tickets;
+    if (conSelectorCentro && centroSel) lista = lista.filter((t) => t.centro === centroSel);
     if (categoria !== "todas") lista = lista.filter((t) => t.categoria === categoria);
-    if (filtro !== "todos") lista = lista.filter((t) => t.estado === filtro);
     return lista;
-  }, [filtro, categoria, tickets]);
+  }, [tickets, conSelectorCentro, centroSel, categoria]);
+
+  const filtrados = useMemo(
+    () => (filtro === "todos" ? delCentro : delCentro.filter((t) => t.estado === filtro)),
+    [filtro, delCentro]
+  );
 
   // Cuando el rol ve todos los centros (sistemas/superadmin), agrupamos
   // los tickets por centro para no mezclarlos en una sola lista
   const porCentro = useMemo(() => {
-    if (!esGlobal) return null;
+    if (!esGlobal || conSelectorCentro) return null;
     const grupos: Record<string, Ticket[]> = {};
     filtrados.forEach((t) => {
       const key = t.centro || "Sin centro asignado";
@@ -203,7 +215,7 @@ export default function TicketsPage() {
     return Object.keys(grupos)
       .sort()
       .map((centro) => ({ centro, tickets: grupos[centro] }));
-  }, [filtrados, esGlobal]);
+  }, [filtrados, esGlobal, conSelectorCentro]);
 
   async function actualizarEstadoDirecto(id: string, estado: string) {
     // Solo se usa para volver a "abierto" — no necesita comentario.
@@ -438,10 +450,10 @@ export default function TicketsPage() {
   }
 
   const conteos = {
-    todos: filtrados.length,
-    abierto: tickets.filter((t) => t.estado === "abierto" && (categoria === "todas" || t.categoria === categoria)).length,
-    en_proceso: tickets.filter((t) => t.estado === "en_proceso" && (categoria === "todas" || t.categoria === categoria)).length,
-    cerrado: tickets.filter((t) => t.estado === "cerrado" && (categoria === "todas" || t.categoria === categoria)).length,
+    todos: delCentro.length,
+    abierto: delCentro.filter((t) => t.estado === "abierto").length,
+    en_proceso: delCentro.filter((t) => t.estado === "en_proceso").length,
+    cerrado: delCentro.filter((t) => t.estado === "cerrado").length,
   };
 
   const badgeInfo = (estado: string) =>
@@ -623,12 +635,23 @@ export default function TicketsPage() {
         <p className="rep-sub">
           {loading
             ? ""
-            : miRol === "operaciones"
-            ? "Reportes de mantenimiento de todos los centros"
+            : conSelectorCentro
+            ? centroSel || "Selecciona un centro"
             : esGlobal
             ? "Reportes de sistemas y mantenimiento de todos los centros"
             : `Reportes de ${miCentro || "tu centro"}`}
         </p>
+        {!loading && conSelectorCentro && (
+          <div className="centro-selector">
+            <select value={centroSel || ""} onChange={(e) => setCentroSel(e.target.value)}>
+              {CENTROS_SELECTOR.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="rep-content">
@@ -787,6 +810,10 @@ export default function TicketsPage() {
           </div>
         ) : filtrados.length === 0 ? (
           <div className="empty-card">Sin reportes en esta categoría</div>
+        ) : conSelectorCentro ? (
+          // Un solo centro: una sola lista (ya viene de más nuevo a más viejo),
+          // sin el bloque de "Recientes" que repetía los mismos reportes.
+          filtrados.map((t) => renderTicket(t))
         ) : (
           <>
             {(() => {
