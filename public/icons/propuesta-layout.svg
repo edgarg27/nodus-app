@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Propuesta de layout: plano azul con la distribución de la oficina y un lápiz. Contorno negro como los demás íconos. -->
+  <g stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Plano -->
+    <rect x="48" y="72" width="380" height="330" rx="20" fill="#3D8BD9"/>
+    <!-- Distribución (muros) -->
+    <g fill="none" stroke="#FFFFFF" stroke-width="12">
+      <rect x="92" y="114" width="292" height="246" rx="4"/>
+      <path d="M232 114v96M232 252v108M232 236h152M92 236h70"/>
+      <!-- Puerta -->
+      <path d="M162 236a50 50 0 0 1 50-50" stroke-width="8"/>
+    </g>
+    <!-- Escritorio -->
+    <rect x="276" y="148" width="74" height="40" rx="6" fill="#FFC14D"/>
+    <!-- Lápiz -->
+    <g transform="rotate(42 380 380)">
+      <rect x="350" y="250" width="60" height="190" rx="8" fill="#F5A623"/>
+      <path d="M350 250h60v-26c0-8-6-14-14-14h-32c-8 0-14 6-14 14z" fill="#F28B9B"/>
+      <path d="M350 440l30 56 30-56z" fill="#F7C8A0"/>
+      <path d="M370 478l10 18 10-18z" fill="#000"/>
+    </g>
+  </g>
+</svg>

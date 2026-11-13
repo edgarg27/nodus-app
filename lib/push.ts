@@ -7,6 +7,7 @@
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { AVISOS_POR_ROL, AVISOS_PROPIOS, avisoEsParaRol } from "@/lib/avisosPorRol";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 import { enviarPushNativo, pushNativoConfigurado } from "@/lib/pushNativo";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -67,6 +68,9 @@ export async function enviarPush(admin: Admin, userIds: string[], aviso: AvisoPu
 // Roles del personal con alcance de todos los centros (igual que `esGlobal` de AdminPanel).
 const ROLES_ALCANCE_GLOBAL = ["sistemas", "superadmin", "gerente", "gerente_ventas", "operaciones", "cobranza", "atencion_cliente", "diseno", "gastos"];
 
+// Mantenimiento (León) recibe los avisos de todos sus centros, no solo del de su perfil.
+const ROLES_VARIOS_CENTROS = ["mantenimiento"];
+
 const TIPOS_DE_PERSONAL = new Set(Object.values(AVISOS_POR_ROL).flat());
 
 export type Aviso = { id: string; tipo: string; mensaje: string | null; centro: string | null; user_id: string | null; categoria?: string | null };
@@ -81,7 +85,10 @@ export async function destinatariosDeAviso(admin: Admin, n: Aviso): Promise<stri
     if (roles.length > 0) {
       const { data: personal } = await admin.from("profiles").select("id, rol, centro").in("rol", roles).eq("activo", true);
       for (const p of personal || []) {
-        if (ROLES_ALCANCE_GLOBAL.includes(p.rol) || (p.centro && p.centro === n.centro)) ids.add(p.id);
+        const susCentros = ROLES_VARIOS_CENTROS.includes(p.rol) ? CENTROS_POR_ROL[p.rol] : undefined;
+        if (susCentros) {
+          if (n.centro && susCentros.includes(n.centro)) ids.add(p.id);
+        } else if (ROLES_ALCANCE_GLOBAL.includes(p.rol) || (p.centro && p.centro === n.centro)) ids.add(p.id);
       }
     }
   }
@@ -135,6 +142,9 @@ export function urlDeAviso(n: { tipo: string; mensaje: string | null }, esPerson
       return "/precios-cotizacion";
     case "comparativo_elegido":
       return "/precios-cotizacion?ver=elegido";
+    case "reparacion_para_mantenimiento":
+    case "reparacion_para_operaciones":
+      return "/reparaciones";
     case "factura_automatica_fallida":
     case "complemento_pago_pendiente":
     case "cancelacion_factura":

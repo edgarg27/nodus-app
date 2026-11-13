@@ -22,6 +22,7 @@ const BUCKETS_PERMITIDOS = new Set([
   "sala-juntas",
   "propuestas-layout",
   "cotizaciones-proveedores",
+  "reparaciones",
 ]);
 
 type Admin = ReturnType<typeof createAdminClient>;

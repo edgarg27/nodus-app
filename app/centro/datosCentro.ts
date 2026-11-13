@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CENTROS_REPORTE } from "@/lib/centrosReporte";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 // Datos que necesita CentroPanel, compartidos por /centro (Panel de Centro)
 // y los módulos /centro/<vista> (Invitados, Vouchers…) para que todos
@@ -36,6 +37,7 @@ export async function datosPanelCentro() {
     nombre: profile?.nombre || session.user.email || "Admin",
     rol: profile?.rol || "",
     centroPerfil: profile?.centro || null,
-    centrosDisponibles: Array.from(centrosSet).sort(),
+    // Mantenimiento (León): solo sus centros.
+    centrosDisponibles: profile?.rol === "mantenimiento" ? CENTROS_POR_ROL.mantenimiento : Array.from(centrosSet).sort(),
   };
 }

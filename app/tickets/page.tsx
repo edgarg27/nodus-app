@@ -6,6 +6,7 @@ import ImagenPrivada from "@/app/components/ImagenPrivada";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import Link from "next/link";
+import { CENTROS_POR_ROL, esRolOperaciones } from "@/lib/roles";
 
 type Ticket = {
   id: string;
@@ -53,8 +54,8 @@ const CATEGORIAS = [
   { id: "mantenimiento", label: "🔨 Mantenimiento" },
 ];
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
-const ROLES_EDITAN_ESTATUS = ["sistemas", "operaciones", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "mantenimiento"];
+const ROLES_EDITAN_ESTATUS = ["sistemas", "operaciones", "mantenimiento", "superadmin", "gerente"];
 // Operaciones (la arquitecta) ve un centro a la vez y lo cambia con el
 // selector del encabezado, igual que en Mapa de Oficinas.
 const CENTROS_SELECTOR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
@@ -72,7 +73,9 @@ export default function TicketsPage() {
   const [miRol, setMiRol] = useState("");
 
   const puedeEditarEstatus = ROLES_EDITAN_ESTATUS.includes(miRol);
-  const conSelectorCentro = miRol === "operaciones";
+  // Mantenimiento (León) igual, pero solo con sus centros.
+  const conSelectorCentro = esRolOperaciones(miRol);
+  const centrosSelector = CENTROS_POR_ROL[miRol] || CENTROS_SELECTOR;
   const [centroSel, setCentroSel] = useState<string | null>(null);
 
   const [mostrarFormReporte, setMostrarFormReporte] = useState(false);
@@ -138,7 +141,10 @@ export default function TicketsPage() {
       setMiRol(rolActual);
       setMiId(user.id);
       setMiNombre(miProfile?.nombre || "");
-      if (rolActual === "operaciones") setCentroSel((prev) => prev || centroActual || CENTROS_SELECTOR[0]);
+      if (esRolOperaciones(rolActual)) {
+        const lista = CENTROS_POR_ROL[rolActual] || CENTROS_SELECTOR;
+        setCentroSel((prev) => prev || (centroActual && lista.includes(centroActual) ? centroActual : lista[0]));
+      }
     }
 
     let query = supabase
@@ -152,8 +158,9 @@ export default function TicketsPage() {
     // Sistemas solo ve reportes de su categoría; operaciones solo mantenimiento
     if (rolActual === "sistemas") {
       query = query.eq("categoria", "sistemas");
-    } else if (rolActual === "operaciones") {
+    } else if (esRolOperaciones(rolActual)) {
       query = query.eq("categoria", "mantenimiento");
+      if (CENTROS_POR_ROL[rolActual]) query = query.in("centro", CENTROS_POR_ROL[rolActual]);
     } else if (rolActual === "ejecutiva_ventas" && user) {
       // Ejecutiva de Ventas reporta como un cliente: solo ve sus propios reportes.
       query = query.eq("user_id", user.id);
@@ -529,6 +536,13 @@ export default function TicketsPage() {
 
         <p style={{ fontSize: 13, color: "#555", margin: 0 }}>{t.descripcion}</p>
 
+        {/* La arquitecta se lo pasa a Mantenimiento de León como reparación con seguimiento (app/reparaciones). */}
+        {miRol === "operaciones" && t.categoria === "mantenimiento" && t.estado !== "cerrado" && t.centro && (CENTROS_POR_ROL.mantenimiento || []).includes(t.centro) && (
+          <Link href={`/reparaciones?ticket=${t.id}`} className="pp-link" style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 700 }}>
+            🔧 Asignar a mantenimiento
+          </Link>
+        )}
+
         {(() => {
           const fotos = t.foto_urls && t.foto_urls.length > 0 ? t.foto_urls : t.foto_url ? [t.foto_url] : [];
           if (fotos.length === 0) return null;
@@ -590,7 +604,7 @@ export default function TicketsPage() {
               {hilo.map((c) => (
                 <div className="ticket-comentario" key={c.id}>
                   <p className="ticket-comentario-meta">
-                    {c.autor_rol === "sistemas" ? "🖥️" : c.autor_rol === "operaciones" ? "🔧" : "👤"}{" "}
+                    {c.autor_rol === "sistemas" ? "🖥️" : esRolOperaciones(c.autor_rol) ? "🔧" : "👤"}{" "}
                     {c.autor_nombre || "Staff"} · {new Date(c.created_at).toLocaleString("es-MX")}
                   </p>
                   {c.mensaje && <p className="ticket-comentario-msg">{c.mensaje}</p>}
@@ -644,7 +658,7 @@ export default function TicketsPage() {
         {!loading && conSelectorCentro && (
           <div className="centro-selector">
             <select value={centroSel || ""} onChange={(e) => setCentroSel(e.target.value)}>
-              {CENTROS_SELECTOR.map((c) => (
+              {centrosSelector.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
@@ -655,7 +669,7 @@ export default function TicketsPage() {
       </div>
 
       <div className="rep-content">
-        {!loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+        {!loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
           <div className="tickets-filtros">
             {CATEGORIAS.map((c) => (
               <button
@@ -724,7 +738,7 @@ export default function TicketsPage() {
           >
             📥 Exportar Excel
           </button>
-          {!loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+          {!loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
             <button
               className="tel-borrar-btn"
               style={{ color: "#0d1b3e", fontWeight: 600 }}
@@ -735,7 +749,7 @@ export default function TicketsPage() {
           )}
         </div>
 
-        {mostrarFormReporte && !loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+        {mostrarFormReporte && !loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
           <form className="form-card" onSubmit={crearReporteStaff}>
             <p className="sub-label">Reportar algo que viste inusual en el centro</p>
             <select

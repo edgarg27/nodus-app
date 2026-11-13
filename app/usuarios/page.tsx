@@ -27,6 +27,7 @@ const ROLES_STAFF = [
   { id: "ceo", label: "CEO" },
   { id: "captive", label: "Captive" },
   { id: "gastos", label: "Gastos" },
+  { id: "mantenimiento", label: "Mantenimiento" },
 ];
 
 // Solo un superadmin puede crear cuentas con estos roles (el gerente tiene sus

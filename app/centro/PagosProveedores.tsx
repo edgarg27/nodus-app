@@ -36,6 +36,7 @@ type Pago = {
   fecha_pago: string | null;
   motivo_no_pago: string | null;
   factura_url: string | null;
+  factura_xml_url?: string | null;
   comprobante_pago_url: string | null;
   urgencia: string | null;
   fecha_limite_pago: string | null;
@@ -73,17 +74,20 @@ const FORM_VACIO = {
 export default function PagosProveedores({
   modo,
   centros: centrosPanel,
+  centrosFijos,
   centroInicial,
   centroFiltro,
 }: {
   modo: "pagos" | "desglose";
   centros: string[];
+  // Si el rol solo trabaja algunos centros (Mantenimiento de León), solo esos.
+  centrosFijos?: string[];
   centroInicial: string | null;
   // Centro elegido en el encabezado de Proveedores ("" = todos). Si viene, no se muestran los botones de centro.
   centroFiltro?: string;
 }) {
   // Todos los centros (los 7), aunque el panel solo traiga los que tienen oficinas registradas.
-  const centros = Array.from(new Set([...CENTROS_REPORTE, ...centrosPanel]));
+  const centros = centrosFijos || Array.from(new Set([...CENTROS_REPORTE, ...centrosPanel]));
   const supabase = createClient();
   const hoy = hoyMexicoISO();
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -96,11 +100,15 @@ export default function PagosProveedores({
   const fCentro = centroFiltro ?? fCentroLocal;
   const [fEstado, setFEstado] = useState("");
   const [fMes, setFMes] = useState("");
+  // "sin" = pagos que todavía no tienen la factura adjunta (para pedírsela al proveedor).
+  const [fFactura, setFFactura] = useState("");
+  const [zipeando, setZipeando] = useState("");
   const [busqueda, setBusqueda] = useState("");
 
   const [modal, setModal] = useState<{ editando: Pago | null } | null>(null);
   const [form, setForm] = useState(FORM_VACIO);
   const [factura, setFactura] = useState<File[]>([]);
+  const [xml, setXml] = useState<File[]>([]);
   const [guardando, setGuardando] = useState(false);
   const [errorForm, setErrorForm] = useState("");
   const [borrando, setBorrando] = useState<Pago | null>(null);
@@ -147,6 +155,8 @@ export default function PagosProveedores({
       if (fCentro && p.centro !== fCentro) return false;
       if (fEstado && estadoDe(p) !== fEstado) return false;
       if (fMes && mesDe(p) !== fMes) return false;
+      if (fFactura === "sin" && p.factura_url) return false;
+      if (fFactura === "con" && !p.factura_url) return false;
       if (q) {
         const texto = [nombreProveedor(p.proveedor_id), p.concepto, p.oficina, p.folio_factura, p.categoria]
           .join(" ")
@@ -158,7 +168,7 @@ export default function PagosProveedores({
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagos, proveedores, fCentro, fEstado, fMes, busqueda]);
+  }, [pagos, proveedores, fCentro, fEstado, fMes, fFactura, busqueda]);
 
   // Agrupados por centro, en el orden de la lista de centros; dentro, del más viejo al más nuevo como en su Excel.
   const porCentro = useMemo(() => {
@@ -181,6 +191,7 @@ export default function PagosProveedores({
   function abrirNuevo() {
     setForm({ ...FORM_VACIO, centro: fCentro || centroInicial || centros[0] || "" });
     setFactura([]);
+    setXml([]);
     setErrorForm("");
     setModal({ editando: null });
   }
@@ -203,6 +214,7 @@ export default function PagosProveedores({
       notas: p.notas || "",
     });
     setFactura([]);
+    setXml([]);
     setErrorForm("");
     setModal({ editando: p });
   }
@@ -251,6 +263,16 @@ export default function PagosProveedores({
       }
     }
 
+    let xmlUrl: string | null = null;
+    if (xml[0]) {
+      xmlUrl = await subirArchivoGasto(supabase, xml[0], "factura-xml");
+      if (!xmlUrl) {
+        setErrorForm("No se pudo subir el XML. Intenta de nuevo.");
+        setGuardando(false);
+        return;
+      }
+    }
+
     const datos = {
       centro: form.centro,
       tipo: "operaciones",
@@ -267,6 +289,8 @@ export default function PagosProveedores({
       fecha_limite_pago: form.fechaLimite || null,
       notas: form.notas.trim() || null,
       factura_url: facturaUrl,
+      // Solo si subió XML (así, sin la migración del XML, lo demás se sigue guardando).
+      ...(xmlUrl ? { factura_xml_url: xmlUrl } : {}),
     };
 
     const { error: errGuardar } = modal.editando
@@ -274,7 +298,9 @@ export default function PagosProveedores({
       : await supabase.from("gastos").insert({ ...datos, registrado_por: (await supabase.auth.getUser()).data.user?.id, registrado_por_nombre: miNombre || null });
     if (errGuardar) {
       setErrorForm(
-        /oficina|folio_factura|subtotal|fecha_factura/i.test(errGuardar.message || "")
+        /factura_xml_url/i.test(errGuardar.message || "")
+          ? "Falta correr la migración migracion_pagos_proveedores_xml.sql."
+          : /oficina|folio_factura|subtotal|fecha_factura/i.test(errGuardar.message || "")
           ? "Falta correr la migración migracion_pagos_proveedores_operaciones.sql."
           : /revisado por contabilidad/i.test(errGuardar.message || "")
           ? "Contabilidad ya revisó este pago: ya no se puede cambiar."
@@ -315,6 +341,46 @@ export default function PagosProveedores({
     setAbriendo(null);
     if (!firmado) return alert("No se pudo abrir el archivo: " + (errFirma || "intenta de nuevo"));
     window.open(firmado, "_blank");
+  }
+
+  // Todas las facturas (PDF y XML) de lo que esté filtrado, en un .zip por centro, para Contabilidad.
+  async function descargarZip() {
+    const archivos = visibles.flatMap((p) =>
+      [p.factura_url ? { p, url: p.factura_url } : null, p.factura_xml_url ? { p, url: p.factura_xml_url } : null].filter(Boolean) as { p: Pago; url: string }[]
+    );
+    if (archivos.length === 0) return alert("Ninguno de estos pagos tiene factura adjunta.");
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+    const limpio = (t: string) => t.replace(/[\\/:*?"<>|]+/g, "-").trim().slice(0, 60);
+    const usados = new Set<string>();
+    let fallidos = 0;
+    for (let i = 0; i < archivos.length; i++) {
+      const { p, url } = archivos[i];
+      setZipeando(`Juntando ${i + 1} de ${archivos.length}…`);
+      const ext = (url.split("?")[0].split(".").pop() || "pdf").toLowerCase();
+      const base = `${limpio(nombreProveedor(p.proveedor_id) || "Proveedor")} - ${limpio(p.folio_factura || p.fecha_factura || p.fecha)}`;
+      let nombre = `${limpio(p.centro || "Sin centro")}/${base}.${ext}`;
+      for (let n = 2; usados.has(nombre); n++) nombre = `${limpio(p.centro || "Sin centro")}/${base} (${n}).${ext}`;
+      usados.add(nombre);
+      try {
+        const { url: firmado } = await pedirLinkFirmado(url);
+        if (!firmado) throw new Error();
+        const resp = await fetch(firmado);
+        if (!resp.ok) throw new Error();
+        zip.file(nombre, await resp.blob());
+      } catch {
+        fallidos++;
+      }
+    }
+    setZipeando("Armando el .zip…");
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `facturas-proveedores${fCentro ? `-${limpio(fCentro)}` : ""}${fMes ? `-${fMes}` : ""}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setZipeando("");
+    if (fallidos) alert(`${fallidos} archivo(s) no se pudieron descargar; el resto sí va en el .zip.`);
   }
 
   function exportar() {
@@ -387,6 +453,9 @@ export default function PagosProveedores({
         <button className="btn-exportar" onClick={exportar} disabled={visibles.length === 0}>
           📥 Excel
         </button>
+        <button className="btn-exportar" onClick={descargarZip} disabled={visibles.length === 0 || !!zipeando} title="PDF y XML de los pagos filtrados">
+          {zipeando || "🗂️ Descargar facturas (.zip)"}
+        </button>
       </div>
 
       {centroFiltro === undefined && (
@@ -404,6 +473,11 @@ export default function PagosProveedores({
           <option value="pendiente">Por pagar</option>
           <option value="pagado">Pagados</option>
           <option value="no_pagado">No se pagan</option>
+        </select>
+        <select className="ticket-admin-select" value={fFactura} onChange={(e) => setFFactura(e.target.value)}>
+          <option value="">Con y sin factura</option>
+          <option value="sin">Sin factura ({pagos.filter((p) => !p.factura_url && (!fCentro || p.centro === fCentro)).length})</option>
+          <option value="con">Con factura</option>
         </select>
         <select className="ticket-admin-select" value={fMes} onChange={(e) => setFMes(e.target.value)}>
           <option value="">Todos los meses</option>
@@ -466,6 +540,11 @@ export default function PagosProveedores({
                               </button>
                             ) : (
                               p.folio_factura || ""
+                            )}
+                            {p.factura_xml_url && (
+                              <button type="button" className="pp-link pp-xml" onClick={() => abrirArchivo(p.factura_xml_url!)} disabled={abriendo === p.factura_xml_url} title="Ver XML">
+                                XML
+                              </button>
                             )}
                           </td>
                           <td>{p.categoria || ""}</td>
@@ -651,6 +730,10 @@ export default function PagosProveedores({
               Factura (PDF o foto) · opcional{modal.editando?.factura_url ? " · ya tiene una, sube otra solo para reemplazarla" : ""}
             </p>
             <FileDropzone files={factura} onChange={setFactura} maxFiles={1} accept="image/*,.pdf" compacto />
+            <p className="sub-label" style={{ margin: "4px 0 0" }}>
+              XML de la factura · opcional{modal.editando?.factura_xml_url ? " · ya tiene uno, sube otro solo para reemplazarlo" : ""}
+            </p>
+            <FileDropzone files={xml} onChange={setXml} maxFiles={1} accept=".xml,text/xml,application/xml" etiquetaTipos="XML" compacto />
 
             {errorForm && <p style={{ color: "#A32D2D", fontSize: 13, margin: 0 }}>{errorForm}</p>}
             <div style={{ display: "flex", gap: 8 }}>

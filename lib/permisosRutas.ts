@@ -27,6 +27,7 @@ export const ROLES_PERSONAL = [
   "ceo",
   "captive",
   "gastos",
+  "mantenimiento",
 ];
 
 // superadmin (y gerente, que tiene sus mismos privilegios) puede abrir todo, así
@@ -52,7 +53,7 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/correos", roles: ["admin", "gerente", "ventas", "gerente_ventas"] },
   { prefijo: "/tours", roles: ["admin", "gerente", "atencion_cliente", "ventas", "gerente_ventas"] },
   { prefijo: "/paqueteria", roles: ["admin", "gerente", "atencion_cliente"] },
-  { prefijo: "/mapa-oficinas", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "ventas"] },
+  { prefijo: "/mapa-oficinas", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente", "ventas", "mantenimiento"] },
   { prefijo: "/experiencia-cliente", roles: ["admin", "gerente", "cobranza", "atencion_cliente", "diseno", "ventas", "gerente_ventas"] },
   { prefijo: "/documentacion-centro", roles: ["admin", "atencion_cliente"] },
   { prefijo: "/inventario", roles: ["admin", "gerente", "sistemas", "operaciones", "atencion_cliente"] },
@@ -60,6 +61,8 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/propuestas-layout", roles: ["admin", "gerente", "operaciones"] },
   // Precios de cotización: la arquitecta sube 3 cotizaciones; gerencia elige.
   { prefijo: "/precios-cotizacion", roles: ["gerente", "operaciones"] },
+  // Reparaciones: la arquitecta asigna y revisa; Mantenimiento sube avances; gerencia consulta.
+  { prefijo: "/reparaciones", roles: ["gerente", "operaciones", "mantenimiento"] },
 
   // ----- Panel de Centro -----
   { prefijo: "/centro/resumen", roles: ["admin", "gerente", "sistemas", "operaciones", "gerente_ventas"] },
@@ -67,8 +70,8 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/centro/solicitudes", roles: ["admin", "gerente"] },
   { prefijo: "/centro/visitas", roles: ["admin", "gerente"] },
   { prefijo: "/centro/vouchers", roles: ["admin", "gerente", "sistemas"] },
-  { prefijo: "/centro/proveedores", roles: ["admin", "gerente", "sistemas", "operaciones"] },
-  { prefijo: "/centro", roles: ["admin", "gerente", "sistemas", "operaciones"] },
+  { prefijo: "/centro/proveedores", roles: ["admin", "gerente", "sistemas", "operaciones", "mantenimiento"] },
+  { prefijo: "/centro", roles: ["admin", "gerente", "sistemas", "operaciones", "mantenimiento"] },
 
   // ----- Dinero -----
   { prefijo: "/cobranza", roles: ["admin", "gerente", "cobranza", "gerente_ventas"] },
@@ -82,11 +85,11 @@ const REGLAS: { prefijo: string; roles: string[] }[] = [
   { prefijo: "/proveedores", roles: ["admin", "gerente", "cobranza", "sistemas"] },
 
   // ----- Sistemas y operación -----
-  { prefijo: "/tickets", roles: ["admin", "gerente", "sistemas", "operaciones"] },
+  { prefijo: "/tickets", roles: ["admin", "gerente", "sistemas", "operaciones", "mantenimiento"] },
   { prefijo: "/telefonia", roles: ["admin", "gerente", "sistemas"] },
   { prefijo: "/wifi-solicitudes", roles: ["gerente", "sistemas"] },
   { prefijo: "/equipos", roles: ["gerente", "sistemas"] },
-  { prefijo: "/mantenimiento", roles: ["admin", "gerente", "sistemas", "operaciones"] },
+  { prefijo: "/mantenimiento", roles: ["admin", "gerente", "sistemas", "operaciones", "mantenimiento"] },
 
   // ----- Otros roles -----
   { prefijo: "/atencion-cliente", roles: ["gerente", "atencion_cliente"] },

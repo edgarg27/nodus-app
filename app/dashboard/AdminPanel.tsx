@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel } from "@/lib/exportExcel";
 import { CarruselDestacados, fetchBannersPromocionales, type BannerDestacado } from "@/app/components/CarruselBanners";
-import { esSuperadmin, labelRol } from "@/lib/roles";
+import { CENTROS_POR_ROL, esSuperadmin, labelRol } from "@/lib/roles";
 import { rolPuede } from "@/lib/permisosApi";
 import {
   CAMPOS_DOMICILIO_FISCAL,
@@ -336,6 +336,21 @@ export default function AdminPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // La campanita se actualiza sola: cada minuto y al regresar a la pestaña
+  // (antes solo al entrar al panel, y lo nuevo no aparecía hasta recargar).
+  useEffect(() => {
+    const refrescar = () => {
+      if (document.visibilityState === "visible") fetchNotificaciones();
+    };
+    const t = setInterval(refrescar, 60000);
+    document.addEventListener("visibilitychange", refrescar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", refrescar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // El middleware manda aquí (?sin_permiso=1) a quien intenta abrir una pantalla que no es de su rol.
   const [sinPermiso, setSinPermiso] = useState(false);
   useEffect(() => {
@@ -391,9 +406,10 @@ export default function AdminPanel({
       .neq("estado", "cerrado")
       .neq("asunto", "📶 Solicitud de nuevo WiFi")
       .order("created_at", { ascending: false });
-    if (!esGlobal && centro) query = query.eq("centro", centro);
+    if (rol === "mantenimiento") query = query.in("centro", CENTROS_POR_ROL.mantenimiento);
+    else if (!esGlobal && centro) query = query.eq("centro", centro);
     if (rol === "sistemas") query = query.eq("categoria", "sistemas");
-    else if (rol === "operaciones") query = query.eq("categoria", "mantenimiento");
+    else if (rol === "operaciones" || rol === "mantenimiento") query = query.eq("categoria", "mantenimiento");
     const { data } = await query;
     setTicketsUrgentes(data || []);
   }
@@ -438,7 +454,9 @@ export default function AdminPanel({
       .in("tipo", tipos)
       .order("created_at", { ascending: false })
       .limit(20);
-    if (!esGlobal && centro) query = query.eq("centro", centro);
+    // Mantenimiento (León) ve los avisos de sus 3 centros, no solo el de su perfil.
+    if (rol === "mantenimiento") query = query.in("centro", CENTROS_POR_ROL.mantenimiento);
+    else if (!esGlobal && centro) query = query.eq("centro", centro);
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -496,6 +514,8 @@ export default function AdminPanel({
       router.push("/propuestas-layout");
     } else if (n.tipo === "comparativo_nuevo") {
       router.push("/precios-cotizacion");
+    } else if (n.tipo === "reparacion_para_mantenimiento" || n.tipo === "reparacion_para_operaciones") {
+      router.push("/reparaciones");
     } else if (n.tipo === "comparativo_elegido") {
       // La decisión ya no está "por decidir": se abre en la lista de elegidas.
       router.push("/precios-cotizacion?ver=elegido");
@@ -995,7 +1015,7 @@ export default function AdminPanel({
               ? "Panel de Atención al Cliente"
               : rol === "diseno"
               ? "Panel de Diseño"
-              : rol === "ventas" || rol === "gerente_ventas" || rol === "cobranza" || rol === "ejecutiva_ventas"
+              : rol === "ventas" || rol === "gerente_ventas" || rol === "cobranza" || rol === "ejecutiva_ventas" || rol === "mantenimiento"
               ? nombre.trim()
                 ? `Hola, ${nombre.trim().split(/\s+/)[0]}`
                 : "Hola"
@@ -1111,7 +1131,7 @@ export default function AdminPanel({
         </div>
       )}
 
-      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "operaciones" && rol !== "ventas" && rol !== "ejecutiva_ventas" && (
+      {rol !== "diseno" && rol !== "sistemas" && rol !== "atencion_cliente" && rol !== "operaciones" && rol !== "mantenimiento" && rol !== "ventas" && rol !== "ejecutiva_ventas" && (
         <div className="panel-tabs">
           <button
             className={"panel-tab" + (tab === "admin" ? " active" : "")}
@@ -1164,7 +1184,7 @@ export default function AdminPanel({
             </Link>
           )}
 
-          {rol !== "sistemas" && rol !== "operaciones" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && rol !== "gerente_ventas" && rol !== "ejecutiva_ventas" && (
+          {rol !== "sistemas" && rol !== "operaciones" && rol !== "mantenimiento" && rol !== "cobranza" && rol !== "atencion_cliente" && rol !== "diseno" && rol !== "ventas" && rol !== "gerente_ventas" && rol !== "ejecutiva_ventas" && (
             deslizadorConBanners(
                 <div className="resumen-deslizable-contenido">
               <p className="panel-section-label">Por atender</p>
@@ -1326,7 +1346,7 @@ export default function AdminPanel({
             </div>
           )}
 
-          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "ventas" || rol === "gerente_ventas" || rol === "ejecutiva_ventas") && (
+          {(rol === "diseno" || rol === "atencion_cliente" || rol === "cobranza" || rol === "operaciones" || rol === "mantenimiento" || rol === "ventas" || rol === "gerente_ventas" || rol === "ejecutiva_ventas") && (
             <div style={{ maxWidth: 700, width: "100%", margin: "0 auto" }}>
               <CarruselDestacados banners={[...bannersPromo, ...bannersLogros]} />
               {rol === "diseno" && (
@@ -1339,7 +1359,42 @@ export default function AdminPanel({
             </div>
           )}
 
-          {rol === "ejecutiva_ventas" ? (
+          {rol === "mantenimiento" ? (
+          // Mantenimiento (León): SOLO estos módulos (mismas rutas que REGLAS en
+          // lib/permisosRutas.ts). Va aparte para que no herede los de la admin.
+          <div style={{ maxWidth: 800, margin: "0 auto", width: "100%" }}>
+            <p className="panel-section-label" style={{ marginTop: 8 }}>
+              Módulos
+            </p>
+            <div className="modulos-grid modulos-grid-5" style={{ marginTop: 8 }}>
+              <Link className="modulo-card" href="/reparaciones">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/reparaciones.svg" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Reparaciones</span>
+              </Link>
+              <Link className="modulo-card" href="/tickets">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/tickets.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Tickets</span>
+              </Link>
+              <Link className="modulo-card" href="/mantenimiento">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/herramientas.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Mtto.</span>
+              </Link>
+              <Link className="modulo-card" href="/centro/proveedores">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/proveedores.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Proveedores</span>
+              </Link>
+              <Link className="modulo-card" href="/mapa-oficinas">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
+                <span className="modulo-name">Mapa oficinas</span>
+              </Link>
+            </div>
+          </div>
+          ) : rol === "ejecutiva_ventas" ? (
           // Ejecutiva de Ventas (León): SOLO estos módulos (mismas rutas que
           // RUTAS_EJECUTIVA_VENTAS en lib/permisosRutas.ts). Va aparte por el
           // mismo motivo que el bloque de Asesora de Ventas. 5 por renglón,
@@ -1842,15 +1897,24 @@ export default function AdminPanel({
                   <span className="modulo-name">Equipos</span>
                 </Link>
               ) },
+              { grupo: 3, ver: rol === "superadmin" || rol === "gerente" || rol === "operaciones", key: "reparaciones", tarjeta: (
+                <Link className="modulo-card" href="/reparaciones">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/reparaciones.svg" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Reparaciones</span>
+                </Link>
+              ) },
               { grupo: 3, ver: rol === "superadmin" || rol === "gerente" || rol === "operaciones", key: "precios-cotizacion", tarjeta: (
                 <Link className="modulo-card" href="/precios-cotizacion">
-                  <span className="modulo-icon">🧾</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/precios-cotizacion.svg" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Precios de cotización</span>
                 </Link>
               ) },
               { grupo: 3, ver: rol === "admin" || rol === "superadmin" || rol === "gerente" || rol === "operaciones", key: "propuestas-layout", tarjeta: (
                 <Link className="modulo-card" href="/propuestas-layout">
-                  <span className="modulo-icon">📐</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/propuesta-layout.svg" alt="" className="modulo-icon icon-img-32" />
                   <span className="modulo-name">Propuesta de layout</span>
                 </Link>
               ) },
@@ -1919,13 +1983,16 @@ export default function AdminPanel({
             const visibles = modulos.filter((m) => m.ver);
             const conTitulos = rol === "admin" || rol === "superadmin" || rol === "gerente";
             const claseGrid =
-              "modulos-grid" + (rol === "sistemas" ? " modulos-grid-5" : rol === "atencion_cliente" ? " modulos-grid-compacta" : "");
+              "modulos-grid" +
+              (rol === "sistemas" ? " modulos-grid-5" : rol === "operaciones" ? " modulos-grid-4" : rol === "atencion_cliente" ? " modulos-grid-compacta" : "");
 
             return (
               <div
                 style={
                   rol === "sistemas"
                     ? { maxWidth: 800, margin: "0 auto", width: "100%" }
+                    : rol === "operaciones"
+                    ? { maxWidth: 760, margin: "0 auto", width: "100%" }
                     : rol === "atencion_cliente"
                       ? { maxWidth: 620, margin: "0 auto", width: "100%" }
                       : undefined

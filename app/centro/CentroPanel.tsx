@@ -10,7 +10,7 @@ import { pedirLinkFirmado } from "@/lib/storage";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import QRCode from "qrcode";
-import { labelRol } from "@/lib/roles";
+import { CENTROS_POR_ROL, esRolOperaciones, labelRol } from "@/lib/roles";
 import { hoyMexicoISO, fechaLocal } from "@/lib/fechaMexico";
 import { HORAS_CALENDARIO, SALAS_POR_CENTRO, esFueraDeHorario } from "@/lib/horarioSala";
 import { esEspacioCowork, fmtHoras, horasPlaneadas, saldoHoras, ventanaHoras, type SaldoHoras } from "@/lib/horasCowork";
@@ -300,13 +300,15 @@ export default function CentroPanel({
   const puedeEditarInternet = rol === "sistemas" || (rol === "superadmin" || rol === "gerente");
   const puedeEditarTelefonia = rol === "admin" || (rol === "superadmin" || rol === "gerente");
   // Ejecutiva de Ventas también elige centro, pero solo entre los de León (los que le pasa Sala de Juntas).
-  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || rol === "operaciones" || rol === "gerente_ventas" || rol === "ejecutiva_ventas";
+  // Mantenimiento (León) trabaja igual que Operaciones, pero solo con sus centros.
+  const esOps = esRolOperaciones(rol);
+  const esGlobal = rol === "sistemas" || (rol === "superadmin" || rol === "gerente") || esOps || rol === "gerente_ventas" || rol === "ejecutiva_ventas";
   const TABS_POR_ROL =
     rol === "sistemas"
       ? TABS_TODAS.filter(
           (t) => t.id !== "invitados" && t.id !== "solicitudes" && t.id !== "visitas"
         )
-      : rol === "operaciones"
+      : esOps
       ? TABS_TODAS.filter((t) => t.id === "proveedores")
       : TABS_TODAS;
   const TABS = TABS_POR_ROL;
@@ -321,7 +323,7 @@ export default function CentroPanel({
   const [subProv, setSubProv] = useState<"pagos" | "desglose" | "proveedores">("pagos");
   // Su centro se elige arriba, en el encabezado (como en Mapa de Oficinas); "" = todos los centros.
   const [centroOps, setCentroOps] = useState("");
-  const conSelectorCentroOps = rol === "operaciones" && tab === "proveedores";
+  const conSelectorCentroOps = esOps && tab === "proveedores";
 
   // Ir a un módulo: si ya estamos en su pantalla solo cambia el contenido;
   // si no, se navega a la pantalla de ese módulo.
@@ -488,7 +490,8 @@ export default function CentroPanel({
   const usaDatosGlobales = !vista || ["resumen", "vouchers", "proveedores", "gastos"].includes(vista);
   useEffect(() => {
     if (esGlobal && usaDatosGlobales) {
-      fetchVouchersTodosLosCentros();
+      // Operaciones / Mantenimiento no usan vouchers.
+      if (!esOps) fetchVouchersTodosLosCentros();
       fetchDatosGlobales();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -522,6 +525,18 @@ export default function CentroPanel({
   // cuando el rol ve todos los centros.
   async function fetchDatosGlobales() {
     setCargandoDatosGlobales(true);
+    // En Proveedores, Operaciones / Mantenimiento solo ocupan la lista de proveedores
+    // (sus pagos los carga PagosProveedores): 1 consulta en vez de 4 por centro.
+    if (esOps) {
+      const { data: provsOps } = await supabase.from("proveedores").select("*").in("centro", centrosDisponibles).order("nombre");
+      setDatosGlobales(
+        Object.fromEntries(
+          centrosDisponibles.map((c) => [c, { proveedores: (provsOps || []).filter((p) => p.centro === c), internet: null, tickets: [], gastos: [] }])
+        )
+      );
+      setCargandoDatosGlobales(false);
+      return;
+    }
     const resultados = await Promise.all(
       centrosDisponibles.map(async (c) => {
         const [{ data: provs }, { data: net }, { data: tks }, { data: gts }] = await Promise.all([
@@ -564,6 +579,21 @@ export default function CentroPanel({
 
   async function fetchTodo(c: string) {
     setLoading(true);
+    // Operaciones / Mantenimiento solo trabajan Proveedores: de todo lo del
+    // centro (clientes, reservaciones, prospectos…) solo necesitan su campanita.
+    if (esOps) {
+      const { data: notifsOps } = await supabase
+        .from("notificaciones")
+        .select("*")
+        .in("centro", centrosDisponibles)
+        .in("tipo", ["ticket_en_proceso", "ticket_resuelto", "nuevo_ticket", "proximo_mantenimiento"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+      const TIPOS_TICKET_OPS = ["nuevo_ticket", "ticket_en_proceso", "ticket_resuelto"];
+      setNotificaciones((notifsOps || []).filter((n) => !TIPOS_TICKET_OPS.includes(n.tipo) || n.categoria === "mantenimiento"));
+      setLoading(false);
+      return;
+    }
     // Una solicitud de reservación que sigue pendiente cuando ya pasó su fecha
     // se cancela sola, para que no estorbe en "Pendientes de confirmar".
     // No se espera a que termine: abajo se marcan igual en la lista que se muestra.
@@ -624,7 +654,7 @@ export default function CentroPanel({
           "tipo",
           rol === "sistemas"
             ? ["ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_ticket", "nuevo_voucher", "nuevo_did"]
-            : rol === "operaciones"
+            : esOps
             ? ["ticket_en_proceso", "ticket_resuelto", "nuevo_ticket", "proximo_mantenimiento"]
             : ["nueva_reservacion", "ticket_en_proceso", "ticket_resuelto", "baja_extension", "nuevo_tour", "pago_confirmado", "servicio_pausado_admin", "nuevo_ticket", "nueva_solicitud_invitado", "solicitud_cliente", "visita_cliente"]
         )
@@ -822,7 +852,7 @@ export default function CentroPanel({
     let notifsFiltradas = notifs || [];
     if (rol === "sistemas") {
       notifsFiltradas = notifsFiltradas.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "sistemas");
-    } else if (rol === "operaciones") {
+    } else if (esOps) {
       notifsFiltradas = notifsFiltradas.filter((n) => !TIPOS_TICKET.includes(n.tipo) || n.categoria === "mantenimiento");
     }
     setNotificaciones(notifsFiltradas);
@@ -907,7 +937,7 @@ export default function CentroPanel({
   // según el rol de quien lo registra.
   function tipoPorRol() {
     if (rol === "sistemas") return "sistemas";
-    if (rol === "operaciones") return "operaciones";
+    if (esOps) return "operaciones";
     return "admin";
   }
 
@@ -997,8 +1027,8 @@ export default function CentroPanel({
     // Sistemas y operaciones eligen a qué centro pertenece el gasto (ven
     // todos los centros); admin/otros roles locales usan su propio centro.
     const centroDelGasto =
-      rol === "sistemas" ? formGastoCentro : rol === "operaciones" ? centroGastosActivo : centro;
-    if ((rol === "sistemas" || rol === "operaciones") && !centroDelGasto) return;
+      rol === "sistemas" ? formGastoCentro : esOps ? centroGastosActivo : centro;
+    if ((rol === "sistemas" || esOps) && !centroDelGasto) return;
 
     const {
       data: { user },
@@ -1058,7 +1088,7 @@ export default function CentroPanel({
     setGastoFactura([]);
     setGastoComprobante([]);
     if (rol === "sistemas") fetchGastosSistemas();
-    else if (rol === "operaciones" && centroDelGasto) recargarDatosCentroGlobal(centroDelGasto);
+    else if (esOps && centroDelGasto) recargarDatosCentroGlobal(centroDelGasto);
     else if (centro) fetchTodo(centro);
   }
 
@@ -2391,7 +2421,7 @@ export default function CentroPanel({
           )}
           <p className="panel-header-title">{TITULO_POR_TAB[tab] || "Panel de Centro"}</p>
           <p className="panel-header-sub">
-            {conSelectorCentroOps ? centroOps || "Todos los centros" : esGlobal ? "Todos tus centros" : centro || "Sin centro asignado"}
+            {conSelectorCentroOps ? centroOps || (rol === "mantenimiento" ? "Todos tus centros" : "Todos los centros") : esGlobal ? "Todos tus centros" : centro || "Sin centro asignado"}
           </p>
           {conSelectorCentroOps && (
             <div className="centro-selector" style={{ marginTop: 10 }}>
@@ -2402,7 +2432,7 @@ export default function CentroPanel({
                   if (e.target.value) setFormProveedorCentro(e.target.value);
                 }}
               >
-                <option value="">Todos los centros</option>
+                <option value="">{rol === "mantenimiento" ? "Todos tus centros" : "Todos los centros"}</option>
                 {centrosDisponibles.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -3731,7 +3761,7 @@ export default function CentroPanel({
             )}
 
             {/* ---------------- PROVEEDORES ---------------- */}
-            {tab === "proveedores" && rol === "operaciones" && (
+            {tab === "proveedores" && esOps && (
               <div className="pm-vistas" style={{ alignSelf: "flex-start" }}>
                 {(
                   [
@@ -3746,10 +3776,10 @@ export default function CentroPanel({
                 ))}
               </div>
             )}
-            {tab === "proveedores" && rol === "operaciones" && subProv !== "proveedores" && (
-              <PagosProveedores key={subProv} modo={subProv} centros={centrosDisponibles} centroInicial={centroPerfil} centroFiltro={centroOps} />
+            {tab === "proveedores" && esOps && subProv !== "proveedores" && (
+              <PagosProveedores key={subProv} modo={subProv} centros={centrosDisponibles} centroInicial={centroPerfil} centroFiltro={centroOps} centrosFijos={CENTROS_POR_ROL[rol]} />
             )}
-            {tab === "proveedores" && (rol !== "operaciones" || subProv === "proveedores") && (
+            {tab === "proveedores" && (!esOps || subProv === "proveedores") && (
               <>
                 {(() => {
                   const todos = esGlobal ? centrosDisponibles.flatMap((c) => datosGlobales[c]?.proveedores || []) : proveedores;
@@ -3798,7 +3828,7 @@ export default function CentroPanel({
                       onClick={() => {
                         const porCentroExport: Record<string, Record<string, any>[]> = {};
                         centrosDisponibles
-                          .filter((c) => rol !== "operaciones" || !centroOps || c === centroOps)
+                          .filter((c) => !esOps || !centroOps || c === centroOps)
                           .forEach((c) => {
                             porCentroExport[c] = proveedoresVisibles(datosGlobales[c]?.proveedores || []).map((p) => ({
                               Departamento: p.tipo === "sistemas" ? "Sistemas" : p.tipo === "operaciones" ? "Operaciones" : "Admin",
@@ -3818,7 +3848,7 @@ export default function CentroPanel({
                         exportarExcelPorCentro("proveedores", porCentroExport);
                       }}
                     >
-                      📥 {rol === "operaciones" && centroOps ? `Excel (${centroOps})` : "Excel (todos los centros)"}
+                      📥 {esOps && centroOps ? `Excel (${centroOps})` : rol === "mantenimiento" ? "Excel (tus centros)" : "Excel (todos los centros)"}
                     </button>
                   )}
                 </div>
@@ -3895,7 +3925,7 @@ export default function CentroPanel({
           </div>
                   ) : (
                     <>
-                      {centrosDisponibles.filter((c) => rol !== "operaciones" || !centroOps || c === centroOps).map((c) => {
+                      {centrosDisponibles.filter((c) => !esOps || !centroOps || c === centroOps).map((c) => {
                         const provs = proveedoresVisibles(datosGlobales[c]?.proveedores || []);
                         // Con búsqueda, los centros sin coincidencias no se muestran.
                         if (hayBusquedaProv && provs.length === 0) return null;
@@ -4003,7 +4033,7 @@ export default function CentroPanel({
                     {rol !== "sistemas" && (
                       <>
                         <p className="panel-section-label">
-                          {rol === "operaciones" ? "Gastos de operaciones por centro" : "Gastos operativos por centro"}
+                          {esOps ? "Gastos de operaciones por centro" : "Gastos operativos por centro"}
                         </p>
                         <div className="tickets-filtros">
                           {centrosDisponibles.map((c) => (
@@ -4017,7 +4047,7 @@ export default function CentroPanel({
                       ))}
                     </div>
 
-                    {rol === "operaciones" && (
+                    {esOps && (
                       <form className="form-card" onSubmit={agregarGasto} style={{ marginTop: 8 }}>
                         <p style={{ fontSize: 12, color: "#888", margin: 0 }}>
                           Se registra en <b>{centroGastosActivo}</b> (el centro que tengas seleccionado arriba)
@@ -4083,7 +4113,7 @@ export default function CentroPanel({
                     ) : (
                       (() => {
                         const listaCentro = (datosGlobales[centroGastosActivo]?.gastos || []).filter(
-                          (g) => rol !== "operaciones" || g.tipo === "operaciones"
+                          (g) => !esOps || g.tipo === "operaciones"
                         );
                         const totalAnio = listaCentro
                           .filter((g) => fechaLocal(g.fecha).getFullYear() === anioGastosCentro)
@@ -4189,7 +4219,7 @@ export default function CentroPanel({
                                     <p className="item-card-monto">
                                       ${Number(g.monto).toLocaleString("es-MX")}
                                     </p>
-                                    {rol === "operaciones" && (
+                                    {esOps && (
                                       <button
                                         className="tel-borrar-btn"
                                         onClick={() => borrarGasto(g.id, centroGastosActivo)}

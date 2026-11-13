@@ -34,6 +34,9 @@ const PERSONAL = {
   // Precios de cotización: las cotizaciones nuevas le llegan a gerencia; la decisión, a Operaciones.
   cotizacionNueva: ["comparativo_nuevo"],
   cotizacionElegida: ["comparativo_elegido"],
+  // Reparaciones: lo que manda la arquitecta le llega a Mantenimiento y al revés.
+  reparacionMtto: ["reparacion_para_mantenimiento"],
+  reparacionArqui: ["reparacion_para_operaciones"],
   quejas: ["nueva_queja"],
   logros: ["nuevo_logro"],
 };
@@ -44,12 +47,12 @@ const sin = (lista: string[], quitar: string[]) => lista.filter((t) => !quitar.i
 // "Contrato a firma" es solo de Ventas; quejas y logros solo del superadmin
 // (y de Atención al Cliente / Diseño, que son sus módulos).
 export const AVISOS_POR_ROL: Record<string, string[]> = {
-  superadmin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida]),
+  superadmin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida, ...PERSONAL.reparacionMtto, ...PERSONAL.reparacionArqui]),
   // Gerente = superadmin con otro nombre.
-  gerente: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida]),
-  admin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionNueva, ...PERSONAL.cotizacionElegida]),
+  gerente: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.cotizacionElegida, ...PERSONAL.reparacionMtto, ...PERSONAL.reparacionArqui]),
+  admin: sin(todosLosDePersonal, [...PERSONAL.contratosAFirma, ...PERSONAL.quejas, ...PERSONAL.logros, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionNueva, ...PERSONAL.cotizacionElegida, ...PERSONAL.reparacionMtto, ...PERSONAL.reparacionArqui]),
   sistemas: [...PERSONAL.tickets, ...PERSONAL.telefonia, ...PERSONAL.vouchers],
-  operaciones: [...PERSONAL.tickets, ...PERSONAL.mantenimiento, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionElegida],
+  operaciones: [...PERSONAL.tickets, ...PERSONAL.mantenimiento, ...PERSONAL.layoutRespuesta, ...PERSONAL.cotizacionElegida, ...PERSONAL.reparacionArqui],
   cobranza: [...PERSONAL.cobros, ...PERSONAL.gastos],
   atencion_cliente: [...PERSONAL.quejas, ...PERSONAL.tours],
   diseno: [...PERSONAL.logros],
@@ -59,6 +62,8 @@ export const AVISOS_POR_ROL: Record<string, string[]> = {
   ejecutiva_ventas: [...PERSONAL.tours],
   // Contabilidad: los gastos que registran los centros, para pagarlos.
   gastos: [...PERSONAL.gastos],
+  // Mantenimiento de León: tickets de mantenimiento y Mtto. de sus centros.
+  mantenimiento: [...PERSONAL.tickets, ...PERSONAL.mantenimiento, ...PERSONAL.reparacionMtto],
 };
 
 // Respuestas a algo que pidió esa misma persona (p. ej. una reservación de
@@ -79,6 +84,6 @@ const TICKETS = PERSONAL.tickets;
 // "mantenimiento".
 export function avisoEsParaRol(rol: string, aviso: { tipo: string; categoria?: string | null }): boolean {
   if (rol === "sistemas" && TICKETS.includes(aviso.tipo)) return aviso.categoria === "sistemas";
-  if (rol === "operaciones" && TICKETS.includes(aviso.tipo)) return aviso.categoria === "mantenimiento";
+  if ((rol === "operaciones" || rol === "mantenimiento") && TICKETS.includes(aviso.tipo)) return aviso.categoria === "mantenimiento";
   return true;
 }
