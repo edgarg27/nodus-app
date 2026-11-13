@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import BotonArchivo from "@/app/components/BotonArchivo";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import Link from "next/link";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
+// "mantenimiento" (León) también elige centro, pero solo entre los suyos (CENTROS_POR_ROL).
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "mantenimiento"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 const CATEGORIAS_SISTEMAS = ["Redes", "Switches", "Access Points", "Cableado estructurado", "Servidores", "Cámaras", "Firewall/Router", "Otro"];
 const CATEGORIAS_OPERACIONES = ["Electricidad", "Aire acondicionado", "Plomería", "Mobiliario", "Limpieza profunda", "Otro"];
@@ -95,8 +97,9 @@ export default function MantenimientoPage() {
     const rol = profile?.rol || "";
     setMiRol(rol);
     if (ROLES_GLOBALES.includes(rol)) {
-      setCentrosDisponibles(CENTROS_SUGERIDOS);
-      const c = profile?.centro || CENTROS_SUGERIDOS[0];
+      const lista = CENTROS_POR_ROL[rol] || CENTROS_SUGERIDOS;
+      setCentrosDisponibles(lista);
+      const c = profile?.centro && lista.includes(profile.centro) ? profile.centro : lista[0];
       setCentro(c);
       await fetchRegistros(c);
     } else {
@@ -296,7 +299,7 @@ export default function MantenimientoPage() {
                         )
                   }
                 >
-                  {exportandoTodo ? "Generando..." : esGlobal ? "📥 Excel (todos los centros)" : "📥 Excel"}
+                  {exportandoTodo ? "Generando..." : esGlobal ? (miRol === "mantenimiento" ? "📥 Excel (León)" : "📥 Excel (todos los centros)") : "📥 Excel"}
                 </button>
                 <button
                   className="tel-borrar-btn"

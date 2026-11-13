@@ -52,10 +52,12 @@ export default function MapaConPines({
   centro,
   imagenUrl,
   puedeEditar,
+  puedeCotizar = true,
 }: {
   centro: string;
   imagenUrl: string;
   puedeEditar: boolean;
+  puedeCotizar?: boolean;
 }) {
   const supabase = createClient();
   const imgRef = useRef<HTMLImageElement>(null);
@@ -415,6 +417,7 @@ export default function MapaConPines({
           oficinas={oficinas}
           oficinaIdInicial={oficinaParaModal}
           onClose={() => setModalAbierto(false)}
+          puedeCotizar={puedeCotizar}
         />
       )}
     </div>

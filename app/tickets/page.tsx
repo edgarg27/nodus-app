@@ -6,6 +6,7 @@ import ImagenPrivada from "@/app/components/ImagenPrivada";
 import { exportarExcel, exportarExcelPorCentro } from "@/lib/exportExcel";
 import FileDropzone from "../soporte/FileDropzone";
 import Link from "next/link";
+import { CENTROS_POR_ROL, esRolOperaciones } from "@/lib/roles";
 
 type Ticket = {
   id: string;
@@ -53,8 +54,11 @@ const CATEGORIAS = [
   { id: "mantenimiento", label: "🔨 Mantenimiento" },
 ];
 
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones"];
-const ROLES_EDITAN_ESTATUS = ["sistemas", "operaciones", "superadmin", "gerente"];
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "mantenimiento"];
+const ROLES_EDITAN_ESTATUS = ["sistemas", "operaciones", "mantenimiento", "superadmin", "gerente"];
+// Operaciones (la arquitecta) ve un centro a la vez y lo cambia con el
+// selector del encabezado, igual que en Mapa de Oficinas.
+const CENTROS_SELECTOR = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 export default function TicketsPage() {
   const supabase = createClient();
@@ -69,6 +73,10 @@ export default function TicketsPage() {
   const [miRol, setMiRol] = useState("");
 
   const puedeEditarEstatus = ROLES_EDITAN_ESTATUS.includes(miRol);
+  // Mantenimiento (León) igual, pero solo con sus centros.
+  const conSelectorCentro = esRolOperaciones(miRol);
+  const centrosSelector = CENTROS_POR_ROL[miRol] || CENTROS_SELECTOR;
+  const [centroSel, setCentroSel] = useState<string | null>(null);
 
   const [mostrarFormReporte, setMostrarFormReporte] = useState(false);
   const [formReporte, setFormReporte] = useState({ asunto: "", descripcion: "", categoria: "sistemas" });
@@ -133,6 +141,10 @@ export default function TicketsPage() {
       setMiRol(rolActual);
       setMiId(user.id);
       setMiNombre(miProfile?.nombre || "");
+      if (esRolOperaciones(rolActual)) {
+        const lista = CENTROS_POR_ROL[rolActual] || CENTROS_SELECTOR;
+        setCentroSel((prev) => prev || (centroActual && lista.includes(centroActual) ? centroActual : lista[0]));
+      }
     }
 
     let query = supabase
@@ -146,8 +158,9 @@ export default function TicketsPage() {
     // Sistemas solo ve reportes de su categoría; operaciones solo mantenimiento
     if (rolActual === "sistemas") {
       query = query.eq("categoria", "sistemas");
-    } else if (rolActual === "operaciones") {
+    } else if (esRolOperaciones(rolActual)) {
       query = query.eq("categoria", "mantenimiento");
+      if (CENTROS_POR_ROL[rolActual]) query = query.in("centro", CENTROS_POR_ROL[rolActual]);
     } else if (rolActual === "ejecutiva_ventas" && user) {
       // Ejecutiva de Ventas reporta como un cliente: solo ve sus propios reportes.
       query = query.eq("user_id", user.id);
@@ -183,17 +196,23 @@ export default function TicketsPage() {
     setLoading(false);
   }
 
-  const filtrados = useMemo(() => {
+  // Tickets del centro elegido (solo cuando hay selector) y de la categoría.
+  const delCentro = useMemo(() => {
     let lista = tickets;
+    if (conSelectorCentro && centroSel) lista = lista.filter((t) => t.centro === centroSel);
     if (categoria !== "todas") lista = lista.filter((t) => t.categoria === categoria);
-    if (filtro !== "todos") lista = lista.filter((t) => t.estado === filtro);
     return lista;
-  }, [filtro, categoria, tickets]);
+  }, [tickets, conSelectorCentro, centroSel, categoria]);
+
+  const filtrados = useMemo(
+    () => (filtro === "todos" ? delCentro : delCentro.filter((t) => t.estado === filtro)),
+    [filtro, delCentro]
+  );
 
   // Cuando el rol ve todos los centros (sistemas/superadmin), agrupamos
   // los tickets por centro para no mezclarlos en una sola lista
   const porCentro = useMemo(() => {
-    if (!esGlobal) return null;
+    if (!esGlobal || conSelectorCentro) return null;
     const grupos: Record<string, Ticket[]> = {};
     filtrados.forEach((t) => {
       const key = t.centro || "Sin centro asignado";
@@ -203,7 +222,7 @@ export default function TicketsPage() {
     return Object.keys(grupos)
       .sort()
       .map((centro) => ({ centro, tickets: grupos[centro] }));
-  }, [filtrados, esGlobal]);
+  }, [filtrados, esGlobal, conSelectorCentro]);
 
   async function actualizarEstadoDirecto(id: string, estado: string) {
     // Solo se usa para volver a "abierto" — no necesita comentario.
@@ -438,10 +457,10 @@ export default function TicketsPage() {
   }
 
   const conteos = {
-    todos: filtrados.length,
-    abierto: tickets.filter((t) => t.estado === "abierto" && (categoria === "todas" || t.categoria === categoria)).length,
-    en_proceso: tickets.filter((t) => t.estado === "en_proceso" && (categoria === "todas" || t.categoria === categoria)).length,
-    cerrado: tickets.filter((t) => t.estado === "cerrado" && (categoria === "todas" || t.categoria === categoria)).length,
+    todos: delCentro.length,
+    abierto: delCentro.filter((t) => t.estado === "abierto").length,
+    en_proceso: delCentro.filter((t) => t.estado === "en_proceso").length,
+    cerrado: delCentro.filter((t) => t.estado === "cerrado").length,
   };
 
   const badgeInfo = (estado: string) =>
@@ -517,6 +536,13 @@ export default function TicketsPage() {
 
         <p style={{ fontSize: 13, color: "#555", margin: 0 }}>{t.descripcion}</p>
 
+        {/* La arquitecta se lo pasa a Mantenimiento de León como reparación con seguimiento (app/reparaciones). */}
+        {miRol === "operaciones" && t.categoria === "mantenimiento" && t.estado !== "cerrado" && t.centro && (CENTROS_POR_ROL.mantenimiento || []).includes(t.centro) && (
+          <Link href={`/reparaciones?ticket=${t.id}`} className="pp-link" style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 700 }}>
+            🔧 Asignar a mantenimiento
+          </Link>
+        )}
+
         {(() => {
           const fotos = t.foto_urls && t.foto_urls.length > 0 ? t.foto_urls : t.foto_url ? [t.foto_url] : [];
           if (fotos.length === 0) return null;
@@ -578,7 +604,7 @@ export default function TicketsPage() {
               {hilo.map((c) => (
                 <div className="ticket-comentario" key={c.id}>
                   <p className="ticket-comentario-meta">
-                    {c.autor_rol === "sistemas" ? "🖥️" : c.autor_rol === "operaciones" ? "🔧" : "👤"}{" "}
+                    {c.autor_rol === "sistemas" ? "🖥️" : esRolOperaciones(c.autor_rol) ? "🔧" : "👤"}{" "}
                     {c.autor_nombre || "Staff"} · {new Date(c.created_at).toLocaleString("es-MX")}
                   </p>
                   {c.mensaje && <p className="ticket-comentario-msg">{c.mensaje}</p>}
@@ -623,16 +649,27 @@ export default function TicketsPage() {
         <p className="rep-sub">
           {loading
             ? ""
-            : miRol === "operaciones"
-            ? "Reportes de mantenimiento de todos los centros"
+            : conSelectorCentro
+            ? centroSel || "Selecciona un centro"
             : esGlobal
             ? "Reportes de sistemas y mantenimiento de todos los centros"
             : `Reportes de ${miCentro || "tu centro"}`}
         </p>
+        {!loading && conSelectorCentro && (
+          <div className="centro-selector">
+            <select value={centroSel || ""} onChange={(e) => setCentroSel(e.target.value)}>
+              {centrosSelector.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="rep-content">
-        {!loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+        {!loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
           <div className="tickets-filtros">
             {CATEGORIAS.map((c) => (
               <button
@@ -701,7 +738,7 @@ export default function TicketsPage() {
           >
             📥 Exportar Excel
           </button>
-          {!loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+          {!loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
             <button
               className="tel-borrar-btn"
               style={{ color: "#0d1b3e", fontWeight: 600 }}
@@ -712,7 +749,7 @@ export default function TicketsPage() {
           )}
         </div>
 
-        {mostrarFormReporte && !loading && miRol !== "sistemas" && miRol !== "operaciones" && (
+        {mostrarFormReporte && !loading && miRol !== "sistemas" && !esRolOperaciones(miRol) && (
           <form className="form-card" onSubmit={crearReporteStaff}>
             <p className="sub-label">Reportar algo que viste inusual en el centro</p>
             <select
@@ -787,6 +824,10 @@ export default function TicketsPage() {
           </div>
         ) : filtrados.length === 0 ? (
           <div className="empty-card">Sin reportes en esta categoría</div>
+        ) : conSelectorCentro ? (
+          // Un solo centro: una sola lista (ya viene de más nuevo a más viejo),
+          // sin el bloque de "Recientes" que repetía los mismos reportes.
+          filtrados.map((t) => renderTicket(t))
         ) : (
           <>
             {(() => {

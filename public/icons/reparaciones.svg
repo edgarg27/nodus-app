@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Reparaciones: caja de herramientas. Mismo estilo que los demás íconos con contorno negro. -->
+  <g stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Desarmador que asoma -->
+    <g transform="rotate(28 330 170)">
+      <rect x="312" y="40" width="36" height="96" rx="12" fill="#F5A623"/>
+      <path d="M322 136h16v84h-16z" fill="#C9D2E3"/>
+    </g>
+    <!-- Mango del martillo que asoma -->
+    <g transform="rotate(-24 180 170)">
+      <rect x="166" y="70" width="30" height="150" rx="10" fill="#B5763C"/>
+      <path d="M128 60h106c8 0 14 6 14 14v18c0 8-6 14-14 14H128c-14 0-26-12-26-23s12-23 26-23z" fill="#8A93A6"/>
+    </g>
+    <!-- Asa -->
+    <path d="M196 200v-34c0-10 8-18 18-18h84c10 0 18 8 18 18v34" fill="none" stroke-width="22"/>
+    <path d="M196 200v-34c0-10 8-18 18-18h84c10 0 18 8 18 18v34" fill="none" stroke="#8A93A6" stroke-width="8"/>
+    <!-- Caja -->
+    <path d="M60 230c0-16 13-30 30-30h332c17 0 30 14 30 30v214c0 16-13 30-30 30H90c-17 0-30-14-30-30z" fill="#E5484D"/>
+    <!-- Tapa -->
+    <path d="M60 230c0-16 13-30 30-30h332c17 0 30 14 30 30v54H60z" fill="#C93439"/>
+    <!-- Broches -->
+    <rect x="132" y="262" width="44" height="52" rx="8" fill="#FFC14D"/>
+    <rect x="336" y="262" width="44" height="52" rx="8" fill="#FFC14D"/>
+    <!-- Franja -->
+    <path d="M60 380h392" fill="none"/>
+  </g>
+</svg>
