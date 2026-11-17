@@ -11055,3 +11055,48 @@ a.stat-card {
   font-weight: 700;
   color: #0f6e56;
 }
+
+/* "Próximamente": módulo o plano que todavía no está listo (p. ej. Mapa de oficinas
+   de Mantenimiento hasta que la arquitecta suba el plano). */
+.modulo-proximamente {
+  position: relative;
+}
+.modulo-badge-proximamente {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #8a5a00;
+  background: #fff4d6;
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.mapa-proximamente {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  background: #fff;
+  border: 2px dashed #e3e6ee;
+  border-radius: 16px;
+  padding: 40px 20px;
+}
+.mapa-proximamente img {
+  width: 56px;
+  height: 56px;
+  opacity: 0.55;
+  filter: grayscale(0.4);
+}
+.mapa-proximamente-titulo {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0d1b3e;
+}
+.mapa-proximamente-texto {
+  margin: 0;
+  max-width: 380px;
+  font-size: 13.5px;
+  color: #7a8399;
+}
