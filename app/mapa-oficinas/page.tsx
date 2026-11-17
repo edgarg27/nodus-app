@@ -25,6 +25,8 @@ export default function MapaOficinasPage() {
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
   const [mapa, setMapa] = useState<Mapa | null>(null);
+  // Centros que ya tienen plano: los demás salen como "próximamente" en el selector.
+  const [centrosConPlano, setCentrosConPlano] = useState<string[]>([]);
 
   // Solo operaciones puede subir/reemplazar layouts — el resto (admins de
   // centro, sistemas, cobranza, etc.) únicamente los puede ver y descargar.
@@ -54,7 +56,12 @@ export default function MapaOficinasPage() {
     if (ROLES_GLOBALES.includes(profile?.rol || "")) {
       const lista = CENTROS_POR_ROL[profile?.rol || ""] || CENTROS_SUGERIDOS;
       setCentrosDisponibles(lista);
-      const c = profile?.centro && lista.includes(profile.centro) ? profile.centro : lista[0];
+      const { data: conPlano } = await supabase.from("mapa_oficinas").select("centro").in("centro", lista).not("imagen_url", "is", null);
+      const listos = (conPlano || []).map((m) => m.centro as string);
+      setCentrosConPlano(listos);
+      // Se abre en un centro que ya tenga plano (si el suyo todavía no).
+      const preferido = profile?.centro && lista.includes(profile.centro) ? profile.centro : lista[0];
+      const c = listos.includes(preferido) || listos.length === 0 ? preferido : listos[0];
       setCentro(c);
       await fetchMapa(c);
     } else {
@@ -144,6 +151,7 @@ export default function MapaOficinasPage() {
               {centrosDisponibles.map((c) => (
                 <option key={c} value={c}>
                   {c}
+                  {!puedeSubir && !centrosConPlano.includes(c) ? " · próximamente" : ""}
                 </option>
               ))}
             </select>
@@ -185,7 +193,16 @@ export default function MapaOficinasPage() {
                 </div>
               </div>
             ) : (
-              <div className="empty-card">Sin layout registrado para {centro}</div>
+              puedeSubir ? (
+                <div className="empty-card">Sin layout registrado para {centro}</div>
+              ) : (
+                <div className="mapa-proximamente">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/mapa-oficinas.png" alt="" />
+                  <p className="mapa-proximamente-titulo">Próximamente</p>
+                  <p className="mapa-proximamente-texto">El plano de {centro} se está preparando. En cuanto la arquitecta lo suba, aparecerá aquí.</p>
+                </div>
+              )
             )}
 
             {puedeSubir && (
