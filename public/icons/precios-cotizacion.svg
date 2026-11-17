@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Precios de cotización: 3 cotizaciones para comparar, con el precio. Contorno negro como los demás íconos. -->
+  <g stroke="#000" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Cotización de atrás -->
+    <rect x="64" y="96" width="220" height="290" rx="18" fill="#9CC7F2" transform="rotate(-12 174 241)"/>
+    <!-- Cotización de en medio -->
+    <rect x="116" y="70" width="220" height="290" rx="18" fill="#FFE08A" transform="rotate(-4 226 215)"/>
+    <!-- Cotización de enfrente -->
+    <path d="M172 60h170l60 60v290c0 12-10 22-22 22H172c-12 0-22-10-22-22V82c0-12 10-22 22-22z" fill="#FFFFFF"/>
+    <path d="M342 60v48c0 7 5 12 12 12h48" fill="#E3E8F2"/>
+    <!-- Renglones -->
+    <path d="M192 150h110M192 196h170M192 242h170M192 288h96" fill="none" stroke-width="14"/>
+    <!-- Moneda con el precio -->
+    <circle cx="372" cy="384" r="84" fill="#22A06B"/>
+    <path d="M396 346c-8-10-20-14-32-14-20 0-34 11-34 26 0 34 70 20 70 54 0 16-15 28-36 28-14 0-28-6-36-16M368 318v18M368 440v18" fill="none" stroke="#FFFFFF" stroke-width="14"/>
+  </g>
+</svg>

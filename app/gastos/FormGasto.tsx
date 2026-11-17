@@ -6,6 +6,26 @@ import FileDropzone from "../soporte/FileDropzone";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
 import { URGENCIAS, type Urgencia } from "@/lib/gastos";
 
+// Sube la factura o el comprobante de un gasto al bucket "comprobantes". El nombre original
+// (sin acentos ni símbolos) va después de "__" para descargarlo con ese mismo nombre.
+// También lo usan los pagos a proveedores de Operaciones (app/centro/PagosProveedores.tsx).
+export async function subirArchivoGasto(supabase: ReturnType<typeof createClient>, archivo: File, prefijo: string) {
+  const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "pdf";
+  const original = archivo.name
+    .replace(/\.[^.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9 ._-]+/g, "-")
+    .trim()
+    .slice(0, 80);
+  const fileName = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${original ? `__${original}` : ""}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("comprobantes")
+    .upload(fileName, archivo, { contentType: archivo.type || undefined, upsert: true });
+  if (uploadError) return null;
+  return supabase.storage.from("comprobantes").getPublicUrl(fileName).data.publicUrl;
+}
+
 // Formulario para registrar un gasto (app/gastos/page.tsx). La factura y el comprobante de pago son
 // opcionales; contabilidad también puede subir el comprobante al marcarlo como pagado
 // (/api/gastos/revisar).
@@ -39,23 +59,7 @@ export default function FormGasto({
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
 
-  async function subirArchivo(archivo: File, prefijo: string) {
-    // El nombre original (sin acentos ni símbolos) va después de "__" para descargarlo con ese mismo nombre.
-    const ext = archivo.name.includes(".") ? archivo.name.split(".").pop() : "pdf";
-    const original = archivo.name
-      .replace(/\.[^.]+$/, "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^A-Za-z0-9 ._-]+/g, "-")
-      .trim()
-      .slice(0, 80);
-    const fileName = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${original ? `__${original}` : ""}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("comprobantes")
-      .upload(fileName, archivo, { contentType: archivo.type || undefined, upsert: true });
-    if (uploadError) return null;
-    return supabase.storage.from("comprobantes").getPublicUrl(fileName).data.publicUrl;
-  }
+  const subirArchivo = (archivo: File, prefijo: string) => subirArchivoGasto(supabase, archivo, prefijo);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();

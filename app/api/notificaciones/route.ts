@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "gerente_ventas", "cobranza", "gastos"];
 
@@ -23,8 +24,18 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: avisos } = await admin.from("notificaciones").select("id, centro, user_id").in("id", ids);
   const esGlobal = ROLES_GLOBALES.includes(yo.rol);
+  // Operaciones (la arquitecta) ve los de todos los centros; Mantenimiento, los de sus centros.
+  const susCentros = yo.rol === "operaciones" ? null : CENTROS_POR_ROL[yo.rol] || null;
   const permitidos = (avisos || [])
-    .filter((n) => n.user_id === session.user.id || esGlobal || !n.centro || n.centro === yo.centro)
+    .filter(
+      (n) =>
+        n.user_id === session.user.id ||
+        esGlobal ||
+        yo.rol === "operaciones" ||
+        !n.centro ||
+        n.centro === yo.centro ||
+        (!!susCentros && susCentros.includes(n.centro))
+    )
     .map((n) => n.id);
   if (permitidos.length === 0) return NextResponse.json({ ok: true, cambiados: 0 });
 

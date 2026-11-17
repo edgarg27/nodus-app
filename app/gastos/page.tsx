@@ -12,6 +12,7 @@ import EncabezadoContabilidad from "./EncabezadoContabilidad";
 import { fechaLocal, hoyMexicoISO } from "@/lib/fechaMexico";
 import { ESTADOS_PAGO, URGENCIAS, textoFechaLimite, urgenciaEfectiva, urgenciaInfo, type EstadoPago } from "@/lib/gastos";
 import Link from "next/link";
+import { LineaDatosPago, type DatosPago } from "../centro/DatosPagoProveedor";
 
 type Gasto = {
   id: string;
@@ -34,9 +35,14 @@ type Gasto = {
   motivo_no_pago: string | null;
   revisado_por_nombre: string | null;
   created_at: string;
+  // Pagos a proveedores de Operaciones (app/centro/PagosProveedores.tsx).
+  oficina?: string | null;
+  folio_factura?: string | null;
+  subtotal?: number | null;
+  fecha_factura?: string | null;
 };
 
-type Proveedor = { id: string; nombre: string };
+type Proveedor = DatosPago & { id: string; nombre: string };
 
 // A diferencia de /tickets, aquí cada quien captura sus PROPIOS gastos —
 // por eso sistemas también se queda scopeado a su centro (no es "global"
@@ -157,7 +163,8 @@ export default function GastosPage() {
 
     // Proveedores para vincular (de su propio centro). Quien ve todos los centros
     // los necesita todos, para ver el nombre del proveedor de cada gasto.
-    let qProv = supabase.from("proveedores").select("id, nombre").order("nombre");
+    // "*" para traer también sus datos de pago (banco, CLABE…) sin fallar si aún no existen esas columnas.
+    let qProv = supabase.from("proveedores").select("*").order("nombre");
     if (!globalActual) qProv = centroActual ? qProv.eq("centro", centroActual) : qProv.eq("centro", "__ninguno__");
     const { data: provs } = await qProv;
     setProveedores(provs || []);
@@ -438,11 +445,28 @@ export default function GastosPage() {
                     {g.categoria ? ` · ${g.categoria}` : ""}
                     {proveedorNombre(g.proveedor_id) ? ` · ${proveedorNombre(g.proveedor_id)}` : ""}
                   </p>
+                  {(g.oficina || g.folio_factura || g.fecha_factura || g.subtotal != null) && (
+                    <p className="item-card-extra">
+                      {[
+                        g.oficina ? `OF: ${g.oficina}` : "",
+                        g.folio_factura ? `Factura ${g.folio_factura}` : "",
+                        g.fecha_factura ? `del ${fechaLocal(g.fecha_factura).toLocaleDateString("es-MX")}` : "",
+                        g.subtotal != null ? `Subtotal $${Number(g.subtotal).toLocaleString("es-MX", { minimumFractionDigits: 2 })} + IVA` : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   <p className="item-card-extra">
+                    {g.tipo === "operaciones" ? "🔧 Operaciones · " : ""}
                     {g.centro || "—"}
                     {g.registrado_por_nombre ? ` · Registró: ${g.registrado_por_nombre}` : ""}
                   </p>
                   {g.notas && <p className="item-card-extra">📝 {g.notas}</p>}
+                  {/* Datos para transferirle al proveedor (solo mientras está por pagar). */}
+                  {estado === "pendiente" && g.proveedor_id && proveedores.find((p) => p.id === g.proveedor_id) && (
+                    <LineaDatosPago p={proveedores.find((p) => p.id === g.proveedor_id)!} />
+                  )}
                   {estado === "pagado" && (
                     <p className="item-card-extra" style={{ color: "#0F6E56" }}>
                       ✅ Pagado el {g.fecha_pago ? fechaLocal(g.fecha_pago).toLocaleDateString("es-MX") : "—"}

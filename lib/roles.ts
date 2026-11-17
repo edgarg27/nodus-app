@@ -17,6 +17,7 @@ export const ROL_LABEL: Record<string, string> = {
   ceo: "CEO",
   captive: "Captive",
   gastos: "Gastos",
+  mantenimiento: "Mantenimiento",
 };
 
 export function labelRol(rol: string): string {
@@ -28,7 +29,17 @@ export function labelRol(rol: string): string {
 // los limita igual (ver migracion_rol_ejecutiva_ventas_2.sql y _3.sql).
 export const CENTROS_POR_ROL: Record<string, string[]> = {
   ejecutiva_ventas: ["Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium"],
+  // Mantenimiento de León: atiende tickets, mantenimientos y pagos a proveedores
+  // solo de estos centros (ver migracion_rol_mantenimiento_2.sql).
+  mantenimiento: ["Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium"],
 };
+
+// Roles que trabajan como Operaciones (tickets de mantenimiento, Mtto. y pagos a
+// proveedores). "operaciones" es la arquitecta (todos los centros); "mantenimiento"
+// hace lo mismo pero solo en sus centros de CENTROS_POR_ROL.
+export function esRolOperaciones(rol: string | null | undefined): boolean {
+  return rol === "operaciones" || rol === "mantenimiento";
+}
 
 // "gerente" tiene exactamente los mismos privilegios que "superadmin" (solo
 // cambia el nombre que se muestra). Todo permiso de superadmin se pregunta

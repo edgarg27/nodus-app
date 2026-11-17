@@ -48,11 +48,14 @@ export default function ModalDisponibilidad({
   oficinas,
   oficinaIdInicial,
   onClose,
+  puedeCotizar = true,
 }: {
   centro: string;
   oficinas: Oficina[];
   oficinaIdInicial: string | null;
   onClose: () => void;
+  // false = solo consulta disponibilidad (p. ej. Mantenimiento), sin ir a Registrar Plan.
+  puedeCotizar?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -278,13 +281,15 @@ export default function ModalDisponibilidad({
           <button className="disp-cerrar" onClick={onClose}>
             Cerrar
           </button>
-          <button
-            className="reservar-btn disp-continuar"
-            disabled={!verificado || !resultado?.disponible}
-            onClick={continuarARegistrarPlan}
-          >
-            Continuar a Registrar Plan →
-          </button>
+          {puedeCotizar && (
+            <button
+              className="reservar-btn disp-continuar"
+              disabled={!verificado || !resultado?.disponible}
+              onClick={continuarARegistrarPlan}
+            >
+              Continuar a Registrar Plan →
+            </button>
+          )}
         </div>
         {(!verificado || !resultado?.disponible) && (
           <p className="disp-ayuda">

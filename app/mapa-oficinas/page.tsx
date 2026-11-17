@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import MapaConPines from "./MapaConPines";
 import Link from "next/link";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 // Operaciones necesita moverse entre todos los centros para poder subir el
 // layout de cada uno (es quien registra los planos), igual que ya puede
 // hacerlo en Panel de Centro con gastos/proveedores.
-const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "atencion_cliente"];
+// Mantenimiento (León) también elige centro, pero solo entre los suyos (CENTROS_POR_ROL), y solo ve.
+const ROLES_GLOBALES = ["sistemas", "superadmin", "gerente", "operaciones", "atencion_cliente", "mantenimiento"];
 const CENTROS_SUGERIDOS = ["Bosques", "Punto 45", "San Telmo", "Puerta Bajío Piso 2", "Puerta Bajío Piso 8", "Stadium", "ILEVA"];
 
 type Mapa = {
@@ -50,8 +52,9 @@ export default function MapaOficinasPage() {
     const { data: profile } = await supabase.from("profiles").select("rol, centro").eq("id", user.id).single();
     setRol(profile?.rol || "");
     if (ROLES_GLOBALES.includes(profile?.rol || "")) {
-      setCentrosDisponibles(CENTROS_SUGERIDOS);
-      const c = profile?.centro || CENTROS_SUGERIDOS[0];
+      const lista = CENTROS_POR_ROL[profile?.rol || ""] || CENTROS_SUGERIDOS;
+      setCentrosDisponibles(lista);
+      const c = profile?.centro && lista.includes(profile.centro) ? profile.centro : lista[0];
       setCentro(c);
       await fetchMapa(c);
     } else {
@@ -166,7 +169,7 @@ export default function MapaOficinasPage() {
             {mapa?.imagen_url || mapa?.dwg_url ? (
               <div className="mapa-imagen-wrap">
                 {mapa.imagen_url && centro && (
-                  <MapaConPines centro={centro} imagenUrl={mapa.imagen_url} puedeEditar={puedeEditarPines} />
+                  <MapaConPines centro={centro} imagenUrl={mapa.imagen_url} puedeEditar={puedeEditarPines} puedeCotizar={rol !== "mantenimiento"} />
                 )}
                 <div className="mapa-descargas">
                   {mapa.imagen_url && (
