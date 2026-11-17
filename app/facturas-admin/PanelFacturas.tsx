@@ -213,6 +213,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   const [miRol, setMiRol] = useState("");
   const [centro, setCentro] = useState<string | null>(null);
   const [centrosDisponibles, setCentrosDisponibles] = useState<string[]>([]);
+  // El centro propio del usuario (su perfil). El admin puede VER otros centros, pero solo MODIFICA el suyo.
+  const [miCentro, setMiCentro] = useState<string | null>(null);
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
@@ -252,7 +254,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
       setBusqueda(qParam);
       setVerTodas(true);
     }
-    if (ROLES_GLOBALES.includes(rol)) {
+    setMiCentro(profile?.centro || null);
+    // El admin de centro también puede cambiar de centro para CONSULTAR otros (modifica solo el suyo).
+    if (ROLES_GLOBALES.includes(rol) || rol === "admin") {
       setCentrosDisponibles(CENTROS_SUGERIDOS);
       setCentro(centroParam && CENTROS_SUGERIDOS.includes(centroParam) ? centroParam : profile?.centro || CENTROS_SUGERIDOS[0]);
     } else {
@@ -291,7 +295,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
     setFacturas(
       (facts || []).map((f) => ({
         ...f,
-        cliente_nombre: f.user_id ? nombrePorId[f.user_id] || "Cliente" : f.rfc_receptor === "XAXX010101000" ? "Público en general" : "Cliente no identificado",
+        cliente_nombre: f.user_id ? nombrePorId[f.user_id] || f.nombre_receptor || "Cliente" : f.rfc_receptor === "XAXX010101000" ? "Público en general" : f.nombre_receptor || "Cliente no identificado",
         cliente_email: f.user_id ? emailPorId[f.user_id] || "" : "",
         cliente_fiscal: f.user_id ? fiscalPorId[f.user_id] || "" : "",
       }))
@@ -754,7 +758,10 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
   }
 
   // ---- Cancelación de CFDI ----
-  const puedoCancelar = ROLES_CANCELAR.includes(miRol);
+  // Solo se puede MODIFICAR (timbrar, cancelar, borrar, complemento) el propio centro. Los roles globales
+  // (gerencia, cobranza) actúan en cualquiera; el admin solo cuando mira su centro. Viendo otro centro: solo consulta.
+  const soloConsulta = !esGlobal && !!centro && !!miCentro && centro !== miCentro;
+  const puedoCancelar = ROLES_CANCELAR.includes(miRol) && (esGlobal || centro === miCentro);
   const [seleccion, setSeleccion] = useState<string[]>([]);
   const [modalCancelar, setModalCancelar] = useState<string[] | null>(null);
   const [motivoCancelar, setMotivoCancelar] = useState("02");
@@ -972,6 +979,11 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
           </div>
         ) : (
           <>
+            {soloConsulta && (
+              <div className="empty-card" style={{ background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", marginBottom: 12 }}>
+                👁️ Solo consulta — estás viendo <b>{centro}</b>, que no es tu centro ({miCentro}). Para modificar (timbrar, cancelar, borrar) cambia a tu centro.
+              </div>
+            )}
             {modo !== "timbradas" && (
               <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1046,9 +1058,9 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
 
             <div className="form-card" style={{ marginTop: 8 }}>
               <div className="tel-form-grid">
-                {esGlobal && centrosDisponibles.length > 1 && (
+                {(esGlobal || miRol === "admin") && centrosDisponibles.length > 1 && (
                   <div>
-                    <p className="sub-label">Centro</p>
+                    <p className="sub-label">Centro{soloConsulta ? " · solo consulta" : ""}</p>
                     <select
                       value={centro || ""}
                       onChange={(e) => {
