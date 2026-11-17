@@ -333,8 +333,22 @@ export default function AdminPanel({
     fetchBannersLogros();
     if (rol === "sistemas") fetchUltimosTicketsSistemas();
     if (rol === "ventas") fetchContratosPorSubir();
+    if (rol === "mantenimiento") fetchMapaLeonListo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Mantenimiento: Mapa de oficinas sale "Próximamente" hasta que la arquitecta suba el
+  // plano de alguno de sus centros; en cuanto hay uno, la tarjeta se desbloquea sola.
+  const [mapaLeonListo, setMapaLeonListo] = useState<boolean | null>(null);
+  async function fetchMapaLeonListo() {
+    const { data } = await supabase
+      .from("mapa_oficinas")
+      .select("centro")
+      .in("centro", CENTROS_POR_ROL.mantenimiento || [])
+      .not("imagen_url", "is", null)
+      .limit(1);
+    setMapaLeonListo((data || []).length > 0);
+  }
 
   // La campanita se actualiza sola: cada minuto y al regresar a la pestaña
   // (antes solo al entrar al panel, y lo nuevo no aparecía hasta recargar).
@@ -1387,11 +1401,20 @@ export default function AdminPanel({
                 <img src="/icons/proveedores.png" alt="" className="modulo-icon icon-img-32" />
                 <span className="modulo-name">Proveedores</span>
               </Link>
-              <Link className="modulo-card" href="/mapa-oficinas">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
-                <span className="modulo-name">Mapa oficinas</span>
-              </Link>
+              {mapaLeonListo === false ? (
+                <div className="modulo-card disabled modulo-proximamente" title="En cuanto la arquitecta suba el plano de algún centro de León se activa">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Mapa oficinas</span>
+                  <span className="modulo-badge-proximamente">Próximamente</span>
+                </div>
+              ) : (
+                <Link className="modulo-card" href="/mapa-oficinas">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/mapa-oficinas.png" alt="" className="modulo-icon icon-img-32" />
+                  <span className="modulo-name">Mapa oficinas</span>
+                </Link>
+              )}
             </div>
           </div>
           ) : rol === "ejecutiva_ventas" ? (
