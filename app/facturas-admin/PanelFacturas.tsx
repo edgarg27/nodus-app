@@ -261,6 +261,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
       setCentro(centroParam && CENTROS_SUGERIDOS.includes(centroParam) ? centroParam : profile?.centro || CENTROS_SUGERIDOS[0]);
     } else {
       setCentro(profile?.centro || null);
+      // Sin centro de verdad: no hay nada que cargar, así se muestra el aviso (y no un spinner eterno).
+      if (!profile?.centro) setLoading(false);
     }
   }
 
@@ -965,9 +967,7 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
       </div>
 
       <div className="rep-content rep-content-completo">
-        {!centro ? (
-          <div className="empty-card">Tu cuenta no tiene un centro asignado</div>
-        ) : loading ? (
+        {loading ? (
           <div className="nodus-inline-loading">
             <div className="nodus-spinner nodus-spinner-sm">
               <span className="nodus-spinner-petal"></span>
@@ -977,6 +977,8 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
             </div>
             <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Cargando...</p>
           </div>
+        ) : !centro ? (
+          <div className="empty-card">Tu cuenta no tiene un centro asignado</div>
         ) : (
           <>
             {soloConsulta && (
@@ -1173,16 +1175,16 @@ export default function PanelFacturas({ modo }: { modo: "estados" | "timbradas" 
                 </div>
                 <div className="ft-grid">
                   <label className="ft-campo">
-                    <span>Centro</span>
+                    <span>Centro{soloConsulta ? " · solo consulta" : ""}</span>
                     <select
                       value={centro || ""}
-                      disabled={!esGlobal || centrosDisponibles.length <= 1}
+                      disabled={!(esGlobal || miRol === "admin") || centrosDisponibles.length <= 1}
                       onChange={(e) => {
                         setFiltroCliente("");
                         setCentro(e.target.value);
                       }}
                     >
-                      {(esGlobal && centrosDisponibles.length > 1 ? centrosDisponibles : [centro || ""]).map((c) => (
+                      {((esGlobal || miRol === "admin") && centrosDisponibles.length > 1 ? centrosDisponibles : [centro || ""]).map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
