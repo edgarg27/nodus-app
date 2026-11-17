@@ -391,7 +391,6 @@ export default function ReparacionesPage() {
   async function enviar(accion: Mensaje["tipo"]) {
     if (!abierta) return;
     const t = texto.trim();
-    if (accion === "terminada" && fotosMsg.length === 0) return setErrorModal("Para marcarla como terminada sube al menos una foto de cómo quedó.");
     if (accion === "regresada" && !t) return setErrorModal("Escribe qué falta o qué hay que corregir.");
     if ((accion === "mensaje" || accion === "avance") && !t && fotosMsg.length === 0) return setErrorModal("Escribe un mensaje o sube una foto.");
     setGuardando(true);
@@ -669,8 +668,13 @@ export default function ReparacionesPage() {
             {/* Acciones según el momento */}
             {esMtto && abierta.estado !== "terminada" && abierta.estado !== "cerrada" && (
               <div className="rp-chat-acciones">
-                <span>¿Ya quedó? Adjunta foto de cómo quedó y márcala.</span>
-                <button type="button" className="rp-chat-accion rp-chat-accion-verde" onClick={() => enviar("terminada")} disabled={guardando}>
+                <span>¿Ya quedó la reparación?</span>
+                <button
+                  type="button"
+                  className="rp-chat-accion rp-chat-accion-verde"
+                  onClick={() => enviar("terminada")}
+                  disabled={guardando}
+                >
                   ✅ Marcar como terminada
                 </button>
               </div>

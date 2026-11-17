@@ -6,10 +6,10 @@
 --   * tickets: ve y cambia el estatus (la pantalla solo muestra los de
 --     mantenimiento) y comenta.
 --   * mantenimientos (Mtto.): todo.
---   * gastos y proveedores de Operaciones (Pagos a proveedores, Desglose,
---     Proveedores): todo. Los pagos llegan a Contabilidad como los de la arqui.
+--   * proveedores de Operaciones (lista de Proveedores con datos de pago):
+--     todo. Los pagos y montos (gastos) NO: esos solo los ve la arquitecta.
 --   * avisos (campanita): ve y manda los de sus centros.
---   * archivos de tickets, mantenimientos y comprobantes.
+--   * archivos de tickets y mantenimientos.
 -- Las políticas se AGREGAN; no se toca ninguna de los demás roles.
 -- Rollback: borrar las políticas que terminan en "_mantenimiento_leon" y la
 --   función centros_mantenimiento().
@@ -61,12 +61,10 @@ create policy "mantenimientos_mantenimiento_leon" on public.mantenimientos
   using (public.mi_rol()::text = 'mantenimiento' and centro = any (public.centros_mantenimiento()))
   with check (public.mi_rol()::text = 'mantenimiento' and centro = any (public.centros_mantenimiento()));
 
--- ---------------------------------------- gastos y proveedores (Operaciones)
+-- ------------------------------------------------- proveedores (Operaciones)
+-- Pagos y montos (gastos) no: solo los ve la arquitecta. Si ya se había
+-- creado el permiso a gastos en una versión anterior de este archivo, se quita.
 drop policy if exists "gastos_mantenimiento_leon" on public.gastos;
-create policy "gastos_mantenimiento_leon" on public.gastos
-  for all to authenticated
-  using (public.mi_rol()::text = 'mantenimiento' and tipo = 'operaciones' and centro = any (public.centros_mantenimiento()))
-  with check (public.mi_rol()::text = 'mantenimiento' and tipo = 'operaciones' and centro = any (public.centros_mantenimiento()));
 
 drop policy if exists "proveedores_mantenimiento_leon" on public.proveedores;
 create policy "proveedores_mantenimiento_leon" on public.proveedores
@@ -89,8 +87,8 @@ create policy "notificaciones_insert_mantenimiento_leon" on public.notificacione
 drop policy if exists "storage_mantenimiento_leon" on storage.objects;
 create policy "storage_mantenimiento_leon" on storage.objects
   for all to authenticated
-  using (bucket_id in ('tickets', 'mantenimientos', 'comprobantes') and public.mi_rol()::text = 'mantenimiento')
-  with check (bucket_id in ('tickets', 'mantenimientos', 'comprobantes') and public.mi_rol()::text = 'mantenimiento');
+  using (bucket_id in ('tickets', 'mantenimientos') and public.mi_rol()::text = 'mantenimiento')
+  with check (bucket_id in ('tickets', 'mantenimientos') and public.mi_rol()::text = 'mantenimiento');
 
 -- ---------------------------------------- perfil de mantenimiento_leon@nodusbc.mx
 -- La cuenta de acceso ya existe; aquí se le pone su perfil.
@@ -103,7 +101,7 @@ on conflict (id) do update
       rol = excluded.rol,
       centro = excluded.centro;
 
--- Comprobación: 10 políticas (9 en tablas + 1 en storage.objects) y el perfil.
+-- Comprobación: 9 políticas (8 en tablas + 1 en storage.objects) y el perfil.
 select tablename, policyname, cmd from pg_policies
 where policyname like '%mantenimiento_leon'
 order by tablename, policyname;

@@ -3761,7 +3761,8 @@ export default function CentroPanel({
             )}
 
             {/* ---------------- PROVEEDORES ---------------- */}
-            {tab === "proveedores" && esOps && (
+            {/* Pagos y Desglose (montos) son solo de la arquitecta; Mantenimiento solo ve la lista de proveedores. */}
+            {tab === "proveedores" && rol === "operaciones" && (
               <div className="pm-vistas" style={{ alignSelf: "flex-start" }}>
                 {(
                   [
@@ -3776,10 +3777,10 @@ export default function CentroPanel({
                 ))}
               </div>
             )}
-            {tab === "proveedores" && esOps && subProv !== "proveedores" && (
+            {tab === "proveedores" && rol === "operaciones" && subProv !== "proveedores" && (
               <PagosProveedores key={subProv} modo={subProv} centros={centrosDisponibles} centroInicial={centroPerfil} centroFiltro={centroOps} centrosFijos={CENTROS_POR_ROL[rol]} />
             )}
-            {tab === "proveedores" && (!esOps || subProv === "proveedores") && (
+            {tab === "proveedores" && (rol !== "operaciones" || subProv === "proveedores") && (
               <>
                 {(() => {
                   const todos = esGlobal ? centrosDisponibles.flatMap((c) => datosGlobales[c]?.proveedores || []) : proveedores;
@@ -3923,9 +3924,52 @@ export default function CentroPanel({
             </div>
             <p style={{ color: "#888", fontSize: 13, margin: 0 }}>Cargando proveedores de todos los centros...</p>
           </div>
+                  ) : esOps ? (
+                    // Operaciones / Mantenimiento ya eligen el centro arriba: una sola lista,
+                    // sin un encabezado por centro (con "Todos" el centro va en cada tarjeta).
+                    (() => {
+                      const lista = centrosDisponibles
+                        .filter((c) => !centroOps || c === centroOps)
+                        .flatMap((c) => proveedoresVisibles(datosGlobales[c]?.proveedores || []).map((p) => ({ p, c })))
+                        .sort((x, y) => x.p.nombre.localeCompare(y.p.nombre));
+                      if (lista.length === 0)
+                        return (
+                          <div className="empty-card" style={{ marginTop: 12 }}>
+                            {hayBusquedaProv ? "Ningún proveedor coincide con la búsqueda" : "Sin proveedores registrados"}
+                          </div>
+                        );
+                      return (
+                        <div style={{ marginTop: 12 }}>
+                          <p className="panel-section-label" style={{ marginBottom: 8 }}>
+                            {lista.length} proveedor{lista.length === 1 ? "" : "es"}
+                          </p>
+                          {lista.map(({ p, c }) => (
+                            <div className="item-card" key={p.id}>
+                              <div className="item-card-info">
+                                <p className="item-card-titulo">{p.nombre}</p>
+                                <p className="item-card-sub">
+                                  {p.categoria || "—"} {p.contacto ? `· ${p.contacto}` : ""}
+                                  {!centroOps ? ` · ${c}` : ""}
+                                </p>
+                                <p className="item-card-extra">
+                                  {p.telefono || ""} {p.email ? `· ${p.email}` : ""}
+                                </p>
+                                <LineaDatosPago p={p} />
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                                <button className="tel-borrar-btn" onClick={() => borrarProveedor(p.id, c)}>
+                                  🗑
+                                </button>
+                                <BotonDatosPago proveedor={p} onGuardado={() => recargarDatosCentroGlobal(c)} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()
                   ) : (
                     <>
-                      {centrosDisponibles.filter((c) => !esOps || !centroOps || c === centroOps).map((c) => {
+                      {centrosDisponibles.map((c) => {
                         const provs = proveedoresVisibles(datosGlobales[c]?.proveedores || []);
                         // Con búsqueda, los centros sin coincidencias no se muestran.
                         if (hayBusquedaProv && provs.length === 0) return null;

@@ -58,6 +58,8 @@ export async function middleware(req: NextRequest) {
   const isProveedores = path.startsWith("/proveedores");
   const isAtencionCliente = path.startsWith("/atencion-cliente");
   const isDiseno = path.startsWith("/diseno");
+  // Pantallas de Operaciones / Mantenimiento (solo personal; el rol lo decide rutaPermitida).
+  const isOperacionesNuevas = ["/reparaciones", "/precios-cotizacion", "/propuestas-layout"].some((r) => path.startsWith(r));
   const isDecoraciones = path.startsWith("/decoraciones");
   const isDocumentacionCentro = path.startsWith("/documentacion-centro");
   const isExpedientes = path.startsWith("/expedientes");
@@ -143,7 +145,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     // panel admin, reportes y telefonía son solo para staff (no clientes)
-    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isCatalogoServicios || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes) && role === "cliente") {
+    if ((isDashboardAdmin || isReportes || isTelefonia || isTickets || isCentro || isUsuarios || isEquipos || isContratos || isCorreos || isAltaCliente || isBajaCliente || isTours || isSalaJuntas || isMapaOficinas || isCotizaciones || isCobranza || isMantenimiento || isInventario || isPagos || isRegistrarPlan || isPaquetes || isFacturasAdmin || isCatalogoServicios || isGastos || isProveedores || isAtencionCliente || isDiseno || isDecoraciones || isDocumentacionCentro || isExpedientes || isAdicionales || isExperienciaCliente || isIngresosCentro || isDayPassCheckin || isProspectos || isPreciosSalaJuntas || isDepositoGarantia || isFidelidadAdmin || isWifiSolicitudes || isOperacionesNuevas) && role === "cliente") {
       return NextResponse.redirect(new URL("/dashboard-cliente", req.url));
     }
     // el dashboard de cliente es solo para clientes
@@ -220,6 +222,9 @@ export const config = {
     "/ingresos-centro/:path*",
     "/day-pass/:id/checkin",
     "/catalogo-servicios/:path*",
+    "/reparaciones/:path*",
+    "/precios-cotizacion/:path*",
+    "/propuestas-layout/:path*",
     "/login",
   ],
 };
