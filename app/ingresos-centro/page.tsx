@@ -209,7 +209,9 @@ export default function IngresosCentroPage() {
           const cubierta =
             pagoEstaCubierto(f.estado) ||
             (m.pago_id ? lineas.some((p) => p.id === m.pago_id && pagoEstaCubierto(p.estado)) : lineas.length > 0 && pagado >= Number(f.monto) - 0.01);
-          rentaPorContrato.set(m.contrato_id, { monto: Number(f.monto) || 0, cubierta });
+          // El monto del mes es el de su línea (una factura adelantada lleva varios meses: su total no es el de este mes).
+          const lineaDelMes = m.pago_id ? lineas.find((p) => p.id === m.pago_id) : null;
+          rentaPorContrato.set(m.contrato_id, { monto: Number(lineaDelMes?.monto ?? f.monto) || 0, cubierta });
         }
       }
     }

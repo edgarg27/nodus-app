@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FormularioNuevaFactura from "../FormularioNuevaFactura";
 import IntegrarPorCliente from "../IntegrarPorCliente";
+import FacturaAdelantada from "../FacturaAdelantada";
 import Link from "next/link";
 
 export default function IntegrarClientePage() {
@@ -12,8 +13,9 @@ export default function IntegrarClientePage() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [vuelta, setVuelta] = useState(0);
-  // "cliente": integrar con contrato y periodo (como ZORA). "libre": factura libre o venta a público en general.
-  const [modo, setModo] = useState<"cliente" | "libre">("cliente");
+  // "cliente": integrar con contrato y periodo (como ZORA). "adelantada": varios meses de renta en una sola factura.
+  // "libre": factura libre o venta a público en general.
+  const [modo, setModo] = useState<"cliente" | "adelantada" | "libre">("cliente");
 
   useEffect(() => {
     (async () => {
@@ -68,6 +70,9 @@ export default function IntegrarClientePage() {
             <button role="tab" aria-selected={modo === "cliente"} className={modo === "cliente" ? "activa" : ""} onClick={() => setModo("cliente")}>
               Por cliente y periodo
             </button>
+            <button role="tab" aria-selected={modo === "adelantada"} className={modo === "adelantada" ? "activa" : ""} onClick={() => setModo("adelantada")}>
+              Adelantada (varios meses)
+            </button>
             <button role="tab" aria-selected={modo === "libre"} className={modo === "libre" ? "activa" : ""} onClick={() => setModo("libre")}>
               Factura libre / Público en general
             </button>
@@ -80,6 +85,14 @@ export default function IntegrarClientePage() {
           modo === "cliente" ? (
             <IntegrarPorCliente
               key={"c" + vuelta}
+              centroInicial={centro}
+              onIntegrada={(id) => {
+                window.location.href = "/facturas-admin/estados-de-cuenta/" + id;
+              }}
+            />
+          ) : modo === "adelantada" ? (
+            <FacturaAdelantada
+              key={"a" + vuelta}
               centroInicial={centro}
               onIntegrada={(id) => {
                 window.location.href = "/facturas-admin/estados-de-cuenta/" + id;
