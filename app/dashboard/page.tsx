@@ -143,7 +143,7 @@ export default async function DashboardPage() {
         .select("*", { count: "exact", head: true })
         .eq("estatus", "vigente")
         .not("user_id", "is", null)
-        .gte("fecha_vencimiento", hoy)
+        // Por renovar: ya vencidos o por vencer dentro de 30 días (mismo criterio que la pestaña "Por renovar").
         .lte("fecha_vencimiento", limite30)
     ),
     // Eventos: se comparten entre todos los centros (ver /experiencia-cliente), sin filtrar.
