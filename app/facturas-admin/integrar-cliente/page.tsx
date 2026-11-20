@@ -10,6 +10,7 @@ import Link from "next/link";
 export default function IntegrarClientePage() {
   const supabase = createClient();
   const [centro, setCentro] = useState<string | null>(null);
+  const [rol, setRol] = useState("");
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState("");
   const [vuelta, setVuelta] = useState(0);
@@ -23,8 +24,9 @@ export default function IntegrarClientePage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: perfil } = await supabase.from("profiles").select("centro").eq("id", user.id).single();
+      const { data: perfil } = await supabase.from("profiles").select("centro, rol").eq("id", user.id).single();
       setCentro(perfil?.centro || "Bosques");
+      setRol(perfil?.rol || "");
       setCargando(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,6 +96,8 @@ export default function IntegrarClientePage() {
             <FacturaAdelantada
               key={"a" + vuelta}
               centroInicial={centro}
+              // Gerencia y Finanzas (Cobranza) facturan en cualquier centro; la admin, solo en el suyo.
+              puedeElegirCentro={["gerente", "superadmin", "cobranza"].includes(rol)}
               onIntegrada={(id) => {
                 window.location.href = "/facturas-admin/estados-de-cuenta/" + id;
               }}

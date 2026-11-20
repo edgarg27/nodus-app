@@ -49,7 +49,15 @@ function Etiqueta({ texto, obligatorio }: { texto: string; obligatorio?: boolean
   );
 }
 
-export default function FacturaAdelantada({ centroInicial, onIntegrada }: { centroInicial: string; onIntegrada: (id: string) => void }) {
+export default function FacturaAdelantada({
+  centroInicial,
+  puedeElegirCentro,
+  onIntegrada,
+}: {
+  centroInicial: string;
+  puedeElegirCentro: boolean;
+  onIntegrada: (id: string) => void;
+}) {
   const hoy = hoyMexicoISO();
   const mesActual = hoy.slice(0, 7) + "-01";
 
@@ -223,14 +231,14 @@ export default function FacturaAdelantada({ centroInicial, onIntegrada }: { cent
 
   return (
     <div>
-      <form className="form-card form-factura-ancho" onSubmit={(e) => e.preventDefault()}>
+      <form className="form-card form-factura-ancho adelantada-form" onSubmit={(e) => e.preventDefault()}>
         <p className="sub-label" style={{ fontWeight: 700, color: "#0d1b3e", gridColumn: "1 / -1" }}>
           Factura adelantada <span style={{ fontWeight: 400, color: "#888" }}>· varios meses de renta en un solo estado de cuenta; esos meses ya no se generan cada mes</span>
         </p>
 
         <div>
           <Etiqueta texto="Centro" obligatorio />
-          <select value={centro} onChange={(e) => setCentro(e.target.value)}>
+          <select value={centro} onChange={(e) => setCentro(e.target.value)} disabled={!puedeElegirCentro} title={puedeElegirCentro ? "" : "Solo facturas en tu centro"}>
             {CENTROS.map((c) => (
               <option key={c} value={c}>
                 {c}
