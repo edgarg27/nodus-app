@@ -10,6 +10,7 @@ import { etiquetaFormaPago } from "@/lib/formaPago";
 import { ETAPA_LABEL, etapaContrato } from "@/lib/contratoPasos";
 import ContratoModal, { ESTATUS_LABEL } from "./ContratoModal";
 import ContratosVentas from "./ContratosVentas";
+import FileDropzone from "@/app/soporte/FileDropzone";
 import { CENTROS_POR_ROL } from "@/lib/roles";
 import Link from "next/link";
 
@@ -413,17 +414,21 @@ export default function ContratosPage() {
   // nuevo desde cero.
   const [renovandoId, setRenovandoId] = useState<string | null>(null);
   const [formRenovacion, setFormRenovacion] = useState({ fecha_vencimiento: "", porcentaje_incremento: "" });
+  // Contrato nuevo (firmado) que se sube al renovar: reemplaza el PDF viejo para que quede ligado a la info nueva.
+  const [archivoRenovacion, setArchivoRenovacion] = useState<File[]>([]);
   const [guardandoRenovacion, setGuardandoRenovacion] = useState(false);
   const [errorRenovacion, setErrorRenovacion] = useState("");
 
   function abrirRenovacion(c: Contrato) {
     setRenovandoId(c.id);
     setFormRenovacion({ fecha_vencimiento: "", porcentaje_incremento: "" });
+    setArchivoRenovacion([]);
     setErrorRenovacion("");
   }
 
   function cerrarRenovacion() {
     setRenovandoId(null);
+    setArchivoRenovacion([]);
     setErrorRenovacion("");
   }
 
@@ -433,21 +438,44 @@ export default function ContratosPage() {
       setErrorRenovacion("Captura la nueva fecha de vencimiento");
       return;
     }
+    const archivo = archivoRenovacion[0];
+    if (!archivo) {
+      setErrorRenovacion("Sube el contrato nuevo (PDF o Word) para la renovación");
+      return;
+    }
     setGuardandoRenovacion(true);
     const incremento = Number(formRenovacion.porcentaje_incremento) || 0;
     const nuevaRenta = incremento > 0 ? Math.round(c.renta_mensual * (1 + incremento / 100) * 100) / 100 : c.renta_mensual;
 
+    // Sube el contrato nuevo al bucket "contratos" (mismo patrón que el detalle) y lo deja como el archivo operativo.
+    const fileName = `${c.user_id || c.id}-renovacion-${Date.now()}.${archivo.name.split(".").pop() || "pdf"}`;
+    const { error: uploadError } = await supabase.storage.from("contratos").upload(fileName, archivo, { contentType: archivo.type, upsert: true });
+    if (uploadError) {
+      setGuardandoRenovacion(false);
+      setErrorRenovacion("No se pudo subir el contrato: " + uploadError.message);
+      return;
+    }
+    const archivoUrl = supabase.storage.from("contratos").getPublicUrl(fileName).data.publicUrl;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { error } = await supabase
       .from("contratos")
-      .update({ fecha_vencimiento: formRenovacion.fecha_vencimiento, renta_mensual: nuevaRenta })
+      .update({ fecha_vencimiento: formRenovacion.fecha_vencimiento, renta_mensual: nuevaRenta, archivo_url: archivoUrl })
       .eq("id", c.id);
 
-    setGuardandoRenovacion(false);
     if (error) {
+      setGuardandoRenovacion(false);
       setErrorRenovacion("No se pudo renovar el contrato. Intenta de nuevo.");
       return;
     }
+    // Deja el contrato nuevo también en el historial de versiones del detalle.
+    await supabase.from("contrato_versiones").insert({ contrato_id: c.id, archivo_url: archivoUrl, nombre_archivo: archivo.name, subido_por: user?.id });
+
+    setGuardandoRenovacion(false);
     setRenovandoId(null);
+    setArchivoRenovacion([]);
     if (centro) fetchTodo(centro);
   }
 
@@ -1155,6 +1183,11 @@ export default function ContratosPage() {
                             /mes
                           </p>
                         )}
+                        <p className="sub-label" style={{ marginTop: 10 }}>Contrato nuevo (obligatorio)</p>
+                        <FileDropzone files={archivoRenovacion} onChange={setArchivoRenovacion} maxFiles={1} accept="application/pdf,.doc,.docx,image/*" />
+                        <p style={{ fontSize: 11, color: "#888", margin: "2px 0 0" }}>
+                          Reemplaza el contrato anterior. Sube el contrato nuevo (firmado) para que quede ligado a esta renovación.
+                        </p>
                         {errorRenovacion && <p style={{ color: "#A32D2D", fontSize: 12, marginTop: 6 }}>{errorRenovacion}</p>}
                         <button
                           className="btn-aceptar"
