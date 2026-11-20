@@ -1276,10 +1276,10 @@ export default function AdminPanel({
                     {resumen.oficinasTotal > 0 ? Math.round((resumen.oficinasOcupadas / resumen.oficinasTotal) * 100) : 0}% de ocupación
                   </p>
                 </Link>
-                <Link className={`stat-card${resumen.contratosPorVencer > 0 ? " stat-card-alerta" : ""}`} href="/contratos">
+                <Link className={`stat-card${resumen.contratosPorVencer > 0 ? " stat-card-alerta" : ""}`} href="/contratos?vista=por_renovar">
                   <p className="stat-val">{resumen.contratosPorVencer}</p>
-                  <p className="stat-lbl">Contratos por vencer</p>
-                  <p className="stat-delta">En los próximos 30 días</p>
+                  <p className="stat-lbl">Contratos por renovar</p>
+                  <p className="stat-delta">Vencidos o por vencer (30 días)</p>
                 </Link>
                 <Link className="stat-card" href="/cobranza?revisar=1">
                   <p className="stat-val">{resumen.comprobantesRevisar}</p>

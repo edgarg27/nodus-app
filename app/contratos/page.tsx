@@ -162,6 +162,8 @@ export default function ContratosPage() {
       setCentro(profile?.centro || null);
     }
     if (ROLES_SOLO_CONSULTA.includes(rol)) setVistaContratos("todos");
+    // Desde el aviso del panel se llega directo a los contratos por renovar.
+    else if (searchParams.get("vista") === "por_renovar") setVistaContratos("por_renovar");
   }
 
   async function fetchTodo(c: string) {
@@ -264,7 +266,7 @@ export default function ContratosPage() {
   // ---- Aprobación de contratos pre_aprobado ----
   const [contratoEditando, setContratoEditando] = useState<Contrato | null>(null);
   const [procesandoAprobacion, setProcesandoAprobacion] = useState<string | null>(null);
-  const [vistaContratos, setVistaContratos] = useState<"pendientes" | "todos">("pendientes");
+  const [vistaContratos, setVistaContratos] = useState<"pendientes" | "todos" | "por_renovar">("pendientes");
 
   // Casilla "Confirmo que el documento cargado es la versión firmada" por
   // tarjeta de contrato pendiente — el botón "✓ Aprobar" no se habilita
@@ -286,7 +288,24 @@ export default function ContratosPage() {
     );
   }
   const contratosPendientes = contratos.filter((c) => c.estatus === "pre_aprobado" && coincideBusquedaContrato(c));
+  // Estado de vencimiento de un contrato VIGENTE: vencido, por vencer (≤30 días) o ok.
+  const estadoVencimiento = (c: Contrato): { tipo: "vencido" | "por_vencer" | "ok"; dias: number } | null => {
+    if (c.estatus !== "vigente" || !c.fecha_vencimiento) return null;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const fin = new Date(String(c.fecha_vencimiento).slice(0, 10) + "T00:00:00");
+    const dias = Math.round((fin.getTime() - hoy.getTime()) / 86400000);
+    if (dias < 0) return { tipo: "vencido", dias };
+    if (dias <= 30) return { tipo: "por_vencer", dias };
+    return { tipo: "ok", dias };
+  };
   const contratosFiltrados = contratos.filter(coincideBusquedaContrato);
+  // Contratos vigentes que hay que renovar: ya vencidos o por vencer (≤30 días).
+  const contratosPorRenovar = contratosFiltrados.filter((c) => {
+    const e = estadoVencimiento(c);
+    return !!e && e.tipo !== "ok";
+  });
+  const listaContratos = vistaContratos === "por_renovar" ? contratosPorRenovar : contratosFiltrados;
 
   // Duplica exactamente la misma lógica de pagos que ContratoModal.tsx →
   // aprobar() — es indispensable no dejar esta vía sin la lógica, porque es
@@ -667,6 +686,12 @@ export default function ContratosPage() {
               >
                 📄 Todos los contratos ({contratosFiltrados.length})
               </button>
+              <button
+                className={"centro-tab" + (vistaContratos === "por_renovar" ? " active" : "")}
+                onClick={() => setVistaContratos("por_renovar")}
+              >
+                🔄 Por renovar ({contratosPorRenovar.length})
+              </button>
             </div>
             )}
 
@@ -736,7 +761,7 @@ export default function ContratosPage() {
               </div>
             )}
 
-            {vistaContratos === "todos" && (
+            {(vistaContratos === "todos" || vistaContratos === "por_renovar") && (
             <div className="rep-ocupacion-card">
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
               <div style={{ display: "flex", gap: 8 }}>
@@ -1001,13 +1026,18 @@ export default function ContratosPage() {
               </form>
             )}
 
-            {contratosFiltrados.length === 0 ? (
+            {listaContratos.length === 0 ? (
               <div className="empty-card">
-                {busquedaContratos ? "Sin contratos que coincidan con la búsqueda" : `Sin contratos registrados en ${centro}`}
+                {vistaContratos === "por_renovar"
+                  ? "No hay contratos por vencer ni vencidos 🎉"
+                  : busquedaContratos
+                  ? "Sin contratos que coincidan con la búsqueda"
+                  : `Sin contratos registrados en ${centro}`}
               </div>
             ) : (
-              contratosFiltrados.map((c) => {
+              listaContratos.map((c) => {
                 const esInactivoDebe = c.estatus === "inactivo_debe";
+                const venc = estadoVencimiento(c);
                 const badge = ESTATUS_LABEL[c.estatus || ""] || { label: c.estatus || "—", bg: "#F0F0F0", color: "#555" };
                 const etiqueta = esInactivoDebe
                   ? `⚠️ Inactivo · debe $${Number(c.monto_adeudado || 0).toLocaleString("es-MX")}`
@@ -1037,11 +1067,24 @@ export default function ContratosPage() {
                         </p>
                         {c.plan_nombre && <p className="contrato-detalle">{c.plan_nombre}</p>}
                       </div>
-                      <span className="factura-badge" style={{ background: badge.bg }}>
-                        <span className="factura-badge-text" style={{ color: badge.color }}>
-                          {etiqueta}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                        <span className="factura-badge" style={{ background: badge.bg }}>
+                          <span className="factura-badge-text" style={{ color: badge.color }}>
+                            {etiqueta}
+                          </span>
                         </span>
-                      </span>
+                        {venc && venc.tipo !== "ok" && (
+                          <span className="factura-badge" style={{ background: venc.tipo === "vencido" ? "#fde8e8" : "#fff4e5" }}>
+                            <span className="factura-badge-text" style={{ color: venc.tipo === "vencido" ? "#A32D2D" : "#9a5a00" }}>
+                              {venc.tipo === "vencido"
+                                ? `🔴 Vencido hace ${Math.abs(venc.dias)} día${Math.abs(venc.dias) === 1 ? "" : "s"}`
+                                : venc.dias === 0
+                                ? "🟠 Vence hoy"
+                                : `🟠 Vence en ${venc.dias} día${venc.dias === 1 ? "" : "s"}`}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {c.archivo_url ? (
                       <button
