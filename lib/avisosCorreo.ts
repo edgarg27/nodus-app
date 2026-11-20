@@ -59,4 +59,5 @@ export const LINK = {
   soporte: `${SITIO}/soporte`,
   reservaciones: `${SITIO}/reservaciones?tab=mis`,
   centro: `${SITIO}/sala-juntas`,
+  reparaciones: `${SITIO}/reparaciones`,
 };

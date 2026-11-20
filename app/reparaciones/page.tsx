@@ -259,6 +259,17 @@ export default function ReparacionesPage() {
     return urls;
   }
 
+  // Correo de Reparaciones (arquitecta → asignado). No se espera:
+  // si el correo falla, el aviso de la campanita ya salió.
+  // (También sirve en el otro sentido: Mantenimiento → la arquitecta, con "avance" y "terminada".)
+  function correoReparacion(reparacionId: string, accion: "nueva" | "mensaje" | "regresada" | "cerrada" | "avance" | "terminada", mensaje?: string) {
+    fetch("/api/correo/aviso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: "reparacion", reparacionId, accion, mensaje: mensaje || "" }),
+    }).catch(() => {});
+  }
+
   async function avisar(r: { centro: string; titulo: string }, para: "mantenimiento" | "operaciones", mensaje: string) {
     await supabase.from("notificaciones").insert({
       centro: r.centro,
@@ -344,13 +355,18 @@ export default function ReparacionesPage() {
       updated_at: new Date().toISOString(),
     };
     if (editando === "nuevo") {
-      const { error: e1 } = await supabase.from("reparaciones").insert({ ...datos, creado_por: miId, creado_por_nombre: miNombre || null });
+      const { data: creada, error: e1 } = await supabase
+        .from("reparaciones")
+        .insert({ ...datos, creado_por: miId, creado_por_nombre: miNombre || null })
+        .select("id")
+        .single();
       if (e1) {
         setGuardando(false);
         return setErrorModal("No se pudo guardar la reparación.");
       }
       const u = urgenciaInfo(form.urgencia);
       await avisar(datos, "mantenimiento", `🔧 Nueva reparación (${u.label.toLowerCase()}): ${datos.titulo} · ${[datos.oficina, datos.centro].filter(Boolean).join(" · ")}`);
+      if (creada?.id) correoReparacion(creada.id, "nueva");
     } else {
       const { error: e2 } = await supabase.from("reparaciones").update(datos).eq("id", editando.id);
       if (e2) {
@@ -434,11 +450,26 @@ export default function ReparacionesPage() {
     const donde = [abierta.oficina, abierta.centro].filter(Boolean).join(" · ");
     const fotosTxt = urls.length ? ` (${urls.length} foto${urls.length === 1 ? "" : "s"})` : "";
     const resumen = t ? `: "${t.slice(0, 80)}"` : "";
-    if (accion === "terminada") await avisar(abierta, "operaciones", `✅ ${miNombre || "Mantenimiento"} terminó: ${abierta.titulo} · ${donde}. Revísala para cerrarla.`);
-    else if (accion === "regresada") await avisar(abierta, "mantenimiento", `↩️ La arquitecta regresó: ${abierta.titulo} · ${donde}${resumen}`);
-    else if (accion === "cerrada") await avisar(abierta, "mantenimiento", `🏁 Reparación cerrada: ${abierta.titulo} · ${donde}`);
-    else if (esMtto) await avisar(abierta, "operaciones", `🔧 Avance de ${miNombre || "Mantenimiento"} en ${abierta.titulo}${fotosTxt}${resumen}`);
-    else await avisar(abierta, "mantenimiento", `💬 La arquitecta escribió en ${abierta.titulo}${fotosTxt}${resumen}`);
+    const textoCorreo = t || (urls.length ? `(mandó ${urls.length} foto${urls.length === 1 ? "" : "s"})` : "");
+    if (accion === "terminada") {
+      await avisar(abierta, "operaciones", `✅ ${miNombre || "Mantenimiento"} terminó: ${abierta.titulo} · ${donde}. Revísala para cerrarla.`);
+      correoReparacion(abierta.id, "terminada", textoCorreo);
+    }
+    else if (accion === "regresada") {
+      await avisar(abierta, "mantenimiento", `↩️ La arquitecta regresó: ${abierta.titulo} · ${donde}${resumen}`);
+      correoReparacion(abierta.id, "regresada", t);
+    } else if (accion === "cerrada") {
+      await avisar(abierta, "mantenimiento", `🏁 Reparación cerrada: ${abierta.titulo} · ${donde}`);
+      correoReparacion(abierta.id, "cerrada", t);
+    }
+    else if (esMtto) {
+      await avisar(abierta, "operaciones", `🔧 Avance de ${miNombre || "Mantenimiento"} en ${abierta.titulo}${fotosTxt}${resumen}`);
+      correoReparacion(abierta.id, "avance", textoCorreo);
+    }
+    else {
+      await avisar(abierta, "mantenimiento", `💬 La arquitecta escribió en ${abierta.titulo}${fotosTxt}${resumen}`);
+      correoReparacion(abierta.id, "mensaje", t || (urls.length ? `(mandó ${urls.length} foto${urls.length === 1 ? "" : "s"})` : ""));
+    }
 
     setTexto("");
     setFotosMsg([]);

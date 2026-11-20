@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { CORREOS_AREA, LINK, enviarAVarios, escapar, plantillaAviso } from "@/lib/avisosCorreo";
+import { CENTROS_POR_ROL } from "@/lib/roles";
 
 // Avisos por correo que antes mandaba la función "send-email" de Supabase. Los datos y los destinatarios salen de la
 // base (no del navegador), salvo las encuestas, que solo puede mandar el personal.
@@ -10,6 +11,8 @@ import { CORREOS_AREA, LINK, enviarAVarios, escapar, plantillaAviso } from "@/li
 //   nueva_reservacion { reservacionId }    → admins del centro
 //   reservacion_confirmada / reservacion_rechazada { reservacionId, motivo? } → cliente (solo personal)
 //   comunicado { destinatarios, asunto, cuerpo } → hasta 50 correos (solo personal)
+//   reparacion { reparacionId, accion, mensaje? } → Operaciones → a quien está asignada;
+//                                                  Mantenimiento (la asignada) → a la arquitecta
 export async function POST(req: NextRequest) {
   const supabase = createClient();
   const {
@@ -26,6 +29,96 @@ export async function POST(req: NextRequest) {
       ? NextResponse.json({ ok: true, ...r })
       : NextResponse.json({ error: r.errores[0], ...r }, { status: 502 });
 
+  // Reparaciones, en los dos sentidos: lo que la arquitecta le manda a Mantenimiento (nueva, mensaje,
+  // regresada, cerrada) y lo que Mantenimiento le contesta a ella (avance, terminada).
+  if (tipo === "reparacion") {
+    if (yo?.rol !== "operaciones" && yo?.rol !== "mantenimiento") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    const { data: r } = await admin
+      .from("reparaciones")
+      .select("titulo, centro, oficina, descripcion, urgencia, fecha_compromiso, asignado_a, asignado_nombre, creado_por, creado_por_nombre")
+      .eq("id", String(b.reparacionId || ""))
+      .maybeSingle();
+    if (!r) return NextResponse.json({ error: "Reparación no encontrada" }, { status: 404 });
+    const accion = String(b.accion || "mensaje");
+    const mensaje = typeof b.mensaje === "string" ? b.mensaje.trim().slice(0, 1000) : "";
+    const donde = [r.oficina, r.centro].filter(Boolean).join(" · ");
+
+    // Mantenimiento → la arquitecta (solo quien la tiene asignada).
+    if (yo?.rol === "mantenimiento") {
+      if (r.asignado_a !== session.user.id) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      const { data: arqui } = r.creado_por
+        ? await admin.from("profiles").select("email").eq("id", r.creado_por).maybeSingle()
+        : { data: null };
+      const destinos = arqui?.email ? [arqui.email] : CORREOS_AREA.mantenimiento;
+      const quien = r.asignado_nombre || "Mantenimiento";
+      const terminada = accion === "terminada";
+      const html = plantillaAviso({
+        etiqueta: "Reparaciones",
+        titulo: terminada ? `${quien} terminó la reparación` : `${quien} mandó un avance`,
+        parrafos: [
+          terminada
+            ? "La marcó como terminada. Revísala para cerrarla o regresarla."
+            : "Hay una contestación nueva en el seguimiento de esta reparación.",
+          ...(mensaje ? [`<b>Mensaje:</b> ${escapar(mensaje)}`] : []),
+        ],
+        filas: [
+          ["Reparación", r.titulo],
+          ["Dónde", donde],
+        ],
+        boton: { texto: "Abrir Reparaciones", url: LINK.reparaciones },
+      });
+      const asunto = `${terminada ? "Terminada" : "Avance"}: ${r.titulo}${donde ? ` · ${donde}` : ""}`;
+      return listo(await enviarAVarios(destinos, asunto, html));
+    }
+
+    // La arquitecta → Mantenimiento.
+    const { data: asignado } = await admin.from("profiles").select("email, nombre").eq("id", r.asignado_a).maybeSingle();
+    if (!asignado?.email) return NextResponse.json({ error: "La persona asignada no tiene correo" }, { status: 400 });
+    const nombre = escapar((asignado.nombre || "").split(/\s+/)[0] || "");
+    const URGENCIA: Record<string, string> = { verde: "No urgente", amarillo: "Algo urgente", rojo: "Urgente" };
+    const textos: Record<string, { asunto: string; titulo: string; parrafo: string }> = {
+      nueva: {
+        asunto: `Nueva reparación: ${r.titulo}`,
+        titulo: "Te asignaron una reparación",
+        parrafo: `Hola ${nombre}, la arquitecta te asignó esta reparación. Sube tus avances con fotos desde Reparaciones.`,
+      },
+      mensaje: {
+        asunto: `Mensaje de la arquitecta: ${r.titulo}`,
+        titulo: "La arquitecta te escribió",
+        parrafo: `Hola ${nombre}, tienes un mensaje nuevo en el seguimiento de esta reparación.`,
+      },
+      regresada: {
+        asunto: `Te regresaron la reparación: ${r.titulo}`,
+        titulo: "La reparación necesita correcciones",
+        parrafo: `Hola ${nombre}, la arquitecta revisó la reparación y te la regresó para corregir.`,
+      },
+      cerrada: {
+        asunto: `Reparación cerrada: ${r.titulo}`,
+        titulo: "La arquitecta cerró la reparación",
+        parrafo: `Hola ${nombre}, la arquitecta revisó y cerró la reparación. ¡Gracias!`,
+      },
+    };
+    const x = textos[accion] || textos.mensaje;
+    const html = plantillaAviso({
+      etiqueta: "Reparaciones",
+      titulo: x.titulo,
+      parrafos: [x.parrafo, ...(mensaje ? [`<b>Mensaje:</b> ${escapar(mensaje)}`] : [])],
+      filas: [
+        ["Reparación", r.titulo],
+        ["Dónde", donde],
+        ...(accion === "nueva"
+          ? ([
+              ["Detalles", r.descripcion],
+              ["Urgencia", URGENCIA[r.urgencia] || r.urgencia],
+              ["Para el", r.fecha_compromiso],
+            ] as [string, string | null][])
+          : []),
+      ],
+      boton: { texto: "Abrir Reparaciones", url: LINK.reparaciones },
+    });
+    return listo(await enviarAVarios([asignado.email], `${x.asunto}${donde ? ` · ${donde}` : ""}`, html));
+  }
+
   if (tipo === "nuevo_ticket" || tipo === "ticket_resuelto") {
     const folio = String(b.folio || "");
     if (!folio) return NextResponse.json({ error: "Falta el folio" }, { status: 400 });
@@ -40,7 +133,12 @@ export async function POST(req: NextRequest) {
 
     if (tipo === "nuevo_ticket") {
       if (!esPersonal && t.user_id !== session.user.id) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
-      const destinos = CORREOS_AREA[t.categoria] || CORREOS_AREA.sistemas;
+      let destinos = CORREOS_AREA[t.categoria] || CORREOS_AREA.sistemas;
+      // Mantenimiento de León también recibe los reportes de mantenimiento de sus centros.
+      if (t.categoria === "mantenimiento" && t.centro && (CENTROS_POR_ROL.mantenimiento || []).includes(t.centro)) {
+        const { data: mtto } = await admin.from("profiles").select("email").eq("rol", "mantenimiento").eq("activo", true);
+        destinos = [...destinos, ...((mtto || []).map((p) => p.email).filter(Boolean) as string[])];
+      }
       const urgente = t.urgencia === "urgente";
       const html = plantillaAviso({
         etiqueta: `${t.categoria === "mantenimiento" ? "Reporte de Mantenimiento" : "Reporte de Sistemas"} · ${t.folio}`,
