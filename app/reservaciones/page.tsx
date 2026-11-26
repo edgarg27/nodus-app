@@ -54,12 +54,31 @@ function formatFechaISO(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function formatHora(h: number) {
-  if (h === 0) return "12:00 AM";
-  if (h < 12) return `${h}:00 AM`;
-  if (h === 12) return "12:00 PM";
-  return `${h - 12}:00 PM`;
+// Formatea una hora decimal (ej. 10.25 = 10:15) a texto de 12h con minutos.
+function formatHora(dec: number) {
+  const h24 = Math.floor(dec + 1e-9);
+  const min = Math.round((dec - h24) * 60);
+  const mm = String(min).padStart(2, "0");
+  const ampm = h24 < 12 ? "AM" : "PM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${mm} ${ampm}`;
 }
+
+// Hora decimal → "HH:MM" (24h) para guardar en reservaciones.hora_inicio/hora_fin.
+function aHHMM(dec: number) {
+  const h24 = Math.floor(dec + 1e-9);
+  const min = Math.round((dec - h24) * 60);
+  return `${String(h24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+// "HH:MM[:SS]" → hora decimal (ej. "10:15" = 10.25).
+function hhmmADecimal(s: string | null | undefined) {
+  if (!s) return 0;
+  const [h, m] = s.split(":").map(Number);
+  return (h || 0) + (m || 0) / 60;
+}
+
+const PASO = 0.25; // 15 minutos
 
 // Espacio compartido de Coworking (sin cupo): ver migracion_coworking_sin_cupo.sql.
 const ESPACIO_COWORKING = "Coworking";
@@ -362,7 +381,7 @@ function ReservacionesInner() {
         if (!r.espacio || !r.hora_inicio || !r.hora_fin) return;
         if (esSalaDeJuntas(r.espacio)) {
           if (r.estado === "cancelada" || r.fecha < ventMes.desde || r.fecha > ventMes.hasta) return;
-          salaUsadas += parseInt(r.hora_fin.split(":")[0]) - parseInt(r.hora_inicio.split(":")[0]);
+          salaUsadas += Math.ceil(hhmmADecimal(r.hora_fin) - hhmmADecimal(r.hora_inicio) - 1e-9);
         } else if (r.fecha >= ventBolsa.desde && r.fecha <= ventBolsa.hasta) {
           reservasBolsa.push(r);
         }
@@ -404,21 +423,29 @@ function ReservacionesInner() {
     return inicioSemana;
   }
 
-  function estaOcupado(fechaISO: string, hora: number) {
+  // ¿Alguna reservación se traslapa con el rango [desde, hasta)? (horas decimales, precisión de minutos)
+  function reservaTraslapa(fechaISO: string, desde: number, hasta: number) {
     return reservas.some((r) => {
       if (r.fecha !== fechaISO || !r.hora_inicio || !r.hora_fin) return false;
       // Coworking no tiene cupo: solo cuenta lo que ya apartó el propio cliente.
       if (espacio === ESPACIO_COWORKING && r.user_id !== miUserId) return false;
-      const ini = parseInt(r.hora_inicio.split(":")[0]);
-      const fin = parseInt(r.hora_fin.split(":")[0]);
-      return hora >= ini && hora < fin;
+      const ri = hhmmADecimal(r.hora_inicio);
+      const rf = hhmmADecimal(r.hora_fin);
+      return desde < rf - 1e-9 && hasta > ri + 1e-9;
     });
+  }
+
+  // Para la cuadrícula (una hora entera): ¿ocupada en algún momento de [h, h+1)?
+  function estaOcupado(fechaISO: string, hora: number) {
+    return reservaTraslapa(fechaISO, hora, hora + 1);
   }
 
   function esPasado(fechaISO: string, hora: number) {
     const ahora = new Date();
     const [y, m, d] = fechaISO.split("-").map(Number);
-    const fechaHora = new Date(y, m - 1, d, hora);
+    const h = Math.floor(hora + 1e-9);
+    const min = Math.round((hora - h) * 60);
+    const fechaHora = new Date(y, m - 1, d, h, min);
     return fechaHora < ahora;
   }
 
@@ -435,45 +462,74 @@ function ReservacionesInner() {
     return esFueraDeHorario(fechaISO, hora);
   }
 
+  // ¿El rango [ini, fin) (horas decimales) está libre? Sin traslape, ni pasado, ni horario bloqueado.
   function rangoLibre(fechaISO: string, ini: number, fin: number) {
-    for (let h = ini; h < fin; h++) {
-      if (estaOcupado(fechaISO, h) || esPasado(fechaISO, h) || bloqueadoPorHorario(fechaISO, h)) return false;
+    if (reservaTraslapa(fechaISO, ini, fin)) return false;
+    for (let t = ini; t < fin - 1e-9; t += PASO) {
+      if (esPasado(fechaISO, t) || bloqueadoPorHorario(fechaISO, Math.floor(t + 1e-9))) return false;
     }
     return true;
   }
 
+  // Clic en la cuadrícula: elige la HORA de inicio (1 hora por defecto). Los minutos exactos de inicio y fin
+  // se ajustan después con los selectores de cuarto de hora (abajo del calendario).
   function clickSlot(fechaISO: string, hora: number) {
     if (estaOcupado(fechaISO, hora) || esPasado(fechaISO, hora) || bloqueadoPorHorario(fechaISO, hora)) return;
-
-    if (!seleccion || seleccion.fecha !== fechaISO) {
-      setSeleccion({ fecha: fechaISO, horaInicio: hora, horaFin: hora + 1 });
-    } else if (hora === seleccion.horaInicio) {
+    // Clic en la hora ya elegida: desmarca.
+    if (seleccion && seleccion.fecha === fechaISO && Math.floor(seleccion.horaInicio + 1e-9) === hora) {
       setSeleccion(null);
-    } else if (hora > seleccion.horaInicio) {
-      const duracionNueva = hora + 1 - seleccion.horaInicio;
-      // Horas Bolsa se topa en el banco de horas restante — no se puede
-      // exceder, ni pagando (a diferencia de Sala de Juntas).
-      if (esBolsaActual && duracionNueva > horasDisponiblesReales) return;
-      if (rangoLibre(fechaISO, seleccion.horaInicio, hora + 1)) {
-        setSeleccion({ ...seleccion, horaFin: hora + 1 });
-      }
-    } else {
-      const duracionNueva = seleccion.horaFin - hora;
-      if (esBolsaActual && duracionNueva > horasDisponiblesReales) return;
-      if (rangoLibre(fechaISO, hora, seleccion.horaFin)) {
-        setSeleccion({ fecha: fechaISO, horaInicio: hora, horaFin: seleccion.horaFin });
-      }
+      return;
     }
+    // 1 hora por defecto si está libre; si no, el primer cuarto libre.
+    let fin = hora + 1;
+    if (!rangoLibre(fechaISO, hora, fin)) fin = hora + PASO;
+    if (esBolsaActual && (fin - hora) > horasDisponiblesReales + 1e-9) fin = hora + PASO;
+    setSeleccion({ fecha: fechaISO, horaInicio: hora, horaFin: fin });
   }
 
+  // Ajusta el minuto de INICIO (dentro de su hora) desde el selector de cuartos.
+  function cambiarInicio(nuevoInicio: number) {
+    if (!seleccion) return;
+    let fin = seleccion.horaFin;
+    if (fin <= nuevoInicio + 1e-9) fin = nuevoInicio + PASO;
+    if (!rangoLibre(seleccion.fecha, nuevoInicio, fin)) return;
+    setSeleccion({ ...seleccion, horaInicio: nuevoInicio, horaFin: fin });
+  }
+
+  // Ajusta la hora/minuto de FIN desde el selector de cuartos.
+  function cambiarFin(nuevoFin: number) {
+    if (!seleccion || nuevoFin <= seleccion.horaInicio + 1e-9) return;
+    if (esBolsaActual && (nuevoFin - seleccion.horaInicio) > horasDisponiblesReales + 1e-9) return;
+    if (!rangoLibre(seleccion.fecha, seleccion.horaInicio, nuevoFin)) return;
+    setSeleccion({ ...seleccion, horaFin: nuevoFin });
+  }
+
+  // Fines válidos (cuartos de hora) desde el inicio actual, hasta el primer choque / fuera del tope.
+  function finesValidos(): number[] {
+    if (!seleccion) return [];
+    const out: number[] = [];
+    const tope = Math.min(24, seleccion.horaInicio + 12);
+    for (let f = seleccion.horaInicio + PASO; f <= tope + 1e-9; f += PASO) {
+      if (!rangoLibre(seleccion.fecha, seleccion.horaInicio, f)) break;
+      if (esBolsaActual && (f - seleccion.horaInicio) > horasDisponiblesReales + 1e-9) break;
+      out.push(Number(f.toFixed(2)));
+    }
+    return out;
+  }
+
+  // Duración real (puede traer cuartos de hora, ej. 1.5) y horas que se COBRAN: la hora entera, redondeando
+  // hacia arriba (1 h 15 → 2 h; 0 h 45 → 1 h). El bloqueo del calendario sí es exacto; el cobro es por hora.
   const duracionSeleccion = seleccion ? seleccion.horaFin - seleccion.horaInicio : 0;
+  const horasCobradas = Math.ceil(duracionSeleccion - 1e-9);
   const esRoomDeJuntas = !esBolsaActual;
-  const horasIncluidas = esRoomDeJuntas ? Math.min(duracionSeleccion, horasDisponiblesReales) : duracionSeleccion;
-  const horasExtra = esRoomDeJuntas ? Math.max(duracionSeleccion - horasDisponiblesReales, 0) : 0;
+  // Sala de Juntas cobra/descuenta por hora entera (redondeo arriba). Horas Cowork descuenta la fracción real del banco.
+  const horasConsumidas = esRoomDeJuntas ? horasCobradas : duracionSeleccion;
+  const horasIncluidas = esRoomDeJuntas ? Math.min(horasCobradas, horasDisponiblesReales) : duracionSeleccion;
+  const horasExtra = esRoomDeJuntas ? Math.max(horasCobradas - horasDisponiblesReales, 0) : 0;
   const costoExtra = horasExtra * precioHoraExtra;
   const seleccionFueraHorario = useMemo(() => {
     if (!seleccion || esBolsaActual) return false;
-    for (let h = seleccion.horaInicio; h < seleccion.horaFin; h++) {
+    for (let h = Math.floor(seleccion.horaInicio + 1e-9); h < Math.ceil(seleccion.horaFin - 1e-9); h++) {
       if (esFueraDeHorario(seleccion.fecha, h)) return true;
     }
     return false;
@@ -515,8 +571,8 @@ function ReservacionesInner() {
         espacio,
         fecha: seleccion.fecha,
         hora: horarioTexto,
-        hora_inicio: `${String(seleccion.horaInicio).padStart(2, "0")}:00`,
-        hora_fin: `${String(seleccion.horaFin).padStart(2, "0")}:00`,
+        hora_inicio: aHHMM(seleccion.horaInicio),
+        hora_fin: aHHMM(seleccion.horaFin),
         centro,
         estado: "pendiente",
         fuera_horario: seleccionFueraHorario,
@@ -811,7 +867,7 @@ function ReservacionesInner() {
                       const sel =
                         seleccion &&
                         seleccion.fecha === fechaISO &&
-                        h >= seleccion.horaInicio &&
+                        h >= Math.floor(seleccion.horaInicio + 1e-9) &&
                         h < seleccion.horaFin;
                       return (
                         <div
@@ -889,9 +945,36 @@ function ReservacionesInner() {
                     {formatHora(seleccion.horaInicio)} - {formatHora(seleccion.horaFin)}
                   </span>
                 </div>
+                <div className="resumen-reserva-row" style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                  <label style={{ flex: 1, minWidth: 110 }}>
+                    <span className="resumen-reserva-label" style={{ display: "block" }}>Inicio</span>
+                    <select value={seleccion.horaInicio} onChange={(e) => cambiarInicio(Number(e.target.value))} style={{ width: "100%" }}>
+                      {[0, 0.25, 0.5, 0.75].map((q) => {
+                        const v = Math.floor(seleccion.horaInicio + 1e-9) + q;
+                        return (
+                          <option key={v} value={v}>
+                            {formatHora(v)}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                  <label style={{ flex: 1, minWidth: 110 }}>
+                    <span className="resumen-reserva-label" style={{ display: "block" }}>Termina</span>
+                    <select value={seleccion.horaFin} onChange={(e) => cambiarFin(Number(e.target.value))} style={{ width: "100%" }}>
+                      {finesValidos().map((f) => (
+                        <option key={f} value={f}>
+                          {formatHora(f)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="resumen-reserva-row">
                   <span className="resumen-reserva-label">Duración</span>
-                  <span className="resumen-reserva-val">{duracionSeleccion} hora(s)</span>
+                  <span className="resumen-reserva-val">
+                    {duracionSeleccion} h{esRoomDeJuntas && horasCobradas !== duracionSeleccion ? ` · se cobran ${horasCobradas} h` : ""}
+                  </span>
                 </div>
                 {esRoomDeJuntas ? (
                   <div className="nota-info">
@@ -903,13 +986,13 @@ function ReservacionesInner() {
                         <b>${costoExtra.toLocaleString("es-MX")}</b> — se le cobrarán aparte.
                       </>
                     ) : (
-                      `Te quedarán ${horasDisponiblesReales - duracionSeleccion} hora(s) del mes después de esta reserva`
+                      `Te quedarán ${horasDisponiblesReales - horasConsumidas} hora(s) del mes después de esta reserva`
                     )}
                   </div>
                 ) : (
                   <>
                     <div className="nota-info">
-                      Te quedarán {fmtHoras(horasDisponiblesReales - duracionSeleccion)} hora(s) Cowork
+                      Te quedarán {fmtHoras(horasDisponiblesReales - horasConsumidas)} hora(s) Cowork
                       {ventanaBolsa?.porVigencia ? " de tu paquete" : " del mes"} después de esta reserva
                     </div>
                     <div className="nota-info">
