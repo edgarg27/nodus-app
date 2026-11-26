@@ -16,8 +16,28 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Firma para Google Play: lee mobile/android/keystore.properties (NO se sube a git; ver
+    // keystore.properties.ejemplo). Sin ese archivo, la versión release sale sin firmar.
+    def propsFirma = new Properties()
+    def archivoFirma = rootProject.file("keystore.properties")
+    if (archivoFirma.exists()) {
+        archivoFirma.withInputStream { propsFirma.load(it) }
+    }
+    signingConfigs {
+        release {
+            if (archivoFirma.exists()) {
+                storeFile rootProject.file(propsFirma["storeFile"])
+                storePassword propsFirma["storePassword"]
+                keyAlias propsFirma["keyAlias"]
+                keyPassword propsFirma["keyPassword"]
+            }
+        }
+    }
     buildTypes {
         release {
+            if (archivoFirma.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
