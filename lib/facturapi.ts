@@ -9,7 +9,7 @@
 import Facturapi from "facturapi";
 import { esFacturaSimulada } from "@/lib/facturaSimulada";
 import { createAdminClient } from "@/lib/supabaseAdmin";
-import { normalizarDatosFiscales, esPublicoGeneral, usosParaTipo } from "@/lib/datosFiscales";
+import { normalizarDatosFiscales, esPublicoGeneral, esFacturaGlobal, usosParaTipo } from "@/lib/datosFiscales";
 import type { CfdiConcepto, CfdiImpuesto } from "@/lib/cfdi";
 import { servicioPorClave } from "@/lib/catalogoServicios";
 import { cuentaPredialDeSerie, lineaConCuentaPredial, serieCentro } from "@/lib/centros";
@@ -206,9 +206,9 @@ async function prepararFactura(admin: Admin, p: ParametrosCfdi) {
     ...(p.condiciones ? { conditions: p.condiciones } : {}),
     ...(p.relacion && p.relacion.uuids.length > 0 ? { related_documents: [{ relationship: p.relacion.tipo, documents: p.relacion.uuids }] } : {}),
     ...(p.cuentaPago ? { pdf_custom_section: `No. cuenta de pago: ${p.cuentaPago.replace(/[<>&]/g, "")}` } : {}),
-    // El SAT exige el nodo "Información Global" cuando el receptor es
-    // público en general (XAXX010101000): se factura como resumen diario.
-    ...(publicoGeneral
+    // El SAT exige el nodo "Información Global" cuando el receptor es público en general (XAXX010101000) con el
+    // nombre "PUBLICO EN GENERAL": se factura como resumen diario. Con otro nombre (el de la persona) es nominativa.
+    ...(esFacturaGlobal(datos)
       ? { global: { periodicity: p.periodicidad || "day", months: p.periodicidad === "two_months" ? String(12 + Math.ceil((hoy.getMonth() + 1) / 2)) : String(hoy.getMonth() + 1).padStart(2, "0"), year: hoy.getFullYear() } }
       : {}),
   };

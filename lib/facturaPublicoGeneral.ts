@@ -5,7 +5,7 @@
 
 import { createAdminClient } from "@/lib/supabaseAdmin";
 import { timbrarCfdi, ErrorFacturacion, cpLugarExpedicion } from "@/lib/facturapi";
-import { DATOS_PUBLICO_GENERAL } from "@/lib/datosFiscales";
+import { DATOS_PUBLICO_GENERAL, nombrePublicoGeneral } from "@/lib/datosFiscales";
 import { serieCentro } from "@/lib/centros";
 import { FORMAS_PAGO_COMPLEMENTO } from "@/lib/formasPagoComplemento";
 import { hoyMexicoISO } from "@/lib/fechaMexico";
@@ -16,7 +16,7 @@ export type ResultadoPublicoGeneral = { ok: boolean; facturaId?: string; uuid?: 
 
 export async function facturarPublicoGeneral(
   admin: Admin,
-  p: { centro: string; concepto: string; monto: number; formaPago: string; adicionalTipo?: string | null }
+  p: { centro: string; concepto: string; monto: number; formaPago: string; adicionalTipo?: string | null; nombre?: string | null }
 ): Promise<ResultadoPublicoGeneral> {
   try {
     const concepto = (p.concepto || "").trim();
@@ -30,7 +30,8 @@ export async function facturarPublicoGeneral(
     // En CFDI 4.0 el código postal de público en general es el del lugar de expedición del emisor.
     const cp = await cpLugarExpedicion();
     const { invoice, datosFactura } = await timbrarCfdi(admin, {
-      cliente: { ...DATOS_PUBLICO_GENERAL, cp_fiscal: cp, email: null },
+      // Con nombre (la persona o como la identifiquen) sale nominativa; sin nombre, factura global.
+      cliente: { ...DATOS_PUBLICO_GENERAL, nombre_fiscal: nombrePublicoGeneral(p.nombre), cp_fiscal: cp, email: null },
       concepto,
       monto,
       adicionalTipo: p.adicionalTipo || null,

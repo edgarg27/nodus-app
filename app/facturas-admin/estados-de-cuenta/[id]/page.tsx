@@ -238,7 +238,8 @@ export default function EstadoDeCuentaPage() {
   const simulada = esFacturaSimulada(factura?.uuid_cfdi);
   const sePuedeTimbrar = !!factura && !timbrada && !!factura.user_id && factura.estado !== "cancelada";
   const avisos = cliente ? avisosDatosFiscales(cliente) : [];
-  const esPublicoGeneral = cliente?.rfc === "XAXX010101000";
+  // Factura global: RFC de público en general con ese nombre (con el nombre de la persona es nominativa, sin periodicidad).
+  const esPublicoGeneral = cliente?.rfc === "XAXX010101000" && (!cliente?.nombre_fiscal || cliente.nombre_fiscal.trim().toUpperCase() === "PUBLICO EN GENERAL");
   const faltanDatos = !!cliente && !(cliente.rfc && cliente.nombre_fiscal && cliente.regimen_fiscal && cliente.cp_fiscal);
 
   // Valida lo del cuadro Facturar; devuelve el mensaje de error o "".

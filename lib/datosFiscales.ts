@@ -133,9 +133,21 @@ export function esPublicoGeneral(rfc: string) {
   return normalizarRfc(rfc) === RFC_PUBLICO_GENERAL;
 }
 
-// Si el RFC es el de público en general, el nombre, régimen y uso van fijos.
+// Con el RFC de público en general se puede poner el nombre de la persona (u otro con el que se le identifique)
+// en vez de "PUBLICO EN GENERAL": la factura sale nominativa. Solo con "PUBLICO EN GENERAL" es factura global
+// (el SAT exige el nodo de información global con ese RFC y ese nombre).
+export function nombrePublicoGeneral(nombre: string | null | undefined): string {
+  const n = String(nombre || "").trim().replace(/\s+/g, " ").toUpperCase();
+  return n || DATOS_PUBLICO_GENERAL.nombre_fiscal;
+}
+
+export function esFacturaGlobal(d: { rfc: string; nombre_fiscal?: string | null }): boolean {
+  return esPublicoGeneral(d.rfc) && nombrePublicoGeneral(d.nombre_fiscal) === DATOS_PUBLICO_GENERAL.nombre_fiscal;
+}
+
+// Si el RFC es el de público en general, el régimen y el uso van fijos; el nombre se respeta si lo escribieron.
 export function normalizarDatosFiscales(d: DatosFiscales): DatosFiscales {
-  return esPublicoGeneral(d.rfc) ? { ...d, ...DATOS_PUBLICO_GENERAL } : d;
+  return esPublicoGeneral(d.rfc) ? { ...d, ...DATOS_PUBLICO_GENERAL, nombre_fiscal: nombrePublicoGeneral(d.nombre_fiscal) } : d;
 }
 
 // RFC de persona física (13) o moral (12), más los genéricos del SAT.
