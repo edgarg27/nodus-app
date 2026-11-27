@@ -70,6 +70,8 @@ export default function FormularioNuevaFactura({
   const [busqueda, setBusqueda] = useState("");
   const [clienteId, setClienteId] = useState("");
   const [publicoGeneral, setPublicoGeneral] = useState(false);
+  // Público en general: nombre opcional (la persona o como la identifiquen). Vacío = "PUBLICO EN GENERAL" (factura global).
+  const [nombrePublico, setNombrePublico] = useState("");
 
   const [pagosSueltos, setPagosSueltos] = useState<PagoSuelto[]>([]);
   const [pagosSel, setPagosSel] = useState<string[]>([]);
@@ -238,11 +240,11 @@ export default function FormularioNuevaFactura({
         const res = await fetch("/api/facturas/publico-general", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ centro, concepto: concepto.trim(), monto: montoNum, formaPago, adicionalTipo: tipo || null }),
+          body: JSON.stringify({ centro, concepto: concepto.trim(), monto: montoNum, formaPago, adicionalTipo: tipo || null, nombre: nombrePublico.trim() || null }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) return setError(data.error || "No se pudo timbrar");
-        return onListo(`Factura ${data.folio} timbrada a público en general (${centro}).`);
+        return onListo(`Factura ${data.folio} timbrada a ${nombrePublico.trim() ? nombrePublico.trim().toUpperCase() + " (RFC genérico)" : "público en general"} (${centro}).`);
       }
       const id = await integrarCobro();
       if (!id) return;
@@ -297,12 +299,24 @@ export default function FormularioNuevaFactura({
       <div style={{ gridColumn: "span 2" }}>
         <Etiqueta texto="Cliente (razón social a quien se factura)" obligatorio />
         {publicoGeneral ? (
-          <div className="adicional-cliente-elegido">
-            <span>{DATOS_PUBLICO_GENERAL.nombre_fiscal} · {centro}</span>
-            <button type="button" className="tel-borrar-btn" onClick={() => setPublicoGeneral(false)}>
-              Cambiar
-            </button>
-          </div>
+          <>
+            <div className="adicional-cliente-elegido">
+              <span>
+                {nombrePublico.trim() ? nombrePublico.trim().toUpperCase() : DATOS_PUBLICO_GENERAL.nombre_fiscal} · {DATOS_PUBLICO_GENERAL.rfc} · {centro}
+              </span>
+              <button type="button" className="tel-borrar-btn" onClick={() => setPublicoGeneral(false)}>
+                Cambiar
+              </button>
+            </div>
+            <input
+              type="text"
+              maxLength={200}
+              style={{ marginTop: 8 }}
+              placeholder="Nombre de la persona (opcional): si lo dejas vacío dice PUBLICO EN GENERAL"
+              value={nombrePublico}
+              onChange={(e) => setNombrePublico(e.target.value.toUpperCase())}
+            />
+          </>
         ) : cliente ? (
           <div className="adicional-cliente-elegido">
             <span>{razonSocial(cliente)}</span>
@@ -503,7 +517,11 @@ export default function FormularioNuevaFactura({
             <div className="prev-bloque">
               <p className="prev-titulo">Receptor</p>
               {publicoGeneral ? (
-                <p className="prev-dato">{DATOS_PUBLICO_GENERAL.nombre_fiscal} · {DATOS_PUBLICO_GENERAL.rfc} · Régimen {DATOS_PUBLICO_GENERAL.regimen_fiscal} · Uso {DATOS_PUBLICO_GENERAL.uso_cfdi}</p>
+                <p className="prev-dato">
+                  {nombrePublico.trim() ? nombrePublico.trim().toUpperCase() : DATOS_PUBLICO_GENERAL.nombre_fiscal} · {DATOS_PUBLICO_GENERAL.rfc} · Régimen {DATOS_PUBLICO_GENERAL.regimen_fiscal} · Uso{" "}
+                  {DATOS_PUBLICO_GENERAL.uso_cfdi}
+                  {nombrePublico.trim() ? " · nominativa" : " · factura global"}
+                </p>
               ) : cliente ? (
                 <>
                   <p className="prev-dato">{cliente.nombre_fiscal || "—"} · {cliente.rfc || "—"}</p>

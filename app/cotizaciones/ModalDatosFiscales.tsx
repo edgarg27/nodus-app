@@ -161,7 +161,17 @@ export default function ModalDatosFiscales({
             <p className="sub-label" style={{ marginTop: 8 }}>
               {tipo === "moral" ? "Razón social" : "Nombre completo"} (como aparece en su constancia fiscal)
             </p>
-            <input style={estiloCampo} disabled={publico} value={f.nombre_fiscal} onChange={(e) => setF({ ...f, nombre_fiscal: e.target.value })} />
+            <input
+              style={estiloCampo}
+              value={f.nombre_fiscal}
+              onChange={(e) => setF({ ...f, nombre_fiscal: e.target.value })}
+              placeholder={publico ? "PUBLICO EN GENERAL, o el nombre de la persona" : ""}
+            />
+            {publico && (
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: "#7a8399" }}>
+                Puedes poner el nombre de la persona para identificarla; si lo dejas como PUBLICO EN GENERAL, sale como factura global.
+              </p>
+            )}
             <p className="sub-label" style={{ marginTop: 8 }}>
               Régimen fiscal
             </p>

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const { centro, concepto, monto, formaPago, adicionalTipo } = await req.json();
+  const { centro, concepto, monto, formaPago, adicionalTipo, nombre } = await req.json();
   if (typeof centro !== "string" || !centro || typeof concepto !== "string" || typeof formaPago !== "string" || typeof monto !== "number") {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
   }
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     monto,
     formaPago,
     adicionalTipo: typeof adicionalTipo === "string" && adicionalTipo ? adicionalTipo : null,
+    nombre: typeof nombre === "string" ? nombre.slice(0, 200) : null,
   });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
   return NextResponse.json({ ok: true, facturaId: r.facturaId, uuid: r.uuid, folio: r.folio });

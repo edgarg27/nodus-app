@@ -6,6 +6,7 @@ import { accesoCliente } from "@/lib/facturasAcceso";
 import { leerCorreosExtra } from "@/lib/correosFactura";
 import {
   DATOS_PUBLICO_GENERAL,
+  nombrePublicoGeneral,
   RFC_PUBLICO_GENERAL,
   domicilioParaGuardar,
   normalizarRfc,
@@ -69,7 +70,8 @@ export async function POST(req: NextRequest) {
     } catch {
       // Sin acceso a Facturapi se queda el que escribieron; al timbrar se valida.
     }
-    datos = { ...datos, ...DATOS_PUBLICO_GENERAL, cp_fiscal: cp };
+    // El nombre se respeta (la persona o como la identifiquen); vacío = "PUBLICO EN GENERAL".
+    datos = { ...datos, ...DATOS_PUBLICO_GENERAL, nombre_fiscal: nombrePublicoGeneral(datos.nombre_fiscal), cp_fiscal: cp };
   }
   // El tipo de persona sale del RFC: 12 caracteres es empresa (moral), 13 es persona física.
   const tipo: TipoPersonaFiscal = datos.rfc.length === 12 ? "moral" : "fisica";
