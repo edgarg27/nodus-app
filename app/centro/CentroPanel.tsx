@@ -1887,6 +1887,9 @@ export default function CentroPanel({
     setCancelandoCentro(null);
     setMotivoCancelCentro("");
     fetchTodo(centro);
+    // El calendario de disponibilidad se alimenta aparte (calReservas); sin esto
+    // el bloque cancelado se quedaba pintado hasta recargar la página.
+    fetchCalReservas();
   }
 
   // Recepción registra que el cliente llegó a usar sus Horas Cowork: las horas
